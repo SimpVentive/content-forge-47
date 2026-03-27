@@ -15,6 +15,7 @@ interface OutputPanelProps {
 
 const tabs = [
   { key: "outline" as const, label: "Outline", icon: BookOpen },
+  { key: "videos" as const, label: "Videos", icon: Youtube },
   { key: "script" as const, label: "Script", icon: FileText },
   { key: "assessment" as const, label: "Assessment", icon: ClipboardCheck },
   { key: "preview" as const, label: "Learner Preview", icon: Play },
