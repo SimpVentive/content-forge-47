@@ -38,6 +38,7 @@ export function useAgentPipeline() {
   const [rawOutputs, setRawOutputs] = useState<RawAgentOutputs>(initialRaw());
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const cancelledRef = useRef(false);
 
   const addLog = useCallback((msg: string) => {
     setLogs((prev) => [...prev, `${timestamp()} ${msg}`]);
