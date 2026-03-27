@@ -18,7 +18,7 @@ const Index = () => {
   );
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
 
-  const { agents, outputData, rawOutputs, logs, isRunning, runPipeline } = useAgentPipeline();
+  const { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline } = useAgentPipeline();
 
   const handleGenerate = () => {
     runPipeline(courseTitle, inputText, agentToggles);
