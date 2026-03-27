@@ -175,6 +175,7 @@ export function useAgentPipeline() {
           addLog, "Compliance Agent"
         );
         setStatus("compliance", "complete");
+        setRawOutputs((prev) => ({ ...prev, compliance: complianceResult }));
         setOutputData((prev) => ({
           ...prev,
           outline: prev.outline + `\n\n---\n\n## Compliance Report\n\n${complianceResult}`,
