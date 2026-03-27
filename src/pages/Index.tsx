@@ -31,8 +31,8 @@ const Index = () => {
         <div className="flex items-center gap-2.5">
           <img src={contentForgeLogo} alt="ContentForge" className="w-9 h-9 rounded-lg" />
         </div>
-        <span className="absolute left-1/2 -translate-x-1/2 text-[24px] font-[800] text-foreground tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
-          Content<span className="bg-gradient-to-r from-[hsl(var(--primary))] to-[#7c3aed] bg-clip-text text-transparent">Forge</span>
+        <span className="absolute left-1/2 -translate-x-1/2 text-[28px] font-[800] text-foreground tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
+          ContentForge
         </span>
         <button className="h-[44px] px-5 bg-primary text-primary-foreground rounded-lg text-[15px] font-bold shadow-btn-primary hover:brightness-110 transition-all duration-[180ms] flex items-center gap-2">
           <Plus className="w-4 h-4" />
