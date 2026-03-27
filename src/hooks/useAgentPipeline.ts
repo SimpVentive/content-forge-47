@@ -76,6 +76,7 @@ export function useAgentPipeline() {
 
     try {
       // ──── AGENT 1: Research ────
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       if (toggles["research"] !== false) {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
