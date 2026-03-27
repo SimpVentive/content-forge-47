@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData } from "@/types/agents";
+import { supabase } from "@/integrations/supabase/client";
 
 const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
@@ -12,152 +13,13 @@ const timestamp = () => {
 };
 
 async function callClaude(systemPrompt: string, userMessage: string): Promise<string> {
-  // Since we don't have a backend proxy, we'll simulate the API call
-  // In production, this would call an edge function
-  await new Promise((r) => setTimeout(r, 2000 + Math.random() * 2000));
+  const { data, error } = await supabase.functions.invoke("claude", {
+    body: { systemPrompt, userMessage },
+  });
 
-  // Simulate based on the system prompt
-  if (systemPrompt.includes("Research Agent")) {
-    return JSON.stringify({
-      themes: [
-        "Hazard Identification & Risk Assessment",
-        "Personal Protective Equipment (PPE)",
-        "Emergency Response Procedures",
-        "Regulatory Compliance (OSHA)",
-        "Ergonomics & Injury Prevention",
-      ],
-      knowledge_areas: [
-        "Occupational Safety & Health Administration Standards",
-        "Industrial Hygiene & Hazardous Materials",
-        "Workplace Ergonomics Research",
-      ],
-      objectives: [
-        "Identify common workplace hazards in manufacturing environments",
-        "Select and properly use appropriate PPE for specific tasks",
-        "Demonstrate lockout/tagout (LOTO) procedures",
-        "Interpret Safety Data Sheets (SDS) for chemical handling",
-        "Execute emergency evacuation and response protocols",
-        "Conduct a basic job hazard analysis (JHA)",
-        "Apply ergonomic principles to reduce musculoskeletal injuries",
-        "Document and report safety incidents per OSHA guidelines",
-      ],
-    }, null, 2);
-  }
-
-  if (systemPrompt.includes("Content Architect")) {
-    return JSON.stringify({
-      course_title: "Workplace Safety for Manufacturing Teams",
-      modules: [
-        {
-          title: "Module 1: Foundations of Workplace Safety",
-          topics: [
-            { name: "Introduction to OSHA Standards", blooms_level: "Remember" },
-            { name: "Safety Culture in Manufacturing", blooms_level: "Understand" },
-            { name: "Rights and Responsibilities", blooms_level: "Understand" },
-          ],
-        },
-        {
-          title: "Module 2: Hazard Identification & Control",
-          topics: [
-            { name: "Types of Manufacturing Hazards", blooms_level: "Analyze" },
-            { name: "Job Hazard Analysis (JHA)", blooms_level: "Apply" },
-            { name: "Hierarchy of Controls", blooms_level: "Evaluate" },
-            { name: "Chemical Safety & SDS", blooms_level: "Apply" },
-          ],
-        },
-        {
-          title: "Module 3: Protective Equipment & Procedures",
-          topics: [
-            { name: "PPE Selection and Use", blooms_level: "Apply" },
-            { name: "Machine Guarding Principles", blooms_level: "Understand" },
-            { name: "Lockout/Tagout (LOTO)", blooms_level: "Apply" },
-          ],
-        },
-        {
-          title: "Module 4: Emergency Preparedness",
-          topics: [
-            { name: "Emergency Action Plans", blooms_level: "Analyze" },
-            { name: "First Aid and Incident Response", blooms_level: "Apply" },
-            { name: "Incident Reporting & Investigation", blooms_level: "Evaluate" },
-          ],
-        },
-        {
-          title: "Module 5: Ergonomics & Long-Term Safety",
-          topics: [
-            { name: "Ergonomic Risk Factors", blooms_level: "Analyze" },
-            { name: "Injury Prevention Strategies", blooms_level: "Create" },
-            { name: "Building a Personal Safety Plan", blooms_level: "Create" },
-          ],
-        },
-      ],
-    }, null, 2);
-  }
-
-  if (systemPrompt.includes("Instructional Writer")) {
-    return `# Module 1: Foundations of Workplace Safety
-
-## Introduction — Why This Matters to You
-
-Picture this: It's your first day on the manufacturing floor. The machines are humming, forklifts are moving, and there's a rhythm to everything. It feels exciting — maybe a little overwhelming. But here's what you need to know before anything else: **your safety is the most important thing in this building.**
-
-Every year, thousands of manufacturing workers are injured in preventable accidents. This module is your foundation — the knowledge that keeps you safe, confident, and compliant from day one.
-
----
-
-## Section 1: Understanding OSHA Standards
-
-You've probably heard of OSHA — the Occupational Safety and Health Administration. Think of them as the rule-makers for workplace safety in the U.S. Their standards aren't suggestions; they're legal requirements your employer must follow.
-
-Here's what matters to you:
-- **General Duty Clause**: Your employer must provide a workplace "free from recognized hazards."
-- **Right to Know**: You have the right to know about hazardous chemicals you work near — that's where Safety Data Sheets come in.
-- **Right to Report**: You can report unsafe conditions without fear of retaliation.
-
-*Example*: If you notice a missing guard on a press machine, you have both the right and responsibility to report it before anyone operates it.
-
----
-
-## Section 2: Building a Safety Culture
-
-Safety isn't just about following rules — it's a mindset. In the best manufacturing facilities, safety is part of the culture. That means:
-
-- **Speaking up** when you see something wrong
-- **Looking out** for your coworkers, not just yourself
-- **Participating** in safety meetings and training actively
-- **Leading by example**, even when no one's watching
-
-A strong safety culture reduces accidents by up to 70%. You're not just protecting yourself — you're protecting your team.
-
----
-
-## Section 3: Your Rights and Responsibilities
-
-Let's break this down simply:
-
-**Your Rights:**
-- Access to training in a language you understand
-- Access to safety records and injury logs
-- Request an OSHA inspection if you believe conditions are unsafe
-
-**Your Responsibilities:**
-- Follow all safety procedures and rules
-- Wear required PPE at all times
-- Report hazards, injuries, and near-misses immediately
-
----
-
-## Summary
-
-You now understand the foundation of workplace safety: OSHA sets the rules, your employer must follow them, and *you* play a critical role in making safety real on the floor. A strong safety culture starts with knowledge — and you've just taken the first step.
-
----
-
-## Reflection Question
-
-> Think about a time you noticed something unsafe — at work, at home, or in public. Did you say something? What would you do differently now that you understand your rights and responsibilities?`;
-  }
-
-  return "Output generated successfully.";
+  if (error) throw new Error(error.message);
+  if (data?.error) throw new Error(data.error);
+  return data.text;
 }
 
 export function useAgentPipeline() {
