@@ -33,6 +33,41 @@ interface Slide {
   video?: InsertedVideo;
 }
 
+/* ── Parse writer content into structured parts ── */
+function parseContentParts(text: string) {
+  const lines = text.split("\n").filter(l => !l.match(/^#{1,3}\s/)); // remove heading lines
+  const joined = lines.join("\n").trim();
+  const paragraphs = joined.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+
+  let hook = "";
+  let body: string[] = [];
+  let takeaway = "";
+  let challenge = "";
+
+  paragraphs.forEach((p, i) => {
+    if (i === 0) {
+      hook = p;
+    } else if (p.match(/^(Key Takeaway|Takeaway|Remember|💡)/i)) {
+      takeaway = p.replace(/^(Key Takeaway:|Takeaway:|Remember:|💡\s*)/i, "").trim();
+    } else if (p.match(/^(Challenge:|Next time|Try this:)/i) || (i === paragraphs.length - 1 && p.length < 120)) {
+      challenge = p.replace(/^(Challenge:\s*)/i, "").trim();
+    } else {
+      body.push(p);
+    }
+  });
+
+  // If no takeaway found, check last body paragraph
+  if (!takeaway && body.length > 1) {
+    const last = body[body.length - 1];
+    if (last.length < 100) {
+      takeaway = last;
+      body = body.slice(0, -1);
+    }
+  }
+
+  return { hook, body, takeaway, challenge };
+}
+
 /* ── build slides from agent outputs ── */
 function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = []): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
@@ -44,10 +79,10 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   let modules: Module[] = [];
   if (archData) {
     const mods = archData.modules || archData.course_structure?.modules || archData.course_modules || [];
-    modules = mods.map((m: any) => ({
-      title: m.module_title || m.title || m.name || "Untitled Module",
-      topics: (m.topics || m.sections || m.lessons || []).map((t: any) =>
-        typeof t === "string" ? t : t.topic_title || t.title || t.name || "Untitled Topic"
+    modules = mods.map((m: any, mi: number) => ({
+      title: m.module_title || m.title || m.name || `Module ${mi + 1}`,
+      topics: (m.topics || m.sections || m.lessons || []).map((t: any, ti: number) =>
+        typeof t === "string" ? t : t.topic_title || t.title || t.name || `Module ${mi + 1} — Part ${ti + 1}`
       ),
     }));
   }
@@ -59,19 +94,23 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   // Extract MCQs
   const mcqs = assessData?.mcq || [];
 
-  // Extract infographic SVGs from visual data
-  const infographics: string[] = [];
-  if (visualData?.modules) {
-    visualData.modules.forEach((m: any) => {
-      infographics.push(m.infographic_description || "");
-    });
-  }
+  // Extract generated SVGs
+  const generatedSvgs: string[] = visualData?.generatedSvgs || [];
 
   // Build slides
   const slides: Slide[] = [];
   
-  // Split writer content into rough sections
-  const writerSections = writerText.split(/(?=#{1,3}\s)/).filter(Boolean);
+  // Split writer content by ## headers to map to topics
+  const writerSections: Record<string, string> = {};
+  const sectionRegex = /##\s+(.+?)\n([\s\S]*?)(?=\n##\s|\n$|$)/g;
+  let match;
+  while ((match = sectionRegex.exec(writerText)) !== null) {
+    writerSections[match[1].trim().toLowerCase()] = match[2].trim();
+  }
+  // Also split by heading for fallback
+  const writerParts = writerText.split(/(?=##\s)/).filter(Boolean);
+
+  let topicCounter = 0;
 
   modules.forEach((mod, mi) => {
     // 1. Title slide
@@ -79,7 +118,15 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
 
     // 2. Content slides — one per topic
     mod.topics.forEach((topic, ti) => {
-      const sectionText = writerSections[ti] || `Content for ${topic} will appear here after running the pipeline.`;
+      // Try to match writer section by topic name
+      let sectionText = writerSections[topic.toLowerCase()] || "";
+      if (!sectionText && writerParts[topicCounter]) {
+        sectionText = writerParts[topicCounter].replace(/^##\s+.+\n/, "").trim();
+      }
+      if (!sectionText) {
+        sectionText = `Content for "${topic}" will appear here after running the pipeline.`;
+      }
+      
       slides.push({
         type: "content",
         moduleIndex: mi,
@@ -87,8 +134,9 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         topicIndex: ti,
         topicTitle: topic,
         content: sectionText,
-        infographicSvg: ti === 0 ? infographics[mi] : undefined,
+        infographicSvg: ti === 0 ? (generatedSvgs[mi] || "") : undefined,
       });
+      topicCounter++;
     });
 
     // 3. Assessment slide
@@ -147,6 +195,23 @@ const Confetti: React.FC = () => {
   );
 };
 
+/* ── Waveform Bars ── */
+const WaveformBars: React.FC<{ playing: boolean }> = ({ playing }) => (
+  <div className="flex items-end gap-[3px] h-5">
+    {[0, 1, 2, 3].map(i => (
+      <div
+        key={i}
+        className="w-[3px] rounded-full"
+        style={{
+          backgroundColor: "#4f46e5",
+          height: playing ? undefined : "4px",
+          animation: playing ? `waveBar 0.6s ease-in-out ${i * 0.1}s infinite` : "none",
+        }}
+      />
+    ))}
+  </div>
+);
+
 /* ── Main component ── */
 interface LearnerPreviewProps {
   courseTitle: string;
@@ -164,17 +229,104 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [startTime] = useState(Date.now());
   const [showCompletion, setShowCompletion] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
   const progress = ((currentSlide + 1) / totalSlides) * 100;
 
+  // Get narration sections
+  const voiceParsed = tryParseJSON(rawOutputs.voice);
+  const narrationSections = voiceParsed?.sections || [];
+
+  // Narration text for current slide
+  const getNarrationForSlide = useCallback((slideIdx: number) => {
+    if (!narrationSections.length) return "";
+    const contentSlides = slides.filter(s => s.type === "content");
+    const s = slides[slideIdx];
+    if (s?.type !== "content") return "";
+    const contentIdx = contentSlides.indexOf(s);
+    if (contentIdx >= 0 && narrationSections[contentIdx]) {
+      return narrationSections[contentIdx].narration_text || "";
+    }
+    return "";
+  }, [slides, narrationSections]);
+
+  // Auto-play narration on slide change
+  useEffect(() => {
+    // Stop current audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+      setIsPlaying(false);
+    }
+
+    // Check for audio — attempt to fetch from VoicePreview's generated audio
+    // For now, we use the narration text existence to show the player
+    // Auto-play would require pre-generated audio URLs (from ElevenLabs)
+    // The floating player will show the state
+  }, [currentSlide]);
+
+  // Generate and auto-play TTS for content slides
+  useEffect(() => {
+    const narrationText = getNarrationForSlide(currentSlide);
+    if (!narrationText || muted) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({
+              text: narrationText.slice(0, 2500),
+              voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah
+            }),
+          }
+        );
+        if (!response.ok) return;
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audio.muted = muted;
+        audioRef.current = audio;
+        audio.onplay = () => setIsPlaying(true);
+        audio.onended = () => setIsPlaying(false);
+        audio.onpause = () => setIsPlaying(false);
+        await audio.play().catch(() => {});
+      } catch {
+        // TTS unavailable, fail silently
+      }
+    }, 800); // delay for animations
+
+    return () => {
+      clearTimeout(timer);
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+        setIsPlaying(false);
+      }
+    };
+  }, [currentSlide, muted, getNarrationForSlide]);
+
+  // Mute/unmute live
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.muted = muted;
+    }
+  }, [muted]);
+
   // Mark visited
   useEffect(() => {
     setVisited(prev => new Set(prev).add(currentSlide));
     if (currentSlide === totalSlides - 1 && slides[currentSlide]?.type === "summary") {
-      // Check if this is the last module's summary
       const lastModuleIdx = modules.length - 1;
       if (slide.moduleIndex === lastModuleIdx) {
         setTimeout(() => setShowCompletion(true), 500);
@@ -201,22 +353,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     if (currentSlide > 0) setCurrentSlide(c => c - 1);
   }, [currentSlide]);
 
-  // Get narration sections
-  const voiceParsed = tryParseJSON(rawOutputs.voice);
-  const narrationSections = voiceParsed?.sections || [];
-
-  // Get slides for current module
   const currentModuleSlides = slides
     .map((s, i) => ({ ...s, idx: i }))
     .filter(s => s.moduleIndex === slide.moduleIndex);
 
-  // Build sidebar TOC
   const toc = modules.map((mod, mi) => ({
     title: mod.title,
     moduleIndex: mi,
-    slides: slides
-      .map((s, i) => ({ ...s, idx: i }))
-      .filter(s => s.moduleIndex === mi),
+    slides: slides.map((s, i) => ({ ...s, idx: i })).filter(s => s.moduleIndex === mi),
   }));
 
   const formatElapsed = () => {
@@ -243,17 +387,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     setScore(prev => ({ correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1 }));
   };
 
-  // Narration text for current slide
-  const getNarrationText = () => {
-    if (!narrationSections.length) return "";
-    // Map slide to narration section roughly
-    const contentSlides = slides.filter(s => s.type === "content");
-    const contentIdx = contentSlides.indexOf(slide as any);
-    if (contentIdx >= 0 && narrationSections[contentIdx]) {
-      return narrationSections[contentIdx].narration_text || "";
-    }
-    return "";
-  };
+  const currentNarration = getNarrationForSlide(currentSlide);
 
   /* ── COMPLETION SCREEN ── */
   if (showCompletion) {
@@ -278,10 +412,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <p className="text-[13px] text-white/50">Time Taken</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all"
-          >
+          <button onClick={onClose} className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all">
             Close Preview
           </button>
         </div>
@@ -294,8 +425,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     switch (slide.type) {
       case "title":
         return (
-          <div className="flex items-center justify-center h-full animate-fade-in">
-            <div className="w-full max-w-[800px] rounded-2xl p-12 text-center"
+          <div className="flex items-center justify-center h-full" key={currentSlide}>
+            <div className="w-full max-w-[800px] rounded-2xl p-12 text-center anim-fade-in-down"
               style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
               <p className="text-[13px] font-bold text-white/60 uppercase tracking-[3px] mb-4">
                 Module {String(slide.moduleIndex + 1).padStart(2, "0")}
@@ -310,42 +441,144 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           </div>
         );
 
-      case "content":
+      case "content": {
+        const parts = parseContentParts(slide.content || "");
+        const moduleLabel = `MODULE ${slide.moduleIndex + 1} — ${slide.moduleTitle}`.toUpperCase();
+        
         return (
-          <div className="max-w-[800px] mx-auto animate-fade-in">
+          <div className="max-w-[800px] mx-auto" key={currentSlide}>
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              <div className="h-1.5 bg-[#4f46e5]" />
-              <div className="p-7">
-                <h2 className="text-[26px] font-bold text-[#0f172a] mb-4">{slide.topicTitle}</h2>
-                <div className="text-[17px] text-[#374151] leading-[1.8] whitespace-pre-wrap">
-                  {slide.content}
-                </div>
-                {slide.infographicSvg && (
-                  <div className="mt-6 bg-slate-50 rounded-xl p-4 text-[14px] text-[#64748b] italic">
-                    📊 Infographic: {slide.infographicSvg}
+              {/* Top accent bar */}
+              <div className="h-[6px]" style={{ background: "linear-gradient(90deg, #4f46e5, #7c3aed)" }} />
+              
+              <div className="p-8">
+                {/* Module label */}
+                <p className="text-[11px] font-semibold tracking-[2px] mb-2 anim-fade-in-down"
+                  style={{ color: "#4f46e5" }}>
+                  {moduleLabel}
+                </p>
+                
+                {/* Topic title */}
+                <h2 className="text-[28px] font-[800] mb-6 anim-fade-in-down"
+                  style={{ color: "#0f172a", animationDelay: "0.1s" }}>
+                  {slide.topicTitle}
+                </h2>
+
+                {/* Hook paragraph — special styling */}
+                {parts.hook && (
+                  <div className="mb-5 rounded-lg p-4 anim-fade-in-up"
+                    style={{
+                      borderLeft: "3px solid #4f46e5",
+                      background: "rgba(79,70,229,0.04)",
+                      animationDelay: "0.15s",
+                    }}>
+                    <p className="text-[17px] leading-[1.8]" style={{ color: "#374151" }}>
+                      {parts.hook}
+                    </p>
                   </div>
                 )}
+
+                {/* Body paragraphs with stagger */}
+                {parts.body.map((para, pi) => (
+                  <p key={pi} className="text-[17px] leading-[1.8] mb-4 anim-fade-in-up"
+                    style={{ color: "#374151", animationDelay: `${0.3 + pi * 0.15}s` }}>
+                    {para}
+                  </p>
+                ))}
+
+                {/* SVG Infographic */}
+                {slide.infographicSvg && (
+                  <div className="my-6 rounded-xl overflow-hidden anim-scale-in"
+                    style={{ animationDelay: "0.3s" }}>
+                    <div
+                      className="w-full flex items-center justify-center bg-[#f8fafc] p-4"
+                      dangerouslySetInnerHTML={{ __html: slide.infographicSvg }}
+                    />
+                  </div>
+                )}
+
+                {/* Fallback if infographicSvg is set but empty (description only) */}
+                {slide.infographicSvg === "" && slide.topicIndex === 0 && (
+                  <div className="my-6 rounded-xl p-6 anim-scale-in"
+                    style={{ background: "#f8fafc", border: "2px dashed #e2e8f0", animationDelay: "0.3s" }}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "rgba(79,70,229,0.1)" }}>
+                        <span className="text-[18px]">📊</span>
+                      </div>
+                      <p className="text-[14px] font-semibold" style={{ color: "#0f172a" }}>Infographic</p>
+                    </div>
+                    <p className="text-[13px]" style={{ color: "#64748b" }}>Visual infographic for this module will be generated.</p>
+                  </div>
+                )}
+
+                {/* Takeaway box */}
+                {parts.takeaway && (
+                  <div className="mt-6 rounded-lg p-[14px_18px] anim-fade-in-up"
+                    style={{
+                      background: "#fffbeb",
+                      borderLeft: "4px solid #f59e0b",
+                      animationDelay: "0.5s",
+                    }}>
+                    <p className="text-[11px] font-bold uppercase tracking-[1.5px] mb-1"
+                      style={{ color: "#d97706" }}>
+                      Key Takeaway
+                    </p>
+                    <p className="text-[15px]" style={{ color: "#92400e" }}>
+                      {parts.takeaway}
+                    </p>
+                  </div>
+                )}
+
+                {/* Challenge line */}
+                {parts.challenge && (
+                  <p className="mt-4 pt-3 text-[15px] italic anim-fade-in-up"
+                    style={{
+                      color: "#6b7280",
+                      borderTop: "1px solid #f1f5f9",
+                      animationDelay: "0.6s",
+                    }}>
+                    {parts.challenge}
+                  </p>
+                )}
               </div>
-              <div className="px-7 pb-4 text-right">
-                <span className="text-[12px] font-semibold text-[#94a3b8] bg-slate-100 px-3 py-1 rounded-full">
+
+              {/* Subtitle strip for narration */}
+              {currentNarration && isPlaying && (
+                <div className="px-8 py-3" style={{ background: "rgba(15,23,42,0.85)" }}>
+                  <p className="text-[15px] text-white/90 anim-fade-in-up">
+                    {currentNarration.slice(0, 80).replace(/\[.*?\]/g, "")}…
+                  </p>
+                </div>
+              )}
+
+              <div className="px-8 pb-4 text-right">
+                <span className="text-[12px] font-semibold px-3 py-1 rounded-full"
+                  style={{ color: "#94a3b8", background: "#f1f5f9" }}>
                   Slide {currentSlide + 1}
                 </span>
               </div>
             </div>
           </div>
         );
+      }
 
       case "assessment": {
         const ans = assessmentAnswers[currentSlide];
         const q = slide.question;
         if (!q) return null;
         return (
-          <div className="max-w-[800px] mx-auto animate-fade-in">
+          <div className="max-w-[800px] mx-auto" key={currentSlide}>
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              <div className="h-1.5 bg-amber-400" />
-              <div className="p-7">
-                <p className="text-[13px] font-bold text-amber-600 uppercase tracking-wider mb-4">Knowledge Check</p>
-                <h2 className="text-[22px] font-bold text-[#0f172a] mb-6">{q.question}</h2>
+              <div className="h-[6px]" style={{ background: "linear-gradient(90deg, #f59e0b, #f97316)" }} />
+              <div className="p-8">
+                <p className="text-[13px] font-bold uppercase tracking-wider mb-4 anim-fade-in-down"
+                  style={{ color: "#d97706" }}>
+                  Knowledge Check
+                </p>
+                <h2 className="text-[22px] font-bold mb-6 anim-bounce-in"
+                  style={{ color: "#0f172a", animationDelay: "0.1s" }}>
+                  {q.question}
+                </h2>
                 <div className="space-y-3">
                   {q.options.map((opt: string, oi: number) => {
                     let style = "border-[#e2e8f0] bg-white hover:bg-[#f0f2f7]";
@@ -362,7 +595,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       <button
                         key={oi}
                         onClick={() => handleSelectAnswer(currentSlide, oi)}
-                        className={`w-full h-[52px] rounded-xl border-2 px-4 text-left text-[16px] transition-all ${style}`}
+                        className={`w-full h-[52px] rounded-xl border-2 px-4 text-left text-[16px] transition-all anim-fade-in-up ${style}`}
+                        style={{ animationDelay: `${0.2 + oi * 0.08}s` }}
                       >
                         <span className="font-semibold mr-2">{String.fromCharCode(65 + oi)}.</span>
                         {opt}
@@ -382,7 +616,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 {ans?.submitted && (
                   <div className="mt-4 space-y-3">
                     {q.rationale && (
-                      <p className="text-[14px] text-[#64748b] bg-slate-50 rounded-xl p-4">💡 {q.rationale}</p>
+                      <p className="text-[14px] bg-slate-50 rounded-xl p-4" style={{ color: "#64748b" }}>
+                        💡 {q.rationale}
+                      </p>
                     )}
                     <button
                       onClick={goNext}
@@ -401,15 +637,16 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
       case "summary":
         return (
-          <div className="flex items-center justify-center h-full animate-fade-in relative">
+          <div className="flex items-center justify-center h-full relative" key={currentSlide}>
             <Confetti />
-            <div className="w-full max-w-[800px] rounded-2xl p-12 text-center relative z-20"
+            <div className="w-full max-w-[800px] rounded-2xl p-12 text-center relative z-20 anim-fade-in-down"
               style={{ background: "linear-gradient(135deg, #4f46e5, #10b981)" }}>
               <p className="text-[13px] font-bold text-white/60 uppercase tracking-[3px] mb-4">Module Complete</p>
               <h1 className="text-[32px] font-[800] text-white leading-tight mb-6">{slide.moduleTitle}</h1>
               <div className="text-left space-y-3 max-w-[500px] mx-auto mb-8">
                 {(slide.takeaways || []).map((t, i) => (
-                  <div key={i} className="flex items-start gap-3 text-white">
+                  <div key={i} className="flex items-start gap-3 text-white anim-slide-in-left"
+                    style={{ animationDelay: `${0.2 + i * 0.1}s` }}>
                     <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center shrink-0 mt-0.5">
                       <Check className="w-3.5 h-3.5" />
                     </div>
@@ -418,17 +655,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 ))}
               </div>
               {slide.moduleIndex < modules.length - 1 ? (
-                <button
-                  onClick={goNext}
-                  className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all"
-                >
+                <button onClick={goNext}
+                  className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all">
                   Next Module →
                 </button>
               ) : (
-                <button
-                  onClick={() => setShowCompletion(true)}
-                  className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all"
-                >
+                <button onClick={() => setShowCompletion(true)}
+                  className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all">
                   Complete Course
                 </button>
               )}
@@ -445,8 +678,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const durMatch = vid.duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
         const durStr = durMatch ? `${parseInt(durMatch[2]||"0")}:${String(parseInt(durMatch[3]||"0")).padStart(2,"0")}` : "";
         return (
-          <div className="max-w-[800px] mx-auto animate-fade-in">
-            <div className="rounded-2xl overflow-hidden" style={{ background: "#0f172a" }}>
+          <div className="max-w-[800px] mx-auto" key={currentSlide}>
+            <div className="rounded-2xl overflow-hidden anim-fade-in-up" style={{ background: "#0f172a" }}>
               <div className="px-7 pt-5 flex items-center gap-2">
                 <span className="text-[12px] text-white/50 uppercase tracking-wider font-semibold">Video Resource</span>
                 <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
@@ -526,7 +759,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     ) : s.idx === currentSlide ? (
                       <div className="w-2 h-2 rounded-full bg-[#4f46e5] shrink-0" />
                     ) : s.type === "video" ? (
-                      <div className="w-2 h-2 rounded-full bg-[#ef4444] shrink-0" title={`Video clip: ${s.topicTitle}`} />
+                      <div className="w-2 h-2 rounded-full bg-[#ef4444] shrink-0" />
                     ) : (
                       <div className="w-2 h-2 rounded-full bg-white/20 shrink-0" />
                     )}
@@ -553,9 +786,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         <div className="w-[200px] shrink-0 overflow-y-auto p-4 hidden lg:block"
           style={{ background: "rgba(0,0,0,0.2)" }}>
           <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-3">Slide Notes</p>
-          {getNarrationText() ? (
+          {currentNarration ? (
             <p className="text-[12px] text-white/60 leading-relaxed whitespace-pre-wrap">
-              {getNarrationText().replace(/\[.*?\]/g, "")}
+              {currentNarration.replace(/\[.*?\]/g, "")}
             </p>
           ) : (
             <p className="text-[12px] text-white/30 italic">No narration for this slide</p>
@@ -567,23 +800,29 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         </div>
       </div>
 
-      {/* NARRATION AUDIO CONTROLS */}
+      {/* NARRATION AUDIO CONTROLS — floating player */}
       <div className="absolute bottom-[72px] left-1/2 -translate-x-1/2 z-50">
-        {getNarrationText() ? (
+        {currentNarration ? (
           <div className="flex items-center gap-3 px-5 py-2.5 rounded-full"
             style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(12px)" }}>
-            <button className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors">
-              <Play className="w-4 h-4" />
+            <button
+              onClick={() => {
+                if (audioRef.current) {
+                  if (isPlaying) { audioRef.current.pause(); }
+                  else { audioRef.current.play().catch(() => {}); }
+                }
+              }}
+              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+            >
+              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             </button>
-            <div className="flex gap-0.5">
-              {Array.from({ length: 16 }).map((_, i) => (
-                <div key={i} className="w-1 rounded-full bg-white/30" style={{ height: `${6 + Math.random() * 12}px` }} />
-              ))}
-            </div>
+            <WaveformBars playing={isPlaying} />
             <button onClick={() => setMuted(!muted)} className="text-white/60 hover:text-white transition-colors">
               {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
-            <span className="text-[11px] text-white/40">Narrated by Rachel</span>
+            <span className="text-[11px] text-white/40">
+              {isPlaying ? "Playing" : "Ready"} · Sarah
+            </span>
           </div>
         ) : (
           <p className="text-[12px] text-white/30 italic">No narration for this slide</p>
