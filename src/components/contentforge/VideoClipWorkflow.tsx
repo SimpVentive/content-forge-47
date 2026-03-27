@@ -69,24 +69,57 @@ interface VideoClipWorkflowProps {
 const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ onYes, onNo }) => (
   <div className="fixed inset-0 z-[9999] flex items-center justify-center">
     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onNo} />
-    <div className="relative bg-card rounded-2xl shadow-2xl w-[480px] max-w-[90vw] overflow-hidden">
-      <div className="p-8 text-center">
-        <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-5">
-          <Film className="w-8 h-8 text-destructive" />
+    <div className="relative bg-card rounded-2xl shadow-2xl w-[600px] max-w-[92vw] overflow-hidden" style={{ fontFamily: "'Outfit', sans-serif" }}>
+      {/* Gradient accent bar */}
+      <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #ef4444 0%, #4f46e5 50%, #7c3aed 100%)" }} />
+
+      <div className="px-10 pt-10 pb-8">
+        {/* Icon + Badge row */}
+        <div className="flex items-center justify-center gap-4 mb-7">
+          <div className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center shadow-lg" style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}>
+            <Film className="w-9 h-9 text-white" />
+          </div>
         </div>
-        <h2 className="text-[22px] font-extrabold text-foreground mb-2">Insert YouTube Videos?</h2>
-        <p className="text-[14px] text-muted-foreground leading-relaxed">
-          Would you like to browse and insert relevant YouTube video clips into your e-learning course?
+
+        <h2 className="text-[26px] font-[800] text-foreground text-center tracking-tight mb-3" style={{ fontFamily: "'Outfit', sans-serif" }}>
+          Enhance with YouTube Videos?
+        </h2>
+
+        <p className="text-[15px] text-muted-foreground text-center leading-relaxed max-w-[420px] mx-auto mb-8">
+          We found relevant YouTube videos for your course modules. Browse, clip specific segments, and insert them directly into your e-learning.
         </p>
-      </div>
-      <div className="flex border-t border-border">
-        <button onClick={onNo} className="flex-1 h-14 text-[15px] font-bold text-muted-foreground hover:bg-secondary/50 transition-all">
-          Skip for Now
-        </button>
-        <div className="w-px bg-border" />
-        <button onClick={onYes} className="flex-1 h-14 text-[15px] font-bold text-primary hover:bg-primary/5 transition-all flex items-center justify-center gap-2">
-          <Check className="w-4 h-4" /> Yes, Let's Go
-        </button>
+
+        {/* Feature highlights */}
+        <div className="grid grid-cols-3 gap-3 mb-8">
+          {[
+            { icon: "🎬", title: "Browse", desc: "Videos per module" },
+            { icon: "✂️", title: "Clip", desc: "Select time ranges" },
+            { icon: "📍", title: "Insert", desc: "Place in course" },
+          ].map((f) => (
+            <div key={f.title} className="bg-secondary/60 rounded-xl p-3.5 text-center">
+              <span className="text-[22px] block mb-1.5">{f.icon}</span>
+              <p className="text-[13px] font-bold text-foreground">{f.title}</p>
+              <p className="text-[11px] text-muted-foreground">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-3">
+          <button
+            onClick={onNo}
+            className="flex-1 h-[52px] rounded-xl text-[15px] font-bold text-muted-foreground border-2 border-border hover:bg-secondary/60 transition-all"
+          >
+            Skip for Now
+          </button>
+          <button
+            onClick={onYes}
+            className="flex-[1.5] h-[52px] rounded-xl text-[15px] font-bold text-white transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02]"
+            style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+          >
+            <Play className="w-4 h-4" /> Yes, Let's Browse Videos
+          </button>
+        </div>
       </div>
     </div>
   </div>
