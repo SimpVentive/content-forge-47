@@ -18,7 +18,7 @@ interface Module {
   topics: string[];
 }
 
-type SlideType = "title" | "content" | "assessment" | "summary";
+type SlideType = "title" | "content" | "assessment" | "summary" | "video";
 
 interface Slide {
   type: SlideType;
