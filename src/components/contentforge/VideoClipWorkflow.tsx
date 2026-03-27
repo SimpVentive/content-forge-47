@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
-import { X, Play, Scissors, Film, Check, ChevronRight, Pencil, MapPin, Plus } from "lucide-react";
+import { X, Play, Scissors, Film, Check, ChevronRight, Pencil, MapPin, Plus, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { InsertedVideo } from "./VideosTab";
 
 /* ── helpers ── */
