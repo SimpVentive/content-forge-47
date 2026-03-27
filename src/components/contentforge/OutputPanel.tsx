@@ -139,12 +139,12 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 /* ─── Package Renderer ─── */
 const PackageView: React.FC<{ raw: string }> = ({ raw }) => {
   const data = tryParseJSON(raw);
-  if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
-
-  const meta = data.metadata || {};
+  const meta = data?.metadata || {};
   const [checklist, setChecklist] = useState<boolean[]>(
-    new Array((data.deployment_checklist || []).length).fill(false)
+    new Array((data?.deployment_checklist || []).length).fill(false)
   );
+
+  if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
   return (
     <div className="space-y-6 animate-fade-in">
