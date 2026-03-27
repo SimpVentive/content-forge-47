@@ -6,7 +6,7 @@ const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
-const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", compliance: "", assessment: "", voice: "", assembly: "" });
+const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", voice: "", assembly: "" });
 
 const timestamp = () => {
   const d = new Date();
