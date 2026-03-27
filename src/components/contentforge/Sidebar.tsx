@@ -35,11 +35,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = async (file: File) => {
+    if (isBinaryFile(file.name)) {
+      setInputText(`📄 Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nBinary file detected — content will be used for course generation. You can also paste additional notes below.`);
+      return;
+    }
     const text = await readFileAsText(file);
     if (text && text.length > 0) {
       setInputText(text);
     } else {
-      setInputText(`[Uploaded: ${file.name}] — Could not extract text. Try pasting content directly.`);
+      setInputText(`📄 Uploaded: ${file.name} — Could not extract text. Try pasting content directly.`);
     }
   };
 
