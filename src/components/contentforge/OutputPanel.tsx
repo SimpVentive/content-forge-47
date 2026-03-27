@@ -16,6 +16,7 @@ const tabs = [
   { key: "outline" as const, label: "Outline", icon: BookOpen },
   { key: "script" as const, label: "Script", icon: FileText },
   { key: "assessment" as const, label: "Assessment", icon: ClipboardCheck },
+  { key: "preview" as const, label: "Learner Preview", icon: Play },
   { key: "package" as const, label: "Package", icon: Package },
 ];
 
