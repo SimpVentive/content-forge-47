@@ -98,6 +98,7 @@ export function useAgentPipeline() {
           addLog, "Content Architect"
         );
         setStatus("architect", "complete");
+        setRawOutputs((prev) => ({ ...prev, architect: archResult }));
         setOutputData((prev) => ({
           ...prev,
           outline: prev.outline + `\n\n---\n\n## Course Structure\n\n${archResult}`,
