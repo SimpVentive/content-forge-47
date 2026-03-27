@@ -8,6 +8,7 @@ const AGENT_COLORS: Record<string, string> = {
   writer: "#0e7490",
   visual: "#ec4899",
   animation: "#f97316",
+  youtube: "#ef4444",
   compliance: "#f59e0b",
   assessment: "#10b981",
   voice: "#06b6d4",
