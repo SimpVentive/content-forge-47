@@ -154,7 +154,7 @@ const VideoCard = ({ video, moduleTitle, isInserted, insertedInfo, onInsert, onR
             </div>
             <span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">{dur}</span>
             {isInserted && (
-              <span className="absolute top-1.5 left-1.5 bg-emerald-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+              <span className="absolute top-1.5 left-1.5 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
                 <Check className="w-2.5 h-2.5" /> Added
               </span>
             )}
