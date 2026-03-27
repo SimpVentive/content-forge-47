@@ -141,7 +141,7 @@ const VideoCard = ({ video, moduleTitle, isInserted, insertedInfo, onInsert, onR
           isInserted={isInserted}
         />
       )}
-      <div className={`bg-card rounded-xl border transition-all hover:shadow-md ${isInserted ? "border-emerald-400 ring-1 ring-emerald-400/20" : "border-border"}`}>
+      <div className={`bg-card rounded-xl border transition-all hover:shadow-md ${isInserted ? "border-primary ring-1 ring-primary/20" : "border-border"}`}>
         {/* Top: Thumbnail + Info Row */}
         <div className="flex gap-3 p-3">
           {/* Thumbnail */}
