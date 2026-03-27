@@ -1,5 +1,6 @@
-import React, { useRef } from "react";
-import { Zap, Upload, Square } from "lucide-react";
+import React, { useRef, useState } from "react";
+import { Zap, Upload, Square, FileText, X, Check } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SidebarProps {
   courseTitle: string;
@@ -29,23 +30,106 @@ const readFileAsText = (file: File): Promise<string> => {
   });
 };
 
+const readFileAsBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string || "";
+      // Remove data URL prefix to get raw base64
+      const base64 = result.split(",")[1] || "";
+      resolve(base64);
+    };
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+};
+
+/** Extract a clean course name from filename */
+const titleFromFilename = (filename: string): string => {
+  // Remove extension
+  let name = filename.replace(/\.[^/.]+$/, "");
+  // Replace underscores and hyphens with spaces
+  name = name.replace(/[_-]/g, " ");
+  // Remove common prefixes/suffixes
+  name = name.replace(/^\d+\s*/, ""); // leading numbers
+  // Title case
+  name = name.replace(/\b\w/g, (c) => c.toUpperCase());
+  return name.trim();
+};
+
+const MIME_MAP: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".doc": "application/msword",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".ppt": "application/vnd.ms-powerpoint",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".xls": "application/vnd.ms-excel",
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   courseTitle, setCourseTitle, inputText, setInputText,
   onGenerate, onStop, isRunning,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFileName, setUploadedFileName] = useState<string>("");
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [showTitleConfirm, setShowTitleConfirm] = useState(false);
+  const [suggestedTitle, setSuggestedTitle] = useState("");
 
   const handleFile = async (file: File) => {
+    setUploadedFileName(file.name);
+
+    // Auto-detect course title from filename
+    const detectedTitle = titleFromFilename(file.name);
+    
     if (isBinaryFile(file.name)) {
-      setInputText(`📄 Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nBinary file detected — content will be used for course generation. You can also paste additional notes below.`);
-      return;
-    }
-    const text = await readFileAsText(file);
-    if (text && text.length > 0) {
-      setInputText(text);
+      // Show extracting state
+      setIsExtracting(true);
+      setInputText(`📄 Extracting content from ${file.name}...`);
+
+      try {
+        const base64 = await readFileAsBase64(file);
+        const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+        const mimeType = MIME_MAP[ext] || file.type || "application/octet-stream";
+
+        const { data, error } = await supabase.functions.invoke("extract-document", {
+          body: { fileBase64: base64, fileName: file.name, mimeType },
+        });
+
+        if (error) throw new Error(error.message);
+        if (data?.error) throw new Error(data.error);
+
+        if (data?.text && data.text.length > 0) {
+          setInputText(data.text);
+        } else {
+          setInputText(`📄 Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nCould not extract text. You can paste additional notes below.`);
+        }
+      } catch (err) {
+        console.error("Document extraction error:", err);
+        setInputText(`📄 Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\n⚠ Could not extract content automatically. Please paste the key topics and notes manually below.`);
+      } finally {
+        setIsExtracting(false);
+      }
     } else {
-      setInputText(`📄 Uploaded: ${file.name} — Could not extract text. Try pasting content directly.`);
+      const text = await readFileAsText(file);
+      if (text && text.length > 0) {
+        setInputText(text);
+      } else {
+        setInputText(`📄 Uploaded: ${file.name} — Could not extract text. Try pasting content directly.`);
+      }
     }
+
+    // Show title confirmation if title is still default or empty
+    setSuggestedTitle(detectedTitle);
+    setShowTitleConfirm(true);
+  };
+
+  const handleConfirmTitle = (useDetected: boolean) => {
+    if (useDetected) {
+      setCourseTitle(suggestedTitle);
+    }
+    setShowTitleConfirm(false);
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -77,6 +161,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         </div>
 
+        {/* Title Confirmation Dialog */}
+        {showTitleConfirm && (
+          <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 animate-fade-in">
+            <p className="text-[13px] font-semibold text-foreground mb-2">
+              📋 Is this the course you are creating?
+            </p>
+            <p className="text-[15px] font-bold text-primary mb-3">"{suggestedTitle}"</p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleConfirmTitle(true)}
+                className="flex-1 h-9 rounded-lg text-[13px] font-bold text-white flex items-center justify-center gap-1.5 bg-primary hover:brightness-110 transition-all"
+              >
+                <Check className="w-3.5 h-3.5" /> Yes, use this title
+              </button>
+              <button
+                onClick={() => handleConfirmTitle(false)}
+                className="flex-1 h-9 rounded-lg text-[13px] font-bold text-foreground flex items-center justify-center gap-1.5 border border-border hover:bg-secondary transition-all"
+              >
+                <X className="w-3.5 h-3.5" /> No, I'll change it
+              </button>
+            </div>
+          </div>
+        )}
+
         <div>
           <label className="text-[14px] font-semibold text-foreground mb-1 block">Source Material</label>
           <p className="text-[12px] text-muted-foreground mb-2">Upload or paste SME notes</p>
@@ -100,6 +208,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-primary text-[12px] font-semibold underline underline-offset-2">Browse files</span>
           </div>
 
+          {/* Uploaded file indicator */}
+          {uploadedFileName && (
+            <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-secondary/50 rounded-lg">
+              <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
+              <span className="text-[12px] text-foreground truncate flex-1">{uploadedFileName}</span>
+              {isExtracting && (
+                <span className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin shrink-0" />
+              )}
+              {!isExtracting && (
+                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              )}
+            </div>
+          )}
+
           <textarea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
@@ -112,7 +234,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isRunning ? (
           <button
             onClick={onStop}
-            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 transition-all duration-[180ms]"
+            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 transition-all duration-[180ms]"
           >
             <Square className="w-4 h-4" />
             Stop Generating
@@ -120,12 +242,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           <button
             onClick={onGenerate}
-            disabled={!courseTitle.trim()}
+            disabled={!courseTitle.trim() || isExtracting}
             className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-[180ms]"
             style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
           >
-            <Zap className="w-4 h-4" />
-            Generate Course
+            {isExtracting ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Extracting...
+              </>
+            ) : (
+              <>
+                <Zap className="w-4 h-4" />
+                Generate Course
+              </>
+            )}
           </button>
         )}
       </div>
