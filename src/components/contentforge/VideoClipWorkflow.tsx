@@ -60,6 +60,10 @@ interface ClipItem {
 interface VideoClipWorkflowProps {
   youtubeRaw: string;
   modules: string[];
+  courseTitle: string;
+  language?: string;
+  level?: string;
+  duration?: string;
   onComplete: (clips: ClipItem[]) => void;
   onSkip: () => void;
 }
