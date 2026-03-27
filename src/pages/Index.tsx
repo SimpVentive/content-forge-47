@@ -29,7 +29,9 @@ const Index = () => {
       {/* Top Navbar */}
       <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6 relative">
         <div className="flex items-center gap-2.5">
-          <img src={contentForgeLogo} alt="ContentForge" className="w-12 h-12 rounded-lg drop-shadow-md" />
+          <div className="w-14 h-14 rounded-xl bg-white flex items-center justify-center shadow-md">
+            <img src={contentForgeLogo} alt="ContentForge" className="w-11 h-11 object-contain" />
+          </div>
         </div>
         <span className="absolute left-1/2 -translate-x-1/2 text-[36px] font-[800] tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: '#1e3a5f' }}>
           ContentForge
