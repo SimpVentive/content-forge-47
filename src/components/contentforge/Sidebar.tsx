@@ -7,6 +7,7 @@ interface SidebarProps {
   inputText: string;
   setInputText: (v: string) => void;
   onGenerate: () => void;
+  onStop: () => void;
   isRunning: boolean;
   agentToggles: Record<string, boolean>;
   setAgentToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
