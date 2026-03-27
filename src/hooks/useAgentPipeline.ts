@@ -99,8 +99,8 @@ export function useAgentPipeline() {
         setStatus("architect", "running");
         addLog("Content Architect: Receiving research output...");
         archResult = await callClaudeWithRetry(
-          "You are a Content Architect. Given research output, create a full course structure with modules and Bloom's taxonomy levels. Return as JSON.",
-          researchResult || `Course: ${courseTitle}\n\nNotes: ${inputText}`,
+          "You are a Content Architect. Given research output AND source material, create a full course structure with modules and Bloom's taxonomy levels. You MUST use the topics and content from the source material. Do NOT invent unrelated topics. Return as JSON.",
+          `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\n\nBuild the course structure strictly from the above content.`,
           addLog, "Content Architect"
         );
         setStatus("architect", "complete");
