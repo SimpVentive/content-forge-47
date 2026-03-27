@@ -75,6 +75,7 @@ const Index = () => {
             inputText={inputText}
             setInputText={setInputText}
             onGenerate={handleGenerate}
+            onStop={stopPipeline}
             isRunning={isRunning}
             agentToggles={agentToggles}
             setAgentToggles={setAgentToggles}

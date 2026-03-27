@@ -109,24 +109,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         </div>
 
-        <button
-          onClick={onGenerate}
-          disabled={isRunning || !courseTitle.trim()}
-          className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-[180ms]"
-          style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
-        >
-          {isRunning ? (
-            <>
-              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              Generating...
-            </>
-          ) : (
-            <>
-              <Zap className="w-4 h-4" />
-              Generate Course
-            </>
-          )}
-        </button>
+        {isRunning ? (
+          <button
+            onClick={onStop}
+            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-red-500 hover:bg-red-600 transition-all duration-[180ms]"
+          >
+            <Square className="w-4 h-4" />
+            Stop Generating
+          </button>
+        ) : (
+          <button
+            onClick={onGenerate}
+            disabled={!courseTitle.trim()}
+            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-[180ms]"
+            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
+          >
+            <Zap className="w-4 h-4" />
+            Generate Course
+          </button>
+        )}
       </div>
     </div>
   );
