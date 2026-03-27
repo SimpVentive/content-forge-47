@@ -1,11 +1,12 @@
 import { useState, useCallback } from "react";
-import { AgentInfo, AgentStatus, AGENTS, OutputData } from "@/types/agents";
+import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
 
 const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
+const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", compliance: "", assessment: "", voice: "", assembly: "" });
 
 const timestamp = () => {
   const d = new Date();
