@@ -275,5 +275,5 @@ export function useAgentPipeline() {
     status: agentStatuses[a.id] || "idle",
   }));
 
-  return { agents, outputData, logs, isRunning, runPipeline };
+  return { agents, outputData, rawOutputs, logs, isRunning, runPipeline };
 }
