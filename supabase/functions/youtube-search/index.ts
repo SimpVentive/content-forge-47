@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { modules, courseTitle } = await req.json();
+    const { modules, courseTitle, language, level } = await req.json();
     const apiKey = Deno.env.get("Youtube_Learning");
 
     if (!apiKey) {
