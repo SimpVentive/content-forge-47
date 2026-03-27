@@ -12,6 +12,13 @@ interface SidebarProps {
   setAgentToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
+const BINARY_EXTENSIONS = ['.pptx', '.ppt', '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.zip'];
+
+const isBinaryFile = (filename: string): boolean => {
+  const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
+  return BINARY_EXTENSIONS.includes(ext);
+};
+
 const readFileAsText = (file: File): Promise<string> => {
   return new Promise((resolve) => {
     const reader = new FileReader();
