@@ -332,14 +332,35 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
   const hasOutput = Object.values(rawOutputs).some(v => v);
   const content = (activeTab === "preview" || activeTab === "videos") ? null : outputData[activeTab as keyof OutputData];
 
+  const handleInsertVideo = (video: InsertedVideo) => {
+    setInsertedVideos(prev => {
+      if (prev.find(v => v.videoId === video.videoId)) return prev;
+      return [...prev, video];
+    });
+  };
+
+  const handleRemoveVideo = (videoId: string) => {
+    setInsertedVideos(prev => prev.filter(v => v.videoId !== videoId));
+  };
+
   const renderContent = () => {
     if (activeTab === "preview") {
-      // This shouldn't render inline — the tab click opens the modal
       return (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <Play className="w-10 h-10 text-primary/30 mb-3" />
           <p className="text-[14px] font-semibold text-muted-foreground">Learner Preview opened in full screen</p>
         </div>
+      );
+    }
+
+    if (activeTab === "videos") {
+      return (
+        <VideosTab
+          raw={rawOutputs.youtube}
+          insertedVideos={insertedVideos}
+          onInsert={handleInsertVideo}
+          onRemove={handleRemoveVideo}
+        />
       );
     }
 
