@@ -35,6 +35,7 @@ async function callClaudeWithRetry(systemPrompt: string, userMessage: string, ad
 export function useAgentPipeline() {
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>(initialStatuses());
   const [outputData, setOutputData] = useState<OutputData>(initialOutput());
+  const [rawOutputs, setRawOutputs] = useState<RawAgentOutputs>(initialRaw());
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
