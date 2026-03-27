@@ -338,12 +338,12 @@ export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onIns
 
       {/* Inserted Videos Summary (top) */}
       {insertedVideos.length > 0 && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-[13px] font-bold text-emerald-800 flex items-center gap-1.5">
+            <p className="text-[13px] font-bold text-primary flex items-center gap-1.5">
               <Check className="w-3.5 h-3.5" /> {insertedVideos.length} video{insertedVideos.length > 1 ? "s" : ""} inserted
             </p>
-            <span className="text-[12px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+            <span className="text-[12px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
               {formatClipDuration(0, totalInsertedTime)} total
             </span>
           </div>
