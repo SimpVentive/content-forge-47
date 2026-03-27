@@ -1,5 +1,5 @@
 import React, { useRef } from "react";
-import { Zap, Upload } from "lucide-react";
+import { Zap, Upload, Square } from "lucide-react";
 
 interface SidebarProps {
   courseTitle: string;
