@@ -340,7 +340,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       case "assessment":
         return <AssessmentView raw={content} />;
       case "package":
-        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} />;
+        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} />;
       case "script":
         return <ScriptView raw={content} voiceRaw={rawOutputs.voice} />;
       case "outline":
