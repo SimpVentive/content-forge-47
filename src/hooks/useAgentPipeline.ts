@@ -48,7 +48,7 @@ export function useAgentPipeline() {
     setAgentStatuses((prev) => ({ ...prev, [id]: status }));
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean }) => {
     cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
@@ -63,7 +63,7 @@ export function useAgentPipeline() {
       setAgentStatuses((prev) => ({ ...prev, [id]: "queued" as AgentStatus }));
     });
 
-    addLog(`Orchestrator: Pipeline initiated for '${courseTitle}'`);
+    addLog(`Orchestrator: Pipeline initiated for '${courseTitle}' (${params?.level || "intermediate"}, ${params?.language || "English"}, ${params?.duration || "1hr"})`);
 
     let researchResult = "";
     let archResult = "";
@@ -81,7 +81,7 @@ export function useAgentPipeline() {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
         researchResult = await callClaudeWithRetry(
-          "You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract 5 key themes, 3 credible knowledge areas, and suggest 8 learning objectives — ALL directly derived from the provided source material. If the source material is about POSH (Prevention of Sexual Harassment), your output must be about POSH. Return as JSON.",
+          `You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract 5 key themes, 3 credible knowledge areas, and suggest 8 learning objectives — ALL directly derived from the provided source material. Course level: ${params?.level || "intermediate"}. Language: ${params?.language || "English"}. Target duration: ${params?.duration || "1hr"}. Return as JSON.`,
           `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content.`,
           addLog, "Research Agent"
         );
@@ -193,7 +193,7 @@ export function useAgentPipeline() {
         
         try {
           const { data, error } = await supabase.functions.invoke("youtube-search", {
-            body: { modules: moduleNames, courseTitle },
+            body: { modules: moduleNames, courseTitle, language: params?.language, level: params?.level },
           });
           
           if (error) throw new Error(error.message);

@@ -40,16 +40,5 @@ export const AGENTS: Omit<AgentInfo, "status">[] = [
   { id: "assembly", name: "Final Assembly Agent", description: "Packages SCORM/xAPI-compliant course output" },
 ];
 
-export const SAMPLE_TITLE = "Workplace Safety for Manufacturing Teams";
-export const SAMPLE_NOTES = `Key topics to cover:
-- OSHA regulations and compliance requirements
-- Personal Protective Equipment (PPE) selection and use
-- Hazard identification and risk assessment procedures
-- Emergency response protocols
-- Machine guarding and lockout/tagout (LOTO) procedures
-- Chemical safety and SDS interpretation
-- Ergonomics and injury prevention
-
-Target audience: New manufacturing floor employees, supervisors
-Duration: 4-hour course with hands-on exercises
-Certification: Must meet OSHA 10-hour general industry standards`;
+export const SAMPLE_TITLE = "";
+export const SAMPLE_NOTES = "";

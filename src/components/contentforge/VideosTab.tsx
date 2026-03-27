@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Eye, ThumbsUp, Play, X, ExternalLink, Check, Trash2 } from "lucide-react";
+import { Eye, ThumbsUp, Play, X, Check, Trash2, Search, Clock, Plus, ChevronDown, ChevronUp, Film } from "lucide-react";
 
 /* ── helpers ── */
 function tryParseJSON(raw: string | undefined | null): any | null {
@@ -71,14 +71,9 @@ interface VideosTabProps {
 }
 
 /* ── Clip Preview Modal ── */
-const ClipModal: React.FC<{
-  video: any;
-  startTime: string;
-  endTime: string;
-  onClose: () => void;
-  onInsert: () => void;
-  isInserted: boolean;
-}> = ({ video, startTime, endTime, onClose, onInsert, isInserted }) => {
+const ClipModal = ({ video, startTime, endTime, onClose, onInsert, isInserted }: {
+  video: any; startTime: string; endTime: string; onClose: () => void; onInsert: () => void; isInserted: boolean;
+}) => {
   const startSec = startTime ? timeToSeconds(startTime) : 0;
   const endSec = endTime ? timeToSeconds(endTime) : durationToSeconds(video.duration);
   const src = `https://www.youtube.com/embed/${video.videoId}?start=${startSec}${endSec ? `&end=${endSec}` : ""}&autoplay=1&rel=0&modestbranding=1`;
@@ -86,28 +81,36 @@ const ClipModal: React.FC<{
 
   return (
     <div className="fixed inset-0 z-[10000] flex items-center justify-center" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/70" />
-      <div className="relative w-[600px] max-w-[95vw] rounded-2xl overflow-hidden" style={{ background: "#1e293b" }} onClick={e => e.stopPropagation()}>
-        <div className="p-4">
-          <h3 className="text-[16px] font-bold text-white truncate">{video.title}</h3>
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+      <div className="relative w-[680px] max-w-[95vw] rounded-2xl overflow-hidden bg-[#0f172a] shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="px-5 py-4 flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[16px] font-bold text-white truncate">{video.title}</h3>
+            <p className="text-[13px] text-white/50 mt-0.5">{video.channelTitle}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center shrink-0 ml-3">
+            <X className="w-4 h-4 text-white/60" />
+          </button>
         </div>
         <div className="w-full aspect-video">
-          <iframe
-            src={src}
-            className="w-full h-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+          <iframe src={src} className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
         </div>
-        <div className="p-4 flex items-center justify-between">
-          <span className="text-[13px] text-white/60 bg-white/10 px-3 py-1 rounded-full">Clip: {clipDur}</span>
+        <div className="px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-[13px] text-white/50 bg-white/10 px-3 py-1.5 rounded-lg flex items-center gap-1.5">
+              <Clock className="w-3 h-3" /> Clip: {clipDur}
+            </span>
+            <span className="text-[12px] text-white/40">
+              {startTime || "0:00"} → {endTime || parseDuration(video.duration)}
+            </span>
+          </div>
           <div className="flex items-center gap-3">
             <button onClick={onClose} className="h-9 px-4 rounded-lg border border-white/20 text-white text-[13px] font-semibold hover:bg-white/5 transition-all">
               Close
             </button>
             {!isInserted && (
-              <button onClick={onInsert} className="h-9 px-4 rounded-lg text-white text-[13px] font-bold transition-all" style={{ background: "#4f46e5" }}>
-                Insert into Course
+              <button onClick={onInsert} className="h-9 px-5 rounded-lg text-white text-[13px] font-bold transition-all flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+                <Plus className="w-3.5 h-3.5" /> Insert into Course
               </button>
             )}
           </div>
@@ -117,115 +120,109 @@ const ClipModal: React.FC<{
   );
 };
 
-/* ── Video Card ── */
-const VideoCard: React.FC<{
-  video: any;
-  moduleTitle: string;
-  isInserted: boolean;
-  insertedInfo?: InsertedVideo;
-  onInsert: (startTime: string, endTime: string) => void;
-  onRemove: () => void;
-}> = ({ video, moduleTitle, isInserted, insertedInfo, onInsert, onRemove }) => {
+/* ── Compact Video Card ── */
+const VideoCard = ({ video, moduleTitle, isInserted, insertedInfo, onInsert, onRemove }: {
+  video: any; moduleTitle: string; isInserted: boolean; insertedInfo?: InsertedVideo;
+  onInsert: (startTime: string, endTime: string) => void; onRemove: () => void;
+}) => {
   const [startTime, setStartTime] = useState(insertedInfo?.startTime || "");
   const [endTime, setEndTime] = useState(insertedInfo?.endTime || "");
   const [showClip, setShowClip] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const dur = parseDuration(video.duration);
 
   return (
     <>
       {showClip && (
         <ClipModal
-          video={video}
-          startTime={startTime}
-          endTime={endTime}
+          video={video} startTime={startTime} endTime={endTime}
           onClose={() => setShowClip(false)}
           onInsert={() => { onInsert(startTime, endTime); setShowClip(false); }}
           isInserted={isInserted}
         />
       )}
-      <div className={`bg-white rounded-xl shadow-sm overflow-hidden transition-all ${isInserted ? "border-l-4 border-emerald-500" : ""}`}>
-        {isInserted && (
-          <div className="bg-emerald-500 text-white text-[12px] font-semibold px-3 py-1.5 flex items-center gap-1.5">
-            <Check className="w-3 h-3" /> Inserted into {moduleTitle}
-          </div>
-        )}
-        {/* Thumbnail */}
-        <div className="relative group cursor-pointer" onClick={() => setShowClip(true)}>
-          <img src={video.thumbnail} alt={video.title} className="w-full aspect-video object-cover" />
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
-            <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
-              <Play className="w-5 h-5 text-[#4f46e5] ml-0.5" />
+      <div className={`bg-card rounded-xl border transition-all hover:shadow-md ${isInserted ? "border-primary ring-1 ring-primary/20" : "border-border"}`}>
+        {/* Top: Thumbnail + Info Row */}
+        <div className="flex gap-3 p-3">
+          {/* Thumbnail */}
+          <div className="relative w-[160px] shrink-0 rounded-lg overflow-hidden cursor-pointer group" onClick={() => setShowClip(true)}>
+            <img src={video.thumbnail} alt={video.title} className="w-full aspect-video object-cover" />
+            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all flex items-center justify-center">
+              <div className="w-9 h-9 rounded-full bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all scale-75 group-hover:scale-100">
+                <Play className="w-4 h-4 text-primary ml-0.5" />
+              </div>
             </div>
+            <span className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">{dur}</span>
+            {isInserted && (
+              <span className="absolute top-1.5 left-1.5 bg-primary text-primary-foreground text-[9px] font-bold px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                <Check className="w-2.5 h-2.5" /> Added
+              </span>
+            )}
           </div>
-          <span className="absolute top-2 left-2 bg-black/80 text-white text-[11px] font-semibold px-2 py-0.5 rounded">{dur}</span>
-        </div>
 
-        {/* Body */}
-        <div className="p-3.5">
-          <h4 className="text-[14px] font-bold text-[#0f172a] line-clamp-2 leading-tight mb-1">{video.title}</h4>
-          <p className="text-[12px] text-[#6b7280] mb-2">{video.channelTitle}</p>
-          <div className="flex items-center gap-3 text-[12px] text-[#94a3b8]">
-            <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{formatCount(video.viewCount)} views</span>
-            <span className="flex items-center gap-1"><ThumbsUp className="w-3 h-3" />{formatCount(video.likeCount)} likes</span>
-          </div>
-        </div>
-
-        {/* Clip Controls */}
-        <div className="bg-[#f8fafc] border-t border-[#e2e8f0] px-3 py-2.5">
-          <p className="text-[11px] font-semibold text-[#475569] mb-2">Select clip range</p>
-          <div className="flex items-center gap-2">
+          {/* Info */}
+          <div className="flex-1 min-w-0 flex flex-col justify-between">
             <div>
-              <label className="text-[10px] text-[#94a3b8]">Start</label>
-              <input
-                value={startTime}
-                onChange={e => setStartTime(e.target.value)}
-                placeholder="0:00"
-                className="w-[72px] h-[36px] border border-[#e2e8f0] rounded-lg text-[13px] text-center focus:outline-none focus:border-[#4f46e5]"
-              />
+              <h4 className="text-[13px] font-bold text-foreground line-clamp-2 leading-tight">{video.title}</h4>
+              <p className="text-[11px] text-muted-foreground mt-1">{video.channelTitle}</p>
             </div>
-            <span className="text-[12px] text-[#94a3b8] mt-4">to</span>
-            <div>
-              <label className="text-[10px] text-[#94a3b8]">End</label>
-              <input
-                value={endTime}
-                onChange={e => setEndTime(e.target.value)}
-                placeholder={dur}
-                className="w-[72px] h-[36px] border border-[#e2e8f0] rounded-lg text-[13px] text-center focus:outline-none focus:border-[#4f46e5]"
-              />
+            <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-1">
+              <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{formatCount(video.viewCount)}</span>
+              <span className="flex items-center gap-1"><ThumbsUp className="w-3 h-3" />{formatCount(video.likeCount)}</span>
             </div>
           </div>
-          <p className="text-[10px] text-[#94a3b8] mt-1">Leave end blank to play to finish</p>
         </div>
 
-        {/* Actions */}
-        <div className="px-3 pb-3 flex gap-2">
-          <button
-            onClick={() => setShowClip(true)}
-            className="flex-1 h-9 rounded-lg text-[12px] font-bold border-2 border-[#4f46e5] text-[#4f46e5] hover:bg-[#4f46e5]/5 transition-all"
-          >
-            Preview Clip
-          </button>
-          {isInserted ? (
-            <button
-              onClick={onRemove}
-              className="flex-1 h-9 rounded-lg text-[12px] font-bold border-2 border-red-500 text-red-500 hover:bg-red-50 transition-all flex items-center justify-center gap-1"
-            >
-              <Trash2 className="w-3 h-3" /> Remove
-            </button>
-          ) : (
-            <button
-              onClick={() => onInsert(startTime, endTime)}
-              className="flex-1 h-9 rounded-lg text-[12px] font-bold text-white transition-all"
-              style={{ background: "#4f46e5" }}
-            >
-              Insert into Course
-            </button>
-          )}
-        </div>
+        {/* Expand toggle for clip controls */}
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="w-full flex items-center justify-center gap-1 py-1.5 text-[11px] font-semibold text-primary hover:bg-primary/5 transition-all border-t border-border"
+        >
+          {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          {expanded ? "Hide clip options" : "Set clip range & insert"}
+        </button>
 
-        {isInserted && insertedInfo && (
-          <div className="px-3 pb-2">
-            <p className="text-[11px] text-[#94a3b8]">Will play after Slide {insertedInfo.afterSlide}</p>
+        {/* Expanded clip controls */}
+        {expanded && (
+          <div className="px-3 pb-3 pt-1 space-y-2.5 border-t border-border bg-secondary/30">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Start</label>
+                <input
+                  value={startTime} onChange={e => setStartTime(e.target.value)}
+                  placeholder="0:00"
+                  className="w-full h-8 border border-border rounded-lg text-[12px] text-center bg-card focus:outline-none focus:border-primary"
+                />
+              </div>
+              <span className="text-[11px] text-muted-foreground mt-4">→</span>
+              <div className="flex-1">
+                <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">End</label>
+                <input
+                  value={endTime} onChange={e => setEndTime(e.target.value)}
+                  placeholder={dur}
+                  className="w-full h-8 border border-border rounded-lg text-[12px] text-center bg-card focus:outline-none focus:border-primary"
+                />
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground">Leave end blank to use full video. Set start/end to clip a specific segment.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowClip(true)} className="flex-1 h-8 rounded-lg text-[11px] font-bold border border-primary text-primary hover:bg-primary/5 transition-all">
+                Preview Clip
+              </button>
+              {isInserted ? (
+                <button onClick={onRemove} className="flex-1 h-8 rounded-lg text-[11px] font-bold text-destructive border border-destructive hover:bg-destructive/5 transition-all flex items-center justify-center gap-1">
+                  <Trash2 className="w-3 h-3" /> Remove
+                </button>
+              ) : (
+                <button
+                  onClick={() => onInsert(startTime, endTime)}
+                  className="flex-1 h-8 rounded-lg text-[11px] font-bold text-white transition-all flex items-center justify-center gap-1"
+                  style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+                >
+                  <Plus className="w-3 h-3" /> Insert into Course
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -237,12 +234,16 @@ const VideoCard: React.FC<{
 export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onInsert, onRemove }) => {
   const data = tryParseJSON(raw);
   const [activeFilter, setActiveFilter] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   if (!raw) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-center">
-        <Play className="w-10 h-10 text-[#ef4444]/30 mb-3" />
-        <p className="text-[14px] font-semibold text-[#6b7280]">Run the pipeline to search YouTube videos</p>
+      <div className="flex flex-col items-center justify-center h-full text-center py-20">
+        <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center mb-4">
+          <Film className="w-8 h-8 text-destructive/40" />
+        </div>
+        <p className="text-[15px] font-bold text-foreground mb-1">YouTube Resources</p>
+        <p className="text-[13px] text-muted-foreground">Run the pipeline to search for relevant videos</p>
       </div>
     );
   }
@@ -257,7 +258,6 @@ export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onIns
 
   const modules: { module_title: string; videos: any[] }[] = data.modules;
   const filteredModules = activeFilter === "all" ? modules : modules.filter(m => m.module_title === activeFilter);
-
   const insertedIds = new Set(insertedVideos.map(v => v.videoId));
 
   const totalInsertedTime = insertedVideos.reduce((acc, v) => {
@@ -266,33 +266,62 @@ export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onIns
     return acc + (endSec - startSec);
   }, 0);
 
+  const totalVideos = modules.reduce((acc, m) => acc + m.videos.length, 0);
+
   const handleInsert = (video: any, moduleTitle: string, startTime: string, endTime: string) => {
     onInsert({
-      videoId: video.videoId,
-      title: video.title,
-      channelTitle: video.channelTitle,
-      thumbnail: video.thumbnail,
-      duration: video.duration,
-      startTime,
-      endTime,
-      moduleTitle,
-      afterSlide: 0, // default
+      videoId: video.videoId, title: video.title, channelTitle: video.channelTitle,
+      thumbnail: video.thumbnail, duration: video.duration,
+      startTime, endTime, moduleTitle, afterSlide: 0,
     });
   };
 
+  // Filter by search query
+  const filterVideos = (videos: any[]) => {
+    if (!searchQuery) return videos;
+    const q = searchQuery.toLowerCase();
+    return videos.filter(v => v.title.toLowerCase().includes(q) || v.channelTitle.toLowerCase().includes(q));
+  };
+
   return (
-    <div className="space-y-5 animate-fade-in">
+    <div className="space-y-4 animate-fade-in">
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <h3 className="text-[24px] font-[800] text-[#0f172a]">YouTube Resources</h3>
-        <p className="text-[14px] text-[#6b7280] text-right">Review and insert videos<br/>into your course</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-[20px] font-extrabold text-foreground">YouTube Resources</h3>
+          <p className="text-[12px] text-muted-foreground mt-0.5">{totalVideos} videos found · {insertedVideos.length} inserted</p>
+        </div>
       </div>
 
-      {/* Filter pills */}
-      <div className="flex gap-2 flex-wrap">
+      {/* How to use hint */}
+      <div className="bg-primary/5 border border-primary/15 rounded-xl p-3 text-[12px] text-foreground leading-relaxed">
+        <p className="font-bold text-primary mb-1">💡 How to insert videos into your course</p>
+        <ol className="list-decimal pl-4 space-y-0.5 text-muted-foreground">
+          <li>Browse videos by module below</li>
+          <li>Click <strong>"Set clip range & insert"</strong> to expand clip options</li>
+          <li>Set start/end times to clip a specific segment (or leave blank for full video)</li>
+          <li>Click <strong>"Preview Clip"</strong> to watch, then <strong>"Insert into Course"</strong></li>
+        </ol>
+      </div>
+
+      {/* Search + Filter */}
+      <div className="flex gap-2 items-center">
+        <div className="relative flex-1">
+          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search videos..."
+            className="w-full h-9 pl-9 pr-3 border border-border rounded-lg text-[12px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors"
+          />
+        </div>
+      </div>
+
+      {/* Module filter pills */}
+      <div className="flex gap-1.5 flex-wrap">
         <button
           onClick={() => setActiveFilter("all")}
-          className={`h-8 px-3 rounded-full text-[12px] font-semibold transition-all ${activeFilter === "all" ? "bg-[#4f46e5] text-white" : "bg-[#f1f5f9] text-[#64748b] hover:bg-[#e2e8f0]"}`}
+          className={`h-7 px-3 rounded-full text-[11px] font-bold transition-all ${activeFilter === "all" ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:bg-border"}`}
         >
           All Modules
         </button>
@@ -300,58 +329,65 @@ export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onIns
           <button
             key={m.module_title}
             onClick={() => setActiveFilter(m.module_title)}
-            className={`h-8 px-3 rounded-full text-[12px] font-semibold transition-all ${activeFilter === m.module_title ? "bg-[#4f46e5] text-white" : "bg-[#f1f5f9] text-[#64748b] hover:bg-[#e2e8f0]"}`}
+            className={`h-7 px-3 rounded-full text-[11px] font-bold transition-all ${activeFilter === m.module_title ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground hover:bg-border"}`}
           >
-            {m.module_title}
+            {m.module_title} ({m.videos.length})
           </button>
         ))}
       </div>
 
-      {/* Module sections */}
-      {filteredModules.map((mod, mi) => (
-        <div key={mi}>
-          <h4 className="text-[16px] font-bold text-[#0f172a] pl-3 border-l-4 border-[#4f46e5] mb-3">{mod.module_title}</h4>
-          {mod.videos.length === 0 ? (
-            <p className="text-[13px] text-[#94a3b8] italic">No videos found for this topic</p>
-          ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3">
-              {mod.videos.map((video: any) => (
-                <VideoCard
-                  key={video.videoId}
-                  video={video}
-                  moduleTitle={mod.module_title}
-                  isInserted={insertedIds.has(video.videoId)}
-                  insertedInfo={insertedVideos.find(v => v.videoId === video.videoId)}
-                  onInsert={(st, et) => handleInsert(video, mod.module_title, st, et)}
-                  onRemove={() => onRemove(video.videoId)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      ))}
-
-      {/* Inserted summary */}
+      {/* Inserted Videos Summary (top) */}
       {insertedVideos.length > 0 && (
-        <div className="bg-[#f8fafc] border border-[#e2e8f0] rounded-xl p-4 mt-6">
-          <h4 className="text-[16px] font-bold text-[#0f172a] mb-3">Inserted Videos</h4>
-          <div className="space-y-2">
+        <div className="bg-primary/5 border border-primary/20 rounded-xl p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[13px] font-bold text-primary flex items-center gap-1.5">
+              <Check className="w-3.5 h-3.5" /> {insertedVideos.length} video{insertedVideos.length > 1 ? "s" : ""} inserted
+            </p>
+            <span className="text-[12px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+              {formatClipDuration(0, totalInsertedTime)} total
+            </span>
+          </div>
+          <div className="space-y-1.5">
             {insertedVideos.map(v => (
-              <div key={v.videoId} className="flex items-center gap-3">
-                <img src={v.thumbnail} alt="" className="w-10 h-10 rounded object-cover" />
+              <div key={v.videoId} className="flex items-center gap-2 bg-white rounded-lg p-2">
+                <img src={v.thumbnail} alt="" className="w-12 h-8 rounded object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-[13px] font-semibold text-[#0f172a] truncate">{v.title}</p>
-                  <p className="text-[11px] text-[#94a3b8]">{v.moduleTitle} · {v.startTime || "0:00"} – {v.endTime || parseDuration(v.duration)}</p>
+                  <p className="text-[11px] font-semibold text-foreground truncate">{v.title}</p>
+                  <p className="text-[10px] text-muted-foreground">{v.moduleTitle} · {v.startTime || "0:00"} → {v.endTime || parseDuration(v.duration)}</p>
                 </div>
-                <button onClick={() => onRemove(v.videoId)} className="text-[12px] text-red-500 font-semibold hover:underline">Remove</button>
+                <button onClick={() => onRemove(v.videoId)} className="text-[11px] text-destructive font-semibold hover:underline shrink-0">Remove</button>
               </div>
             ))}
           </div>
-          <p className="text-[13px] font-semibold text-[#475569] mt-3">
-            Total video time added: {formatClipDuration(0, totalInsertedTime)}
-          </p>
         </div>
       )}
+
+      {/* Module sections */}
+      {filteredModules.map((mod, mi) => {
+        const videos = filterVideos(mod.videos);
+        return (
+          <div key={mi}>
+            <h4 className="text-[14px] font-bold text-foreground pl-3 border-l-[3px] border-primary mb-2">{mod.module_title}</h4>
+            {videos.length === 0 ? (
+              <p className="text-[12px] text-muted-foreground italic pl-3">No videos found for this topic</p>
+            ) : (
+              <div className="grid grid-cols-1 gap-2">
+                {videos.map((video: any) => (
+                  <VideoCard
+                    key={video.videoId}
+                    video={video}
+                    moduleTitle={mod.module_title}
+                    isInserted={insertedIds.has(video.videoId)}
+                    insertedInfo={insertedVideos.find(v => v.videoId === video.videoId)}
+                    onInsert={(st, et) => handleInsert(video, mod.module_title, st, et)}
+                    onRemove={() => onRemove(video.videoId)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 };
