@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Zap, Upload } from "lucide-react";
 
 interface SidebarProps {
@@ -12,16 +12,40 @@ interface SidebarProps {
   setAgentToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
 
+const readFileAsText = (file: File): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string || "");
+    reader.onerror = () => resolve("");
+    reader.readAsText(file);
+  });
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   courseTitle, setCourseTitle, inputText, setInputText,
   onGenerate, isRunning,
 }) => {
-  const handleDrop = (e: React.DragEvent) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFile = async (file: File) => {
+    const text = await readFileAsText(file);
+    if (text && text.length > 0) {
+      setInputText(text);
+    } else {
+      setInputText(`[Uploaded: ${file.name}] — Could not extract text. Try pasting content directly.`);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
-    if (file) {
-      setInputText(`[Uploaded: ${file.name}] — File parsing coming soon. Paste text content below instead.`);
-    }
+    if (file) await handleFile(file);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) await handleFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   return (
@@ -45,7 +69,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <label className="text-[14px] font-semibold text-foreground mb-1 block">Source Material</label>
           <p className="text-[12px] text-muted-foreground mb-2">Upload or paste SME notes</p>
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.md,.csv,.json,.xml,.html,.doc,.docx,.ppt,.pptx,.pdf"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
+
           <div
+            onClick={() => fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             className="border-2 border-dashed border-primary/25 rounded-xl p-4 text-center cursor-pointer hover:bg-primary/[0.04] hover:border-primary transition-all duration-[180ms] mb-3"
