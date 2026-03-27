@@ -330,6 +330,16 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
   const content = activeTab === "preview" ? null : outputData[activeTab as keyof OutputData];
 
   const renderContent = () => {
+    if (activeTab === "preview") {
+      // This shouldn't render inline — the tab click opens the modal
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center">
+          <Play className="w-10 h-10 text-primary/30 mb-3" />
+          <p className="text-[14px] font-semibold text-muted-foreground">Learner Preview opened in full screen</p>
+        </div>
+      );
+    }
+
     if (!content) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center">
