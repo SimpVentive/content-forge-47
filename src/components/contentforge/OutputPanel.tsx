@@ -121,17 +121,27 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 };
 
 /* ─── Package Renderer ─── */
-const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string }> = ({ raw, archRaw, visualRaw, courseTitle }) => {
+const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
   const [checklist, setChecklist] = useState<boolean[]>(
     new Array((data?.deployment_checklist || []).length).fill(false)
   );
+  const [showLearnerPreview, setShowLearnerPreview] = useState(false);
 
   if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
   return (
     <div className="space-y-6 animate-fade-in">
+      {/* Learner Preview Modal */}
+      {showLearnerPreview && (
+        <LearnerPreview
+          courseTitle={courseTitle}
+          rawOutputs={rawOutputs}
+          onClose={() => setShowLearnerPreview(false)}
+        />
+      )}
+
       {/* 1. Slide Preview */}
       {archRaw && visualRaw && (
         <SlidePreview archRaw={archRaw} visualRaw={visualRaw} courseTitle={courseTitle} />
@@ -220,17 +230,26 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       )}
 
-      {/* 6. Export Button */}
-      <button
-        disabled
-        className="w-full h-12 rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 opacity-60 cursor-not-allowed"
-        style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
-        title="Full export coming in next build"
-      >
-        <Download className="w-4 h-4" />
-        Export Package
-      </button>
-      <p className="text-[11px] text-muted-foreground text-center -mt-4">Full export coming in next build</p>
+      {/* 6. Action Buttons — Preview + Export */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => setShowLearnerPreview(true)}
+          className="flex-1 h-12 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 border-2 border-[#4f46e5] text-[#4f46e5] hover:bg-[#4f46e5]/5 transition-all"
+        >
+          <Play className="w-4 h-4" />
+          Preview as Learner
+        </button>
+        <button
+          disabled
+          className="flex-1 h-12 rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 opacity-60 cursor-not-allowed"
+          style={{ background: '#4f46e5' }}
+          title="Coming soon"
+        >
+          <Download className="w-4 h-4" />
+          Export Package
+        </button>
+      </div>
+      <p className="text-[11px] text-muted-foreground text-center -mt-4">Export coming soon</p>
     </div>
   );
 };
