@@ -102,6 +102,18 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       });
     }
 
+    // 3b. Insert video slides for this module
+    const modVideos = insertedVideos.filter(v => v.moduleTitle === mod.title);
+    modVideos.forEach(vid => {
+      slides.push({
+        type: "video",
+        moduleIndex: mi,
+        moduleTitle: mod.title,
+        topicTitle: vid.title,
+        video: vid,
+      });
+    });
+
     // 4. Summary slide
     slides.push({
       type: "summary",
