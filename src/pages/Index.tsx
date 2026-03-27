@@ -27,7 +27,7 @@ const Index = () => {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       {/* Top Navbar */}
-      <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6">
+      <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6 relative">
         <div className="flex items-center gap-2.5">
           <img src={contentForgeLogo} alt="ContentForge" className="w-9 h-9 rounded-lg" />
         </div>
@@ -35,10 +35,6 @@ const Index = () => {
           Content<span className="bg-gradient-to-r from-[hsl(var(--primary))] to-[#7c3aed] bg-clip-text text-transparent">Forge</span>
         </span>
         <button className="h-[44px] px-5 bg-primary text-primary-foreground rounded-lg text-[15px] font-bold shadow-btn-primary hover:brightness-110 transition-all duration-[180ms] flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          New Course
-        </button>
-      </header>
           <Plus className="w-4 h-4" />
           New Course
         </button>
