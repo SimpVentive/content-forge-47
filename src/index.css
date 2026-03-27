@@ -15,7 +15,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 244 57% 55%;
+    --primary: 192 91% 36%;
     --primary-foreground: 0 0% 100%;
 
     --secondary: 220 14% 96%;
@@ -24,7 +24,7 @@
     --muted: 220 14% 96%;
     --muted-foreground: 215 16% 62%;
 
-    --accent: 244 57% 55%;
+    --accent: 192 91% 36%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 0 72% 51%;
@@ -32,12 +32,12 @@
 
     --border: 214 32% 91%;
     --input: 214 32% 91%;
-    --ring: 244 57% 55%;
+    --ring: 192 91% 36%;
 
     --radius: 0.75rem;
 
     --status-idle: 215 16% 47%;
-    --status-running: 244 57% 55%;
+    --status-running: 192 91% 36%;
     --status-complete: 160 84% 39%;
     --status-queued: 38 92% 50%;
     --status-error: 0 72% 51%;
@@ -75,7 +75,7 @@
 }
 
 .shadow-btn-primary {
-  box-shadow: 0 4px 14px rgba(79,70,229,0.35);
+  box-shadow: 0 4px 14px rgba(14,116,144,0.35);
 }
 
 /* Animations */
