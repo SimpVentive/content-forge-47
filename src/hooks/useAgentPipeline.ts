@@ -51,6 +51,7 @@ export function useAgentPipeline() {
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
     setOutputData(initialOutput());
+    setRawOutputs(initialRaw());
     setLogs([]);
 
     // Set all agents to queued initially
