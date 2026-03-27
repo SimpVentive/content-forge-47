@@ -63,7 +63,7 @@ export function useAgentPipeline() {
       setAgentStatuses((prev) => ({ ...prev, [id]: "queued" as AgentStatus }));
     });
 
-    addLog(`Orchestrator: Pipeline initiated for '${courseTitle}'`);
+    addLog(`Orchestrator: Pipeline initiated for '${courseTitle}' (${params?.level || "intermediate"}, ${params?.language || "English"}, ${params?.duration || "1hr"})`);
 
     let researchResult = "";
     let archResult = "";
