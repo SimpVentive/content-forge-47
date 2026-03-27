@@ -193,7 +193,7 @@ export function useAgentPipeline() {
         
         try {
           const { data, error } = await supabase.functions.invoke("youtube-search", {
-            body: { modules: moduleNames, courseTitle },
+            body: { modules: moduleNames, courseTitle, language: params?.language, level: params?.level },
           });
           
           if (error) throw new Error(error.message);
