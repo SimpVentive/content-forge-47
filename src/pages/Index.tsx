@@ -112,6 +112,19 @@ const Index = () => {
         onCancel={() => setShowParamsDialog(false)}
       />
 
+      {/* YouTube Clip Workflow — triggered after pipeline completes */}
+      {showVideoWorkflow && rawOutputs.youtube && (
+        <VideoClipWorkflow
+          youtubeRaw={rawOutputs.youtube}
+          modules={getModuleNames()}
+          onComplete={(clips) => {
+            setShowVideoWorkflow(false);
+            // Switch to Videos tab is handled by OutputPanel
+          }}
+          onSkip={() => setShowVideoWorkflow(false)}
+        />
+      )}
+
       {/* 3-column resizable layout */}
       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
         {/* Left — Course Input */}
