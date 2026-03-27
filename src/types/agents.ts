@@ -14,6 +14,18 @@ export interface OutputData {
   package: string;
 }
 
+export interface RawAgentOutputs {
+  research: string;
+  architect: string;
+  writer: string;
+  visual: string;
+  animation: string;
+  compliance: string;
+  assessment: string;
+  voice: string;
+  assembly: string;
+}
+
 export const AGENTS: Omit<AgentInfo, "status">[] = [
   { id: "research", name: "Research Agent", description: "Extracts key themes, knowledge areas, and learning objectives" },
   { id: "architect", name: "Content Architect Agent", description: "Structures modules with Bloom's taxonomy alignment" },

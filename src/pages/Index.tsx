@@ -15,7 +15,7 @@ const Index = () => {
     Object.fromEntries(AGENTS.map((a) => [a.id, true]))
   );
 
-  const { agents, outputData, logs, isRunning, runPipeline } = useAgentPipeline();
+  const { agents, outputData, rawOutputs, logs, isRunning, runPipeline } = useAgentPipeline();
 
   const handleGenerate = () => {
     runPipeline(courseTitle, inputText, agentToggles);
@@ -75,7 +75,7 @@ const Index = () => {
 
         {/* Right — Output */}
         <ResizablePanel defaultSize={30} minSize={15} maxSize={45}>
-          <OutputPanel outputData={outputData} />
+          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

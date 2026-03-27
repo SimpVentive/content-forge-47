@@ -1,11 +1,12 @@
 import { useState, useCallback } from "react";
-import { AgentInfo, AgentStatus, AGENTS, OutputData } from "@/types/agents";
+import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
 
 const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
+const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", compliance: "", assessment: "", voice: "", assembly: "" });
 
 const timestamp = () => {
   const d = new Date();
@@ -34,6 +35,7 @@ async function callClaudeWithRetry(systemPrompt: string, userMessage: string, ad
 export function useAgentPipeline() {
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>(initialStatuses());
   const [outputData, setOutputData] = useState<OutputData>(initialOutput());
+  const [rawOutputs, setRawOutputs] = useState<RawAgentOutputs>(initialRaw());
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
 
@@ -49,6 +51,7 @@ export function useAgentPipeline() {
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
     setOutputData(initialOutput());
+    setRawOutputs(initialRaw());
     setLogs([]);
 
     // Set all agents to queued initially
@@ -78,6 +81,7 @@ export function useAgentPipeline() {
           addLog, "Research Agent"
         );
         setStatus("research", "complete");
+        setRawOutputs((prev) => ({ ...prev, research: researchResult }));
         setOutputData((prev) => ({ ...prev, outline: `## Research Output\n\n${researchResult}` }));
         addLog("Research Agent: Complete. 8 objectives identified.");
       } else {
@@ -94,6 +98,7 @@ export function useAgentPipeline() {
           addLog, "Content Architect"
         );
         setStatus("architect", "complete");
+        setRawOutputs((prev) => ({ ...prev, architect: archResult }));
         setOutputData((prev) => ({
           ...prev,
           outline: prev.outline + `\n\n---\n\n## Course Structure\n\n${archResult}`,
@@ -113,6 +118,7 @@ export function useAgentPipeline() {
           addLog, "Writer Agent"
         );
         setStatus("writer", "complete");
+        setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
         setOutputData((prev) => ({ ...prev, script: writerResult }));
         addLog("Writer Agent: Complete. Module 1 script ready.");
       } else {
@@ -129,6 +135,7 @@ export function useAgentPipeline() {
           addLog, "Visual Design Agent"
         );
         setStatus("visual", "complete");
+        setRawOutputs((prev) => ({ ...prev, visual: visualResult }));
         setOutputData((prev) => ({
           ...prev,
           outline: prev.outline + `\n\n---\n\n## Visual Design Plan\n\n${visualResult}`,
@@ -148,6 +155,7 @@ export function useAgentPipeline() {
           addLog, "Animation Agent"
         );
         setStatus("animation", "complete");
+        setRawOutputs((prev) => ({ ...prev, animation: animResult }));
         setOutputData((prev) => ({
           ...prev,
           script: prev.script + `\n\n---\n\n## Animation & Interaction Notes\n\n${animResult}`,
@@ -167,6 +175,7 @@ export function useAgentPipeline() {
           addLog, "Compliance Agent"
         );
         setStatus("compliance", "complete");
+        setRawOutputs((prev) => ({ ...prev, compliance: complianceResult }));
         setOutputData((prev) => ({
           ...prev,
           outline: prev.outline + `\n\n---\n\n## Compliance Report\n\n${complianceResult}`,
@@ -194,6 +203,7 @@ export function useAgentPipeline() {
           addLog, "Assessment Agent"
         );
         setStatus("assessment", "complete");
+        setRawOutputs((prev) => ({ ...prev, assessment: assessmentResult }));
         setOutputData((prev) => ({ ...prev, assessment: assessmentResult }));
         addLog("Assessment Agent: Complete. Assessment bank ready.");
       } else {
@@ -210,6 +220,7 @@ export function useAgentPipeline() {
           addLog, "Voice Agent"
         );
         setStatus("voice", "complete");
+        setRawOutputs((prev) => ({ ...prev, voice: voiceResult }));
         setOutputData((prev) => ({
           ...prev,
           script: prev.script + `\n\n---\n\n## Narration Script\n\n${voiceResult}`,
@@ -238,6 +249,7 @@ export function useAgentPipeline() {
           addLog, "Final Assembly"
         );
         setStatus("assembly", "complete");
+        setRawOutputs((prev) => ({ ...prev, assembly: assemblyResult }));
         setOutputData((prev) => ({ ...prev, package: assemblyResult }));
         addLog("Final Assembly: Complete. Course package ready for LMS deployment.");
         addLog("Orchestrator: All 9 agents complete. Pipeline finished successfully.");
@@ -263,5 +275,5 @@ export function useAgentPipeline() {
     status: agentStatuses[a.id] || "idle",
   }));
 
-  return { agents, outputData, logs, isRunning, runPipeline };
+  return { agents, outputData, rawOutputs, logs, isRunning, runPipeline };
 }
