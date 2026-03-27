@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/contentforge/Sidebar";
 import { AgentPipeline } from "@/components/contentforge/AgentPipeline";
 import { OutputPanel } from "@/components/contentforge/OutputPanel";
@@ -10,6 +10,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { LearnerPreview } from "@/components/contentforge/LearnerPreview";
 import { CourseParametersDialog, CourseParameters } from "@/components/contentforge/CourseParametersDialog";
+import { VideoClipWorkflow } from "@/components/contentforge/VideoClipWorkflow";
 
 const Index = () => {
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
