@@ -33,6 +33,7 @@ export const AGENTS: Omit<AgentInfo, "status">[] = [
   { id: "writer", name: "Writer Agent", description: "Produces instructional scripts in conversational tone" },
   { id: "visual", name: "Visual Design Agent", description: "Generates slide layouts, diagrams, and infographics" },
   { id: "animation", name: "Animation Agent", description: "Creates motion graphics and interactive elements" },
+  { id: "youtube", name: "YouTube Agent", description: "Finds top videos per module topic by views and relevance" },
   { id: "compliance", name: "Compliance Agent", description: "Validates accessibility and regulatory compliance" },
   { id: "assessment", name: "Assessment Agent", description: "Builds quizzes, scenarios, and rubrics" },
   { id: "voice", name: "Voice & Narration Agent", description: "Generates voice scripts and audio narration" },

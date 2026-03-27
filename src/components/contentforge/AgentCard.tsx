@@ -21,6 +21,7 @@ const AGENT_INITIALS: Record<string, string> = {
   writer: "W",
   visual: "V",
   animation: "M",
+  youtube: "Y",
   compliance: "C",
   assessment: "Q",
   voice: "N",
