@@ -6,7 +6,7 @@ const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
-const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", compliance: "", assessment: "", voice: "", assembly: "" });
+const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", voice: "", assembly: "" });
 
 const timestamp = () => {
   const d = new Date();
@@ -163,6 +163,53 @@ export function useAgentPipeline() {
         addLog("Animation Agent: Complete.");
       } else {
         setStatus("animation", "idle");
+      }
+
+      // ──── AGENT 5b: YouTube ────
+      if (toggles["youtube"] !== false) {
+        setStatus("youtube", "running");
+        // Extract module titles from architect output
+        let moduleNames: string[] = [];
+        try {
+          const archParsed = JSON.parse(archResult || "{}");
+          const mods = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
+          moduleNames = mods.map((m: any) => m.module_title || m.title || m.name || "").filter(Boolean);
+        } catch {
+          moduleNames = [courseTitle];
+        }
+        if (moduleNames.length === 0) moduleNames = [courseTitle];
+
+        addLog(`YouTube Agent: Searching top videos for ${moduleNames.length} modules...`);
+        
+        try {
+          const { data, error } = await supabase.functions.invoke("youtube-search", {
+            body: { modules: moduleNames, courseTitle },
+          });
+          
+          if (error) throw new Error(error.message);
+          if (data?.error) {
+            if (data.missing_key) {
+              addLog("YouTube Agent: ⚠ YOUTUBE_API_KEY not configured. Skipping.");
+              setStatus("youtube", "error");
+            } else if (data.quota_exceeded) {
+              addLog("YouTube Agent: ⚠ YouTube quota exceeded. Try again tomorrow.");
+              setStatus("youtube", "error");
+            } else {
+              throw new Error(data.error);
+            }
+          } else {
+            const totalVideos = (data.modules || []).reduce((acc: number, m: any) => acc + (m.videos?.length || 0), 0);
+            const youtubeResult = JSON.stringify(data);
+            setRawOutputs((prev) => ({ ...prev, youtube: youtubeResult }));
+            setStatus("youtube", "complete");
+            addLog(`YouTube Agent: Found ${totalVideos} videos across all modules. Ready for review.`);
+          }
+        } catch (err) {
+          addLog(`YouTube Agent: Error — ${(err as Error).message}`);
+          setStatus("youtube", "error");
+        }
+      } else {
+        setStatus("youtube", "idle");
       }
 
       // ──── AGENT 6: Compliance ────

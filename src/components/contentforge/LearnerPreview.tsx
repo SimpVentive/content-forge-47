@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock } from "lucide-react";
 import { RawAgentOutputs } from "@/types/agents";
+import { InsertedVideo } from "./VideosTab";
 
 /* ── helpers ── */
 function tryParseJSON(raw: string): any | null {
@@ -17,7 +18,7 @@ interface Module {
   topics: string[];
 }
 
-type SlideType = "title" | "content" | "assessment" | "summary";
+type SlideType = "title" | "content" | "assessment" | "summary" | "video";
 
 interface Slide {
   type: SlideType;
@@ -29,10 +30,11 @@ interface Slide {
   infographicSvg?: string;
   question?: { question: string; options: string[]; correct_answer: string; rationale?: string };
   takeaways?: string[];
+  video?: InsertedVideo;
 }
 
 /* ── build slides from agent outputs ── */
-function buildSlides(rawOutputs: RawAgentOutputs): { modules: Module[]; slides: Slide[] } {
+function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = []): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
   const assessData = tryParseJSON(rawOutputs.assessment);
@@ -100,6 +102,18 @@ function buildSlides(rawOutputs: RawAgentOutputs): { modules: Module[]; slides: 
       });
     }
 
+    // 3b. Insert video slides for this module
+    const modVideos = insertedVideos.filter(v => v.moduleTitle === mod.title);
+    modVideos.forEach(vid => {
+      slides.push({
+        type: "video",
+        moduleIndex: mi,
+        moduleTitle: mod.title,
+        topicTitle: vid.title,
+        video: vid,
+      });
+    });
+
     // 4. Summary slide
     slides.push({
       type: "summary",
@@ -138,10 +152,11 @@ interface LearnerPreviewProps {
   courseTitle: string;
   rawOutputs: RawAgentOutputs;
   onClose: () => void;
+  insertedVideos?: InsertedVideo[];
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose }) => {
-  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs), [rawOutputs]);
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [] }) => {
+  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, insertedVideos), [rawOutputs, insertedVideos]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set([0]));
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
@@ -421,6 +436,42 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           </div>
         );
 
+      case "video": {
+        const vid = slide.video;
+        if (!vid) return null;
+        const startSec = vid.startTime ? vid.startTime.split(":").reduce((a: number, b: string) => a * 60 + parseInt(b), 0) : 0;
+        const endParam = vid.endTime ? `&end=${vid.endTime.split(":").reduce((a: number, b: string) => a * 60 + parseInt(b), 0)}` : "";
+        const src = `https://www.youtube.com/embed/${vid.videoId}?start=${startSec}${endParam}&rel=0&modestbranding=1&color=white`;
+        const durMatch = vid.duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+        const durStr = durMatch ? `${parseInt(durMatch[2]||"0")}:${String(parseInt(durMatch[3]||"0")).padStart(2,"0")}` : "";
+        return (
+          <div className="max-w-[800px] mx-auto animate-fade-in">
+            <div className="rounded-2xl overflow-hidden" style={{ background: "#0f172a" }}>
+              <div className="px-7 pt-5 flex items-center gap-2">
+                <span className="text-[12px] text-white/50 uppercase tracking-wider font-semibold">Video Resource</span>
+                <span className="w-2 h-2 rounded-full bg-[#ef4444]" />
+              </div>
+              <div className="px-7 pt-3 pb-3">
+                <h2 className="text-[22px] font-bold text-white">{vid.title}</h2>
+                <p className="text-[13px] text-white/60 mt-1">{vid.channelTitle} · {durStr}</p>
+              </div>
+              <div className="px-5 pb-4">
+                <iframe
+                  src={src}
+                  className="w-full rounded-xl"
+                  style={{ height: "338px" }}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+              <div className="px-7 pb-5">
+                <p className="text-[11px] text-white/40">Source: YouTube — included for educational purposes</p>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
       default:
         return null;
     }
@@ -474,6 +525,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       <Check className="w-3 h-3 text-emerald-400 shrink-0" />
                     ) : s.idx === currentSlide ? (
                       <div className="w-2 h-2 rounded-full bg-[#4f46e5] shrink-0" />
+                    ) : s.type === "video" ? (
+                      <div className="w-2 h-2 rounded-full bg-[#ef4444] shrink-0" title={`Video clip: ${s.topicTitle}`} />
                     ) : (
                       <div className="w-2 h-2 rounded-full bg-white/20 shrink-0" />
                     )}
@@ -481,6 +534,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       {s.type === "title" ? "Introduction" :
                         s.type === "assessment" ? "Knowledge Check" :
                         s.type === "summary" ? "Summary" :
+                        s.type === "video" ? `▶ ${s.topicTitle?.slice(0, 25) || "Video"}` :
                         s.topicTitle || `Topic ${(s.topicIndex || 0) + 1}`}
                     </span>
                   </button>

@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
-import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play } from "lucide-react";
+import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube } from "lucide-react";
 import { VoicePreview } from "./VoicePreview";
 import { SlidePreview } from "./SlidePreview";
 import { InfographicPreview } from "./InfographicPreview";
 import { LearnerPreview } from "./LearnerPreview";
+import { VideosTab, InsertedVideo } from "./VideosTab";
 
 interface OutputPanelProps {
   outputData: OutputData;
@@ -14,6 +15,7 @@ interface OutputPanelProps {
 
 const tabs = [
   { key: "outline" as const, label: "Outline", icon: BookOpen },
+  { key: "videos" as const, label: "Videos", icon: Youtube },
   { key: "script" as const, label: "Script", icon: FileText },
   { key: "assessment" as const, label: "Assessment", icon: ClipboardCheck },
   { key: "preview" as const, label: "Learner Preview", icon: Play },
@@ -326,17 +328,39 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
 export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
+  const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
   const hasOutput = Object.values(rawOutputs).some(v => v);
-  const content = activeTab === "preview" ? null : outputData[activeTab as keyof OutputData];
+  const content = (activeTab === "preview" || activeTab === "videos") ? null : outputData[activeTab as keyof OutputData];
+
+  const handleInsertVideo = (video: InsertedVideo) => {
+    setInsertedVideos(prev => {
+      if (prev.find(v => v.videoId === video.videoId)) return prev;
+      return [...prev, video];
+    });
+  };
+
+  const handleRemoveVideo = (videoId: string) => {
+    setInsertedVideos(prev => prev.filter(v => v.videoId !== videoId));
+  };
 
   const renderContent = () => {
     if (activeTab === "preview") {
-      // This shouldn't render inline — the tab click opens the modal
       return (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <Play className="w-10 h-10 text-primary/30 mb-3" />
           <p className="text-[14px] font-semibold text-muted-foreground">Learner Preview opened in full screen</p>
         </div>
+      );
+    }
+
+    if (activeTab === "videos") {
+      return (
+        <VideosTab
+          raw={rawOutputs.youtube}
+          insertedVideos={insertedVideos}
+          onInsert={handleInsertVideo}
+          onRemove={handleRemoveVideo}
+        />
       );
     }
 
