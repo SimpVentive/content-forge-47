@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        sans: ["Inter", "sans-serif"],
+        sans: ["Plus Jakarta Sans", "sans-serif"],
         mono: ["JetBrains Mono", "monospace"],
       },
       colors: {
@@ -50,13 +50,6 @@ export default {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
-        },
-        surface: {
-          deep: "hsl(var(--surface-deep))",
-          terminal: "hsl(var(--surface-terminal))",
-        },
-        terminal: {
-          text: "hsl(var(--terminal-text))",
         },
         status: {
           idle: "hsl(var(--status-idle))",

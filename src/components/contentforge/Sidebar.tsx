@@ -1,7 +1,6 @@
 import React from "react";
 import { Zap, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
+import { AGENTS } from "@/types/agents";
 
 interface SidebarProps {
   courseTitle: string;
@@ -27,95 +26,100 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside className="w-[260px] shrink-0 border-r border-border flex flex-col bg-card">
-      {/* Logo */}
-      <div className="p-5 border-b border-border">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-            <Zap className="w-4 h-4 text-primary" />
-          </div>
-          <span className="text-lg font-semibold text-foreground tracking-tight">ContentForge</span>
-        </div>
-      </div>
+    <aside className="w-[420px] shrink-0 border-r border-border flex flex-col bg-card">
+      <div className="flex-1 overflow-y-auto px-7 py-8 space-y-7">
+        {/* Section label */}
+        <p className="text-[13px] font-bold text-primary tracking-[0.1em] uppercase">
+          Build Your Course
+        </p>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-5">
-        {/* Upload zone */}
-        <div
-          onDrop={handleDrop}
-          onDragOver={(e) => e.preventDefault()}
-          className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
-        >
-          <Upload className="w-5 h-5 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-xs text-muted-foreground">Drop PPT, PDF, DOCX or paste text below</p>
-        </div>
-
-        {/* Course title */}
+        {/* Course Title */}
         <div>
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 block">
+          <label className="text-[15px] font-bold text-foreground mb-2 block">
             Course Title
           </label>
           <input
             value={courseTitle}
             onChange={(e) => setCourseTitle(e.target.value)}
-            className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+            className="w-full h-12 border-[1.5px] border-border rounded-xl px-4 text-[17px] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors duration-[180ms]"
             placeholder="Enter course title..."
           />
         </div>
 
-        {/* SME Notes */}
+        {/* Source Material */}
         <div>
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1.5 block">
-            SME Notes / Content
+          <label className="text-[15px] font-bold text-foreground mb-1 block">
+            Source Material
           </label>
+          <p className="text-[13px] text-muted-foreground mb-3">
+            Upload a file or paste your SME notes below
+          </p>
+
+          {/* Drag-drop zone */}
+          <div
+            onDrop={handleDrop}
+            onDragOver={(e) => e.preventDefault()}
+            className="border-2 border-dashed border-primary/25 rounded-2xl p-6 text-center cursor-pointer hover:bg-primary/[0.04] hover:border-primary transition-all duration-[180ms] mb-4"
+          >
+            <Upload className="w-9 h-9 mx-auto mb-3 text-primary" />
+            <p className="text-[15px] font-semibold text-foreground mb-1">Drop PPT, PDF or DOCX here</p>
+            <div className="flex items-center gap-3 justify-center my-2">
+              <div className="h-px w-8 bg-border" />
+              <span className="text-[13px] text-muted-foreground">or</span>
+              <div className="h-px w-8 bg-border" />
+            </div>
+            <span className="text-primary text-[14px] font-semibold underline underline-offset-2">Browse files</span>
+          </div>
+
+          {/* Textarea */}
           <textarea
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
-            rows={6}
-            className="w-full bg-secondary border border-border rounded-md px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+            rows={10}
+            className="w-full border-[1.5px] border-border rounded-xl px-4 py-3.5 text-[15px] leading-[1.6] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none transition-colors duration-[180ms]"
             placeholder="Paste subject matter notes..."
           />
         </div>
 
         {/* Generate button */}
-        <Button
+        <button
           onClick={onGenerate}
           disabled={isRunning || !courseTitle.trim()}
-          className="w-full h-10 font-semibold"
+          className="w-full h-14 rounded-xl text-[17px] font-bold text-white flex items-center justify-center gap-2.5 shadow-btn-primary hover:brightness-[1.08] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-[180ms]"
+          style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
         >
           {isRunning ? (
-            <span className="flex items-center gap-2">
-              <span className="w-3 h-3 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+            <>
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               Generating...
-            </span>
+            </>
           ) : (
             <>
-              <Zap className="w-4 h-4" />
+              <Zap className="w-5 h-5" />
               Generate Course
             </>
           )}
-        </Button>
+        </button>
 
-        {/* Pipeline Settings */}
+        {/* Pipeline Toggles */}
         <div>
-          <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
-            Pipeline Settings
-          </h3>
-          <div className="space-y-2">
+          <h3 className="text-[15px] font-bold text-foreground mb-3">Pipeline Agents</h3>
+          <div className="grid grid-cols-2 gap-2.5">
             {AGENTS.map((agent) => (
-              <label key={agent.id} className="flex items-center justify-between text-sm">
-                <span className="text-foreground/80 truncate mr-2">{agent.name}</span>
+              <label key={agent.id} className="flex items-center gap-2 cursor-pointer">
                 <button
                   onClick={() => setAgentToggles(prev => ({ ...prev, [agent.id]: !prev[agent.id] }))}
-                  className={`w-9 h-5 rounded-full transition-colors relative ${
+                  className={`w-10 h-[22px] rounded-full transition-colors duration-[180ms] relative shrink-0 ${
                     agentToggles[agent.id] ? "bg-primary" : "bg-border"
                   }`}
                 >
                   <span
-                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-foreground transition-transform ${
-                      agentToggles[agent.id] ? "translate-x-4" : "translate-x-0.5"
+                    className={`absolute top-[3px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-[180ms] ${
+                      agentToggles[agent.id] ? "translate-x-[22px]" : "translate-x-[3px]"
                     }`}
                   />
                 </button>
+                <span className="text-[14px] font-semibold text-foreground truncate">{agent.name.replace(' Agent', '')}</span>
               </label>
             ))}
           </div>
