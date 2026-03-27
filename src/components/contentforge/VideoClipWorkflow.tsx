@@ -428,16 +428,31 @@ const ClipPlayer: React.FC<{ clips: ClipItem[]; onClose: () => void }> = ({ clip
 /* ═══════════════════════════════════════
    MAIN WORKFLOW ORCHESTRATOR
    ═══════════════════════════════════════ */
-export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, onComplete, onSkip }) => {
+export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, courseTitle, language, level, duration, onComplete, onSkip }) => {
   const [step, setStep] = useState<"ask" | "browse" | "clipRange" | "insertAnother" | "review" | "preview" | "done">("ask");
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
   const [browseModule, setBrowseModule] = useState("all");
   const [searchQ, setSearchQ] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [youtubeData, setYoutubeData] = useState(() => tryParseJSON(youtubeRaw));
   const idCounter = useRef(0);
 
-  const data = tryParseJSON(youtubeRaw);
-  const allModules: { module_title: string; videos: any[] }[] = data?.modules || [];
+  const allModules: { module_title: string; videos: any[] }[] = youtubeData?.modules || [];
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const moduleNames = modules.length > 0 ? modules : [courseTitle];
+      const { data, error } = await supabase.functions.invoke("youtube-search", {
+        body: { modules: moduleNames, courseTitle, language, level, duration },
+      });
+      if (!error && data?.modules) {
+        setYoutubeData(data);
+      }
+    } catch {}
+    setRefreshing(false);
+  };
 
   const handleSelectVideo = (video: any) => {
     setSelectedVideo(video);

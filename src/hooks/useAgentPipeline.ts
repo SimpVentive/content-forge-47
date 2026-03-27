@@ -192,8 +192,8 @@ export function useAgentPipeline() {
         addLog(`YouTube Agent: Searching top videos for ${moduleNames.length} modules...`);
         
         try {
-          const { data, error } = await supabase.functions.invoke("youtube-search", {
-            body: { modules: moduleNames, courseTitle, language: params?.language, level: params?.level },
+        const { data, error } = await supabase.functions.invoke("youtube-search", {
+            body: { modules: moduleNames, courseTitle, language: params?.language, level: params?.level, duration: params?.duration },
           });
           
           if (error) throw new Error(error.message);
