@@ -46,27 +46,23 @@ export const AgentCard: React.FC<AgentCardProps> = ({ agent, isLast, enabled, on
   const color = AGENT_COLORS[agent.id] || "#64748b";
   const initial = AGENT_INITIALS[agent.id] || "?";
 
-  const leftBorder =
-    agent.status === "running" ? `4px solid #4f46e5` :
-    agent.status === "complete" ? `4px solid #059669` : "4px solid transparent";
-
   return (
     <div className="relative">
       <div
         className={`bg-card rounded-xl shadow-card hover:shadow-card-hover hover:-translate-y-px transition-all duration-[180ms] flex items-center gap-4 px-5 py-4 ${!enabled ? "opacity-50" : ""}`}
-        style={{ borderLeft: leftBorder, background: agent.status === "running" ? "rgba(79,70,229,0.02)" : undefined }}
       >
         {/* Toggle */}
         <button
-          onClick={onToggle}
-          className={`w-[38px] h-[20px] rounded-full transition-colors duration-[180ms] relative shrink-0 ${
-            enabled ? "bg-primary" : "bg-border"
-          }`}
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          className="relative shrink-0 w-[44px] h-[24px] rounded-full transition-colors duration-200 cursor-pointer"
+          style={{ backgroundColor: enabled ? "hsl(192, 91%, 36%)" : "#cbd5e1" }}
+          type="button"
+          role="switch"
+          aria-checked={enabled}
         >
           <span
-            className={`absolute top-[2px] w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-[180ms] ${
-              enabled ? "translate-x-[20px]" : "translate-x-[2px]"
-            }`}
+            className="absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200"
+            style={{ left: enabled ? "23px" : "3px" }}
           />
         </button>
 
