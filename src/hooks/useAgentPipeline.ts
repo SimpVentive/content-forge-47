@@ -120,8 +120,8 @@ export function useAgentPipeline() {
         setStatus("writer", "running");
         addLog("Writer Agent: Drafting Module 1 script...");
         writerResult = await callClaudeWithRetry(
-          "You are an Expert Instructional Writer. Write a full learning script for Module 1 only. Include: intro hook, 3 content sections with examples, a summary, and a reflection question. Write in second person, conversational tone, 400-600 words.",
-          archResult || researchResult || `Course: ${courseTitle}`,
+          "You are an Expert Instructional Writer. Write a full learning script for Module 1 only. Include: intro hook, 3 content sections with examples, a summary, and a reflection question. Write in second person, conversational tone, 400-600 words. You MUST use content, examples, and terminology from the source material provided. Do NOT use generic or unrelated examples.",
+          `Course Structure:\n${archResult}\n\nResearch:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\n\nWrite the script using the actual content from the source material above.`,
           addLog, "Writer Agent"
         );
         setStatus("writer", "complete");
