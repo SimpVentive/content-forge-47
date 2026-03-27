@@ -397,20 +397,35 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           )}
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-[180ms] ${
-                activeTab === tab.key
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:bg-border"
-              }`}
-            >
-              <tab.icon className="w-3 h-3" />
-              {tab.label}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const isPreview = tab.key === "preview";
+            const disabled = isPreview && !hasOutput;
+            return (
+              <button
+                key={tab.key}
+                disabled={disabled}
+                onClick={() => {
+                  if (isPreview && hasOutput) {
+                    setShowLearnerPreview(true);
+                  } else if (!isPreview) {
+                    setActiveTab(tab.key);
+                  }
+                }}
+                className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-[180ms] ${
+                  disabled
+                    ? "bg-secondary/50 text-muted-foreground/40 cursor-not-allowed"
+                    : isPreview
+                      ? "bg-accent text-primary hover:bg-primary/10 border border-primary/30"
+                      : activeTab === tab.key
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-muted-foreground hover:bg-border"
+                }`}
+              >
+                <tab.icon className="w-3 h-3" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
