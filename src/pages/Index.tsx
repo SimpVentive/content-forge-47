@@ -31,7 +31,7 @@ const Index = () => {
         <div className="flex items-center gap-2.5">
           <img src={contentForgeLogo} alt="ContentForge" className="w-12 h-12 rounded-lg drop-shadow-md" />
         </div>
-        <span className="absolute left-1/2 -translate-x-1/2 text-[28px] font-[800] text-foreground tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <span className="absolute left-1/2 -translate-x-1/2 text-[36px] font-[800] tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: '#1e3a5f' }}>
           ContentForge
         </span>
         <button className="h-[44px] px-5 bg-primary text-primary-foreground rounded-lg text-[15px] font-bold shadow-btn-primary hover:brightness-110 transition-all duration-[180ms] flex items-center gap-2">

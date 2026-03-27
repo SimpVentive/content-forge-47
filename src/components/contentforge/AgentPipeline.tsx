@@ -16,7 +16,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
-          <h2 className="text-[28px] font-[800] text-foreground">Pipeline Agents</h2>
+          <h2 className="text-[22px] font-[700] text-foreground">Pipeline Agents</h2>
           <p className="text-[14px] text-muted-foreground mt-0.5">Toggle agents on/off · Watch them work in real-time</p>
         </div>
         <div className="flex items-center gap-2 bg-card rounded-full px-4 py-2 shadow-card">
