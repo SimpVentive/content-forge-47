@@ -119,9 +119,41 @@ export function useAgentPipeline() {
       if (toggles["writer"] !== false) {
         setStatus("writer", "running");
         addLog("Writer Agent: Drafting Module 1 script...");
+        // Extract module/topic info for writer
+        let writerTopics = "";
+        try {
+          const archParsed = JSON.parse(archResult || "{}");
+          const mods = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
+          writerTopics = mods.map((m: any, mi: number) => {
+            const title = m.module_title || m.title || m.name || `Module ${mi+1}`;
+            const topics = (m.topics || m.sections || m.lessons || []).map((t: any) => {
+              const name = typeof t === "string" ? t : t.topic_title || t.title || t.name || "";
+              const obj = typeof t === "string" ? "" : t.learning_objective || t.objective || "";
+              return `  - Topic: ${name}${obj ? ` | Objective: ${obj}` : ""}`;
+            }).join("\n");
+            return `Module: ${title}\n${topics}`;
+          }).join("\n\n");
+        } catch { writerTopics = courseTitle; }
+
         writerResult = await callClaudeWithRetry(
-          "You are an Expert Instructional Writer. Write a full learning script for Module 1 only. Include: intro hook, 3 content sections with examples, a summary, and a reflection question. Write in second person, conversational tone, 400-600 words. You MUST use content, examples, and terminology from the source material provided. Do NOT use generic or unrelated examples.",
-          `Course Structure:\n${archResult}\n\nResearch:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\n\nWrite the script using the actual content from the source material above.`,
+          `You are an elite instructional writer who specialises in corporate eLearning that people actually enjoy. Your writing style is: conversational, direct, and energetic — like a brilliant colleague explaining something important over coffee, not a textbook.
+
+Rules you NEVER break:
+- Open every topic with a provocative hook — a shocking stat, a bold claim, a real-world scenario, or a question that makes the learner stop and think
+- Write in second person: 'You', 'Your team', 'You've probably seen this'
+- Short punchy sentences. Never more than 20 words per sentence.
+- Use concrete real-world examples, not abstract theory
+- Every section must have ONE memorable takeaway — something the learner will still remember next week
+- Use analogies. Make complex ideas click instantly.
+- End every topic with a challenge or reflection: 'Next time you X, try Y instead'
+- NO passive voice. NO jargon without explanation. NO bullet walls.
+- Format each topic as: Hook (2-3 sentences) → Core concept (3-4 sentences) → Real example (2-3 sentences) → Key Takeaway: (1-2 sentences) → Challenge: (1 sentence)
+- Total length per topic: 120-180 words. Tight and impactful.
+- Use markdown ## headers for each topic title, matching the exact topic names provided.
+- You MUST use content from the source material provided. Do NOT invent unrelated examples.
+
+For the current course, write content that would make a learner lean forward, not lean back.`,
+          `Course Title: ${courseTitle}\n\nModules & Topics:\n${writerTopics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for EVERY topic listed above. Use ## headers matching the topic names exactly.`,
           addLog, "Writer Agent"
         );
         setStatus("writer", "complete");
@@ -149,6 +181,46 @@ export function useAgentPipeline() {
           outline: prev.outline + `\n\n---\n\n## Visual Design Plan\n\n${visualResult}`,
         }));
         addLog("Visual Design Agent: Complete. Design plan ready.");
+
+        // ── SVG Generation Pass ──
+        addLog("Visual Design Agent: Generating SVG infographics...");
+        try {
+          const visParsed = JSON.parse(visualResult || "{}");
+          const visModules = visParsed.modules || [];
+          const archParsed = JSON.parse(archResult || "{}");
+          const archMods = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
+          
+          const svgs: string[] = [];
+          for (let si = 0; si < Math.min(visModules.length, archMods.length); si++) {
+            if (isCancelled()) break;
+            const vm = visModules[si];
+            const am = archMods[si];
+            const modTitle = vm.module_title || am?.module_title || am?.title || `Module ${si+1}`;
+            const topics = (am?.topics || am?.sections || []).map((t: any) => typeof t === "string" ? t : t.topic_title || t.title || t.name || "").filter(Boolean);
+            const layoutType = vm.slide_layout || "Standard";
+            
+            addLog(`Visual Design Agent: Generating SVG ${si+1}/${visModules.length}...`);
+            try {
+              const svgText = await callClaude(
+                "You are an SVG designer. Generate a complete, self-contained SVG infographic (600x380px). Use ONLY these colors: #4f46e5 (indigo), #7c3aed (violet), #10b981 (emerald), #f59e0b (amber), #f8fafc (light bg), #0f172a (dark text), #ffffff (white). No external fonts — use font-family='system-ui, sans-serif'. No external images. Use only SVG primitives: rect, circle, path, text, line, polygon. Make it visually striking with geometric shapes, icons built from primitives, clear hierarchy. Must look professional and corporate. Return ONLY the SVG markup, nothing else.",
+                `Create an infographic for: ${modTitle}. Layout: ${layoutType}. Key points to visualise: ${topics.join(", ")}. Include the module title at the top in large bold text. Add a small 'ContentForge' label bottom-right in 10px muted text.`
+              );
+              // Extract SVG from response
+              const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i);
+              svgs.push(svgMatch ? svgMatch[0] : "");
+            } catch {
+              svgs.push("");
+            }
+          }
+          
+          // Update visual output with SVGs
+          const updatedVisual = { ...visParsed, generatedSvgs: svgs };
+          const updatedVisualStr = JSON.stringify(updatedVisual);
+          setRawOutputs((prev) => ({ ...prev, visual: updatedVisualStr }));
+          addLog(`Visual Design Agent: ${svgs.filter(Boolean).length} SVG infographics generated.`);
+        } catch (svgErr) {
+          addLog("Visual Design Agent: SVG generation skipped (parse error).");
+        }
       } else {
         setStatus("visual", "idle");
       }
