@@ -75,7 +75,7 @@ const Index = () => {
 
         {/* Right — Output */}
         <ResizablePanel defaultSize={30} minSize={15} maxSize={45}>
-          <OutputPanel outputData={outputData} />
+          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
