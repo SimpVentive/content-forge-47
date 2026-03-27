@@ -76,7 +76,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [level, setLevel] = useState<CourseParameters["level"]>("intermediate");
   const [language, setLanguage] = useState("English");
   const [voiceAccent, setVoiceAccent] = useState("Rachel");
-  const [duration, setDuration] = useState("1hr");
+  const [duration, setDuration] = useState("15min");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
 
   if (!open) return null;
