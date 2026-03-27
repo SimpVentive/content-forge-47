@@ -324,7 +324,9 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
 
 export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle }) => {
   const [activeTab, setActiveTab] = useState<keyof OutputData>("script");
+  const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const content = outputData[activeTab];
+  const hasOutput = Object.values(rawOutputs).some(v => v);
 
   const renderContent = () => {
     if (!content) {
@@ -356,12 +358,32 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
 
   return (
     <div className="h-full flex flex-col bg-card border-l border-border">
+      {/* Learner Preview Modal */}
+      {showLearnerPreview && (
+        <LearnerPreview
+          courseTitle={courseTitle}
+          rawOutputs={rawOutputs}
+          onClose={() => setShowLearnerPreview(false)}
+        />
+      )}
+
       <div className="px-5 pt-6 pb-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
-            <Sparkles className="w-4 h-4 text-white" />
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
+              <Sparkles className="w-4 h-4 text-white" />
+            </div>
+            <h2 className="text-[20px] font-extrabold text-foreground">Course Output</h2>
           </div>
-          <h2 className="text-[20px] font-extrabold text-foreground">Course Output</h2>
+          {hasOutput && (
+            <button
+              onClick={() => setShowLearnerPreview(true)}
+              className="h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1.5 border-2 border-primary text-primary hover:bg-primary/5 transition-all"
+            >
+              <Play className="w-3 h-3" />
+              Preview
+            </button>
+          )}
         </div>
         <div className="flex gap-1.5 flex-wrap">
           {tabs.map((tab) => (
