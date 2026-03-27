@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -38,6 +38,7 @@ export function useAgentPipeline() {
   const [rawOutputs, setRawOutputs] = useState<RawAgentOutputs>(initialRaw());
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const cancelledRef = useRef(false);
 
   const addLog = useCallback((msg: string) => {
     setLogs((prev) => [...prev, `${timestamp()} ${msg}`]);
@@ -48,11 +49,14 @@ export function useAgentPipeline() {
   }, []);
 
   const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>) => {
+    cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
     setOutputData(initialOutput());
     setRawOutputs(initialRaw());
     setLogs([]);
+
+    const isCancelled = () => cancelledRef.current;
 
     // Set all agents to queued initially
     AGENTS.forEach(({ id }) => {
@@ -72,6 +76,7 @@ export function useAgentPipeline() {
 
     try {
       // ──── AGENT 1: Research ────
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       if (toggles["research"] !== false) {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
@@ -88,6 +93,7 @@ export function useAgentPipeline() {
         setStatus("research", "idle");
       }
 
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 2: Content Architect ────
       if (toggles["architect"] !== false) {
         setStatus("architect", "running");
@@ -108,6 +114,7 @@ export function useAgentPipeline() {
         setStatus("architect", "idle");
       }
 
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 3: Writer ────
       if (toggles["writer"] !== false) {
         setStatus("writer", "running");
@@ -125,6 +132,7 @@ export function useAgentPipeline() {
         setStatus("writer", "idle");
       }
 
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 4: Visual Design ────
       if (toggles["visual"] !== false) {
         setStatus("visual", "running");
@@ -145,6 +153,7 @@ export function useAgentPipeline() {
         setStatus("visual", "idle");
       }
 
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 5: Animation ────
       if (toggles["animation"] !== false) {
         setStatus("animation", "running");
@@ -165,6 +174,7 @@ export function useAgentPipeline() {
         setStatus("animation", "idle");
       }
 
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 5b: YouTube ────
       if (toggles["youtube"] !== false) {
         setStatus("youtube", "running");
@@ -212,6 +222,7 @@ export function useAgentPipeline() {
         setStatus("youtube", "idle");
       }
 
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 6: Compliance ────
       if (toggles["compliance"] !== false) {
         setStatus("compliance", "running");
@@ -240,6 +251,7 @@ export function useAgentPipeline() {
         setStatus("compliance", "idle");
       }
 
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 7: Assessment ────
       if (toggles["assessment"] !== false) {
         setStatus("assessment", "running");
@@ -257,6 +269,7 @@ export function useAgentPipeline() {
         setStatus("assessment", "idle");
       }
 
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 8: Voice & Narration ────
       if (toggles["voice"] !== false) {
         setStatus("voice", "running");
@@ -285,6 +298,7 @@ export function useAgentPipeline() {
         setStatus("voice", "idle");
       }
 
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 9: Final Assembly ────
       if (toggles["assembly"] !== false) {
         setStatus("assembly", "running");
@@ -317,10 +331,15 @@ export function useAgentPipeline() {
     setIsRunning(false);
   }, [addLog, setStatus]);
 
+  const stopPipeline = useCallback(() => {
+    cancelledRef.current = true;
+    addLog("Orchestrator: Stop requested — finishing current agent...");
+  }, [addLog]);
+
   const agents: AgentInfo[] = AGENTS.map((a) => ({
     ...a,
     status: agentStatuses[a.id] || "idle",
   }));
 
-  return { agents, outputData, rawOutputs, logs, isRunning, runPipeline };
+  return { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline };
 }
