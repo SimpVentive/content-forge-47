@@ -9,6 +9,7 @@ import { Plus, Play } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { LearnerPreview } from "@/components/contentforge/LearnerPreview";
+import { CourseParametersDialog, CourseParameters } from "@/components/contentforge/CourseParametersDialog";
 
 const Index = () => {
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
@@ -17,11 +18,26 @@ const Index = () => {
     Object.fromEntries(AGENTS.map((a) => [a.id, true]))
   );
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
+  const [showParamsDialog, setShowParamsDialog] = useState(false);
+  const [courseParams, setCourseParams] = useState<CourseParameters | null>(null);
 
   const { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline } = useAgentPipeline();
 
-  const handleGenerate = () => {
-    runPipeline(courseTitle, inputText, agentToggles);
+  const handleGenerateClick = () => {
+    // Show parameters dialog before generating
+    setShowParamsDialog(true);
+  };
+
+  const handleParamsConfirm = (params: CourseParameters) => {
+    setCourseParams(params);
+    setShowParamsDialog(false);
+    // Disable assessment agent if not required
+    if (!params.assessmentRequired) {
+      setAgentToggles(prev => ({ ...prev, assessment: false }));
+    } else {
+      setAgentToggles(prev => ({ ...prev, assessment: true }));
+    }
+    runPipeline(courseTitle, inputText, agentToggles, params);
   };
 
   const hasRun = logs.length > 0;
@@ -65,6 +81,14 @@ const Index = () => {
         />
       )}
 
+      {/* Course Parameters Dialog */}
+      <CourseParametersDialog
+        open={showParamsDialog}
+        courseTitle={courseTitle}
+        onConfirm={handleParamsConfirm}
+        onCancel={() => setShowParamsDialog(false)}
+      />
+
       {/* 3-column resizable layout */}
       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
         {/* Left — Course Input */}
@@ -74,7 +98,7 @@ const Index = () => {
             setCourseTitle={setCourseTitle}
             inputText={inputText}
             setInputText={setInputText}
-            onGenerate={handleGenerate}
+            onGenerate={handleGenerateClick}
             onStop={stopPipeline}
             isRunning={isRunning}
             agentToggles={agentToggles}
