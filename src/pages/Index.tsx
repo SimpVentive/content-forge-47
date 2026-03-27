@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "@/components/contentforge/Sidebar";
 import { AgentPipeline } from "@/components/contentforge/AgentPipeline";
 import { OutputPanel } from "@/components/contentforge/OutputPanel";
@@ -10,6 +10,7 @@ import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/componen
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { LearnerPreview } from "@/components/contentforge/LearnerPreview";
 import { CourseParametersDialog, CourseParameters } from "@/components/contentforge/CourseParametersDialog";
+import { VideoClipWorkflow } from "@/components/contentforge/VideoClipWorkflow";
 
 const Index = () => {
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
@@ -20,8 +21,30 @@ const Index = () => {
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [showParamsDialog, setShowParamsDialog] = useState(false);
   const [courseParams, setCourseParams] = useState<CourseParameters | null>(null);
+  const [showVideoWorkflow, setShowVideoWorkflow] = useState(false);
+  const prevIsRunning = useRef(false);
 
   const { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline } = useAgentPipeline();
+
+  // Detect pipeline completion → trigger video workflow
+  useEffect(() => {
+    if (prevIsRunning.current && !isRunning && rawOutputs.youtube) {
+      // Pipeline just finished and has youtube data
+      setTimeout(() => setShowVideoWorkflow(true), 800);
+    }
+    prevIsRunning.current = isRunning;
+  }, [isRunning, rawOutputs.youtube]);
+
+  // Extract module names from architect output
+  const getModuleNames = (): string[] => {
+    try {
+      const parsed = JSON.parse(rawOutputs.architect || "{}");
+      const mods = parsed.modules || parsed.course_structure?.modules || parsed.course_modules || [];
+      return mods.map((m: any) => m.module_title || m.title || m.name || "").filter(Boolean);
+    } catch {
+      return [courseTitle];
+    }
+  };
 
   const handleGenerateClick = () => {
     // Show parameters dialog before generating
@@ -88,6 +111,19 @@ const Index = () => {
         onConfirm={handleParamsConfirm}
         onCancel={() => setShowParamsDialog(false)}
       />
+
+      {/* YouTube Clip Workflow — triggered after pipeline completes */}
+      {showVideoWorkflow && rawOutputs.youtube && (
+        <VideoClipWorkflow
+          youtubeRaw={rawOutputs.youtube}
+          modules={getModuleNames()}
+          onComplete={(clips) => {
+            setShowVideoWorkflow(false);
+            // Switch to Videos tab is handled by OutputPanel
+          }}
+          onSkip={() => setShowVideoWorkflow(false)}
+        />
+      )}
 
       {/* 3-column resizable layout */}
       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
