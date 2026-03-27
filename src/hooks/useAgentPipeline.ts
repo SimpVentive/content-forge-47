@@ -81,7 +81,7 @@ export function useAgentPipeline() {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
         researchResult = await callClaudeWithRetry(
-          "You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract 5 key themes, 3 credible knowledge areas, and suggest 8 learning objectives — ALL directly derived from the provided source material. If the source material is about POSH (Prevention of Sexual Harassment), your output must be about POSH. Return as JSON.",
+          `You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract 5 key themes, 3 credible knowledge areas, and suggest 8 learning objectives — ALL directly derived from the provided source material. Course level: ${params?.level || "intermediate"}. Language: ${params?.language || "English"}. Target duration: ${params?.duration || "1hr"}. Return as JSON.`,
           `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content.`,
           addLog, "Research Agent"
         );
