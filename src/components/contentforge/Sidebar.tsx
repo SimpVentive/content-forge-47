@@ -31,7 +31,7 @@ const readFileAsText = (file: File): Promise<string> => {
 
 export const Sidebar: React.FC<SidebarProps> = ({
   courseTitle, setCourseTitle, inputText, setInputText,
-  onGenerate, isRunning,
+  onGenerate, onStop, isRunning,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
