@@ -25,16 +25,20 @@ serve(async (req) => {
     const results: any[] = [];
 
     for (const mod of modules) {
-      const query = `${mod} ${courseTitle}`;
+      const query = `${mod} ${courseTitle} ${language || ""} ${level || ""}`.trim();
       const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
       searchUrl.searchParams.set("key", apiKey);
       searchUrl.searchParams.set("q", query);
       searchUrl.searchParams.set("part", "snippet");
       searchUrl.searchParams.set("type", "video");
-      searchUrl.searchParams.set("maxResults", "3");
-      searchUrl.searchParams.set("order", "viewCount");
+      searchUrl.searchParams.set("maxResults", "8");
+      searchUrl.searchParams.set("order", "relevance");
       searchUrl.searchParams.set("videoEmbeddable", "true");
       searchUrl.searchParams.set("safeSearch", "strict");
+      if (language && language !== "English") {
+        const langMap: Record<string, string> = { Hindi: "hi", Tamil: "ta", Telugu: "te", Kannada: "kn", Malayalam: "ml", Bengali: "bn", Marathi: "mr", Gujarati: "gu", Punjabi: "pa", Urdu: "ur" };
+        if (langMap[language]) searchUrl.searchParams.set("relevanceLanguage", langMap[language]);
+      }
 
       const searchRes = await fetch(searchUrl.toString());
       const searchData = await searchRes.json();
