@@ -249,6 +249,7 @@ export function useAgentPipeline() {
           addLog, "Final Assembly"
         );
         setStatus("assembly", "complete");
+        setRawOutputs((prev) => ({ ...prev, assembly: assemblyResult }));
         setOutputData((prev) => ({ ...prev, package: assemblyResult }));
         addLog("Final Assembly: Complete. Course package ready for LMS deployment.");
         addLog("Orchestrator: All 9 agents complete. Pipeline finished successfully.");
