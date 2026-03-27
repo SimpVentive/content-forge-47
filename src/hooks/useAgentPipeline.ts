@@ -331,10 +331,15 @@ export function useAgentPipeline() {
     setIsRunning(false);
   }, [addLog, setStatus]);
 
+  const stopPipeline = useCallback(() => {
+    cancelledRef.current = true;
+    addLog("Orchestrator: Stop requested — finishing current agent...");
+  }, [addLog]);
+
   const agents: AgentInfo[] = AGENTS.map((a) => ({
     ...a,
     status: agentStatuses[a.id] || "idle",
   }));
 
-  return { agents, outputData, rawOutputs, logs, isRunning, runPipeline };
+  return { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline };
 }
