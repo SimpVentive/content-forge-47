@@ -117,9 +117,12 @@ const Index = () => {
         <VideoClipWorkflow
           youtubeRaw={rawOutputs.youtube}
           modules={getModuleNames()}
+          courseTitle={courseTitle}
+          language={courseParams?.language}
+          level={courseParams?.level}
+          duration={courseParams?.duration}
           onComplete={(clips) => {
             setShowVideoWorkflow(false);
-            // Switch to Videos tab is handled by OutputPanel
           }}
           onSkip={() => setShowVideoWorkflow(false)}
         />
