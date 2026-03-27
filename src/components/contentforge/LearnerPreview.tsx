@@ -34,7 +34,7 @@ interface Slide {
 }
 
 /* ── build slides from agent outputs ── */
-function buildSlides(rawOutputs: RawAgentOutputs): { modules: Module[]; slides: Slide[] } {
+function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = []): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
   const assessData = tryParseJSON(rawOutputs.assessment);
