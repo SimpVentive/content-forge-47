@@ -4,8 +4,8 @@ import { Check } from "lucide-react";
 
 const AGENT_COLORS: Record<string, string> = {
   research: "#3b82f6",
-  architect: "#8b5cf6",
-  writer: "#4f46e5",
+  architect: "#0891b2",
+  writer: "#0e7490",
   visual: "#ec4899",
   animation: "#f97316",
   compliance: "#f59e0b",
