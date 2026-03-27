@@ -18,17 +18,15 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData }) => {
   const content = outputData[activeTab];
 
   return (
-    <aside className="w-[380px] shrink-0 border-l border-border flex flex-col bg-card">
-      <div className="px-6 pt-6 pb-4">
-        <h2 className="text-[20px] font-[800] text-foreground mb-4">Course Output</h2>
-
-        {/* Tab bar */}
-        <div className="flex gap-1.5">
+    <div className="h-full flex flex-col bg-card border-l border-border">
+      <div className="px-5 pt-6 pb-4">
+        <h2 className="text-[20px] font-extrabold text-foreground mb-4">Course Output</h2>
+        <div className="flex gap-1.5 flex-wrap">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`h-8 px-3 rounded-lg text-[13px] font-bold flex items-center gap-1 transition-all duration-[180ms] ${
+              className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-[180ms] ${
                 activeTab === tab.key
                   ? "bg-primary text-primary-foreground"
                   : "bg-secondary text-muted-foreground hover:bg-border"
@@ -41,8 +39,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData }) => {
         </div>
       </div>
 
-      {/* Content area */}
-      <div className="flex-1 overflow-y-auto px-6 pb-6">
+      <div className="flex-1 overflow-y-auto px-5 pb-6">
         {content ? (
           <div className="text-[14px] text-foreground/90 whitespace-pre-wrap leading-[1.7] animate-fade-in">
             {content}
@@ -50,10 +47,10 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData }) => {
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <FileText className="w-10 h-10 text-muted-foreground/30 mb-3" />
-            <p className="text-[15px] font-semibold text-muted-foreground">Run the pipeline to see output</p>
+            <p className="text-[14px] font-semibold text-muted-foreground">Run the pipeline to see output</p>
           </div>
         )}
       </div>
-    </aside>
+    </div>
   );
 };
