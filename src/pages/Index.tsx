@@ -29,12 +29,16 @@ const Index = () => {
       {/* Top Navbar */}
       <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
-            <Zap className="w-4 h-4 text-white" strokeWidth={2.5} />
-          </div>
-          <span className="text-[22px] font-[800] text-foreground tracking-tight">ContentForge</span>
+          <img src={contentForgeLogo} alt="ContentForge" className="w-9 h-9 rounded-lg" />
         </div>
+        <span className="absolute left-1/2 -translate-x-1/2 text-[24px] font-[800] text-foreground tracking-tight" style={{ fontFamily: "'Outfit', sans-serif" }}>
+          Content<span className="bg-gradient-to-r from-[hsl(var(--primary))] to-[#7c3aed] bg-clip-text text-transparent">Forge</span>
+        </span>
         <button className="h-[44px] px-5 bg-primary text-primary-foreground rounded-lg text-[15px] font-bold shadow-btn-primary hover:brightness-110 transition-all duration-[180ms] flex items-center gap-2">
+          <Plus className="w-4 h-4" />
+          New Course
+        </button>
+      </header>
           <Plus className="w-4 h-4" />
           New Course
         </button>
