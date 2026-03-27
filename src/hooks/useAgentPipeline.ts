@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData } from "@/types/agents";
+import { supabase } from "@/integrations/supabase/client";
 
 const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
