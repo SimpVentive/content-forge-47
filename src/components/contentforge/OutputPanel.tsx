@@ -328,8 +328,9 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
 export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
+  const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
   const hasOutput = Object.values(rawOutputs).some(v => v);
-  const content = activeTab === "preview" ? null : outputData[activeTab as keyof OutputData];
+  const content = (activeTab === "preview" || activeTab === "videos") ? null : outputData[activeTab as keyof OutputData];
 
   const renderContent = () => {
     if (activeTab === "preview") {
