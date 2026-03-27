@@ -119,9 +119,41 @@ export function useAgentPipeline() {
       if (toggles["writer"] !== false) {
         setStatus("writer", "running");
         addLog("Writer Agent: Drafting Module 1 script...");
+        // Extract module/topic info for writer
+        let writerTopics = "";
+        try {
+          const archParsed = JSON.parse(archResult || "{}");
+          const mods = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
+          writerTopics = mods.map((m: any, mi: number) => {
+            const title = m.module_title || m.title || m.name || `Module ${mi+1}`;
+            const topics = (m.topics || m.sections || m.lessons || []).map((t: any) => {
+              const name = typeof t === "string" ? t : t.topic_title || t.title || t.name || "";
+              const obj = typeof t === "string" ? "" : t.learning_objective || t.objective || "";
+              return `  - Topic: ${name}${obj ? ` | Objective: ${obj}` : ""}`;
+            }).join("\n");
+            return `Module: ${title}\n${topics}`;
+          }).join("\n\n");
+        } catch { writerTopics = courseTitle; }
+
         writerResult = await callClaudeWithRetry(
-          "You are an Expert Instructional Writer. Write a full learning script for Module 1 only. Include: intro hook, 3 content sections with examples, a summary, and a reflection question. Write in second person, conversational tone, 400-600 words. You MUST use content, examples, and terminology from the source material provided. Do NOT use generic or unrelated examples.",
-          `Course Structure:\n${archResult}\n\nResearch:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\n\nWrite the script using the actual content from the source material above.`,
+          `You are an elite instructional writer who specialises in corporate eLearning that people actually enjoy. Your writing style is: conversational, direct, and energetic — like a brilliant colleague explaining something important over coffee, not a textbook.
+
+Rules you NEVER break:
+- Open every topic with a provocative hook — a shocking stat, a bold claim, a real-world scenario, or a question that makes the learner stop and think
+- Write in second person: 'You', 'Your team', 'You've probably seen this'
+- Short punchy sentences. Never more than 20 words per sentence.
+- Use concrete real-world examples, not abstract theory
+- Every section must have ONE memorable takeaway — something the learner will still remember next week
+- Use analogies. Make complex ideas click instantly.
+- End every topic with a challenge or reflection: 'Next time you X, try Y instead'
+- NO passive voice. NO jargon without explanation. NO bullet walls.
+- Format each topic as: Hook (2-3 sentences) → Core concept (3-4 sentences) → Real example (2-3 sentences) → Key Takeaway: (1-2 sentences) → Challenge: (1 sentence)
+- Total length per topic: 120-180 words. Tight and impactful.
+- Use markdown ## headers for each topic title, matching the exact topic names provided.
+- You MUST use content from the source material provided. Do NOT invent unrelated examples.
+
+For the current course, write content that would make a learner lean forward, not lean back.`,
+          `Course Title: ${courseTitle}\n\nModules & Topics:\n${writerTopics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for EVERY topic listed above. Use ## headers matching the topic names exactly.`,
           addLog, "Writer Agent"
         );
         setStatus("writer", "complete");
