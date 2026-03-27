@@ -81,6 +81,7 @@ export function useAgentPipeline() {
           addLog, "Research Agent"
         );
         setStatus("research", "complete");
+        setRawOutputs((prev) => ({ ...prev, research: researchResult }));
         setOutputData((prev) => ({ ...prev, outline: `## Research Output\n\n${researchResult}` }));
         addLog("Research Agent: Complete. 8 objectives identified.");
       } else {
