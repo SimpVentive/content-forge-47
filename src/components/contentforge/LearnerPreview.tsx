@@ -155,8 +155,8 @@ interface LearnerPreviewProps {
   insertedVideos?: InsertedVideo[];
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose }) => {
-  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs), [rawOutputs]);
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [] }) => {
+  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, insertedVideos), [rawOutputs, insertedVideos]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set([0]));
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
