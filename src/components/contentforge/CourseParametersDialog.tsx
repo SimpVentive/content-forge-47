@@ -50,13 +50,25 @@ const VOICE_ACCENTS = [
 ];
 
 const DURATIONS = [
-  { value: "15min", label: "15 minutes" },
-  { value: "30min", label: "30 minutes" },
-  { value: "1hr", label: "1 hour" },
-  { value: "2hr", label: "2 hours" },
-  { value: "4hr", label: "4 hours" },
-  { value: "8hr", label: "8 hours (full day)" },
+  { value: "5min", label: "5 min" },
+  { value: "10min", label: "10 min" },
+  { value: "15min", label: "15 min" },
+  { value: "20min", label: "20 min" },
+  { value: "30min", label: "30 min" },
+  { value: "45min", label: "45 min" },
+  { value: "60min", label: "60 min" },
 ];
+
+// Map duration to YouTube video count
+export const DURATION_VIDEO_COUNT: Record<string, number> = {
+  "5min": 5,
+  "10min": 8,
+  "15min": 10,
+  "20min": 15,
+  "30min": 20,
+  "45min": 30,
+  "60min": 50,
+};
 
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   open, courseTitle, onConfirm, onCancel,
