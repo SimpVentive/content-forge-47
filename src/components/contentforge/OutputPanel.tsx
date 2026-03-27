@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { OutputData } from "@/types/agents";
-import { FileText, BookOpen, ClipboardCheck, Package } from "lucide-react";
+import { FileText, BookOpen, ClipboardCheck, Package, Sparkles } from "lucide-react";
 
 interface OutputPanelProps {
   outputData: OutputData;
