@@ -152,6 +152,7 @@ interface LearnerPreviewProps {
   courseTitle: string;
   rawOutputs: RawAgentOutputs;
   onClose: () => void;
+  insertedVideos?: InsertedVideo[];
 }
 
 export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose }) => {
