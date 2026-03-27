@@ -50,13 +50,25 @@ const VOICE_ACCENTS = [
 ];
 
 const DURATIONS = [
-  { value: "15min", label: "15 minutes" },
-  { value: "30min", label: "30 minutes" },
-  { value: "1hr", label: "1 hour" },
-  { value: "2hr", label: "2 hours" },
-  { value: "4hr", label: "4 hours" },
-  { value: "8hr", label: "8 hours (full day)" },
+  { value: "5min", label: "5 min" },
+  { value: "10min", label: "10 min" },
+  { value: "15min", label: "15 min" },
+  { value: "20min", label: "20 min" },
+  { value: "30min", label: "30 min" },
+  { value: "45min", label: "45 min" },
+  { value: "60min", label: "60 min" },
 ];
+
+// Map duration to YouTube video count
+export const DURATION_VIDEO_COUNT: Record<string, number> = {
+  "5min": 5,
+  "10min": 8,
+  "15min": 10,
+  "20min": 15,
+  "30min": 20,
+  "45min": 30,
+  "60min": 50,
+};
 
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   open, courseTitle, onConfirm, onCancel,
@@ -64,7 +76,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [level, setLevel] = useState<CourseParameters["level"]>("intermediate");
   const [language, setLanguage] = useState("English");
   const [voiceAccent, setVoiceAccent] = useState("Rachel");
-  const [duration, setDuration] = useState("1hr");
+  const [duration, setDuration] = useState("15min");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
 
   if (!open) return null;
@@ -149,22 +161,16 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
           {/* Duration */}
           <div>
-            <label className="text-[13px] font-bold text-foreground mb-2 block">Target Duration</label>
-            <div className="flex flex-wrap gap-2">
+            <label className="text-[13px] font-bold text-foreground mb-1.5 block">Target Duration</label>
+            <select
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+            >
               {DURATIONS.map((d) => (
-                <button
-                  key={d.value}
-                  onClick={() => setDuration(d.value)}
-                  className={`h-9 px-4 rounded-lg text-[12px] font-bold transition-all ${
-                    duration === d.value
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-muted-foreground hover:bg-border"
-                  }`}
-                >
-                  {d.label}
-                </button>
+                <option key={d.value} value={d.value}>{d.label}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           {/* Assessment Toggle */}

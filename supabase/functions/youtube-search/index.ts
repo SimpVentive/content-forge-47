@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { modules, courseTitle, language, level } = await req.json();
+    const { modules, courseTitle, language, level, duration } = await req.json();
     const apiKey = Deno.env.get("Youtube_Learning");
 
     if (!apiKey) {
@@ -21,6 +21,13 @@ serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    // Map duration to max results per module
+    const durationVideoMap: Record<string, number> = {
+      "5min": 5, "10min": 8, "15min": 10, "20min": 15,
+      "30min": 20, "45min": 30, "60min": 50,
+    };
+    const maxPerModule = Math.min(durationVideoMap[duration] || 20, 50);
 
     const results: any[] = [];
 
@@ -31,7 +38,7 @@ serve(async (req) => {
       searchUrl.searchParams.set("q", query);
       searchUrl.searchParams.set("part", "snippet");
       searchUrl.searchParams.set("type", "video");
-      searchUrl.searchParams.set("maxResults", "20");
+      searchUrl.searchParams.set("maxResults", String(maxPerModule));
       searchUrl.searchParams.set("order", "relevance");
       searchUrl.searchParams.set("videoEmbeddable", "true");
       searchUrl.searchParams.set("safeSearch", "strict");

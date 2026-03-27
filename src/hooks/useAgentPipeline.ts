@@ -63,7 +63,7 @@ export function useAgentPipeline() {
       setAgentStatuses((prev) => ({ ...prev, [id]: "queued" as AgentStatus }));
     });
 
-    addLog(`Orchestrator: Pipeline initiated for '${courseTitle}' (${params?.level || "intermediate"}, ${params?.language || "English"}, ${params?.duration || "1hr"})`);
+    addLog(`Orchestrator: Pipeline initiated for '${courseTitle}' (${params?.level || "intermediate"}, ${params?.language || "English"}, ${params?.duration || "15min"})`);
 
     let researchResult = "";
     let archResult = "";
@@ -81,8 +81,8 @@ export function useAgentPipeline() {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
         researchResult = await callClaudeWithRetry(
-          `You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract 5 key themes, 3 credible knowledge areas, and suggest 8 learning objectives — ALL directly derived from the provided source material. Course level: ${params?.level || "intermediate"}. Language: ${params?.language || "English"}. Target duration: ${params?.duration || "1hr"}. Return as JSON.`,
-          `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content.`,
+          `You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract key themes, credible knowledge areas, and suggest learning objectives — ALL directly derived from the provided source material. Course level: ${params?.level || "intermediate"}. Language: ${params?.language || "English"}. CRITICAL — Target duration is ${params?.duration || "15min"}. You MUST scale the depth and breadth of content to fill this entire duration. For a ${params?.duration || "15min"} course, generate proportionally more objectives and themes. Return as JSON.`,
+          `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content. Target duration: ${params?.duration || "15min"} — scale content accordingly.`,
           addLog, "Research Agent"
         );
         setStatus("research", "complete");
@@ -192,8 +192,8 @@ export function useAgentPipeline() {
         addLog(`YouTube Agent: Searching top videos for ${moduleNames.length} modules...`);
         
         try {
-          const { data, error } = await supabase.functions.invoke("youtube-search", {
-            body: { modules: moduleNames, courseTitle, language: params?.language, level: params?.level },
+        const { data, error } = await supabase.functions.invoke("youtube-search", {
+            body: { modules: moduleNames, courseTitle, language: params?.language, level: params?.level, duration: params?.duration },
           });
           
           if (error) throw new Error(error.message);

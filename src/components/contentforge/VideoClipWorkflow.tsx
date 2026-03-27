@@ -1,5 +1,6 @@
 import React, { useState, useRef } from "react";
-import { X, Play, Scissors, Film, Check, ChevronRight, Pencil, MapPin, Plus } from "lucide-react";
+import { X, Play, Scissors, Film, Check, ChevronRight, Pencil, MapPin, Plus, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { InsertedVideo } from "./VideosTab";
 
 /* ── helpers ── */
@@ -59,6 +60,10 @@ interface ClipItem {
 interface VideoClipWorkflowProps {
   youtubeRaw: string;
   modules: string[];
+  courseTitle: string;
+  language?: string;
+  level?: string;
+  duration?: string;
   onComplete: (clips: ClipItem[]) => void;
   onSkip: () => void;
 }
@@ -423,16 +428,31 @@ const ClipPlayer: React.FC<{ clips: ClipItem[]; onClose: () => void }> = ({ clip
 /* ═══════════════════════════════════════
    MAIN WORKFLOW ORCHESTRATOR
    ═══════════════════════════════════════ */
-export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, onComplete, onSkip }) => {
+export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, courseTitle, language, level, duration, onComplete, onSkip }) => {
   const [step, setStep] = useState<"ask" | "browse" | "clipRange" | "insertAnother" | "review" | "preview" | "done">("ask");
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
   const [browseModule, setBrowseModule] = useState("all");
   const [searchQ, setSearchQ] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [youtubeData, setYoutubeData] = useState(() => tryParseJSON(youtubeRaw));
   const idCounter = useRef(0);
 
-  const data = tryParseJSON(youtubeRaw);
-  const allModules: { module_title: string; videos: any[] }[] = data?.modules || [];
+  const allModules: { module_title: string; videos: any[] }[] = youtubeData?.modules || [];
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const moduleNames = modules.length > 0 ? modules : [courseTitle];
+      const { data, error } = await supabase.functions.invoke("youtube-search", {
+        body: { modules: moduleNames, courseTitle, language, level, duration },
+      });
+      if (!error && data?.modules) {
+        setYoutubeData(data);
+      }
+    } catch {}
+    setRefreshing(false);
+  };
 
   const handleSelectVideo = (video: any) => {
     setSelectedVideo(video);
@@ -519,11 +539,20 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
               </h2>
               <p className="text-[13px] text-muted-foreground mt-0.5">Click a video to play it, then select a clip range to insert</p>
             </div>
-            {clips.length > 0 && (
-              <button onClick={() => setStep("review")} className="h-9 px-4 rounded-lg text-[12px] font-bold text-white flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
-                Review {clips.length} Clip{clips.length > 1 ? "s" : ""} <ChevronRight className="w-3 h-3" />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="h-9 px-3 rounded-lg text-[12px] font-bold border border-border text-muted-foreground hover:text-foreground hover:bg-secondary transition-all flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
               </button>
-            )}
+              {clips.length > 0 && (
+                <button onClick={() => setStep("review")} className="h-9 px-4 rounded-lg text-[12px] font-bold text-white flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+                  Review {clips.length} Clip{clips.length > 1 ? "s" : ""} <ChevronRight className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Search + Filter */}
