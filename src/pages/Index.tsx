@@ -75,9 +75,30 @@ const Index = () => {
             <img src={contentForgeLogo} alt="ContentForge" className="w-11 h-11 object-contain" />
           </div>
         </div>
-        <span className="absolute left-1/2 -translate-x-1/2 text-[36px] font-[800] tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: '#1e3a5f' }}>
-          ContentForge
-        </span>
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 select-none">
+          <span className="text-[38px] font-[900] tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: '#1e3a5f' }}>
+            Content
+          </span>
+          <span className="relative text-[38px] font-[900] tracking-tight" style={{
+            fontFamily: "'Outfit', sans-serif",
+            background: 'linear-gradient(135deg, #0e7490 0%, #f97316 100%)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            filter: 'drop-shadow(0 2px 4px rgba(14,116,144,0.3))',
+          }}>
+            Forge
+            {/* Spark icon */}
+            <svg className="absolute -top-2.5 -right-4 w-5 h-5 animate-pulse" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" fill="url(#spark-grad)" />
+              <defs>
+                <linearGradient id="spark-grad" x1="4" y1="2" x2="20" y2="18">
+                  <stop offset="0%" stopColor="#f97316" />
+                  <stop offset="100%" stopColor="#facc15" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </span>
+        </div>
         <div className="flex items-center gap-3">
           {hasOutput && (
             <button
