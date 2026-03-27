@@ -525,6 +525,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       <Check className="w-3 h-3 text-emerald-400 shrink-0" />
                     ) : s.idx === currentSlide ? (
                       <div className="w-2 h-2 rounded-full bg-[#4f46e5] shrink-0" />
+                    ) : s.type === "video" ? (
+                      <div className="w-2 h-2 rounded-full bg-[#ef4444] shrink-0" title={`Video clip: ${s.topicTitle}`} />
                     ) : (
                       <div className="w-2 h-2 rounded-full bg-white/20 shrink-0" />
                     )}
@@ -532,6 +534,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       {s.type === "title" ? "Introduction" :
                         s.type === "assessment" ? "Knowledge Check" :
                         s.type === "summary" ? "Summary" :
+                        s.type === "video" ? `▶ ${s.topicTitle?.slice(0, 25) || "Video"}` :
                         s.topicTitle || `Topic ${(s.topicIndex || 0) + 1}`}
                     </span>
                   </button>
