@@ -54,16 +54,25 @@ export const AgentCard: React.FC<AgentCardProps> = ({ agent, isLast, enabled, on
         {/* Toggle */}
         <button
           onClick={(e) => { e.stopPropagation(); onToggle(); }}
-          className="relative shrink-0 w-[44px] h-[24px] rounded-full transition-colors duration-200 cursor-pointer"
-          style={{ backgroundColor: enabled ? "hsl(192, 91%, 36%)" : "#cbd5e1" }}
+          className="relative shrink-0 w-[52px] h-[28px] rounded-full transition-colors duration-200 cursor-pointer border-2"
+          style={{
+            backgroundColor: enabled ? "hsl(192, 91%, 36%)" : "#e2e8f0",
+            borderColor: enabled ? "hsl(192, 91%, 30%)" : "#cbd5e1",
+          }}
           type="button"
           role="switch"
           aria-checked={enabled}
         >
           <span
-            className="absolute top-[3px] w-[18px] h-[18px] rounded-full bg-white shadow-md transition-all duration-200"
-            style={{ left: enabled ? "23px" : "3px" }}
+            className="absolute top-[2px] w-[22px] h-[22px] rounded-full shadow-lg transition-all duration-200"
+            style={{
+              left: enabled ? "26px" : "2px",
+              backgroundColor: enabled ? "#ffffff" : "#94a3b8",
+            }}
           />
+          <span className="absolute inset-0 flex items-center text-[9px] font-bold text-white pointer-events-none">
+            {enabled ? <span className="ml-[6px]">ON</span> : <span className="ml-[24px] text-slate-500">OFF</span>}
+          </span>
         </button>
 
         {/* Circle icon */}
