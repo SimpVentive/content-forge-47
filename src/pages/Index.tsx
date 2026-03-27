@@ -5,7 +5,9 @@ import { OutputPanel } from "@/components/contentforge/OutputPanel";
 import { OrchestratorLog } from "@/components/contentforge/OrchestratorLog";
 import { useAgentPipeline } from "@/hooks/useAgentPipeline";
 import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
-import { Zap, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 const Index = () => {
