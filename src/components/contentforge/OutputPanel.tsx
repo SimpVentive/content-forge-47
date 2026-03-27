@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
-import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download } from "lucide-react";
+import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play } from "lucide-react";
 import { VoicePreview } from "./VoicePreview";
 import { SlidePreview } from "./SlidePreview";
 import { InfographicPreview } from "./InfographicPreview";
+import { LearnerPreview } from "./LearnerPreview";
 
 interface OutputPanelProps {
   outputData: OutputData;
