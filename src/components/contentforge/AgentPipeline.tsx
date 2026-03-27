@@ -30,10 +30,14 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
       </div>
 
       {/* Orchestrator bar */}
-      <div className="bg-card rounded-xl shadow-card mb-4 px-5 py-3 flex items-center gap-2" style={{ borderLeft: '4px solid #4f46e5' }}>
-        <Zap className="w-4 h-4 text-primary" />
-        <span className="text-[13px] font-bold text-primary tracking-wide">ORCHESTRATOR</span>
-        <span className="text-[13px] text-muted-foreground ml-1">— Managing pipeline flow</span>
+      <div className="bg-card rounded-xl shadow-card mb-5 px-5 py-4">
+        <div className="flex items-center gap-2 mb-2">
+          <Zap className="w-5 h-5 text-primary" />
+          <span className="text-[16px] font-[700] text-foreground">Orchestrator</span>
+        </div>
+        <p className="text-[13px] text-muted-foreground leading-relaxed">
+          The E-Learning Content is now orchestrated using multiple agents. You can manage the Pipeline flow by selecting the tools you want to use for the development of the E-Learning content.
+        </p>
       </div>
 
       {/* Agent cards */}
