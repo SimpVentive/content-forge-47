@@ -20,6 +20,7 @@ export interface RawAgentOutputs {
   writer: string;
   visual: string;
   animation: string;
+  youtube: string;
   compliance: string;
   assessment: string;
   voice: string;
