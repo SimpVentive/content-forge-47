@@ -16,6 +16,7 @@ const Index = () => {
   const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(
     Object.fromEntries(AGENTS.map((a) => [a.id, true]))
   );
+  const [showLearnerPreview, setShowLearnerPreview] = useState(false);
 
   const { agents, outputData, rawOutputs, logs, isRunning, runPipeline } = useAgentPipeline();
 
@@ -24,6 +25,7 @@ const Index = () => {
   };
 
   const hasRun = logs.length > 0;
+  const hasOutput = Object.values(rawOutputs).some(v => v);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
