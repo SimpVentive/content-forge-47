@@ -5,9 +5,10 @@ import { OutputPanel } from "@/components/contentforge/OutputPanel";
 import { OrchestratorLog } from "@/components/contentforge/OrchestratorLog";
 import { useAgentPipeline } from "@/hooks/useAgentPipeline";
 import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
-import { Plus } from "lucide-react";
+import { Plus, Play } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
+import { LearnerPreview } from "@/components/contentforge/LearnerPreview";
 
 const Index = () => {
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
@@ -15,6 +16,7 @@ const Index = () => {
   const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(
     Object.fromEntries(AGENTS.map((a) => [a.id, true]))
   );
+  const [showLearnerPreview, setShowLearnerPreview] = useState(false);
 
   const { agents, outputData, rawOutputs, logs, isRunning, runPipeline } = useAgentPipeline();
 
@@ -23,6 +25,7 @@ const Index = () => {
   };
 
   const hasRun = logs.length > 0;
+  const hasOutput = Object.values(rawOutputs).some(v => v);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
@@ -36,11 +39,31 @@ const Index = () => {
         <span className="absolute left-1/2 -translate-x-1/2 text-[36px] font-[800] tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: '#1e3a5f' }}>
           ContentForge
         </span>
-        <button className="h-[44px] px-5 bg-primary text-primary-foreground rounded-lg text-[15px] font-bold shadow-btn-primary hover:brightness-110 transition-all duration-[180ms] flex items-center gap-2">
-          <Plus className="w-4 h-4" />
-          New Course
-        </button>
+        <div className="flex items-center gap-3">
+          {hasOutput && (
+            <button
+              onClick={() => setShowLearnerPreview(true)}
+              className="h-[44px] px-5 rounded-lg text-[15px] font-bold border-2 border-primary text-primary hover:bg-primary/5 transition-all duration-[180ms] flex items-center gap-2"
+            >
+              <Play className="w-4 h-4" />
+              Preview as Learner
+            </button>
+          )}
+          <button className="h-[44px] px-5 bg-primary text-primary-foreground rounded-lg text-[15px] font-bold shadow-btn-primary hover:brightness-110 transition-all duration-[180ms] flex items-center gap-2">
+            <Plus className="w-4 h-4" />
+            New Course
+          </button>
+        </div>
       </header>
+
+      {/* Learner Preview Modal */}
+      {showLearnerPreview && (
+        <LearnerPreview
+          courseTitle={courseTitle}
+          rawOutputs={rawOutputs}
+          onClose={() => setShowLearnerPreview(false)}
+        />
+      )}
 
       {/* 3-column resizable layout */}
       <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
