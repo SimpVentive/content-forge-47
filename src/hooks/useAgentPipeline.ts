@@ -49,11 +49,14 @@ export function useAgentPipeline() {
   }, []);
 
   const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>) => {
+    cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
     setOutputData(initialOutput());
     setRawOutputs(initialRaw());
     setLogs([]);
+
+    const isCancelled = () => cancelledRef.current;
 
     // Set all agents to queued initially
     AGENTS.forEach(({ id }) => {
