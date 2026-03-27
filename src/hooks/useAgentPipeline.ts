@@ -155,6 +155,7 @@ export function useAgentPipeline() {
           addLog, "Animation Agent"
         );
         setStatus("animation", "complete");
+        setRawOutputs((prev) => ({ ...prev, animation: animResult }));
         setOutputData((prev) => ({
           ...prev,
           script: prev.script + `\n\n---\n\n## Animation & Interaction Notes\n\n${animResult}`,
