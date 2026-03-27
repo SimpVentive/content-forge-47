@@ -203,6 +203,7 @@ export function useAgentPipeline() {
           addLog, "Assessment Agent"
         );
         setStatus("assessment", "complete");
+        setRawOutputs((prev) => ({ ...prev, assessment: assessmentResult }));
         setOutputData((prev) => ({ ...prev, assessment: assessmentResult }));
         addLog("Assessment Agent: Complete. Assessment bank ready.");
       } else {
