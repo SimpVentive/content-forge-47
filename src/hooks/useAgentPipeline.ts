@@ -181,6 +181,46 @@ For the current course, write content that would make a learner lean forward, no
           outline: prev.outline + `\n\n---\n\n## Visual Design Plan\n\n${visualResult}`,
         }));
         addLog("Visual Design Agent: Complete. Design plan ready.");
+
+        // ── SVG Generation Pass ──
+        addLog("Visual Design Agent: Generating SVG infographics...");
+        try {
+          const visParsed = JSON.parse(visualResult || "{}");
+          const visModules = visParsed.modules || [];
+          const archParsed = JSON.parse(archResult || "{}");
+          const archMods = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
+          
+          const svgs: string[] = [];
+          for (let si = 0; si < Math.min(visModules.length, archMods.length); si++) {
+            if (isCancelled()) break;
+            const vm = visModules[si];
+            const am = archMods[si];
+            const modTitle = vm.module_title || am?.module_title || am?.title || `Module ${si+1}`;
+            const topics = (am?.topics || am?.sections || []).map((t: any) => typeof t === "string" ? t : t.topic_title || t.title || t.name || "").filter(Boolean);
+            const layoutType = vm.slide_layout || "Standard";
+            
+            addLog(`Visual Design Agent: Generating SVG ${si+1}/${visModules.length}...`);
+            try {
+              const svgText = await callClaude(
+                "You are an SVG designer. Generate a complete, self-contained SVG infographic (600x380px). Use ONLY these colors: #4f46e5 (indigo), #7c3aed (violet), #10b981 (emerald), #f59e0b (amber), #f8fafc (light bg), #0f172a (dark text), #ffffff (white). No external fonts — use font-family='system-ui, sans-serif'. No external images. Use only SVG primitives: rect, circle, path, text, line, polygon. Make it visually striking with geometric shapes, icons built from primitives, clear hierarchy. Must look professional and corporate. Return ONLY the SVG markup, nothing else.",
+                `Create an infographic for: ${modTitle}. Layout: ${layoutType}. Key points to visualise: ${topics.join(", ")}. Include the module title at the top in large bold text. Add a small 'ContentForge' label bottom-right in 10px muted text.`
+              );
+              // Extract SVG from response
+              const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i);
+              svgs.push(svgMatch ? svgMatch[0] : "");
+            } catch {
+              svgs.push("");
+            }
+          }
+          
+          // Update visual output with SVGs
+          const updatedVisual = { ...visParsed, generatedSvgs: svgs };
+          const updatedVisualStr = JSON.stringify(updatedVisual);
+          setRawOutputs((prev) => ({ ...prev, visual: updatedVisualStr }));
+          addLog(`Visual Design Agent: ${svgs.filter(Boolean).length} SVG infographics generated.`);
+        } catch (svgErr) {
+          addLog("Visual Design Agent: SVG generation skipped (parse error).");
+        }
       } else {
         setStatus("visual", "idle");
       }
