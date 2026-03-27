@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { OutputData } from "@/types/agents";
-import { FileText, BookOpen, ClipboardCheck, Package } from "lucide-react";
+import { FileText, BookOpen, ClipboardCheck, Package, Sparkles } from "lucide-react";
 
 interface OutputPanelProps {
   outputData: OutputData;
@@ -14,13 +14,18 @@ const tabs = [
 ];
 
 export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData }) => {
-  const [activeTab, setActiveTab] = useState<keyof OutputData>("outline");
+  const [activeTab, setActiveTab] = useState<keyof OutputData>("script");
   const content = outputData[activeTab];
 
   return (
     <div className="h-full flex flex-col bg-card border-l border-border">
       <div className="px-5 pt-6 pb-4">
-        <h2 className="text-[20px] font-extrabold text-foreground mb-4">Course Output</h2>
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
+            <Sparkles className="w-4 h-4 text-white" />
+          </div>
+          <h2 className="text-[20px] font-extrabold text-foreground">Course Output</h2>
+        </div>
         <div className="flex gap-1.5 flex-wrap">
           {tabs.map((tab) => (
             <button

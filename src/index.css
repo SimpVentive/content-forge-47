@@ -53,6 +53,10 @@
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
   }
+
+  input, textarea, button, select {
+    font-family: inherit;
+  }
 }
 
 @layer utilities {
