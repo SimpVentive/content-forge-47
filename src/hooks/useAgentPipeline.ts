@@ -220,6 +220,7 @@ export function useAgentPipeline() {
           addLog, "Voice Agent"
         );
         setStatus("voice", "complete");
+        setRawOutputs((prev) => ({ ...prev, voice: voiceResult }));
         setOutputData((prev) => ({
           ...prev,
           script: prev.script + `\n\n---\n\n## Narration Script\n\n${voiceResult}`,
