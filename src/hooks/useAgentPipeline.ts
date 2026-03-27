@@ -135,6 +135,7 @@ export function useAgentPipeline() {
           addLog, "Visual Design Agent"
         );
         setStatus("visual", "complete");
+        setRawOutputs((prev) => ({ ...prev, visual: visualResult }));
         setOutputData((prev) => ({
           ...prev,
           outline: prev.outline + `\n\n---\n\n## Visual Design Plan\n\n${visualResult}`,
