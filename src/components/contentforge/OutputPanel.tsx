@@ -16,6 +16,7 @@ const tabs = [
   { key: "outline" as const, label: "Outline", icon: BookOpen },
   { key: "script" as const, label: "Script", icon: FileText },
   { key: "assessment" as const, label: "Assessment", icon: ClipboardCheck },
+  { key: "preview" as const, label: "Learner Preview", icon: Play },
   { key: "package" as const, label: "Package", icon: Package },
 ];
 
@@ -323,12 +324,22 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
 };
 
 export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle }) => {
-  const [activeTab, setActiveTab] = useState<keyof OutputData>("script");
+  const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
-  const content = outputData[activeTab];
   const hasOutput = Object.values(rawOutputs).some(v => v);
+  const content = activeTab === "preview" ? null : outputData[activeTab as keyof OutputData];
 
   const renderContent = () => {
+    if (activeTab === "preview") {
+      // This shouldn't render inline — the tab click opens the modal
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-center">
+          <Play className="w-10 h-10 text-primary/30 mb-3" />
+          <p className="text-[14px] font-semibold text-muted-foreground">Learner Preview opened in full screen</p>
+        </div>
+      );
+    }
+
     if (!content) {
       return (
         <div className="flex flex-col items-center justify-center h-full text-center">
@@ -386,20 +397,35 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           )}
         </div>
         <div className="flex gap-1.5 flex-wrap">
-          {tabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
-              className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-[180ms] ${
-                activeTab === tab.key
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:bg-border"
-              }`}
-            >
-              <tab.icon className="w-3 h-3" />
-              {tab.label}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const isPreview = tab.key === "preview";
+            const disabled = isPreview && !hasOutput;
+            return (
+              <button
+                key={tab.key}
+                disabled={disabled}
+                onClick={() => {
+                  if (isPreview && hasOutput) {
+                    setShowLearnerPreview(true);
+                  } else if (!isPreview) {
+                    setActiveTab(tab.key);
+                  }
+                }}
+                className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-[180ms] ${
+                  disabled
+                    ? "bg-secondary/50 text-muted-foreground/40 cursor-not-allowed"
+                    : isPreview
+                      ? "bg-accent text-primary hover:bg-primary/10 border border-primary/30"
+                      : activeTab === tab.key
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-secondary text-muted-foreground hover:bg-border"
+                }`}
+              >
+                <tab.icon className="w-3 h-3" />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
