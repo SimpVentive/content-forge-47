@@ -6,6 +6,7 @@ import { OrchestratorLog } from "@/components/contentforge/OrchestratorLog";
 import { useAgentPipeline } from "@/hooks/useAgentPipeline";
 import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
 import { Zap, Plus } from "lucide-react";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 const Index = () => {
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
@@ -20,7 +21,6 @@ const Index = () => {
     runPipeline(courseTitle, inputText, agentToggles);
   };
 
-  const hasOutput = !!(outputData.outline || outputData.script || outputData.assessment || outputData.package);
   const hasRun = logs.length > 0;
 
   return (
@@ -39,35 +39,45 @@ const Index = () => {
         </button>
       </header>
 
-      {/* 3-column layout */}
-      <div className="flex flex-1 min-h-0">
-        {/* Left — Course Input (compact) */}
-        <Sidebar
-          courseTitle={courseTitle}
-          setCourseTitle={setCourseTitle}
-          inputText={inputText}
-          setInputText={setInputText}
-          onGenerate={handleGenerate}
-          isRunning={isRunning}
-          agentToggles={agentToggles}
-          setAgentToggles={setAgentToggles}
-        />
+      {/* 3-column resizable layout */}
+      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
+        {/* Left — Course Input */}
+        <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
+          <Sidebar
+            courseTitle={courseTitle}
+            setCourseTitle={setCourseTitle}
+            inputText={inputText}
+            setInputText={setInputText}
+            onGenerate={handleGenerate}
+            isRunning={isRunning}
+            agentToggles={agentToggles}
+            setAgentToggles={setAgentToggles}
+          />
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
 
         {/* Center — Agent Pipeline (hero) */}
-        <div className="flex-1 overflow-y-auto p-6" style={{ background: '#f0f2f7' }}>
-          {!hasRun ? (
-            <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} />
-          ) : (
-            <div className="space-y-6 max-w-[720px] mx-auto">
+        <ResizablePanel defaultSize={50} minSize={30}>
+          <div className="h-full overflow-y-auto p-6" style={{ background: '#f0f2f7' }}>
+            {!hasRun ? (
               <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} />
-              <OrchestratorLog logs={logs} />
-            </div>
-          )}
-        </div>
+            ) : (
+              <div className="space-y-6 max-w-[720px] mx-auto">
+                <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} />
+                <OrchestratorLog logs={logs} />
+              </div>
+            )}
+          </div>
+        </ResizablePanel>
+
+        <ResizableHandle withHandle />
 
         {/* Right — Output */}
-        <OutputPanel outputData={outputData} />
-      </div>
+        <ResizablePanel defaultSize={30} minSize={15} maxSize={45}>
+          <OutputPanel outputData={outputData} />
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   );
 };
