@@ -118,6 +118,7 @@ export function useAgentPipeline() {
           addLog, "Writer Agent"
         );
         setStatus("writer", "complete");
+        setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
         setOutputData((prev) => ({ ...prev, script: writerResult }));
         addLog("Writer Agent: Complete. Module 1 script ready.");
       } else {
