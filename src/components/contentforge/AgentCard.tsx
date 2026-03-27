@@ -28,7 +28,7 @@ const AGENT_INITIALS: Record<string, string> = {
 
 const statusConfig: Record<AgentStatus, { label: string; bg: string; text: string }> = {
   idle: { label: "Idle", bg: "#f1f5f9", text: "#64748b" },
-  running: { label: "Running", bg: "#4f46e5", text: "#ffffff" },
+  running: { label: "Running", bg: "#0e7490", text: "#ffffff" },
   complete: { label: "Complete", bg: "#ecfdf5", text: "#059669" },
   queued: { label: "Queued", bg: "#fffbeb", text: "#d97706" },
   error: { label: "Error", bg: "#fef2f2", text: "#dc2626" },
