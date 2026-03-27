@@ -8,7 +8,6 @@ import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
 import { Plus } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 
 const Index = () => {
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
