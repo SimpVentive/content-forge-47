@@ -15,7 +15,7 @@ const Index = () => {
     Object.fromEntries(AGENTS.map((a) => [a.id, true]))
   );
 
-  const { agents, outputData, logs, isRunning, runPipeline } = useAgentPipeline();
+  const { agents, outputData, rawOutputs, logs, isRunning, runPipeline } = useAgentPipeline();
 
   const handleGenerate = () => {
     runPipeline(courseTitle, inputText, agentToggles);
