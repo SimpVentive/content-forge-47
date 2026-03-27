@@ -48,7 +48,7 @@ export function useAgentPipeline() {
     setAgentStatuses((prev) => ({ ...prev, [id]: status }));
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean }) => {
     cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
