@@ -30,6 +30,7 @@ interface Slide {
   infographicSvg?: string;
   question?: { question: string; options: string[]; correct_answer: string; rationale?: string };
   takeaways?: string[];
+  video?: InsertedVideo;
 }
 
 /* ── build slides from agent outputs ── */
