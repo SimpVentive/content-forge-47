@@ -21,8 +21,30 @@ const Index = () => {
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [showParamsDialog, setShowParamsDialog] = useState(false);
   const [courseParams, setCourseParams] = useState<CourseParameters | null>(null);
+  const [showVideoWorkflow, setShowVideoWorkflow] = useState(false);
+  const prevIsRunning = useRef(false);
 
   const { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline } = useAgentPipeline();
+
+  // Detect pipeline completion → trigger video workflow
+  useEffect(() => {
+    if (prevIsRunning.current && !isRunning && rawOutputs.youtube) {
+      // Pipeline just finished and has youtube data
+      setTimeout(() => setShowVideoWorkflow(true), 800);
+    }
+    prevIsRunning.current = isRunning;
+  }, [isRunning, rawOutputs.youtube]);
+
+  // Extract module names from architect output
+  const getModuleNames = (): string[] => {
+    try {
+      const parsed = JSON.parse(rawOutputs.architect || "{}");
+      const mods = parsed.modules || parsed.course_structure?.modules || parsed.course_modules || [];
+      return mods.map((m: any) => m.module_title || m.title || m.name || "").filter(Boolean);
+    } catch {
+      return [courseTitle];
+    }
+  };
 
   const handleGenerateClick = () => {
     // Show parameters dialog before generating
