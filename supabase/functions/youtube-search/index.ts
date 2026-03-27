@@ -31,7 +31,7 @@ serve(async (req) => {
       searchUrl.searchParams.set("q", query);
       searchUrl.searchParams.set("part", "snippet");
       searchUrl.searchParams.set("type", "video");
-      searchUrl.searchParams.set("maxResults", "8");
+      searchUrl.searchParams.set("maxResults", "20");
       searchUrl.searchParams.set("order", "relevance");
       searchUrl.searchParams.set("videoEmbeddable", "true");
       searchUrl.searchParams.set("safeSearch", "strict");
