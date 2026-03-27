@@ -81,8 +81,8 @@ export function useAgentPipeline() {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
         researchResult = await callClaudeWithRetry(
-          "You are a Research Agent. Given a course topic, extract 5 key themes, 3 credible knowledge areas, and suggest 8 learning objectives. Return as JSON.",
-          `Course: ${courseTitle}\n\nNotes: ${inputText}`,
+          "You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract 5 key themes, 3 credible knowledge areas, and suggest 8 learning objectives — ALL directly derived from the provided source material. If the source material is about POSH (Prevention of Sexual Harassment), your output must be about POSH. Return as JSON.",
+          `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content.`,
           addLog, "Research Agent"
         );
         setStatus("research", "complete");
@@ -99,8 +99,8 @@ export function useAgentPipeline() {
         setStatus("architect", "running");
         addLog("Content Architect: Receiving research output...");
         archResult = await callClaudeWithRetry(
-          "You are a Content Architect. Given research output, create a full course structure with modules and Bloom's taxonomy levels. Return as JSON.",
-          researchResult || `Course: ${courseTitle}\n\nNotes: ${inputText}`,
+          "You are a Content Architect. Given research output AND source material, create a full course structure with modules and Bloom's taxonomy levels. You MUST use the topics and content from the source material. Do NOT invent unrelated topics. Return as JSON.",
+          `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\n\nBuild the course structure strictly from the above content.`,
           addLog, "Content Architect"
         );
         setStatus("architect", "complete");
@@ -120,8 +120,8 @@ export function useAgentPipeline() {
         setStatus("writer", "running");
         addLog("Writer Agent: Drafting Module 1 script...");
         writerResult = await callClaudeWithRetry(
-          "You are an Expert Instructional Writer. Write a full learning script for Module 1 only. Include: intro hook, 3 content sections with examples, a summary, and a reflection question. Write in second person, conversational tone, 400-600 words.",
-          archResult || researchResult || `Course: ${courseTitle}`,
+          "You are an Expert Instructional Writer. Write a full learning script for Module 1 only. Include: intro hook, 3 content sections with examples, a summary, and a reflection question. Write in second person, conversational tone, 400-600 words. You MUST use content, examples, and terminology from the source material provided. Do NOT use generic or unrelated examples.",
+          `Course Structure:\n${archResult}\n\nResearch:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\n\nWrite the script using the actual content from the source material above.`,
           addLog, "Writer Agent"
         );
         setStatus("writer", "complete");
