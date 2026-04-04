@@ -509,8 +509,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </p>
                   </div>
                 )}
-                  </div>
-                )}
 
                 {/* Takeaway box */}
                 {parts.takeaway && (
