@@ -255,67 +255,67 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     return "";
   }, [slides, narrationSections]);
 
-  // Auto-play narration on slide change
+  // Stop audio on slide change
   useEffect(() => {
-    // Stop current audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       audioRef.current = null;
       setIsPlaying(false);
     }
-
-    // Check for audio — attempt to fetch from VoicePreview's generated audio
-    // For now, we use the narration text existence to show the player
-    // Auto-play would require pre-generated audio URLs (from ElevenLabs)
-    // The floating player will show the state
   }, [currentSlide]);
 
-  // Generate and auto-play TTS for content slides
-  useEffect(() => {
+  // Fetch and play TTS on demand (user gesture)
+  const playNarration = useCallback(async () => {
     const narrationText = getNarrationForSlide(currentSlide);
-    if (!narrationText || muted) return;
+    if (!narrationText) return;
 
-    const timer = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-            body: JSON.stringify({
-              text: narrationText.slice(0, 2500),
-              voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah
-            }),
-          }
-        );
-        if (!response.ok) return;
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.muted = muted;
-        audioRef.current = audio;
-        audio.onplay = () => setIsPlaying(true);
-        audio.onended = () => setIsPlaying(false);
-        audio.onpause = () => setIsPlaying(false);
-        await audio.play().catch(() => {});
-      } catch {
-        // TTS unavailable, fail silently
-      }
-    }, 800); // delay for animations
+    // If we already have audio for this slide, just play it
+    if (audioUrlsRef.current[currentSlide]) {
+      const audio = new Audio(audioUrlsRef.current[currentSlide]);
+      audio.muted = muted;
+      audioRef.current = audio;
+      audio.onplay = () => setIsPlaying(true);
+      audio.onended = () => setIsPlaying(false);
+      audio.onpause = () => setIsPlaying(false);
+      await audio.play().catch(() => {});
+      return;
+    }
 
-    return () => {
-      clearTimeout(timer);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-        setIsPlaying(false);
-      }
-    };
+    // Fetch from ElevenLabs
+    setAudioLoading(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            text: narrationText.slice(0, 2500),
+            voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah
+          }),
+        }
+      );
+      if (!response.ok) return;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      audioUrlsRef.current[currentSlide] = url;
+      const audio = new Audio(url);
+      audio.muted = muted;
+      audioRef.current = audio;
+      audio.onplay = () => setIsPlaying(true);
+      audio.onended = () => setIsPlaying(false);
+      audio.onpause = () => setIsPlaying(false);
+      await audio.play().catch(() => {});
+    } catch {
+      // TTS unavailable
+    } finally {
+      setAudioLoading(false);
+    }
   }, [currentSlide, muted, getNarrationForSlide]);
 
   // Mute/unmute live
