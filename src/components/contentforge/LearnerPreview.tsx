@@ -585,11 +585,36 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 )}
               </div>
 
-              {/* Subtitle strip for narration */}
-              {currentNarration && isPlaying && (
-                <div className="px-8 py-3" style={{ background: "rgba(15,23,42,0.85)" }}>
-                  <p className="text-[15px] text-white/90 anim-fade-in-up">
-                    {currentNarration.slice(0, 80).replace(/\[.*?\]/g, "")}…
+              {/* Subtitle strip with word highlighting */}
+              {narrationWords.length > 0 && isPlaying && (
+                <div className="px-8 py-3 overflow-hidden" style={{ background: "rgba(15,23,42,0.85)" }}>
+                  <p className="text-[15px] leading-relaxed">
+                    {(() => {
+                      // Show a window of ~15 words around the current highlighted word
+                      const windowSize = 15;
+                      const start = Math.max(0, highlightWordIdx - 5);
+                      const end = Math.min(narrationWords.length, start + windowSize);
+                      return narrationWords.slice(start, end).map((word, i) => {
+                        const globalIdx = start + i;
+                        const isActive = globalIdx === highlightWordIdx;
+                        return (
+                          <span
+                            key={globalIdx}
+                            className="transition-all duration-150"
+                            style={{
+                              color: isActive ? "#fff" : globalIdx < highlightWordIdx ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)",
+                              fontWeight: isActive ? 700 : 400,
+                              fontSize: isActive ? "16px" : "15px",
+                              textDecoration: isActive ? "underline" : "none",
+                              textDecorationColor: "#4f46e5",
+                              textUnderlineOffset: "3px",
+                            }}
+                          >
+                            {word}{" "}
+                          </span>
+                        );
+                      });
+                    })()}
                   </p>
                 </div>
               )}
