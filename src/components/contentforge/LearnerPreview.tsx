@@ -491,28 +491,24 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   </p>
                 ))}
 
-                {/* SVG Infographic */}
-                {slide.infographicSvg && (
-                  <div className="my-6 rounded-xl overflow-hidden anim-scale-in"
-                    style={{ animationDelay: "0.3s" }}>
-                    <div
-                      className="w-full flex items-center justify-center bg-[#f8fafc] p-4"
-                      dangerouslySetInnerHTML={{ __html: slide.infographicSvg }}
-                    />
-                  </div>
-                )}
-
-                {/* Fallback if infographicSvg is set but empty (description only) */}
-                {slide.infographicSvg === "" && slide.topicIndex === 0 && (
-                  <div className="my-6 rounded-xl p-6 anim-scale-in"
-                    style={{ background: "#f8fafc", border: "2px dashed #e2e8f0", animationDelay: "0.3s" }}>
+                {/* Infographic visual */}
+                {slide.infographicSvg && slide.topicIndex === 0 && (
+                  <div className="my-6 rounded-xl p-5 anim-scale-in"
+                    style={{ background: "linear-gradient(135deg, rgba(79,70,229,0.06), rgba(124,58,237,0.06))", border: "1px solid rgba(79,70,229,0.15)", animationDelay: "0.3s" }}>
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "rgba(79,70,229,0.1)" }}>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "rgba(79,70,229,0.12)" }}>
                         <span className="text-[18px]">📊</span>
                       </div>
-                      <p className="text-[14px] font-semibold" style={{ color: "#0f172a" }}>Infographic</p>
+                      <div>
+                        <p className="text-[14px] font-bold" style={{ color: "#0f172a" }}>Module Infographic</p>
+                        <p className="text-[11px] font-semibold" style={{ color: "#4f46e5" }}>Visual Aid</p>
+                      </div>
                     </div>
-                    <p className="text-[13px]" style={{ color: "#64748b" }}>Visual infographic for this module will be generated.</p>
+                    <p className="text-[13px] leading-relaxed" style={{ color: "#475569" }}>
+                      {slide.infographicSvg}
+                    </p>
+                  </div>
+                )}
                   </div>
                 )}
 
