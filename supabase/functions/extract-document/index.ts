@@ -6,6 +6,15 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type",
 };
 
+// Mime types that Gemini can process via multimodal (image_url)
+const SUPPORTED_MIME_TYPES = [
+  "application/pdf",
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -19,7 +28,36 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not set");
     }
 
-    // Use Gemini's multimodal capability to extract text from the document
+    if (!fileBase64 || !fileName) {
+      throw new Error("Missing fileBase64 or fileName");
+    }
+
+    // Check if the mime type is supported for multimodal extraction
+    const isSupported = SUPPORTED_MIME_TYPES.some(t => mimeType?.startsWith(t));
+
+    if (!isSupported) {
+      // For unsupported binary formats (DOCX, PPTX, XLSX), return a helpful message
+      return new Response(JSON.stringify({
+        text: "",
+        unsupported: true,
+        message: `Cannot extract text from ${fileName} automatically. Please copy and paste the content directly.`
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Limit payload size — base64 over ~10MB is risky for edge functions
+    if (fileBase64.length > 10_000_000) {
+      return new Response(JSON.stringify({
+        text: "",
+        unsupported: true,
+        message: `File is too large for automatic extraction. Please paste the key content manually.`
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Use Gemini's multimodal capability to extract text from PDF/images
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -53,8 +91,9 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const errData = await response.json();
-      throw new Error(errData.error?.message || "Failed to extract document text");
+      const errText = await response.text();
+      console.error("AI gateway error:", errText);
+      throw new Error("Failed to extract document text");
     }
 
     const data = await response.json();
@@ -64,6 +103,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
+    console.error("extract-document error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
