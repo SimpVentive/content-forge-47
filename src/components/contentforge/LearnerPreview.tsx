@@ -94,8 +94,11 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   // Extract MCQs
   const mcqs = assessData?.mcq || [];
 
-  // Extract generated SVGs
-  const generatedSvgs: string[] = visualData?.generatedSvgs || [];
+  // Extract infographic descriptions from visual agent
+  const visualModules = visualData?.modules || [];
+  const infographicDescriptions: string[] = visualModules.map(
+    (vm: any) => vm?.infographic_description || vm?.slide_layout || ""
+  );
 
   // Build slides
   const slides: Slide[] = [];
@@ -134,7 +137,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         topicIndex: ti,
         topicTitle: topic,
         content: sectionText,
-        infographicSvg: ti === 0 ? (generatedSvgs[mi] || "") : undefined,
+        infographicSvg: ti === 0 ? (infographicDescriptions[mi] || "") : undefined,
       });
       topicCounter++;
     });
@@ -230,7 +233,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [showCompletion, setShowCompletion] = useState(false);
   const [muted, setMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlsRef = useRef<Record<number, string>>({});
 
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
@@ -253,67 +258,67 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     return "";
   }, [slides, narrationSections]);
 
-  // Auto-play narration on slide change
+  // Stop audio on slide change
   useEffect(() => {
-    // Stop current audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       audioRef.current = null;
       setIsPlaying(false);
     }
-
-    // Check for audio — attempt to fetch from VoicePreview's generated audio
-    // For now, we use the narration text existence to show the player
-    // Auto-play would require pre-generated audio URLs (from ElevenLabs)
-    // The floating player will show the state
   }, [currentSlide]);
 
-  // Generate and auto-play TTS for content slides
-  useEffect(() => {
+  // Fetch and play TTS on demand (user gesture)
+  const playNarration = useCallback(async () => {
     const narrationText = getNarrationForSlide(currentSlide);
-    if (!narrationText || muted) return;
+    if (!narrationText) return;
 
-    const timer = setTimeout(async () => {
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-            },
-            body: JSON.stringify({
-              text: narrationText.slice(0, 2500),
-              voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah
-            }),
-          }
-        );
-        if (!response.ok) return;
-        const blob = await response.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audio.muted = muted;
-        audioRef.current = audio;
-        audio.onplay = () => setIsPlaying(true);
-        audio.onended = () => setIsPlaying(false);
-        audio.onpause = () => setIsPlaying(false);
-        await audio.play().catch(() => {});
-      } catch {
-        // TTS unavailable, fail silently
-      }
-    }, 800); // delay for animations
+    // If we already have audio for this slide, just play it
+    if (audioUrlsRef.current[currentSlide]) {
+      const audio = new Audio(audioUrlsRef.current[currentSlide]);
+      audio.muted = muted;
+      audioRef.current = audio;
+      audio.onplay = () => setIsPlaying(true);
+      audio.onended = () => setIsPlaying(false);
+      audio.onpause = () => setIsPlaying(false);
+      await audio.play().catch(() => {});
+      return;
+    }
 
-    return () => {
-      clearTimeout(timer);
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-        setIsPlaying(false);
-      }
-    };
+    // Fetch from ElevenLabs
+    setAudioLoading(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            text: narrationText.slice(0, 2500),
+            voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah
+          }),
+        }
+      );
+      if (!response.ok) return;
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      audioUrlsRef.current[currentSlide] = url;
+      const audio = new Audio(url);
+      audio.muted = muted;
+      audioRef.current = audio;
+      audio.onplay = () => setIsPlaying(true);
+      audio.onended = () => setIsPlaying(false);
+      audio.onpause = () => setIsPlaying(false);
+      await audio.play().catch(() => {});
+    } catch {
+      // TTS unavailable
+    } finally {
+      setAudioLoading(false);
+    }
   }, [currentSlide, muted, getNarrationForSlide]);
 
   // Mute/unmute live
@@ -486,28 +491,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   </p>
                 ))}
 
-                {/* SVG Infographic */}
-                {slide.infographicSvg && (
-                  <div className="my-6 rounded-xl overflow-hidden anim-scale-in"
-                    style={{ animationDelay: "0.3s" }}>
-                    <div
-                      className="w-full flex items-center justify-center bg-[#f8fafc] p-4"
-                      dangerouslySetInnerHTML={{ __html: slide.infographicSvg }}
-                    />
-                  </div>
-                )}
-
-                {/* Fallback if infographicSvg is set but empty (description only) */}
-                {slide.infographicSvg === "" && slide.topicIndex === 0 && (
-                  <div className="my-6 rounded-xl p-6 anim-scale-in"
-                    style={{ background: "#f8fafc", border: "2px dashed #e2e8f0", animationDelay: "0.3s" }}>
+                {/* Infographic visual */}
+                {slide.infographicSvg && slide.topicIndex === 0 && (
+                  <div className="my-6 rounded-xl p-5 anim-scale-in"
+                    style={{ background: "linear-gradient(135deg, rgba(79,70,229,0.06), rgba(124,58,237,0.06))", border: "1px solid rgba(79,70,229,0.15)", animationDelay: "0.3s" }}>
                     <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "rgba(79,70,229,0.1)" }}>
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "rgba(79,70,229,0.12)" }}>
                         <span className="text-[18px]">📊</span>
                       </div>
-                      <p className="text-[14px] font-semibold" style={{ color: "#0f172a" }}>Infographic</p>
+                      <div>
+                        <p className="text-[14px] font-bold" style={{ color: "#0f172a" }}>Module Infographic</p>
+                        <p className="text-[11px] font-semibold" style={{ color: "#4f46e5" }}>Visual Aid</p>
+                      </div>
                     </div>
-                    <p className="text-[13px]" style={{ color: "#64748b" }}>Visual infographic for this module will be generated.</p>
+                    <p className="text-[13px] leading-relaxed" style={{ color: "#475569" }}>
+                      {slide.infographicSvg}
+                    </p>
                   </div>
                 )}
 
@@ -807,21 +806,27 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(12px)" }}>
             <button
               onClick={() => {
-                if (audioRef.current) {
-                  if (isPlaying) { audioRef.current.pause(); }
-                  else { audioRef.current.play().catch(() => {}); }
+                if (audioLoading) return;
+                if (audioRef.current && isPlaying) {
+                  audioRef.current.pause();
+                } else if (audioRef.current && !isPlaying) {
+                  audioRef.current.play().catch(() => {});
+                } else {
+                  playNarration();
                 }
               }}
               className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
             >
-              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {audioLoading ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             </button>
             <WaveformBars playing={isPlaying} />
             <button onClick={() => setMuted(!muted)} className="text-white/60 hover:text-white transition-colors">
               {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
             <span className="text-[11px] text-white/40">
-              {isPlaying ? "Playing" : "Ready"} · Sarah
+              {audioLoading ? "Loading…" : isPlaying ? "Playing" : "Click ▶ to play"} · Sarah
             </span>
           </div>
         ) : (
