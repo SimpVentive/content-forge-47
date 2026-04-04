@@ -230,7 +230,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [showCompletion, setShowCompletion] = useState(false);
   const [muted, setMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlsRef = useRef<Record<number, string>>({});
 
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
