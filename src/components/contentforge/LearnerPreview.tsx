@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock } from "lucide-react";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
@@ -245,18 +245,39 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const voiceParsed = tryParseJSON(rawOutputs.voice);
   const narrationSections = voiceParsed?.sections || [];
 
-  // Narration text for current slide
+  // Word highlight state
+  const [highlightWordIdx, setHighlightWordIdx] = useState(-1);
+  const animFrameRef = useRef<number>(0);
+
+  // Narration text for current slide — with fallback to slide content
   const getNarrationForSlide = useCallback((slideIdx: number) => {
-    if (!narrationSections.length) return "";
-    const contentSlides = slides.filter(s => s.type === "content");
     const s = slides[slideIdx];
-    if (s?.type !== "content") return "";
-    const contentIdx = contentSlides.indexOf(s);
-    if (contentIdx >= 0 && narrationSections[contentIdx]) {
-      return narrationSections[contentIdx].narration_text || "";
+    if (!s || s.type !== "content") return "";
+
+    // Try voice agent output first
+    if (narrationSections.length) {
+      const contentSlides = slides.filter(sl => sl.type === "content");
+      const contentIdx = contentSlides.indexOf(s);
+      if (contentIdx >= 0 && narrationSections[contentIdx]) {
+        const txt = narrationSections[contentIdx].narration_text || "";
+        if (txt) return txt;
+      }
     }
-    return "";
+
+    // Fallback: build narration from slide content
+    const parts = parseContentParts(s.content || "");
+    const lines: string[] = [];
+    if (parts.hook) lines.push(parts.hook);
+    parts.body.forEach(p => lines.push(p));
+    if (parts.takeaway) lines.push(`Key takeaway: ${parts.takeaway}`);
+    return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
   }, [slides, narrationSections]);
+
+  // Split narration into words for highlighting
+  const narrationWords = useMemo(() => {
+    const text = getNarrationForSlide(currentSlide);
+    return text ? text.split(/\s+/).filter(Boolean) : [];
+  }, [currentSlide, getNarrationForSlide]);
 
   // Stop audio on slide change
   useEffect(() => {
@@ -266,7 +287,33 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       audioRef.current = null;
       setIsPlaying(false);
     }
+    setHighlightWordIdx(-1);
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
   }, [currentSlide]);
+
+  // Animate word highlight while playing
+  const startWordHighlight = useCallback((audio: HTMLAudioElement) => {
+    const totalWords = narrationWords.length;
+    if (!totalWords) return;
+
+    const tick = () => {
+      if (audio.paused || audio.ended) return;
+      const progress = audio.duration > 0 ? audio.currentTime / audio.duration : 0;
+      const wordIdx = Math.min(Math.floor(progress * totalWords), totalWords - 1);
+      setHighlightWordIdx(wordIdx);
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+  }, [narrationWords]);
+
+  // Helper to wire up audio events
+  const wireAudio = useCallback((audio: HTMLAudioElement) => {
+    audio.muted = muted;
+    audioRef.current = audio;
+    audio.onplay = () => { setIsPlaying(true); startWordHighlight(audio); };
+    audio.onended = () => { setIsPlaying(false); setHighlightWordIdx(-1); };
+    audio.onpause = () => { setIsPlaying(false); if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
+  }, [muted, startWordHighlight]);
 
   // Fetch and play TTS on demand (user gesture)
   const playNarration = useCallback(async () => {
@@ -276,11 +323,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     // If we already have audio for this slide, just play it
     if (audioUrlsRef.current[currentSlide]) {
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
-      audio.muted = muted;
-      audioRef.current = audio;
-      audio.onplay = () => setIsPlaying(true);
-      audio.onended = () => setIsPlaying(false);
-      audio.onpause = () => setIsPlaying(false);
+      wireAudio(audio);
       await audio.play().catch(() => {});
       return;
     }
@@ -303,23 +346,24 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           }),
         }
       );
-      if (!response.ok) return;
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("TTS error:", response.status, errText);
+        return;
+      }
       const blob = await response.blob();
+      if (blob.size < 100) { console.error("TTS returned empty audio"); return; }
       const url = URL.createObjectURL(blob);
       audioUrlsRef.current[currentSlide] = url;
       const audio = new Audio(url);
-      audio.muted = muted;
-      audioRef.current = audio;
-      audio.onplay = () => setIsPlaying(true);
-      audio.onended = () => setIsPlaying(false);
-      audio.onpause = () => setIsPlaying(false);
+      wireAudio(audio);
       await audio.play().catch(() => {});
-    } catch {
-      // TTS unavailable
+    } catch (err) {
+      console.error("TTS fetch failed:", err);
     } finally {
       setAudioLoading(false);
     }
-  }, [currentSlide, muted, getNarrationForSlide]);
+  }, [currentSlide, getNarrationForSlide, wireAudio]);
 
   // Mute/unmute live
   useEffect(() => {
@@ -541,11 +585,36 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 )}
               </div>
 
-              {/* Subtitle strip for narration */}
-              {currentNarration && isPlaying && (
-                <div className="px-8 py-3" style={{ background: "rgba(15,23,42,0.85)" }}>
-                  <p className="text-[15px] text-white/90 anim-fade-in-up">
-                    {currentNarration.slice(0, 80).replace(/\[.*?\]/g, "")}…
+              {/* Subtitle strip with word highlighting */}
+              {narrationWords.length > 0 && isPlaying && (
+                <div className="px-8 py-3 overflow-hidden" style={{ background: "rgba(15,23,42,0.85)" }}>
+                  <p className="text-[15px] leading-relaxed">
+                    {(() => {
+                      // Show a window of ~15 words around the current highlighted word
+                      const windowSize = 15;
+                      const start = Math.max(0, highlightWordIdx - 5);
+                      const end = Math.min(narrationWords.length, start + windowSize);
+                      return narrationWords.slice(start, end).map((word, i) => {
+                        const globalIdx = start + i;
+                        const isActive = globalIdx === highlightWordIdx;
+                        return (
+                          <span
+                            key={globalIdx}
+                            className="transition-all duration-150"
+                            style={{
+                              color: isActive ? "#fff" : globalIdx < highlightWordIdx ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)",
+                              fontWeight: isActive ? 700 : 400,
+                              fontSize: isActive ? "16px" : "15px",
+                              textDecoration: isActive ? "underline" : "none",
+                              textDecorationColor: "#4f46e5",
+                              textUnderlineOffset: "3px",
+                            }}
+                          >
+                            {word}{" "}
+                          </span>
+                        );
+                      });
+                    })()}
                   </p>
                 </div>
               )}
@@ -784,13 +853,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         {/* RIGHT SIDEBAR */}
         <div className="w-[200px] shrink-0 overflow-y-auto p-4 hidden lg:block"
           style={{ background: "rgba(0,0,0,0.2)" }}>
-          <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-3">Slide Notes</p>
+          <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-3">Narration Script</p>
           {currentNarration ? (
             <p className="text-[12px] text-white/60 leading-relaxed whitespace-pre-wrap">
-              {currentNarration.replace(/\[.*?\]/g, "")}
+              {currentNarration.replace(/\[.*?\]/g, "").slice(0, 500)}
             </p>
           ) : (
-            <p className="text-[12px] text-white/30 italic">No narration for this slide</p>
+            <p className="text-[12px] text-white/30 italic">No narration for this slide type</p>
           )}
           <div className="mt-6">
             <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">Resources</p>
