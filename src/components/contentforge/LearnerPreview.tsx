@@ -94,8 +94,11 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   // Extract MCQs
   const mcqs = assessData?.mcq || [];
 
-  // Extract generated SVGs
-  const generatedSvgs: string[] = visualData?.generatedSvgs || [];
+  // Extract infographic descriptions from visual agent
+  const visualModules = visualData?.modules || [];
+  const infographicDescriptions: string[] = visualModules.map(
+    (vm: any) => vm?.infographic_description || vm?.slide_layout || ""
+  );
 
   // Build slides
   const slides: Slide[] = [];
