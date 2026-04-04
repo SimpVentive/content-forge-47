@@ -853,13 +853,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         {/* RIGHT SIDEBAR */}
         <div className="w-[200px] shrink-0 overflow-y-auto p-4 hidden lg:block"
           style={{ background: "rgba(0,0,0,0.2)" }}>
-          <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-3">Slide Notes</p>
+          <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-3">Narration Script</p>
           {currentNarration ? (
             <p className="text-[12px] text-white/60 leading-relaxed whitespace-pre-wrap">
-              {currentNarration.replace(/\[.*?\]/g, "")}
+              {currentNarration.replace(/\[.*?\]/g, "").slice(0, 500)}
             </p>
           ) : (
-            <p className="text-[12px] text-white/30 italic">No narration for this slide</p>
+            <p className="text-[12px] text-white/30 italic">No narration for this slide type</p>
           )}
           <div className="mt-6">
             <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">Resources</p>
