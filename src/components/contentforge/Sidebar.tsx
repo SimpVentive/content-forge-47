@@ -100,7 +100,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (error) throw new Error(error.message);
         if (data?.error) throw new Error(data.error);
 
-        if (data?.text && data.text.length > 0) {
+        if (data?.unsupported) {
+          setInputText(`📄 Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\n⚠ ${data.message || "Please paste the content directly."}`);
+        } else if (data?.text && data.text.length > 0) {
           setInputText(data.text);
         } else {
           setInputText(`📄 Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nCould not extract text. You can paste additional notes below.`);
