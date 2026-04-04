@@ -809,21 +809,27 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(12px)" }}>
             <button
               onClick={() => {
-                if (audioRef.current) {
-                  if (isPlaying) { audioRef.current.pause(); }
-                  else { audioRef.current.play().catch(() => {}); }
+                if (audioLoading) return;
+                if (audioRef.current && isPlaying) {
+                  audioRef.current.pause();
+                } else if (audioRef.current && !isPlaying) {
+                  audioRef.current.play().catch(() => {});
+                } else {
+                  playNarration();
                 }
               }}
               className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
             >
-              {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+              {audioLoading ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
             </button>
             <WaveformBars playing={isPlaying} />
             <button onClick={() => setMuted(!muted)} className="text-white/60 hover:text-white transition-colors">
               {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
             </button>
             <span className="text-[11px] text-white/40">
-              {isPlaying ? "Playing" : "Ready"} · Sarah
+              {audioLoading ? "Loading…" : isPlaying ? "Playing" : "Click ▶ to play"} · Sarah
             </span>
           </div>
         ) : (
