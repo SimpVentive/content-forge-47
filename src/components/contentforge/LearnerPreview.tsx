@@ -245,18 +245,39 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const voiceParsed = tryParseJSON(rawOutputs.voice);
   const narrationSections = voiceParsed?.sections || [];
 
-  // Narration text for current slide
+  // Word highlight state
+  const [highlightWordIdx, setHighlightWordIdx] = useState(-1);
+  const animFrameRef = useRef<number>(0);
+
+  // Narration text for current slide — with fallback to slide content
   const getNarrationForSlide = useCallback((slideIdx: number) => {
-    if (!narrationSections.length) return "";
-    const contentSlides = slides.filter(s => s.type === "content");
     const s = slides[slideIdx];
-    if (s?.type !== "content") return "";
-    const contentIdx = contentSlides.indexOf(s);
-    if (contentIdx >= 0 && narrationSections[contentIdx]) {
-      return narrationSections[contentIdx].narration_text || "";
+    if (!s || s.type !== "content") return "";
+
+    // Try voice agent output first
+    if (narrationSections.length) {
+      const contentSlides = slides.filter(sl => sl.type === "content");
+      const contentIdx = contentSlides.indexOf(s);
+      if (contentIdx >= 0 && narrationSections[contentIdx]) {
+        const txt = narrationSections[contentIdx].narration_text || "";
+        if (txt) return txt;
+      }
     }
-    return "";
+
+    // Fallback: build narration from slide content
+    const parts = parseContentParts(s.content || "");
+    const lines: string[] = [];
+    if (parts.hook) lines.push(parts.hook);
+    parts.body.forEach(p => lines.push(p));
+    if (parts.takeaway) lines.push(`Key takeaway: ${parts.takeaway}`);
+    return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
   }, [slides, narrationSections]);
+
+  // Split narration into words for highlighting
+  const narrationWords = useMemo(() => {
+    const text = getNarrationForSlide(currentSlide);
+    return text ? text.split(/\s+/).filter(Boolean) : [];
+  }, [currentSlide, getNarrationForSlide]);
 
   // Stop audio on slide change
   useEffect(() => {
@@ -266,7 +287,33 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       audioRef.current = null;
       setIsPlaying(false);
     }
+    setHighlightWordIdx(-1);
+    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
   }, [currentSlide]);
+
+  // Animate word highlight while playing
+  const startWordHighlight = useCallback((audio: HTMLAudioElement) => {
+    const totalWords = narrationWords.length;
+    if (!totalWords) return;
+
+    const tick = () => {
+      if (audio.paused || audio.ended) return;
+      const progress = audio.duration > 0 ? audio.currentTime / audio.duration : 0;
+      const wordIdx = Math.min(Math.floor(progress * totalWords), totalWords - 1);
+      setHighlightWordIdx(wordIdx);
+      animFrameRef.current = requestAnimationFrame(tick);
+    };
+    animFrameRef.current = requestAnimationFrame(tick);
+  }, [narrationWords]);
+
+  // Helper to wire up audio events
+  const wireAudio = useCallback((audio: HTMLAudioElement) => {
+    audio.muted = muted;
+    audioRef.current = audio;
+    audio.onplay = () => { setIsPlaying(true); startWordHighlight(audio); };
+    audio.onended = () => { setIsPlaying(false); setHighlightWordIdx(-1); };
+    audio.onpause = () => { setIsPlaying(false); if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
+  }, [muted, startWordHighlight]);
 
   // Fetch and play TTS on demand (user gesture)
   const playNarration = useCallback(async () => {
@@ -276,11 +323,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     // If we already have audio for this slide, just play it
     if (audioUrlsRef.current[currentSlide]) {
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
-      audio.muted = muted;
-      audioRef.current = audio;
-      audio.onplay = () => setIsPlaying(true);
-      audio.onended = () => setIsPlaying(false);
-      audio.onpause = () => setIsPlaying(false);
+      wireAudio(audio);
       await audio.play().catch(() => {});
       return;
     }
@@ -303,23 +346,24 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           }),
         }
       );
-      if (!response.ok) return;
+      if (!response.ok) {
+        const errText = await response.text();
+        console.error("TTS error:", response.status, errText);
+        return;
+      }
       const blob = await response.blob();
+      if (blob.size < 100) { console.error("TTS returned empty audio"); return; }
       const url = URL.createObjectURL(blob);
       audioUrlsRef.current[currentSlide] = url;
       const audio = new Audio(url);
-      audio.muted = muted;
-      audioRef.current = audio;
-      audio.onplay = () => setIsPlaying(true);
-      audio.onended = () => setIsPlaying(false);
-      audio.onpause = () => setIsPlaying(false);
+      wireAudio(audio);
       await audio.play().catch(() => {});
-    } catch {
-      // TTS unavailable
+    } catch (err) {
+      console.error("TTS fetch failed:", err);
     } finally {
       setAudioLoading(false);
     }
-  }, [currentSlide, muted, getNarrationForSlide]);
+  }, [currentSlide, getNarrationForSlide, wireAudio]);
 
   // Mute/unmute live
   useEffect(() => {
