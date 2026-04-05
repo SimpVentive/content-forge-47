@@ -223,18 +223,45 @@ function buildModuleHtml(
   totalModules: number,
   paragraphs: string[],
   quizzes: { question: string; options: string[]; correct: number }[],
-  audioBase64: string | null
+  audioBase64: string | null,
+  narrationText: string
 ): string {
-  const contentHtml = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join("\n        ");
+  // Split narration into sentences for highlighting
+  const sentences = narrationText
+    ? narrationText.match(/[^.!?]+[.!?]+[\s]*/g) || [narrationText]
+    : [];
+  const hasSentences = sentences.length > 0 && audioBase64;
+
+  // Build content with sentence spans if narration exists
+  const contentHtml = hasSentences
+    ? `<div id="narration-text">${sentences.map((s, i) =>
+        `<span class="hl-sentence" data-idx="${i}">${escapeHtml(s.trim())} </span>`
+      ).join("")}</div>`
+    : paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join("\n        ");
 
   const audioHtml = audioBase64 ? `
       <div class="audio-section">
-        <h2>🎧 Listen to Narration</h2>
-        <audio controls class="audio-player" preload="auto">
+        <div class="audio-header">
+          <h2>🎧 Listen to Narration</h2>
+          <div class="palette-bar">
+            <span class="palette-label">Highlight:</span>
+            <button class="palette-btn active" data-palette="yellow" onclick="setPalette('yellow')" title="Yellow">
+              <span class="palette-dot" style="background:#fef9c3;border-color:#fde047"></span>
+            </button>
+            <button class="palette-btn" data-palette="mint" onclick="setPalette('mint')" title="Mint">
+              <span class="palette-dot" style="background:#d1fae5;border-color:#6ee7b7"></span>
+            </button>
+            <button class="palette-btn" data-palette="sky" onclick="setPalette('sky')" title="Sky">
+              <span class="palette-dot" style="background:#dbeafe;border-color:#93c5fd"></span>
+            </button>
+            <button class="hl-toggle active" id="hlToggle" onclick="toggleHighlight()">On</button>
+          </div>
+        </div>
+        <audio controls class="audio-player" id="moduleAudio" preload="auto">
           <source src="data:audio/mpeg;base64,${audioBase64}" type="audio/mpeg"/>
           Your browser does not support the audio element.
         </audio>
-        <p class="audio-hint">Click play to hear the narration for this module</p>
+        <p class="audio-hint">Click play — text highlights sentence by sentence as you listen</p>
       </div>` : "";
 
   const quizHtml = quizzes.length > 0 ? `
@@ -278,11 +305,25 @@ function buildModuleHtml(
     .container { max-width: 780px; margin: 0 auto; padding: 32px 24px; }
     .topics { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
     .topic-chip { background: var(--primary); color: #fff; font-size: 12px; font-weight: 600; padding: 4px 14px; border-radius: 999px; }
-    .content p { margin-bottom: 16px; font-size: 15px; }
+    .content { font-size: 15px; line-height: 1.8; }
+    .content p { margin-bottom: 16px; }
+    #narration-text { font-size: 16px; line-height: 2; }
+    .hl-sentence { padding: 2px 4px; border-radius: 6px; transition: background 0.3s ease, box-shadow 0.3s ease; }
+    .hl-sentence.active-yellow { background: #fef9c3; box-shadow: inset 4px 0 0 #fde047; }
+    .hl-sentence.active-mint { background: #d1fae5; box-shadow: inset 4px 0 0 #6ee7b7; }
+    .hl-sentence.active-sky { background: #dbeafe; box-shadow: inset 4px 0 0 #93c5fd; }
     .audio-section { background: linear-gradient(135deg, #eef2ff, #e0e7ff); border: 1px solid #c7d2fe; border-radius: 16px; padding: 24px; margin-bottom: 28px; }
-    .audio-section h2 { font-size: 18px; margin-bottom: 12px; color: var(--primary); }
+    .audio-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .audio-section h2 { font-size: 18px; color: var(--primary); margin: 0; }
     .audio-player { width: 100%; height: 48px; border-radius: 12px; }
     .audio-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .palette-bar { display: flex; align-items: center; gap: 6px; }
+    .palette-label { font-size: 12px; font-weight: 600; color: var(--muted); }
+    .palette-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.2s; }
+    .palette-btn.active { border-color: var(--primary); }
+    .palette-dot { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid; }
+    .hl-toggle { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 8px; border: 1.5px solid var(--primary); background: none; color: var(--primary); cursor: pointer; transition: all 0.2s; }
+    .hl-toggle.active { background: var(--primary); color: #fff; }
     .quiz-section { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-top: 32px; }
     .quiz-section h2 { font-size: 18px; margin-bottom: 16px; color: var(--primary); }
     .quiz-item { margin-bottom: 20px; }
@@ -320,6 +361,10 @@ function buildModuleHtml(
   </div>
   <script>
     var score = 0, total = ${quizzes.length}, answered = 0;
+    var hlEnabled = true, hlPalette = 'yellow';
+    var totalSentences = ${hasSentences ? sentences.length : 0};
+    var animId = 0;
+
     function checkAnswer(qi, selected, correct) {
       var fb = document.getElementById('fb' + qi);
       if (selected === correct) {
@@ -335,10 +380,72 @@ function buildModuleHtml(
         scormSetScore(Math.round((score / total) * 100));
       }
     }
+
     function completeCourse() {
       scormSetComplete();
       scormFinish();
       alert('Congratulations! You have completed the course.');
+    }
+
+    function clearHighlights() {
+      var spans = document.querySelectorAll('.hl-sentence');
+      for (var i = 0; i < spans.length; i++) {
+        spans[i].className = 'hl-sentence';
+      }
+    }
+
+    function highlightSentence(idx) {
+      clearHighlights();
+      if (!hlEnabled || idx < 0 || idx >= totalSentences) return;
+      var el = document.querySelector('.hl-sentence[data-idx="' + idx + '"]');
+      if (el) {
+        el.className = 'hl-sentence active-' + hlPalette;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    function setPalette(p) {
+      hlPalette = p;
+      var btns = document.querySelectorAll('.palette-btn');
+      for (var i = 0; i < btns.length; i++) {
+        btns[i].className = btns[i].getAttribute('data-palette') === p ? 'palette-btn active' : 'palette-btn';
+      }
+      // Re-apply current highlight
+      var active = document.querySelector('.hl-sentence[class*="active-"]');
+      if (active) {
+        var idx = active.getAttribute('data-idx');
+        highlightSentence(parseInt(idx));
+      }
+    }
+
+    function toggleHighlight() {
+      hlEnabled = !hlEnabled;
+      var btn = document.getElementById('hlToggle');
+      btn.textContent = hlEnabled ? 'On' : 'Off';
+      btn.className = hlEnabled ? 'hl-toggle active' : 'hl-toggle';
+      if (!hlEnabled) clearHighlights();
+    }
+
+    // Sync highlight with audio playback
+    var audio = document.getElementById('moduleAudio');
+    if (audio && totalSentences > 0) {
+      audio.addEventListener('play', function() {
+        function tick() {
+          if (audio.paused || audio.ended) return;
+          var progress = audio.currentTime / (audio.duration || 1);
+          var sentIdx = Math.min(Math.floor(progress * totalSentences), totalSentences - 1);
+          highlightSentence(sentIdx);
+          animId = requestAnimationFrame(tick);
+        }
+        tick();
+      });
+      audio.addEventListener('pause', function() { cancelAnimationFrame(animId); });
+      audio.addEventListener('ended', function() { cancelAnimationFrame(animId); clearHighlights(); });
+      audio.addEventListener('seeked', function() {
+        var progress = audio.currentTime / (audio.duration || 1);
+        var sentIdx = Math.min(Math.floor(progress * totalSentences), totalSentences - 1);
+        highlightSentence(sentIdx);
+      });
     }
   <\/script>
 </body>
@@ -407,7 +514,8 @@ export async function exportScormPackage(
     const startQ = i * quizzesPerModule;
     const modQuizzes = allQuizzes.slice(startQ, startQ + quizzesPerModule);
     const audioBase64 = audioBase64Map.get(i) || null;
-    const html = buildModuleHtml(courseTitle, mod, i, modules.length, paragraphs, modQuizzes, audioBase64);
+    const narrationText = voiceSections[i]?.narration_text || "";
+    const html = buildModuleHtml(courseTitle, mod, i, modules.length, paragraphs, modQuizzes, audioBase64, narrationText);
     zip.file(`module_${i + 1}.html`, html);
   });
 
