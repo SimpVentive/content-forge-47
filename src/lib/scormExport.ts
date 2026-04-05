@@ -120,9 +120,6 @@ ${orgItems}
   </organizations>
   <resources>
 ${resources}
-    <resource identifier="RES_API" type="webcontent" adlcp:scormType="asset" href="scorm_api.js">
-      <file href="scorm_api.js"/>
-    </resource>
   </resources>
 </manifest>`;
 }
