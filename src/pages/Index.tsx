@@ -39,6 +39,7 @@ const Index = () => {
   const [showParamsDialog, setShowParamsDialog] = useState(false);
   const [courseParams, setCourseParams] = useState<CourseParameters | null>(null);
   const [showVideoWorkflow, setShowVideoWorkflow] = useState(false);
+  const [workflowClips, setWorkflowClips] = useState<any[]>([]);
   const prevIsRunning = useRef(false);
 
   const { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline } = useAgentPipeline();
@@ -166,7 +167,8 @@ const Index = () => {
             language={courseParams?.language}
             level={courseParams?.level}
             duration={courseParams?.duration}
-            onComplete={() => {
+            onComplete={(clips) => {
+              setWorkflowClips(clips);
               setShowVideoWorkflow(false);
             }}
             onSkip={() => setShowVideoWorkflow(false)}
@@ -207,7 +209,7 @@ const Index = () => {
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize={30} minSize={15} maxSize={45}>
-          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} />
+          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} workflowClips={workflowClips} courseDuration={courseParams?.duration} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

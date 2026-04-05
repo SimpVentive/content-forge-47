@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film } from "lucide-react";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
+import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
 
 /* ── helpers ── */
 function tryParseJSON(raw: string): any | null {
@@ -221,10 +222,19 @@ interface LearnerPreviewProps {
   rawOutputs: RawAgentOutputs;
   onClose: () => void;
   insertedVideos?: InsertedVideo[];
+  courseDuration?: string;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [] }) => {
-  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, insertedVideos), [rawOutputs, insertedVideos]);
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration }) => {
+  const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
+  const [showPlacer, setShowPlacer] = useState(false);
+
+  // Sync if parent changes
+  useEffect(() => { setLocalVideos(insertedVideos); }, [insertedVideos]);
+
+  const unassignedCount = localVideos.filter(v => !v.moduleTitle).length;
+
+  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, localVideos), [rawOutputs, localVideos]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set([0]));
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
@@ -945,6 +955,51 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       >
         <X className="w-4 h-4" /> Close
       </button>
+
+      {/* Floating "Place Videos" button for unassigned clips */}
+      {unassignedCount > 0 && (
+        <button
+          onClick={() => setShowPlacer(true)}
+          className="absolute top-4 right-24 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-bold text-white shadow-lg animate-pulse hover:animate-none transition-all"
+          style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}
+        >
+          <Film className="w-4 h-4" />
+          Place {unassignedCount} Video{unassignedCount > 1 ? "s" : ""}
+        </button>
+      )}
+
+      {/* VideoTimelinePlacer overlay */}
+      {showPlacer && (
+        <VideoTimelinePlacer
+          clips={localVideos.map(v => ({
+            id: v.videoId,
+            videoId: v.videoId,
+            title: v.title,
+            channelTitle: v.channelTitle,
+            thumbnail: v.thumbnail,
+            duration: v.duration,
+            clipType: "all" as const,
+            startTime: v.startTime,
+            endTime: v.endTime,
+            customName: v.customName || v.title,
+            insertAfterModule: v.moduleTitle || "",
+          }))}
+          modules={modules.map(m => ({ title: m.title, sections: m.topics }))}
+          courseDuration={courseDuration || "15min"}
+          onUpdateClip={(id, updates) => {
+            setLocalVideos(prev => prev.map(v =>
+              v.videoId === id
+                ? { ...v, moduleTitle: updates.insertAfterModule ?? v.moduleTitle }
+                : v
+            ));
+          }}
+          onRemoveClip={(id) => {
+            setLocalVideos(prev => prev.filter(v => v.videoId !== id));
+          }}
+          onFinish={() => setShowPlacer(false)}
+          onBack={() => setShowPlacer(false)}
+        />
+      )}
     </div>
   );
 };
