@@ -138,7 +138,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         topicIndex: ti,
         topicTitle: topic,
         content: sectionText,
-        infographicSvg: ti === 0 ? (infographicDescriptions[mi] || "") : undefined,
+        infographicSvg: ti === 0 ? (infographicDescriptions[mi] || undefined) : undefined,
       });
       topicCounter++;
     });
@@ -283,11 +283,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
   }, [slides, narrationSections]);
 
-  // Split narration into words for highlighting
+  // Split narration into sentences for highlighting
+  const narrationSentences = useMemo(() => {
+    const text = getNarrationForSlide(currentSlide);
+    if (!text) return [];
+    // Split by sentence-ending punctuation, keeping the punctuation
+    return text.match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(Boolean) || [text];
+  }, [currentSlide, getNarrationForSlide]);
+
+  // Also keep words for progress calculation
   const narrationWords = useMemo(() => {
     const text = getNarrationForSlide(currentSlide);
     return text ? text.split(/\s+/).filter(Boolean) : [];
   }, [currentSlide, getNarrationForSlide]);
+
+  // Track current sentence index (not word)
+  const [highlightSentenceIdx, setHighlightSentenceIdx] = useState(-1);
 
   // Stop audio on slide change
   useEffect(() => {
@@ -298,30 +309,47 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       setIsPlaying(false);
     }
     setHighlightWordIdx(-1);
+    setHighlightSentenceIdx(-1);
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
   }, [currentSlide]);
 
-  // Animate word highlight while playing
+  // Animate sentence highlight while playing
   const startWordHighlight = useCallback((audio: HTMLAudioElement) => {
+    const totalSentences = narrationSentences.length;
     const totalWords = narrationWords.length;
-    if (!totalWords) return;
+    if (!totalSentences || !totalWords) return;
+
+    // Pre-compute cumulative word counts per sentence to map audio progress → sentence
+    const sentenceWordCounts = narrationSentences.map(s => s.split(/\s+/).length);
+    const cumulativeWords: number[] = [];
+    sentenceWordCounts.reduce((acc, count, i) => {
+      cumulativeWords[i] = acc + count;
+      return acc + count;
+    }, 0);
 
     const tick = () => {
       if (audio.paused || audio.ended) return;
       const progress = audio.duration > 0 ? audio.currentTime / audio.duration : 0;
-      const wordIdx = Math.min(Math.floor(progress * totalWords), totalWords - 1);
+      const wordIdx = Math.floor(progress * totalWords);
+      // Find which sentence this word belongs to
+      let sentIdx = 0;
+      for (let i = 0; i < cumulativeWords.length; i++) {
+        if (wordIdx < cumulativeWords[i]) { sentIdx = i; break; }
+        sentIdx = i;
+      }
       setHighlightWordIdx(wordIdx);
+      setHighlightSentenceIdx(sentIdx);
       animFrameRef.current = requestAnimationFrame(tick);
     };
     animFrameRef.current = requestAnimationFrame(tick);
-  }, [narrationWords]);
+  }, [narrationSentences, narrationWords]);
 
   // Helper to wire up audio events
   const wireAudio = useCallback((audio: HTMLAudioElement) => {
     audio.muted = muted;
     audioRef.current = audio;
     audio.onplay = () => { setIsPlaying(true); startWordHighlight(audio); };
-    audio.onended = () => { setIsPlaying(false); setHighlightWordIdx(-1); };
+    audio.onended = () => { setIsPlaying(false); setHighlightWordIdx(-1); setHighlightSentenceIdx(-1); };
     audio.onpause = () => { setIsPlaying(false); if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   }, [muted, startWordHighlight]);
 
@@ -503,6 +531,50 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       case "content": {
         const parts = parseContentParts(slide.content || "");
         const moduleLabel = `MODULE ${slide.moduleIndex + 1} — ${slide.moduleTitle}`.toUpperCase();
+
+        // Build an ordered list of text blocks for sentence-matching
+        const allTextBlocks: { type: "hook" | "body" | "takeaway" | "challenge"; text: string; bodyIdx?: number }[] = [];
+        if (parts.hook) allTextBlocks.push({ type: "hook", text: parts.hook });
+        parts.body.forEach((p, i) => allTextBlocks.push({ type: "body", text: p, bodyIdx: i }));
+        if (parts.takeaway) allTextBlocks.push({ type: "takeaway", text: parts.takeaway });
+        if (parts.challenge) allTextBlocks.push({ type: "challenge", text: parts.challenge });
+
+        // Map each sentence to a block index for highlighting
+        const sentenceToBlock: number[] = [];
+        if (isPlaying && narrationSentences.length > 0) {
+          narrationSentences.forEach(sentence => {
+            const clean = sentence.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+            let bestBlock = 0;
+            let bestScore = 0;
+            allTextBlocks.forEach((block, bi) => {
+              const blockClean = block.text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+              // Score by word overlap
+              const sentWords = clean.split(/\s+/);
+              const matches = sentWords.filter(w => blockClean.includes(w)).length;
+              const score = matches / Math.max(sentWords.length, 1);
+              if (score > bestScore) { bestScore = score; bestBlock = bi; }
+            });
+            sentenceToBlock.push(bestBlock);
+          });
+        }
+
+        // Which block is currently being spoken?
+        const activeBlockIdx = isPlaying && highlightSentenceIdx >= 0 ? sentenceToBlock[highlightSentenceIdx] ?? -1 : -1;
+
+        const highlightStyle = (blockIdx: number) => {
+          if (activeBlockIdx === blockIdx) {
+            return {
+              background: "rgba(79, 70, 229, 0.08)",
+              borderRadius: "8px",
+              padding: "4px 8px",
+              transition: "background 0.3s ease",
+              boxShadow: "inset 3px 0 0 #4f46e5",
+            };
+          }
+          return { transition: "background 0.3s ease" };
+        };
+
+        let blockCounter = 0;
         
         return (
           <div className="max-w-[800px] mx-auto" key={currentSlide}>
@@ -524,29 +596,38 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 </h2>
 
                 {/* Hook paragraph — special styling */}
-                {parts.hook && (
-                  <div className="mb-5 rounded-lg p-4 anim-fade-in-up"
-                    style={{
-                      borderLeft: "3px solid #4f46e5",
-                      background: "rgba(79,70,229,0.04)",
-                      animationDelay: "0.15s",
-                    }}>
-                    <p className="text-[17px] leading-[1.8]" style={{ color: "#374151" }}>
-                      {parts.hook}
-                    </p>
-                  </div>
-                )}
+                {parts.hook && (() => {
+                  const bi = blockCounter++;
+                  return (
+                    <div className="mb-5 rounded-lg p-4 anim-fade-in-up"
+                      style={{
+                        borderLeft: activeBlockIdx === bi ? "3px solid #4f46e5" : "3px solid #4f46e5",
+                        background: activeBlockIdx === bi ? "rgba(79,70,229,0.12)" : "rgba(79,70,229,0.04)",
+                        animationDelay: "0.15s",
+                        transition: "background 0.3s ease",
+                      }}>
+                      <p className="text-[17px] leading-[1.8]" style={{ color: "#374151" }}>
+                        {parts.hook}
+                      </p>
+                    </div>
+                  );
+                })()}
 
-                {/* Body paragraphs with stagger */}
-                {parts.body.map((para, pi) => (
-                  <p key={pi} className="text-[17px] leading-[1.8] mb-4 anim-fade-in-up"
-                    style={{ color: "#374151", animationDelay: `${0.3 + pi * 0.15}s` }}>
-                    {para}
-                  </p>
-                ))}
+                {/* Body paragraphs with stagger + inline highlight */}
+                {parts.body.map((para, pi) => {
+                  const bi = blockCounter++;
+                  return (
+                    <div key={pi} style={highlightStyle(bi)} className="mb-4 anim-fade-in-up">
+                      <p className="text-[17px] leading-[1.8]"
+                        style={{ color: "#374151", animationDelay: `${0.3 + pi * 0.15}s` }}>
+                        {para}
+                      </p>
+                    </div>
+                  );
+                })}
 
-                {/* Infographic visual */}
-                {slide.infographicSvg && slide.topicIndex === 0 && (
+                {/* Infographic visual — show whenever available */}
+                {slide.infographicSvg && (
                   <div className="my-6 rounded-xl p-5 anim-scale-in"
                     style={{ background: "linear-gradient(135deg, rgba(79,70,229,0.06), rgba(124,58,237,0.06))", border: "1px solid rgba(79,70,229,0.15)", animationDelay: "0.3s" }}>
                     <div className="flex items-center gap-3 mb-3">
@@ -565,69 +646,44 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 )}
 
                 {/* Takeaway box */}
-                {parts.takeaway && (
-                  <div className="mt-6 rounded-lg p-[14px_18px] anim-fade-in-up"
-                    style={{
-                      background: "#fffbeb",
-                      borderLeft: "4px solid #f59e0b",
-                      animationDelay: "0.5s",
-                    }}>
-                    <p className="text-[11px] font-bold uppercase tracking-[1.5px] mb-1"
-                      style={{ color: "#d97706" }}>
-                      Key Takeaway
-                    </p>
-                    <p className="text-[15px]" style={{ color: "#92400e" }}>
-                      {parts.takeaway}
-                    </p>
-                  </div>
-                )}
+                {parts.takeaway && (() => {
+                  const bi = blockCounter++;
+                  return (
+                    <div className="mt-6 rounded-lg p-[14px_18px] anim-fade-in-up"
+                      style={{
+                        background: activeBlockIdx === bi ? "rgba(79, 70, 229, 0.1)" : "#fffbeb",
+                        borderLeft: activeBlockIdx === bi ? "4px solid #4f46e5" : "4px solid #f59e0b",
+                        animationDelay: "0.5s",
+                        transition: "background 0.3s, border-color 0.3s",
+                      }}>
+                      <p className="text-[11px] font-bold uppercase tracking-[1.5px] mb-1"
+                        style={{ color: "#d97706" }}>
+                        Key Takeaway
+                      </p>
+                      <p className="text-[15px]" style={{ color: "#92400e" }}>
+                        {parts.takeaway}
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 {/* Challenge line */}
-                {parts.challenge && (
-                  <p className="mt-4 pt-3 text-[15px] italic anim-fade-in-up"
-                    style={{
-                      color: "#6b7280",
-                      borderTop: "1px solid #f1f5f9",
-                      animationDelay: "0.6s",
-                    }}>
-                    {parts.challenge}
-                  </p>
-                )}
+                {parts.challenge && (() => {
+                  const bi = blockCounter++;
+                  return (
+                    <p className="mt-4 pt-3 text-[15px] italic anim-fade-in-up"
+                      style={{
+                        color: "#6b7280",
+                        borderTop: "1px solid #f1f5f9",
+                        animationDelay: "0.6s",
+                        ...(activeBlockIdx === bi ? { background: "rgba(79, 70, 229, 0.08)", borderRadius: "8px", padding: "8px 12px" } : {}),
+                        transition: "background 0.3s ease",
+                      }}>
+                      {parts.challenge}
+                    </p>
+                  );
+                })()}
               </div>
-
-              {/* Subtitle strip with word highlighting */}
-              {narrationWords.length > 0 && isPlaying && (
-                <div className="px-8 py-3 overflow-hidden" style={{ background: "rgba(15,23,42,0.85)" }}>
-                  <p className="text-[15px] leading-relaxed">
-                    {(() => {
-                      // Show a window of ~15 words around the current highlighted word
-                      const windowSize = 15;
-                      const start = Math.max(0, highlightWordIdx - 5);
-                      const end = Math.min(narrationWords.length, start + windowSize);
-                      return narrationWords.slice(start, end).map((word, i) => {
-                        const globalIdx = start + i;
-                        const isActive = globalIdx === highlightWordIdx;
-                        return (
-                          <span
-                            key={globalIdx}
-                            className="transition-all duration-150"
-                            style={{
-                              color: isActive ? "#fff" : globalIdx < highlightWordIdx ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.35)",
-                              fontWeight: isActive ? 700 : 400,
-                              fontSize: isActive ? "16px" : "15px",
-                              textDecoration: isActive ? "underline" : "none",
-                              textDecorationColor: "#4f46e5",
-                              textUnderlineOffset: "3px",
-                            }}
-                          >
-                            {word}{" "}
-                          </span>
-                        );
-                      });
-                    })()}
-                  </p>
-                </div>
-              )}
 
               <div className="px-8 pb-4 text-right">
                 <span className="text-[12px] font-semibold px-3 py-1 rounded-full"
