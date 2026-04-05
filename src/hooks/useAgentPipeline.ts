@@ -135,8 +135,16 @@ export function useAgentPipeline() {
           }).join("\n\n");
         } catch { writerTopics = courseTitle; }
 
+        const durationMinutes = parseInt(params?.duration || "15", 10);
+        const wordsPerTopic = durationMinutes <= 5 ? "60-90" : durationMinutes <= 10 ? "90-120" : "120-180";
+
         writerResult = await callClaudeWithRetry(
           `You are an elite instructional writer who specialises in corporate eLearning that people actually enjoy. Your writing style is: conversational, direct, and energetic — like a brilliant colleague explaining something important over coffee, not a textbook.
+
+CRITICAL: Target course duration is ${params?.duration || "15min"}. You MUST scale content length to match this duration exactly.
+- Total word count per topic: ${wordsPerTopic} words.
+- For short courses (3-5 min), be ultra-concise: one sharp hook, one core insight, one takeaway per topic. No filler.
+- For longer courses (30-60 min), expand with more examples, deeper analysis, and richer scenarios.
 
 Rules you NEVER break:
 - Open every topic with a provocative hook — a shocking stat, a bold claim, a real-world scenario, or a question that makes the learner stop and think
@@ -148,12 +156,11 @@ Rules you NEVER break:
 - End every topic with a challenge or reflection: 'Next time you X, try Y instead'
 - NO passive voice. NO jargon without explanation. NO bullet walls.
 - Format each topic as: Hook (2-3 sentences) → Core concept (3-4 sentences) → Real example (2-3 sentences) → Key Takeaway: (1-2 sentences) → Challenge: (1 sentence)
-- Total length per topic: 120-180 words. Tight and impactful.
 - Use markdown ## headers for each topic title, matching the exact topic names provided.
 - You MUST use content from the source material provided. Do NOT invent unrelated examples.
 
 For the current course, write content that would make a learner lean forward, not lean back.`,
-          `Course Title: ${courseTitle}\n\nModules & Topics:\n${writerTopics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for EVERY topic listed above. Use ## headers matching the topic names exactly.`,
+          `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\n\nModules & Topics:\n${writerTopics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for EVERY topic listed above. Use ## headers matching the topic names exactly. Scale total content to fit ${params?.duration || "15min"}.`,
           addLog, "Writer Agent"
         );
         setStatus("writer", "complete");
