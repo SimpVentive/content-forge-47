@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
-import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube } from "lucide-react";
+import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2 } from "lucide-react";
+import { exportScormPackage } from "@/lib/scormExport";
+import { toast } from "sonner";
 import { VoicePreview } from "./VoicePreview";
 import { SlidePreview } from "./SlidePreview";
 import { InfographicPreview } from "./InfographicPreview";
