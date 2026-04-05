@@ -304,8 +304,11 @@ export async function exportScormPackage(
   // Distribute quizzes across modules (roughly even)
   const quizzesPerModule = Math.max(1, Math.floor(allQuizzes.length / modules.length));
 
-  // Add SCORM manifest
+  // Add SCORM manifest and required XSD schema files
   zip.file("imsmanifest.xml", buildManifest(courseTitle, modules));
+  zip.file("imscp_rootv1p1p2.xsd", IMSCP_XSD);
+  zip.file("adlcp_rootv1p2.xsd", ADLCP_XSD);
+  zip.file("imsmd_rootv1p2p1.xsd", IMSMD_XSD);
 
   // Add SCORM API
   zip.file("scorm_api.js", SCORM_API_JS);
