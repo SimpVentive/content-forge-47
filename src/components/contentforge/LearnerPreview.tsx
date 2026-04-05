@@ -138,7 +138,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         topicIndex: ti,
         topicTitle: topic,
         content: sectionText,
-        infographicSvg: infographicDescriptions[mi] || undefined,
+        infographicSvg: ti === 0 ? (infographicDescriptions[mi] || undefined) : undefined,
       });
       topicCounter++;
     });
