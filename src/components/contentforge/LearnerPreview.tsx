@@ -222,10 +222,19 @@ interface LearnerPreviewProps {
   rawOutputs: RawAgentOutputs;
   onClose: () => void;
   insertedVideos?: InsertedVideo[];
+  courseDuration?: string;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [] }) => {
-  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, insertedVideos), [rawOutputs, insertedVideos]);
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration }) => {
+  const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
+  const [showPlacer, setShowPlacer] = useState(false);
+
+  // Sync if parent changes
+  useEffect(() => { setLocalVideos(insertedVideos); }, [insertedVideos]);
+
+  const unassignedCount = localVideos.filter(v => !v.moduleTitle).length;
+
+  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, localVideos), [rawOutputs, localVideos]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set([0]));
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
