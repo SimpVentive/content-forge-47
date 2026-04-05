@@ -475,7 +475,7 @@ const ClipPlayer: React.FC<{ clips: ClipItem[]; onClose: () => void }> = ({ clip
    MAIN WORKFLOW ORCHESTRATOR
    ═══════════════════════════════════════ */
 export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, moduleSections, courseTitle, language, level, duration, onComplete, onSkip }) => {
-  const [step, setStep] = useState<"ask" | "browse" | "clipRange" | "insertAnother" | "review" | "preview" | "done">("ask");
+  const [step, setStep] = useState<"ask" | "browse" | "clipRange" | "insertAnother" | "placeChoice" | "review" | "preview" | "done">("ask");
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
   const [browseModule, setBrowseModule] = useState("all");
