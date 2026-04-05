@@ -164,19 +164,18 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           {/* Duration */}
           <div>
             <label className="text-[13px] font-bold text-foreground mb-2 block">Target Duration</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="flex flex-wrap gap-2">
               {DURATIONS.map((d) => (
                 <button
                   key={d.value}
                   onClick={() => setDuration(d.value)}
-                  className={`p-2.5 rounded-xl border-2 text-center transition-all ${
+                  className={`h-9 px-4 rounded-full text-[13px] font-semibold border-2 transition-all ${
                     duration === d.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/30"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-foreground hover:border-primary/30"
                   }`}
                 >
-                  <p className={`text-[14px] font-bold ${duration === d.value ? "text-primary" : "text-foreground"}`}>{d.label}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{d.desc}</p>
+                  {d.label}
                 </button>
               ))}
             </div>
