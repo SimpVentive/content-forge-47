@@ -11,19 +11,21 @@ function tryParseJSON(raw: string): any | null {
   }
 }
 
-function escapeXml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function escapeXml(s: unknown): string {
+  const str = typeof s === "string" ? s : JSON.stringify(s) || "";
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-function escapeHtml(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function escapeHtml(s: unknown): string {
+  const str = typeof s === "string" ? s : JSON.stringify(s) || "";
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 interface Module { title: string; topics: string[]; }
 
 function parseModules(archRaw: string): Module[] {
   const data = tryParseJSON(archRaw);
-  if (data?.modules) return data.modules.map((m: any) => ({ title: m.title || m.module_title || "", topics: m.topics || m.sections || [] }));
+  if (data?.modules) return data.modules.map((m: any) => ({ title: String(m.title || m.module_title || ""), topics: (m.topics || m.sections || []).map((t: any) => typeof t === "string" ? t : t.title || t.topic || t.name || JSON.stringify(t)) }));
   const modules: Module[] = [];
   const lines = archRaw.split("\n");
   let cur: Module | null = null;
