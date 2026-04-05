@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
 import type { CourseParameters } from "@/components/contentforge/CourseParametersDialog";
 import { estimateMinutesFromText } from "@/components/contentforge/Sidebar";
 import { Sidebar } from "@/components/contentforge/Sidebar";
 import { AgentPipeline } from "@/components/contentforge/AgentPipeline";
 import { OutputPanel } from "@/components/contentforge/OutputPanel";
 import { OrchestratorLog } from "@/components/contentforge/OrchestratorLog";
+import type { InsertedVideo } from "@/components/contentforge/VideosTab";
 import { useAgentPipeline } from "@/hooks/useAgentPipeline";
 import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
 import { Plus, Play } from "lucide-react";
@@ -93,6 +94,18 @@ const Index = () => {
 
   const hasRun = logs.length > 0;
   const hasOutput = Object.values(rawOutputs).some((v) => v);
+  const previewVideos = useMemo<InsertedVideo[]>(() => workflowClips.map((clip) => ({
+    videoId: clip.videoId,
+    title: clip.title,
+    channelTitle: clip.channelTitle,
+    thumbnail: clip.thumbnail,
+    duration: clip.duration,
+    startTime: clip.startTime || "",
+    endTime: clip.endTime || "",
+    customName: clip.customName || clip.title,
+    moduleTitle: clip.insertAfterModule || "",
+    afterSlide: -1,
+  })), [workflowClips]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
@@ -141,6 +154,8 @@ const Index = () => {
             courseTitle={courseTitle}
             rawOutputs={rawOutputs}
             onClose={() => setShowLearnerPreview(false)}
+            insertedVideos={previewVideos}
+            courseDuration={courseParams?.duration}
           />
         </Suspense>
       )}

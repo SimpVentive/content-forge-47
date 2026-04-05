@@ -126,7 +126,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 };
 
 /* ─── Package Renderer ─── */
-const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs }) => {
+const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
   const [checklist, setChecklist] = useState<boolean[]>(
@@ -144,6 +144,8 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           courseTitle={courseTitle}
           rawOutputs={rawOutputs}
           onClose={() => setShowLearnerPreview(false)}
+          insertedVideos={insertedVideos}
+          courseDuration={courseDuration}
         />
       )}
 
@@ -399,7 +401,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       case "assessment":
         return <AssessmentView raw={content} />;
       case "package":
-        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} />;
+        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} insertedVideos={allInsertedVideos} courseDuration={courseDuration} />;
       case "script":
         return <ScriptView raw={content} voiceRaw={rawOutputs.voice} />;
       case "outline":

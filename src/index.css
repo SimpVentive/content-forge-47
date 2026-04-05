@@ -41,6 +41,18 @@
     --status-complete: 160 84% 39%;
     --status-queued: 38 92% 50%;
     --status-error: 0 72% 51%;
+
+    --highlight-yellow-bg: 48 100% 88%;
+    --highlight-yellow-border: 42 96% 46%;
+    --highlight-yellow-foreground: 28 54% 24%;
+
+    --highlight-mint-bg: 152 52% 88%;
+    --highlight-mint-border: 158 64% 34%;
+    --highlight-mint-foreground: 162 51% 22%;
+
+    --highlight-sky-bg: 200 100% 90%;
+    --highlight-sky-border: 200 84% 42%;
+    --highlight-sky-foreground: 210 54% 24%;
   }
 }
 
