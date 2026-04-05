@@ -308,7 +308,7 @@ export async function exportScormPackage(
   zip.file("imsmd_rootv1p2p1.xsd", IMSMD_XSD);
 
   // Add SCORM API
-  zip.file("scorm_api.js", SCORM_API_JS);
+  
 
   // Add module HTML pages
   modules.forEach((mod, i) => {
