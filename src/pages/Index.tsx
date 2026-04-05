@@ -167,7 +167,8 @@ const Index = () => {
             language={courseParams?.language}
             level={courseParams?.level}
             duration={courseParams?.duration}
-            onComplete={() => {
+            onComplete={(clips) => {
+              setWorkflowClips(clips);
               setShowVideoWorkflow(false);
             }}
             onSkip={() => setShowVideoWorkflow(false)}
