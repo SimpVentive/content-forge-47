@@ -981,7 +981,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             clipType: "all" as const,
             startTime: v.startTime,
             endTime: v.endTime,
-            customName: v.title,
+            customName: v.customName || v.title,
             insertAfterModule: v.moduleTitle || "",
           }))}
           modules={modules.map(m => ({ title: m.title, sections: m.topics }))}
