@@ -209,7 +209,7 @@ const Index = () => {
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize={30} minSize={15} maxSize={45}>
-          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} />
+          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} workflowClips={workflowClips} courseDuration={courseParams?.duration} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
