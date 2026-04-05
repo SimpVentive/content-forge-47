@@ -61,6 +61,7 @@ export interface InsertedVideo {
   endTime: string;
   moduleTitle: string;
   afterSlide: number;
+  customName?: string;
 }
 
 interface VideosTabProps {
