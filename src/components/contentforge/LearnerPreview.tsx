@@ -3,6 +3,7 @@ import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clo
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
+import { HIGHLIGHT_PALETTES, PreviewActionBar, type HighlightPalette } from "./PreviewActionBar";
 
 /* ── helpers ── */
 function tryParseJSON(raw: string): any | null {
@@ -17,6 +18,30 @@ function tryParseJSON(raw: string): any | null {
 interface Module {
   title: string;
   topics: string[];
+}
+
+function normalizeModuleKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/gi, " ").trim();
+}
+
+function buildFallbackInfographicText(module: Module): string {
+  const topics = module.topics.filter(Boolean).slice(0, 3);
+  if (topics.length === 0) {
+    return `A visual summary for ${module.title} showing the core learning flow and main learner decisions.`;
+  }
+  return `A structured visual for ${module.title} connecting ${topics.join(", ")} into one learner-friendly concept map.`;
+}
+
+function getInfographicDescription(visualModule: any, module: Module): string {
+  const candidate = [
+    visualModule?.infographic_description,
+    visualModule?.infographic,
+    visualModule?.visual_aid,
+    visualModule?.diagram_description,
+    visualModule?.slide_layout,
+  ].find((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+  return candidate?.trim() || buildFallbackInfographicText(module);
 }
 
 type SlideType = "title" | "content" | "assessment" | "summary" | "video";
@@ -96,10 +121,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   const mcqs = assessData?.mcq || [];
 
   // Extract infographic descriptions from visual agent
-  const visualModules = visualData?.modules || [];
-  const infographicDescriptions: string[] = visualModules.map(
-    (vm: any) => vm?.infographic_description || vm?.slide_layout || ""
-  );
+  const visualModules = visualData?.modules || visualData?.course_visual_plan?.modules || visualData?.module_visuals || [];
 
   // Build slides
   const slides: Slide[] = [];
@@ -117,6 +139,12 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   let topicCounter = 0;
 
   modules.forEach((mod, mi) => {
+    const matchedVisualModule = visualModules.find((vm: any) => {
+      const moduleTitle = vm?.module_title || vm?.title || vm?.name || "";
+      return moduleTitle && normalizeModuleKey(moduleTitle) === normalizeModuleKey(mod.title);
+    }) || visualModules[mi];
+    const infographicDescription = getInfographicDescription(matchedVisualModule, mod);
+
     // 1. Title slide
     slides.push({ type: "title", moduleIndex: mi, moduleTitle: mod.title });
 
@@ -138,7 +166,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         topicIndex: ti,
         topicTitle: topic,
         content: sectionText,
-        infographicSvg: ti === 0 ? (infographicDescriptions[mi] || undefined) : undefined,
+        infographicSvg: ti === 0 ? infographicDescription : undefined,
       });
       topicCounter++;
     });
@@ -228,11 +256,14 @@ interface LearnerPreviewProps {
 export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration }) => {
   const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
   const [showPlacer, setShowPlacer] = useState(false);
+  const [highlightEnabled, setHighlightEnabled] = useState(true);
+  const [highlightPalette, setHighlightPalette] = useState<HighlightPalette>("yellow");
 
   // Sync if parent changes
   useEffect(() => { setLocalVideos(insertedVideos); }, [insertedVideos]);
 
   const unassignedCount = localVideos.filter(v => !v.moduleTitle).length;
+  const activeHighlightPalette = HIGHLIGHT_PALETTES[highlightPalette];
 
   const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, localVideos), [rawOutputs, localVideos]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -559,19 +590,19 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         }
 
         // Which block is currently being spoken?
-        const activeBlockIdx = isPlaying && highlightSentenceIdx >= 0 ? sentenceToBlock[highlightSentenceIdx] ?? -1 : -1;
+        const activeBlockIdx = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 ? sentenceToBlock[highlightSentenceIdx] ?? -1 : -1;
 
-        const highlightStyle = (blockIdx: number) => {
+        const highlightStyle = (blockIdx: number, options?: { borderRadius?: string; padding?: string }): React.CSSProperties => {
           if (activeBlockIdx === blockIdx) {
             return {
-              background: "rgba(79, 70, 229, 0.08)",
-              borderRadius: "8px",
-              padding: "4px 8px",
-              transition: "background 0.3s ease",
-              boxShadow: "inset 3px 0 0 #4f46e5",
+              background: activeHighlightPalette.background,
+              borderRadius: options?.borderRadius || "12px",
+              padding: options?.padding || "6px 10px",
+              transition: "background 0.25s ease, box-shadow 0.25s ease, padding 0.25s ease",
+              boxShadow: `inset 4px 0 0 ${activeHighlightPalette.border}`,
             };
           }
-          return { transition: "background 0.3s ease" };
+          return { transition: "background 0.25s ease, box-shadow 0.25s ease, padding 0.25s ease" };
         };
 
         let blockCounter = 0;
@@ -595,16 +626,34 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   {slide.topicTitle}
                 </h2>
 
+                {slide.infographicSvg?.trim() && (
+                  <div className="mb-6 rounded-2xl border border-border bg-secondary/70 p-4 anim-scale-in" style={{ animationDelay: "0.16s" }}>
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-[18px] text-primary">
+                        📊
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[14px] font-bold text-foreground">Module Infographic</p>
+                        <p className="text-[11px] font-semibold text-primary">Visual Aid</p>
+                        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
+                          {slide.infographicSvg}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Hook paragraph — special styling */}
                 {parts.hook && (() => {
                   const bi = blockCounter++;
+                  const isActive = activeBlockIdx === bi;
                   return (
                     <div className="mb-5 rounded-lg p-4 anim-fade-in-up"
                       style={{
-                        borderLeft: activeBlockIdx === bi ? "3px solid #4f46e5" : "3px solid #4f46e5",
-                        background: activeBlockIdx === bi ? "rgba(79,70,229,0.12)" : "rgba(79,70,229,0.04)",
+                         ...highlightStyle(bi, { borderRadius: "14px", padding: "16px 18px" }),
+                         borderLeft: isActive ? undefined : "3px solid hsl(var(--primary))",
+                         background: isActive ? activeHighlightPalette.background : "hsl(var(--primary) / 0.06)",
                         animationDelay: "0.15s",
-                        transition: "background 0.3s ease",
                       }}>
                       <p className="text-[17px] leading-[1.8]" style={{ color: "#374151" }}>
                         {parts.hook}
@@ -626,35 +675,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   );
                 })}
 
-                {/* Infographic visual — show whenever available */}
-                {slide.infographicSvg && (
-                  <div className="my-6 rounded-xl p-5 anim-scale-in"
-                    style={{ background: "linear-gradient(135deg, rgba(79,70,229,0.06), rgba(124,58,237,0.06))", border: "1px solid rgba(79,70,229,0.15)", animationDelay: "0.3s" }}>
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "rgba(79,70,229,0.12)" }}>
-                        <span className="text-[18px]">📊</span>
-                      </div>
-                      <div>
-                        <p className="text-[14px] font-bold" style={{ color: "#0f172a" }}>Module Infographic</p>
-                        <p className="text-[11px] font-semibold" style={{ color: "#4f46e5" }}>Visual Aid</p>
-                      </div>
-                    </div>
-                    <p className="text-[13px] leading-relaxed" style={{ color: "#475569" }}>
-                      {slide.infographicSvg}
-                    </p>
-                  </div>
-                )}
-
                 {/* Takeaway box */}
                 {parts.takeaway && (() => {
                   const bi = blockCounter++;
+                  const isActive = activeBlockIdx === bi;
                   return (
                     <div className="mt-6 rounded-lg p-[14px_18px] anim-fade-in-up"
                       style={{
-                        background: activeBlockIdx === bi ? "rgba(79, 70, 229, 0.1)" : "#fffbeb",
-                        borderLeft: activeBlockIdx === bi ? "4px solid #4f46e5" : "4px solid #f59e0b",
+                         ...highlightStyle(bi, { borderRadius: "14px", padding: "14px 18px" }),
+                         background: isActive ? activeHighlightPalette.background : "hsl(var(--highlight-yellow-bg))",
+                         borderLeft: isActive ? undefined : "4px solid hsl(var(--highlight-yellow-border))",
                         animationDelay: "0.5s",
-                        transition: "background 0.3s, border-color 0.3s",
                       }}>
                       <p className="text-[11px] font-bold uppercase tracking-[1.5px] mb-1"
                         style={{ color: "#d97706" }}>
@@ -676,8 +707,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         color: "#6b7280",
                         borderTop: "1px solid #f1f5f9",
                         animationDelay: "0.6s",
-                        ...(activeBlockIdx === bi ? { background: "rgba(79, 70, 229, 0.08)", borderRadius: "8px", padding: "8px 12px" } : {}),
-                        transition: "background 0.3s ease",
+                         ...highlightStyle(bi, { borderRadius: "10px", padding: "8px 12px" }),
                       }}>
                       {parts.challenge}
                     </p>
@@ -866,6 +896,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         </div>
       </div>
 
+      <PreviewActionBar
+        highlightEnabled={highlightEnabled}
+        highlightPalette={highlightPalette}
+        onToggleHighlight={() => setHighlightEnabled(prev => !prev)}
+        onSelectPalette={setHighlightPalette}
+        onPlaceVideos={unassignedCount > 0 ? () => setShowPlacer(true) : undefined}
+        unassignedCount={unassignedCount}
+      />
+
       {/* MAIN */}
       <div className="flex-1 flex min-h-0">
         {/* LEFT SIDEBAR */}
@@ -1011,18 +1050,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       >
         <X className="w-4 h-4" /> Close
       </button>
-
-      {/* Floating "Place Videos" button for unassigned clips */}
-      {unassignedCount > 0 && (
-        <button
-          onClick={() => setShowPlacer(true)}
-          className="absolute top-4 right-24 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-bold text-white shadow-lg animate-pulse hover:animate-none transition-all"
-          style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}
-        >
-          <Film className="w-4 h-4" />
-          Place {unassignedCount} Video{unassignedCount > 1 ? "s" : ""}
-        </button>
-      )}
 
       {/* VideoTimelinePlacer overlay */}
       {showPlacer && (
