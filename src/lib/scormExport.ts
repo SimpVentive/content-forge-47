@@ -451,7 +451,6 @@ function buildModuleHtml(
 </body>
 </html>`;
 }
-}
 
 /* ── Main export function ── */
 export async function exportScormPackage(
