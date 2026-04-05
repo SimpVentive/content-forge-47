@@ -505,16 +505,21 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
     return <InsertAnotherDialog clipCount={clips.length} onYes={() => setStep("browse")} onDone={() => setStep("review")} />;
   }
 
-  // Step: REVIEW clips
+  // Step: REVIEW clips — Timeline Placer
   if (step === "review") {
+    const timelineModules = moduleSections && moduleSections.length > 0
+      ? moduleSections
+      : modules.map(m => ({ title: m, sections: [] }));
+
     return (
-      <ClipReviewPanel
+      <VideoTimelinePlacer
         clips={clips}
-        modules={modules}
+        modules={timelineModules}
+        courseDuration={duration || "15min"}
         onUpdateClip={handleUpdateClip}
         onRemoveClip={handleRemoveClip}
         onFinish={() => { onComplete(clips); setStep("done"); }}
-        onPreviewAll={() => setStep("preview")}
+        onBack={() => setStep("browse")}
       />
     );
   }
