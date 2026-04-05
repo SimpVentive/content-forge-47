@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import type { CourseParameters } from "@/components/contentforge/CourseParametersDialog";
+import { estimateMinutesFromText } from "@/components/contentforge/Sidebar";
 import { Sidebar } from "@/components/contentforge/Sidebar";
 import { AgentPipeline } from "@/components/contentforge/AgentPipeline";
 import { OutputPanel } from "@/components/contentforge/OutputPanel";
