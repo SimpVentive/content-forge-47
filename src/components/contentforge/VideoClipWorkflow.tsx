@@ -2,6 +2,7 @@ import React, { useState, useRef } from "react";
 import { X, Play, Scissors, Film, Check, ChevronRight, Pencil, MapPin, Plus, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { InsertedVideo } from "./VideosTab";
+import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
 
 /* ── helpers ── */
 function parseDuration(iso: string): string {
@@ -60,6 +61,7 @@ interface ClipItem {
 interface VideoClipWorkflowProps {
   youtubeRaw: string;
   modules: string[];
+  moduleSections?: { title: string; sections: string[] }[];
   courseTitle: string;
   language?: string;
   level?: string;
@@ -428,7 +430,7 @@ const ClipPlayer: React.FC<{ clips: ClipItem[]; onClose: () => void }> = ({ clip
 /* ═══════════════════════════════════════
    MAIN WORKFLOW ORCHESTRATOR
    ═══════════════════════════════════════ */
-export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, courseTitle, language, level, duration, onComplete, onSkip }) => {
+export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, moduleSections, courseTitle, language, level, duration, onComplete, onSkip }) => {
   const [step, setStep] = useState<"ask" | "browse" | "clipRange" | "insertAnother" | "review" | "preview" | "done">("ask");
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
@@ -503,16 +505,21 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
     return <InsertAnotherDialog clipCount={clips.length} onYes={() => setStep("browse")} onDone={() => setStep("review")} />;
   }
 
-  // Step: REVIEW clips
+  // Step: REVIEW clips — Timeline Placer
   if (step === "review") {
+    const timelineModules = moduleSections && moduleSections.length > 0
+      ? moduleSections
+      : modules.map(m => ({ title: m, sections: [] }));
+
     return (
-      <ClipReviewPanel
+      <VideoTimelinePlacer
         clips={clips}
-        modules={modules}
+        modules={timelineModules}
+        courseDuration={duration || "15min"}
         onUpdateClip={handleUpdateClip}
         onRemoveClip={handleRemoveClip}
         onFinish={() => { onComplete(clips); setStep("done"); }}
-        onPreviewAll={() => setStep("preview")}
+        onBack={() => setStep("browse")}
       />
     );
   }
