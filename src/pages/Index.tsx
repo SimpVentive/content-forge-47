@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import type { CourseParameters } from "@/components/contentforge/CourseParametersDialog";
+import { estimateMinutesFromText } from "@/components/contentforge/Sidebar";
 import { Sidebar } from "@/components/contentforge/Sidebar";
 import { AgentPipeline } from "@/components/contentforge/AgentPipeline";
 import { OutputPanel } from "@/components/contentforge/OutputPanel";
@@ -101,14 +102,12 @@ const Index = () => {
           </div>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 select-none">
-          <span className="text-[38px] font-[900] tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: '#1e3a5f' }}>
+          <span className="text-[38px] font-[900] tracking-tight text-[#1e3a5f]">
             Content
           </span>
           <span
-            className="relative text-[38px] font-[900] tracking-tight"
+            className="relative text-[38px] font-[900] tracking-tight text-[#b8860b]"
             style={{
-              fontFamily: "'Outfit', sans-serif",
-              color: '#b8860b',
               textShadow: '0 1px 2px rgba(184,134,11,0.4)',
             }}
           >
@@ -150,6 +149,7 @@ const Index = () => {
           <CourseParametersDialog
             open={showParamsDialog}
             courseTitle={courseTitle}
+            estimatedMinutes={estimateMinutesFromText(inputText)}
             onConfirm={handleParamsConfirm}
             onCancel={() => setShowParamsDialog(false)}
           />

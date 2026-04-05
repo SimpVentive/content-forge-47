@@ -2,6 +2,13 @@ import React, { useRef, useState } from "react";
 import { Zap, Upload, Square, FileText, X, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
+/** Estimate e-learning minutes from word count (~150 words/min narrated) */
+export function estimateMinutesFromText(text: string): number {
+  if (!text) return 0;
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.round(words / 150));
+}
+
 interface SidebarProps {
   courseTitle: string;
   setCourseTitle: (v: string) => void;
