@@ -88,7 +88,7 @@ const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ on
           </div>
         </div>
 
-        <h2 className="text-[26px] font-[800] text-foreground text-center tracking-tight mb-3" style={{ fontFamily: "'Outfit', sans-serif" }}>
+        <h2 className="text-[26px] font-[800] text-foreground text-center tracking-tight mb-3">
           Enhance with YouTube Videos?
         </h2>
 
