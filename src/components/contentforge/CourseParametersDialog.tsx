@@ -50,13 +50,14 @@ const VOICE_ACCENTS = [
 ];
 
 const DURATIONS = [
-  { value: "5min", label: "5 min" },
-  { value: "10min", label: "10 min" },
-  { value: "15min", label: "15 min" },
-  { value: "20min", label: "20 min" },
-  { value: "30min", label: "30 min" },
-  { value: "45min", label: "45 min" },
-  { value: "60min", label: "60 min" },
+  { value: "3min", label: "3 min", desc: "Quick overview" },
+  { value: "5min", label: "5 min", desc: "Short briefing" },
+  { value: "10min", label: "10 min", desc: "Concise lesson" },
+  { value: "15min", label: "15 min", desc: "Standard module" },
+  { value: "20min", label: "20 min", desc: "Detailed session" },
+  { value: "30min", label: "30 min", desc: "Deep dive" },
+  { value: "45min", label: "45 min", desc: "Comprehensive" },
+  { value: "60min", label: "60 min", desc: "Full course" },
 ];
 
 // Map duration to YouTube video count
