@@ -62,6 +62,30 @@ function parseAssessment(assessRaw: string): { question: string; options: string
   return [];
 }
 
+/* ── SCORM 1.2 XSD schema stubs (required by most LMS validators) ── */
+const IMSCP_XSD = `<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+  xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
+  elementFormDefault="qualified" version="IMS CP 1.1.2">
+  <xs:element name="manifest"/>
+</xs:schema>`;
+
+const ADLCP_XSD = `<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://www.adlnet.org/xsd/adlcp_rootv1p2"
+  xmlns="http://www.adlnet.org/xsd/adlcp_rootv1p2"
+  elementFormDefault="qualified" version="ADL SCORM 1.2">
+  <xs:attribute name="scormtype" type="xs:string"/>
+</xs:schema>`;
+
+const IMSMD_XSD = `<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+  targetNamespace="http://www.imsglobal.org/xsd/imsmd_rootv1p2p1"
+  xmlns="http://www.imsglobal.org/xsd/imsmd_rootv1p2p1"
+  elementFormDefault="qualified" version="IMS MD 1.2.2">
+</xs:schema>`;
+
 /* ── SCORM imsmanifest.xml ── */
 function buildManifest(courseTitle: string, modules: Module[]): string {
   const orgItems = modules.map((m, i) =>
@@ -71,7 +95,7 @@ function buildManifest(courseTitle: string, modules: Module[]): string {
   ).join("\n");
 
   const resources = modules.map((m, i) =>
-    `    <resource identifier="RES_M${i + 1}" type="webcontent" adlcp:scormtype="sco" href="module_${i + 1}.html">
+    `    <resource identifier="RES_M${i + 1}" type="webcontent" adlcp:scormType="sco" href="module_${i + 1}.html">
       <file href="module_${i + 1}.html"/>
     </resource>`
   ).join("\n");
@@ -82,6 +106,7 @@ function buildManifest(courseTitle: string, modules: Module[]): string {
   xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
   xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd
+    http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd
     http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd">
   <metadata>
     <schema>ADL SCORM</schema>
@@ -95,7 +120,7 @@ ${orgItems}
   </organizations>
   <resources>
 ${resources}
-    <resource identifier="RES_API" type="webcontent" adlcp:scormtype="asset" href="scorm_api.js">
+    <resource identifier="RES_API" type="webcontent" adlcp:scormType="asset" href="scorm_api.js">
       <file href="scorm_api.js"/>
     </resource>
   </resources>
@@ -279,8 +304,11 @@ export async function exportScormPackage(
   // Distribute quizzes across modules (roughly even)
   const quizzesPerModule = Math.max(1, Math.floor(allQuizzes.length / modules.length));
 
-  // Add SCORM manifest
+  // Add SCORM manifest and required XSD schema files
   zip.file("imsmanifest.xml", buildManifest(courseTitle, modules));
+  zip.file("imscp_rootv1p1p2.xsd", IMSCP_XSD);
+  zip.file("adlcp_rootv1p2.xsd", ADLCP_XSD);
+  zip.file("imsmd_rootv1p2p1.xsd", IMSMD_XSD);
 
   // Add SCORM API
   zip.file("scorm_api.js", SCORM_API_JS);
