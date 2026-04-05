@@ -210,7 +210,7 @@ function buildModuleHtml(
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>${escapeHtml(mod.title)} - ${escapeHtml(courseTitle)}</title>
-  <script src="scorm_api.js"><\/script>
+  <script>${SCORM_API_JS}<\/script>
   <style>
     :root { --primary: #4f46e5; --bg: #f8f9fc; --card: #fff; --text: #1e1b4b; --muted: #64748b; --border: #e2e8f0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
