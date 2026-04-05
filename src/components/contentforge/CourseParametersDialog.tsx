@@ -62,6 +62,7 @@ const DURATIONS = [
 
 // Map duration to YouTube video count
 export const DURATION_VIDEO_COUNT: Record<string, number> = {
+  "3min": 3,
   "5min": 5,
   "10min": 8,
   "15min": 10,
