@@ -266,6 +266,50 @@ const InsertAnotherDialog: React.FC<{ clipCount: number; onYes: () => void; onDo
 );
 
 /* ═══════════════════════════════════════
+   STEP 3b: Place Now or Later?
+   ═══════════════════════════════════════ */
+const PlaceNowOrLaterDialog: React.FC<{ clipCount: number; onNow: () => void; onLater: () => void }> = ({ clipCount, onNow, onLater }) => (
+  <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+    <div className="relative bg-card rounded-2xl shadow-2xl w-[520px] max-w-[92vw] overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="px-8 pt-8 pb-6 text-center">
+        <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg"
+          style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+          <MapPin className="w-8 h-8 text-white" />
+        </div>
+        <h2 className="text-[22px] font-extrabold text-foreground mb-2">
+          Place {clipCount} Video{clipCount > 1 ? "s" : ""} into Modules?
+        </h2>
+        <p className="text-[14px] text-muted-foreground leading-relaxed max-w-[380px] mx-auto">
+          Choose which module each video belongs to. You can do this now or later while previewing the course.
+        </p>
+      </div>
+
+      <div className="px-8 pb-8 grid grid-cols-2 gap-3">
+        <button
+          onClick={onNow}
+          className="p-4 rounded-xl border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-all text-left"
+        >
+          <p className="text-[15px] font-bold text-primary mb-1">📍 Place Now</p>
+          <p className="text-[12px] text-muted-foreground leading-snug">
+            Drag & drop videos into specific modules on a timeline view right now.
+          </p>
+        </button>
+        <button
+          onClick={onLater}
+          className="p-4 rounded-xl border-2 border-border hover:border-primary/30 transition-all text-left"
+        >
+          <p className="text-[15px] font-bold text-foreground mb-1">⏳ Place Later</p>
+          <p className="text-[12px] text-muted-foreground leading-snug">
+            Skip for now. You can drag & drop videos while previewing the course as a learner.
+          </p>
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
+/* ═══════════════════════════════════════
    STEP 4: Review, rename, preview, assign
    ═══════════════════════════════════════ */
 const ClipReviewPanel: React.FC<{
@@ -431,7 +475,7 @@ const ClipPlayer: React.FC<{ clips: ClipItem[]; onClose: () => void }> = ({ clip
    MAIN WORKFLOW ORCHESTRATOR
    ═══════════════════════════════════════ */
 export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, moduleSections, courseTitle, language, level, duration, onComplete, onSkip }) => {
-  const [step, setStep] = useState<"ask" | "browse" | "clipRange" | "insertAnother" | "review" | "preview" | "done">("ask");
+  const [step, setStep] = useState<"ask" | "browse" | "clipRange" | "insertAnother" | "placeChoice" | "review" | "preview" | "done">("ask");
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
   const [browseModule, setBrowseModule] = useState("all");
@@ -502,7 +546,18 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
 
   // Step: INSERT ANOTHER?
   if (step === "insertAnother") {
-    return <InsertAnotherDialog clipCount={clips.length} onYes={() => setStep("browse")} onDone={() => setStep("review")} />;
+    return <InsertAnotherDialog clipCount={clips.length} onYes={() => setStep("browse")} onDone={() => setStep("placeChoice")} />;
+  }
+
+  // Step: PLACE NOW OR LATER?
+  if (step === "placeChoice") {
+    return (
+      <PlaceNowOrLaterDialog
+        clipCount={clips.length}
+        onNow={() => setStep("review")}
+        onLater={() => { onComplete(clips); setStep("done"); }}
+      />
+    );
   }
 
   // Step: REVIEW clips — Timeline Placer
