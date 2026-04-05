@@ -62,7 +62,54 @@ function parseAssessment(assessRaw: string): { question: string; options: string
   return [];
 }
 
-/* ── SCORM 1.2 XSD schema stubs (required by most LMS validators) ── */
+interface NarrationSection {
+  title: string;
+  narration_text: string;
+  word_count: number;
+}
+
+function parseVoiceSections(voiceRaw: string): NarrationSection[] {
+  if (!voiceRaw) return [];
+  const data = tryParseJSON(voiceRaw);
+  return data?.sections || [];
+}
+
+/* ── TTS Generation ── */
+async function generateTTSAudio(text: string, voiceId: string): Promise<ArrayBuffer> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  const response = await fetch(
+    `${supabaseUrl}/functions/v1/elevenlabs-tts`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+      },
+      body: JSON.stringify({ text: text.slice(0, 5000), voiceId }),
+    }
+  );
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => null);
+    throw new Error(errData?.error || `TTS failed: ${response.status}`);
+  }
+
+  return response.arrayBuffer();
+}
+
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/* ── SCORM 1.2 XSD schema stubs ── */
 const IMSCP_XSD = `<?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
   targetNamespace="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
@@ -175,9 +222,20 @@ function buildModuleHtml(
   moduleIndex: number,
   totalModules: number,
   paragraphs: string[],
-  quizzes: { question: string; options: string[]; correct: number }[]
+  quizzes: { question: string; options: string[]; correct: number }[],
+  audioBase64: string | null
 ): string {
   const contentHtml = paragraphs.map(p => `<p>${escapeHtml(p)}</p>`).join("\n        ");
+
+  const audioHtml = audioBase64 ? `
+      <div class="audio-section">
+        <h2>🎧 Listen to Narration</h2>
+        <audio controls class="audio-player" preload="auto">
+          <source src="data:audio/mpeg;base64,${audioBase64}" type="audio/mpeg"/>
+          Your browser does not support the audio element.
+        </audio>
+        <p class="audio-hint">Click play to hear the narration for this module</p>
+      </div>` : "";
 
   const quizHtml = quizzes.length > 0 ? `
       <div class="quiz-section">
@@ -221,6 +279,10 @@ function buildModuleHtml(
     .topics { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 24px; }
     .topic-chip { background: var(--primary); color: #fff; font-size: 12px; font-weight: 600; padding: 4px 14px; border-radius: 999px; }
     .content p { margin-bottom: 16px; font-size: 15px; }
+    .audio-section { background: linear-gradient(135deg, #eef2ff, #e0e7ff); border: 1px solid #c7d2fe; border-radius: 16px; padding: 24px; margin-bottom: 28px; }
+    .audio-section h2 { font-size: 18px; margin-bottom: 12px; color: var(--primary); }
+    .audio-player { width: 100%; height: 48px; border-radius: 12px; }
+    .audio-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
     .quiz-section { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; margin-top: 32px; }
     .quiz-section h2 { font-size: 18px; margin-bottom: 16px; color: var(--primary); }
     .quiz-item { margin-bottom: 20px; }
@@ -246,6 +308,7 @@ function buildModuleHtml(
     <div class="topics">
       ${mod.topics.map(t => `<span class="topic-chip">${escapeHtml(t)}</span>`).join("\n      ")}
     </div>
+    ${audioHtml}
     <div class="content">
       ${contentHtml}
     </div>
@@ -285,9 +348,17 @@ function buildModuleHtml(
 /* ── Main export function ── */
 export async function exportScormPackage(
   courseTitle: string,
-  rawOutputs: RawAgentOutputs
+  rawOutputs: RawAgentOutputs,
+  options?: {
+    includeVoice?: boolean;
+    voiceId?: string;
+    onProgress?: (message: string) => void;
+  }
 ): Promise<void> {
   const zip = new JSZip();
+  const includeVoice = options?.includeVoice ?? true;
+  const voiceId = options?.voiceId || "21m00Tcm4TlvDq8ikWAM"; // Rachel default
+  const onProgress = options?.onProgress || (() => {});
 
   // Parse course data
   const modules = parseModules(rawOutputs.architect);
@@ -297,9 +368,32 @@ export async function exportScormPackage(
 
   const scriptMap = parseScript(rawOutputs.writer, modules);
   const allQuizzes = parseAssessment(rawOutputs.assessment);
+  const voiceSections = parseVoiceSections(rawOutputs.voice);
 
-  // Distribute quizzes across modules (roughly even)
+  // Distribute quizzes across modules
   const quizzesPerModule = Math.max(1, Math.floor(allQuizzes.length / modules.length));
+
+  // Generate TTS audio for each module if voice data exists
+  const audioBase64Map = new Map<number, string>();
+
+  if (includeVoice && voiceSections.length > 0) {
+    onProgress("Generating voice narration...");
+    for (let i = 0; i < modules.length; i++) {
+      const section = voiceSections[i];
+      if (!section?.narration_text) continue;
+
+      onProgress(`Generating audio for Module ${i + 1}/${modules.length}: ${modules[i].title}`);
+      try {
+        const audioBuffer = await generateTTSAudio(section.narration_text, voiceId);
+        const base64 = arrayBufferToBase64(audioBuffer);
+        audioBase64Map.set(i, base64);
+      } catch (err) {
+        console.warn(`TTS failed for module ${i + 1}:`, err);
+        onProgress(`⚠ Audio skipped for Module ${i + 1} (${(err as Error).message})`);
+      }
+    }
+    onProgress(`Audio generated for ${audioBase64Map.size} of ${modules.length} modules`);
+  }
 
   // Add SCORM manifest and required XSD schema files
   zip.file("imsmanifest.xml", buildManifest(courseTitle, modules));
@@ -307,17 +401,17 @@ export async function exportScormPackage(
   zip.file("adlcp_rootv1p2.xsd", ADLCP_XSD);
   zip.file("imsmd_rootv1p2p1.xsd", IMSMD_XSD);
 
-  // Add SCORM API
-  
-
   // Add module HTML pages
   modules.forEach((mod, i) => {
     const paragraphs = scriptMap.get(mod.title) || ["Content for " + mod.title];
     const startQ = i * quizzesPerModule;
     const modQuizzes = allQuizzes.slice(startQ, startQ + quizzesPerModule);
-    const html = buildModuleHtml(courseTitle, mod, i, modules.length, paragraphs, modQuizzes);
+    const audioBase64 = audioBase64Map.get(i) || null;
+    const html = buildModuleHtml(courseTitle, mod, i, modules.length, paragraphs, modQuizzes, audioBase64);
     zip.file(`module_${i + 1}.html`, html);
   });
+
+  onProgress("Packaging SCORM ZIP...");
 
   // Generate and download
   const blob = await zip.generateAsync({ type: "blob" });

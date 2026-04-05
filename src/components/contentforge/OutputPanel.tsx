@@ -253,8 +253,14 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           onClick={async () => {
             setExporting(true);
             try {
-              await exportScormPackage(courseTitle, rawOutputs);
-              toast.success("SCORM package exported successfully!");
+              const hasVoice = !!rawOutputs.voice;
+              await exportScormPackage(courseTitle, rawOutputs, {
+                includeVoice: hasVoice,
+                onProgress: (msg) => toast.info(msg, { duration: 3000 }),
+              });
+              toast.success(hasVoice
+                ? "SCORM package with voice narration exported!"
+                : "SCORM package exported successfully!");
             } catch (err: any) {
               toast.error(err?.message || "Export failed");
             } finally {
@@ -265,7 +271,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           className="flex-1 h-12 rounded-xl text-[15px] font-bold text-primary-foreground flex items-center justify-center gap-2 bg-primary hover:brightness-110 transition-all disabled:opacity-60"
         >
           {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {exporting ? "Exporting…" : "Export SCORM Package"}
+          {exporting ? "Generating audio & exporting…" : "Export SCORM Package"}
         </button>
       </div>
     </div>
