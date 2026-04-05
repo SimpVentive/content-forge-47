@@ -955,6 +955,51 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       >
         <X className="w-4 h-4" /> Close
       </button>
+
+      {/* Floating "Place Videos" button for unassigned clips */}
+      {unassignedCount > 0 && (
+        <button
+          onClick={() => setShowPlacer(true)}
+          className="absolute top-4 right-24 z-50 flex items-center gap-2 px-4 py-2 rounded-full text-[12px] font-bold text-white shadow-lg animate-pulse hover:animate-none transition-all"
+          style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}
+        >
+          <Film className="w-4 h-4" />
+          Place {unassignedCount} Video{unassignedCount > 1 ? "s" : ""}
+        </button>
+      )}
+
+      {/* VideoTimelinePlacer overlay */}
+      {showPlacer && (
+        <VideoTimelinePlacer
+          clips={localVideos.map(v => ({
+            id: v.videoId,
+            videoId: v.videoId,
+            title: v.title,
+            channelTitle: v.channelTitle,
+            thumbnail: v.thumbnail,
+            duration: v.duration,
+            clipType: "all" as const,
+            startTime: v.startTime,
+            endTime: v.endTime,
+            customName: v.customName || v.title,
+            insertAfterModule: v.moduleTitle || "",
+          }))}
+          modules={modules.map(m => ({ title: m.title, sections: m.topics }))}
+          courseDuration={courseDuration || "15min"}
+          onUpdateClip={(id, updates) => {
+            setLocalVideos(prev => prev.map(v =>
+              v.videoId === id
+                ? { ...v, moduleTitle: updates.insertAfterModule ?? v.moduleTitle }
+                : v
+            ));
+          }}
+          onRemoveClip={(id) => {
+            setLocalVideos(prev => prev.filter(v => v.videoId !== id));
+          }}
+          onFinish={() => setShowPlacer(false)}
+          onBack={() => setShowPlacer(false)}
+        />
+      )}
     </div>
   );
 };
