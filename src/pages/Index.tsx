@@ -102,7 +102,7 @@ const Index = () => {
           </div>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 select-none">
-          <span className="text-[38px] font-[900] tracking-tight" style={{ fontFamily: "'Outfit', sans-serif", color: '#1e3a5f' }}>
+          <span className="text-[38px] font-[900] tracking-tight text-[#1e3a5f]">
             Content
           </span>
           <span
