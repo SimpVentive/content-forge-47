@@ -349,7 +349,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     audio.muted = muted;
     audioRef.current = audio;
     audio.onplay = () => { setIsPlaying(true); startWordHighlight(audio); };
-    audio.onended = () => { setIsPlaying(false); setHighlightWordIdx(-1); };
+    audio.onended = () => { setIsPlaying(false); setHighlightWordIdx(-1); setHighlightSentenceIdx(-1); };
     audio.onpause = () => { setIsPlaying(false); if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
   }, [muted, startWordHighlight]);
 
