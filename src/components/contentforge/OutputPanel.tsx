@@ -11,6 +11,8 @@ interface OutputPanelProps {
   outputData: OutputData;
   rawOutputs: RawAgentOutputs;
   courseTitle: string;
+  workflowClips?: any[];
+  courseDuration?: string;
 }
 
 const tabs = [
