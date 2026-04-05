@@ -421,6 +421,8 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           courseTitle={courseTitle}
           rawOutputs={rawOutputs}
           onClose={() => setShowLearnerPreview(false)}
+          insertedVideos={allInsertedVideos}
+          courseDuration={courseDuration}
         />
       )}
 
