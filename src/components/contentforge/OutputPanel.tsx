@@ -268,6 +268,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           {exporting ? "Exporting…" : "Export SCORM Package"}
         </button>
       </div>
+    </div>
   );
 };
 
