@@ -59,6 +59,21 @@ const Index = () => {
     }
   };
 
+  const getModuleSections = (): { title: string; sections: string[] }[] => {
+    try {
+      const parsed = JSON.parse(rawOutputs.architect || "{}");
+      const mods = parsed.modules || parsed.course_structure?.modules || parsed.course_modules || [];
+      return mods.map((m: any) => ({
+        title: m.module_title || m.title || m.name || "",
+        sections: (m.topics || m.sections || m.lessons || []).map((t: any) =>
+          typeof t === "string" ? t : t.topic_title || t.title || t.name || ""
+        ).filter(Boolean),
+      })).filter((m: any) => m.title);
+    } catch {
+      return [{ title: courseTitle, sections: [] }];
+    }
+  };
+
   const handleGenerateClick = () => {
     setShowParamsDialog(true);
   };
