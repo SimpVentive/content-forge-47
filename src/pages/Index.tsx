@@ -151,6 +151,7 @@ const Index = () => {
           <CourseParametersDialog
             open={showParamsDialog}
             courseTitle={courseTitle}
+            estimatedMinutes={estimateMinutesFromText(inputText)}
             onConfirm={handleParamsConfirm}
             onCancel={() => setShowParamsDialog(false)}
           />
