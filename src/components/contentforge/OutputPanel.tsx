@@ -135,6 +135,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
     new Array((data?.deployment_checklist || []).length).fill(false)
   );
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
