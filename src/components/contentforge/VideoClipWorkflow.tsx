@@ -61,6 +61,7 @@ interface ClipItem {
 interface VideoClipWorkflowProps {
   youtubeRaw: string;
   modules: string[];
+  moduleSections?: { title: string; sections: string[] }[];
   courseTitle: string;
   language?: string;
   level?: string;
