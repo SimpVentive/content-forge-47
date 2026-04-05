@@ -76,7 +76,7 @@ interface VideoClipWorkflowProps {
 const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ onYes, onNo }) => (
   <div className="fixed inset-0 z-[9999] flex items-center justify-center">
     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onNo} />
-    <div className="relative bg-card rounded-2xl shadow-2xl w-[600px] max-w-[92vw] overflow-hidden" style={{ fontFamily: "'Outfit', sans-serif" }}>
+    <div className="relative bg-card rounded-2xl shadow-2xl w-[600px] max-w-[92vw] overflow-hidden">
       {/* Gradient accent bar */}
       <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #ef4444 0%, #4f46e5 50%, #7c3aed 100%)" }} />
 
