@@ -346,6 +346,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       endTime: c.endTime || "",
       customName: c.customName || c.title,
       moduleTitle: c.insertAfterModule || "",
+      afterSlide: -1,
     }));
     // Merge: workflow clips + manually inserted from Videos tab (avoid duplicates)
     const ids = new Set(fromWorkflow.map(v => v.videoId));
