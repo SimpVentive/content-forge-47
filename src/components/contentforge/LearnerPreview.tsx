@@ -309,23 +309,40 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       setIsPlaying(false);
     }
     setHighlightWordIdx(-1);
+    setHighlightSentenceIdx(-1);
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
   }, [currentSlide]);
 
-  // Animate word highlight while playing
+  // Animate sentence highlight while playing
   const startWordHighlight = useCallback((audio: HTMLAudioElement) => {
+    const totalSentences = narrationSentences.length;
     const totalWords = narrationWords.length;
-    if (!totalWords) return;
+    if (!totalSentences || !totalWords) return;
+
+    // Pre-compute cumulative word counts per sentence to map audio progress → sentence
+    const sentenceWordCounts = narrationSentences.map(s => s.split(/\s+/).length);
+    const cumulativeWords: number[] = [];
+    sentenceWordCounts.reduce((acc, count, i) => {
+      cumulativeWords[i] = acc + count;
+      return acc + count;
+    }, 0);
 
     const tick = () => {
       if (audio.paused || audio.ended) return;
       const progress = audio.duration > 0 ? audio.currentTime / audio.duration : 0;
-      const wordIdx = Math.min(Math.floor(progress * totalWords), totalWords - 1);
+      const wordIdx = Math.floor(progress * totalWords);
+      // Find which sentence this word belongs to
+      let sentIdx = 0;
+      for (let i = 0; i < cumulativeWords.length; i++) {
+        if (wordIdx < cumulativeWords[i]) { sentIdx = i; break; }
+        sentIdx = i;
+      }
       setHighlightWordIdx(wordIdx);
+      setHighlightSentenceIdx(sentIdx);
       animFrameRef.current = requestAnimationFrame(tick);
     };
     animFrameRef.current = requestAnimationFrame(tick);
-  }, [narrationWords]);
+  }, [narrationSentences, narrationWords]);
 
   // Helper to wire up audio events
   const wireAudio = useCallback((audio: HTMLAudioElement) => {
