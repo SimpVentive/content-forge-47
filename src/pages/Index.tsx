@@ -161,6 +161,7 @@ const Index = () => {
           <VideoClipWorkflow
             youtubeRaw={rawOutputs.youtube}
             modules={getModuleNames()}
+            moduleSections={getModuleSections()}
             courseTitle={courseTitle}
             language={courseParams?.language}
             level={courseParams?.level}
