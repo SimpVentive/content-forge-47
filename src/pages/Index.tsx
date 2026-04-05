@@ -39,6 +39,7 @@ const Index = () => {
   const [showParamsDialog, setShowParamsDialog] = useState(false);
   const [courseParams, setCourseParams] = useState<CourseParameters | null>(null);
   const [showVideoWorkflow, setShowVideoWorkflow] = useState(false);
+  const [workflowClips, setWorkflowClips] = useState<any[]>([]);
   const prevIsRunning = useRef(false);
 
   const { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline } = useAgentPipeline();
