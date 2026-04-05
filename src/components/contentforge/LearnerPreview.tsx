@@ -553,7 +553,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <p className="text-[15px] text-white/60 mb-8">{courseTitle}</p>
               <span className="inline-flex items-center gap-2 bg-white/20 text-white text-[13px] font-semibold px-4 py-2 rounded-full">
                 <Clock className="w-4 h-4" />
-                ~12 min
+                ~{courseDuration || "15"} min
               </span>
             </div>
           </div>
