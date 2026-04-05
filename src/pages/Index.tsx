@@ -106,10 +106,8 @@ const Index = () => {
             Content
           </span>
           <span
-            className="relative text-[38px] font-[900] tracking-tight"
+            className="relative text-[38px] font-[900] tracking-tight text-[#b8860b]"
             style={{
-              fontFamily: "'Outfit', sans-serif",
-              color: '#b8860b',
               textShadow: '0 1px 2px rgba(184,134,11,0.4)',
             }}
           >
