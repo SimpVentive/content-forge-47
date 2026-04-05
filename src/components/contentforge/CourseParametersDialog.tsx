@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { X, Settings2 } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { X, Settings2, AlertTriangle } from "lucide-react";
 
 export interface CourseParameters {
   level: "basic" | "intermediate" | "advanced";
@@ -12,6 +12,7 @@ export interface CourseParameters {
 interface CourseParametersDialogProps {
   open: boolean;
   courseTitle: string;
+  estimatedMinutes?: number | null;
   onConfirm: (params: CourseParameters) => void;
   onCancel: () => void;
 }
@@ -50,14 +51,14 @@ const VOICE_ACCENTS = [
 ];
 
 const DURATIONS = [
-  { value: "3min", label: "3 min", desc: "Quick overview" },
-  { value: "5min", label: "5 min", desc: "Short briefing" },
-  { value: "10min", label: "10 min", desc: "Concise lesson" },
-  { value: "15min", label: "15 min", desc: "Standard module" },
-  { value: "20min", label: "20 min", desc: "Detailed session" },
-  { value: "30min", label: "30 min", desc: "Deep dive" },
-  { value: "45min", label: "45 min", desc: "Comprehensive" },
-  { value: "60min", label: "60 min", desc: "Full course" },
+  { value: "3min", label: "3 min", minutes: 3 },
+  { value: "5min", label: "5 min", minutes: 5 },
+  { value: "10min", label: "10 min", minutes: 10 },
+  { value: "15min", label: "15 min", minutes: 15 },
+  { value: "20min", label: "20 min", minutes: 20 },
+  { value: "30min", label: "30 min", minutes: 30 },
+  { value: "45min", label: "45 min", minutes: 45 },
+  { value: "60min", label: "60 min", minutes: 60 },
 ];
 
 // Map duration to YouTube video count
@@ -72,24 +73,114 @@ export const DURATION_VIDEO_COUNT: Record<string, number> = {
   "60min": 50,
 };
 
+function getDurationMinutes(val: string): number {
+  return DURATIONS.find(d => d.value === val)?.minutes ?? 15;
+}
+
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
-  open, courseTitle, onConfirm, onCancel,
+  open, courseTitle, estimatedMinutes, onConfirm, onCancel,
 }) => {
   const [level, setLevel] = useState<CourseParameters["level"]>("intermediate");
   const [language, setLanguage] = useState("English");
   const [voiceAccent, setVoiceAccent] = useState("Rachel");
   const [duration, setDuration] = useState("15min");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
+  const [showMismatchWarning, setShowMismatchWarning] = useState(false);
+  const [mismatchType, setMismatchType] = useState<"more" | "less">("more");
+
+  const selectedMinutes = getDurationMinutes(duration);
+
+  // Check for mismatch when user tries to generate
+  const mismatchInfo = useMemo(() => {
+    if (!estimatedMinutes || estimatedMinutes <= 0) return null;
+    const diff = Math.abs(selectedMinutes - estimatedMinutes) / estimatedMinutes;
+    if (diff > 0.2) {
+      return {
+        type: selectedMinutes > estimatedMinutes ? "more" as const : "less" as const,
+        estimatedMin: estimatedMinutes,
+        selectedMin: selectedMinutes,
+      };
+    }
+    return null;
+  }, [estimatedMinutes, selectedMinutes]);
 
   if (!open) return null;
 
   const handleConfirm = () => {
+    if (mismatchInfo) {
+      setMismatchType(mismatchInfo.type);
+      setShowMismatchWarning(true);
+      return;
+    }
+    onConfirm({ level, language, voiceAccent, duration, assessmentRequired });
+  };
+
+  const handleProceedWithContent = () => {
+    // Find the closest duration to estimated minutes
+    const closest = DURATIONS.reduce((prev, curr) =>
+      Math.abs(curr.minutes - (estimatedMinutes || 15)) < Math.abs(prev.minutes - (estimatedMinutes || 15)) ? curr : prev
+    );
+    setDuration(closest.value);
+    setShowMismatchWarning(false);
+    onConfirm({ level, language, voiceAccent, duration: closest.value, assessmentRequired });
+  };
+
+  const handleProceedWithSelected = () => {
+    setShowMismatchWarning(false);
     onConfirm({ level, language, voiceAccent, duration, assessmentRequired });
   };
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+
+      {/* Mismatch Warning Dialog */}
+      {showMismatchWarning && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div className="relative w-[500px] max-w-[92vw] bg-card rounded-2xl shadow-2xl overflow-hidden animate-fade-in" onClick={(e) => e.stopPropagation()}>
+            <div className="h-1.5 w-full bg-amber-500" />
+            <div className="px-8 pt-7 pb-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-amber-500" />
+                </div>
+                <h3 className="text-[18px] font-extrabold text-foreground leading-tight">
+                  Duration Mismatch
+                </h3>
+              </div>
+
+              <p className="text-[14px] text-foreground leading-relaxed mb-6">
+                You have uploaded content that would require approximately{" "}
+                <span className="font-bold text-primary">{estimatedMinutes} min</span> of e-learning,
+                whereas you are asking for a{" "}
+                <span className="font-bold text-primary">{selectedMinutes} min</span> e-learning course.
+                {mismatchType === "more"
+                  ? " The selected duration is longer than what the content supports — the AI may need to pad with supplementary material."
+                  : " The selected duration is shorter — the AI will need to condense and prioritize key topics."}
+              </p>
+              <p className="text-[14px] font-semibold text-foreground mb-5">What would you like to do?</p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleProceedWithContent}
+                  className="w-full h-[52px] rounded-xl text-[14px] font-bold text-white transition-all flex items-center justify-center gap-2 shadow-lg hover:brightness-110"
+                  style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+                >
+                  📄 Proceed based on the content outline uploaded (~{estimatedMinutes} min)
+                </button>
+                <button
+                  onClick={handleProceedWithSelected}
+                  className="w-full h-[52px] rounded-xl text-[14px] font-bold text-foreground border-2 border-border hover:bg-secondary/60 transition-all flex items-center justify-center gap-2"
+                >
+                  ⏱️ Go with the duration I have selected ({selectedMinutes} min)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         className="relative w-[520px] max-w-[95vw] max-h-[90vh] bg-card rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
         onClick={(e) => e.stopPropagation()}
@@ -163,7 +254,14 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
           {/* Duration */}
           <div>
-            <label className="text-[13px] font-bold text-foreground mb-2 block">Target Duration</label>
+            <label className="text-[13px] font-bold text-foreground mb-2 block">
+              Target Duration
+              {estimatedMinutes && estimatedMinutes > 0 && (
+                <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                  (Content estimate: ~{estimatedMinutes} min)
+                </span>
+              )}
+            </label>
             <div className="flex flex-wrap gap-2">
               {DURATIONS.map((d) => (
                 <button
