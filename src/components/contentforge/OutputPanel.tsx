@@ -400,6 +400,34 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
     }
 
     if (!content) {
+      if (activeTab === "package") {
+        return (
+          <div className="flex flex-col items-center justify-center h-full text-center px-6">
+            <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mb-4">
+              <Package className="w-8 h-8 text-amber-600" />
+            </div>
+            <h3 className="text-[16px] font-extrabold text-foreground mb-2">Package Not Ready Yet</h3>
+            <p className="text-[13px] text-muted-foreground leading-relaxed max-w-[320px]">
+              You haven't inserted videos into your course yet. Once you complete the video placement, you can generate and export the SCORM package.
+            </p>
+            <div className="mt-4 flex flex-col gap-2 items-center">
+              <span className="text-[11px] text-muted-foreground">Steps to complete:</span>
+              <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px]">1</span>
+                Run the pipeline
+              </div>
+              <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px]">2</span>
+                Insert or place videos
+              </div>
+              <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
+                <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px]">3</span>
+                Export SCORM package
+              </div>
+            </div>
+          </div>
+        );
+      }
       return (
         <div className="flex flex-col items-center justify-center h-full text-center">
           <FileText className="w-10 h-10 text-muted-foreground/30 mb-3" />
