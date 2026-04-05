@@ -283,11 +283,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
   }, [slides, narrationSections]);
 
-  // Split narration into words for highlighting
+  // Split narration into sentences for highlighting
+  const narrationSentences = useMemo(() => {
+    const text = getNarrationForSlide(currentSlide);
+    if (!text) return [];
+    // Split by sentence-ending punctuation, keeping the punctuation
+    return text.match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(Boolean) || [text];
+  }, [currentSlide, getNarrationForSlide]);
+
+  // Also keep words for progress calculation
   const narrationWords = useMemo(() => {
     const text = getNarrationForSlide(currentSlide);
     return text ? text.split(/\s+/).filter(Boolean) : [];
   }, [currentSlide, getNarrationForSlide]);
+
+  // Track current sentence index (not word)
+  const [highlightSentenceIdx, setHighlightSentenceIdx] = useState(-1);
 
   // Stop audio on slide change
   useEffect(() => {
