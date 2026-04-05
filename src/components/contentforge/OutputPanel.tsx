@@ -327,12 +327,31 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
   );
 };
 
-export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle }) => {
+export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
   const hasOutput = Object.values(rawOutputs).some(v => v);
   const content = (activeTab === "preview" || activeTab === "videos") ? null : outputData[activeTab as keyof OutputData];
+
+  // Convert workflow clips to InsertedVideo format
+  const allInsertedVideos: InsertedVideo[] = React.useMemo(() => {
+    const fromWorkflow: InsertedVideo[] = workflowClips.map(c => ({
+      videoId: c.videoId,
+      title: c.title,
+      channelTitle: c.channelTitle,
+      thumbnail: c.thumbnail,
+      duration: c.duration,
+      startTime: c.startTime || "",
+      endTime: c.endTime || "",
+      customName: c.customName || c.title,
+      moduleTitle: c.insertAfterModule || "",
+    }));
+    // Merge: workflow clips + manually inserted from Videos tab (avoid duplicates)
+    const ids = new Set(fromWorkflow.map(v => v.videoId));
+    const extra = insertedVideos.filter(v => !ids.has(v.videoId));
+    return [...fromWorkflow, ...extra];
+  }, [workflowClips, insertedVideos]);
 
   const handleInsertVideo = (video: InsertedVideo) => {
     setInsertedVideos(prev => {
