@@ -50,17 +50,19 @@ const VOICE_ACCENTS = [
 ];
 
 const DURATIONS = [
-  { value: "5min", label: "5 min" },
-  { value: "10min", label: "10 min" },
-  { value: "15min", label: "15 min" },
-  { value: "20min", label: "20 min" },
-  { value: "30min", label: "30 min" },
-  { value: "45min", label: "45 min" },
-  { value: "60min", label: "60 min" },
+  { value: "3min", label: "3 min", desc: "Quick overview" },
+  { value: "5min", label: "5 min", desc: "Short briefing" },
+  { value: "10min", label: "10 min", desc: "Concise lesson" },
+  { value: "15min", label: "15 min", desc: "Standard module" },
+  { value: "20min", label: "20 min", desc: "Detailed session" },
+  { value: "30min", label: "30 min", desc: "Deep dive" },
+  { value: "45min", label: "45 min", desc: "Comprehensive" },
+  { value: "60min", label: "60 min", desc: "Full course" },
 ];
 
 // Map duration to YouTube video count
 export const DURATION_VIDEO_COUNT: Record<string, number> = {
+  "3min": 3,
   "5min": 5,
   "10min": 8,
   "15min": 10,
@@ -161,16 +163,23 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
           {/* Duration */}
           <div>
-            <label className="text-[13px] font-bold text-foreground mb-1.5 block">Target Duration</label>
-            <select
-              value={duration}
-              onChange={(e) => setDuration(e.target.value)}
-              className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
-            >
+            <label className="text-[13px] font-bold text-foreground mb-2 block">Target Duration</label>
+            <div className="grid grid-cols-4 gap-2">
               {DURATIONS.map((d) => (
-                <option key={d.value} value={d.value}>{d.label}</option>
+                <button
+                  key={d.value}
+                  onClick={() => setDuration(d.value)}
+                  className={`p-2.5 rounded-xl border-2 text-center transition-all ${
+                    duration === d.value
+                      ? "border-primary bg-primary/5"
+                      : "border-border hover:border-primary/30"
+                  }`}
+                >
+                  <p className={`text-[14px] font-bold ${duration === d.value ? "text-primary" : "text-foreground"}`}>{d.label}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{d.desc}</p>
+                </button>
               ))}
-            </select>
+            </div>
           </div>
 
           {/* Assessment Toggle */}
