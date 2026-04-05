@@ -96,7 +96,24 @@ serve(async (req) => {
       throw new Error("Failed to extract document text");
     }
 
-    const data = await response.json();
+    const rawText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(rawText);
+    } catch (parseErr) {
+      console.error("Failed to parse AI response, length:", rawText.length, "preview:", rawText.substring(0, 200));
+      // If we got partial text, try to extract useful content anyway
+      if (rawText.length > 0) {
+        // Try to find the content field in the partial JSON
+        const contentMatch = rawText.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+        if (contentMatch) {
+          return new Response(JSON.stringify({ text: contentMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+      throw new Error("Failed to parse AI response - document may be too large. Try a smaller file or paste content manually.");
+    }
     const text = data.choices?.[0]?.message?.content || "";
 
     return new Response(JSON.stringify({ text }), {
