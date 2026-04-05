@@ -546,7 +546,18 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
 
   // Step: INSERT ANOTHER?
   if (step === "insertAnother") {
-    return <InsertAnotherDialog clipCount={clips.length} onYes={() => setStep("browse")} onDone={() => setStep("review")} />;
+    return <InsertAnotherDialog clipCount={clips.length} onYes={() => setStep("browse")} onDone={() => setStep("placeChoice")} />;
+  }
+
+  // Step: PLACE NOW OR LATER?
+  if (step === "placeChoice") {
+    return (
+      <PlaceNowOrLaterDialog
+        clipCount={clips.length}
+        onNow={() => setStep("review")}
+        onLater={() => { onComplete(clips); setStep("done"); }}
+      />
+    );
   }
 
   // Step: REVIEW clips — Timeline Placer
