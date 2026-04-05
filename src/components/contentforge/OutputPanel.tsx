@@ -250,17 +250,24 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           Preview as Learner
         </button>
         <button
-          disabled
-          className="flex-1 h-12 rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 opacity-60 cursor-not-allowed"
-          style={{ background: '#4f46e5' }}
-          title="Coming soon"
+          onClick={async () => {
+            setExporting(true);
+            try {
+              await exportScormPackage(courseTitle, rawOutputs);
+              toast.success("SCORM package exported successfully!");
+            } catch (err: any) {
+              toast.error(err?.message || "Export failed");
+            } finally {
+              setExporting(false);
+            }
+          }}
+          disabled={exporting}
+          className="flex-1 h-12 rounded-xl text-[15px] font-bold text-primary-foreground flex items-center justify-center gap-2 bg-primary hover:brightness-110 transition-all disabled:opacity-60"
         >
-          <Download className="w-4 h-4" />
-          Export Package
+          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+          {exporting ? "Exporting…" : "Export SCORM Package"}
         </button>
       </div>
-      <p className="text-[11px] text-muted-foreground text-center -mt-4">Export coming soon</p>
-    </div>
   );
 };
 
