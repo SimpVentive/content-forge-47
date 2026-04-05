@@ -514,7 +514,8 @@ export async function exportScormPackage(
     const startQ = i * quizzesPerModule;
     const modQuizzes = allQuizzes.slice(startQ, startQ + quizzesPerModule);
     const audioBase64 = audioBase64Map.get(i) || null;
-    const html = buildModuleHtml(courseTitle, mod, i, modules.length, paragraphs, modQuizzes, audioBase64);
+    const narrationText = voiceSections[i]?.narration_text || "";
+    const html = buildModuleHtml(courseTitle, mod, i, modules.length, paragraphs, modQuizzes, audioBase64, narrationText);
     zip.file(`module_${i + 1}.html`, html);
   });
 
