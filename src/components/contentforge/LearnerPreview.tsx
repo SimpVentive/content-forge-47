@@ -108,7 +108,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     modules = mods.map((m: any, mi: number) => ({
       title: m.module_title || m.title || m.name || `Module ${mi + 1}`,
       topics: (m.topics || m.sections || m.lessons || []).map((t: any, ti: number) =>
-        typeof t === "string" ? t : t.topic_title || t.title || t.name || `Module ${mi + 1} — Part ${ti + 1}`
+        typeof t === "string" ? t : t.topic_name || t.topic_title || t.title || t.name || `Module ${mi + 1} — Part ${ti + 1}`
       ),
     }));
   }

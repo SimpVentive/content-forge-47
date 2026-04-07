@@ -42,7 +42,7 @@ function buildSlides(archRaw: string, visualRaw: string, courseTitle: string): S
   modules.forEach((mod: any, i: number) => {
     const title = mod.module_title || mod.title || mod.name || `Module ${i + 1}`;
     const topics = mod.topics || mod.sections || mod.key_topics || [];
-    const topicNames = topics.map((t: any) => (typeof t === "string" ? t : t.title || t.topic || t.name || ""));
+    const topicNames = topics.map((t: any) => (typeof t === "string" ? t : t.topic_name || t.topic_title || t.title || t.topic || t.name || ""));
     const vm = visualModules[i];
     const layoutType = vm?.slide_layout || "Standard Layout";
 
