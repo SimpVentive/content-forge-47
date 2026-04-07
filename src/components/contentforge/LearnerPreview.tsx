@@ -244,7 +244,105 @@ const WaveformBars: React.FC<{ playing: boolean }> = ({ playing }) => (
   </div>
 );
 
-/* ── Main component ── */
+/* ── Infographic Visual Aid (on-demand SVG generation) ── */
+function extractSVG(text: string): string {
+  const svgMatch = text.match(/<svg[\s\S]*?<\/svg>/i);
+  if (svgMatch) return svgMatch[0];
+  const codeMatch = text.match(/```(?:svg|xml)?\s*([\s\S]*?)```/);
+  if (codeMatch) {
+    const inner = codeMatch[1].trim();
+    const innerSvg = inner.match(/<svg[\s\S]*?<\/svg>/i);
+    if (innerSvg) return innerSvg[0];
+  }
+  return "";
+}
+
+const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string }> = ({ description, moduleTitle }) => {
+  const [expanded, setExpanded] = useState(false);
+  const [svg, setSvg] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
+
+  const generateSvg = useCallback(async () => {
+    if (svg || loading) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error: fnErr } = await supabase.functions.invoke("claude", {
+        body: {
+          systemPrompt: "You are an SVG infographic designer. Generate a clean, professional SVG infographic. Use only these colors: #4f46e5 (indigo), #7c3aed (violet), #10b981 (emerald), #f59e0b (amber), #f8fafc (background), #0f172a (text). The SVG must be 600x400px, self-contained, with no external fonts or images. Use geometric shapes, icons made from basic SVG paths, and bold readable text.",
+          userMessage: `Create an infographic for module: "${moduleTitle}". Visual description: ${description}`,
+        },
+      });
+      if (fnErr || data?.error) {
+        setError(true);
+      } else {
+        const result = extractSVG(data.text || "");
+        if (result) setSvg(result);
+        else setError(true);
+      }
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }, [svg, loading, description, moduleTitle]);
+
+  const handleToggle = () => {
+    if (!expanded && !svg && !loading) generateSvg();
+    setExpanded(!expanded);
+  };
+
+  return (
+    <div className="mb-6 rounded-2xl border border-border overflow-hidden anim-scale-in" style={{ animationDelay: "0.16s" }}>
+      <button
+        onClick={handleToggle}
+        className="w-full flex items-start gap-3 p-4 hover:bg-secondary/50 transition-colors text-left"
+        style={{ background: "hsl(var(--secondary) / 0.7)" }}
+      >
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-[18px] text-primary">
+          📊
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[14px] font-bold text-foreground">Module Infographic</p>
+          <p className="text-[11px] font-semibold text-primary">
+            {expanded ? "Click to collapse" : "Click to view visual aid"}
+          </p>
+        </div>
+        <div className="shrink-0 mt-1">
+          {expanded ? <ZoomOut className="w-4 h-4 text-muted-foreground" /> : <ZoomIn className="w-4 h-4 text-muted-foreground" />}
+        </div>
+      </button>
+      {expanded && (
+        <div className="border-t border-border p-4" style={{ minHeight: 200 }}>
+          {loading ? (
+            <div className="flex items-center justify-center h-[200px]">
+              <Loader2 className="w-6 h-6 text-primary animate-spin" />
+              <span className="ml-2 text-[13px] text-muted-foreground">Generating infographic…</span>
+            </div>
+          ) : svg ? (
+            <div
+              className="w-full flex items-center justify-center overflow-hidden"
+              dangerouslySetInnerHTML={{ __html: svg }}
+            />
+          ) : error ? (
+            <div className="flex flex-col items-center justify-center h-[200px] gap-2">
+              <p className="text-[13px] text-red-500">Failed to generate infographic</p>
+              <button onClick={generateSvg} className="text-[12px] font-semibold text-primary hover:underline">
+                Retry
+              </button>
+            </div>
+          ) : (
+            <p className="text-[13px] text-muted-foreground leading-relaxed">{description}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 interface LearnerPreviewProps {
   courseTitle: string;
   rawOutputs: RawAgentOutputs;
