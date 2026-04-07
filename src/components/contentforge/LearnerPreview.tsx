@@ -563,50 +563,61 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const parts = parseContentParts(slide.content || "");
         const moduleLabel = `MODULE ${slide.moduleIndex + 1} — ${slide.moduleTitle}`.toUpperCase();
 
-        // Build an ordered list of text blocks for sentence-matching
-        const allTextBlocks: { type: "hook" | "body" | "takeaway" | "challenge"; text: string; bodyIdx?: number }[] = [];
-        if (parts.hook) allTextBlocks.push({ type: "hook", text: parts.hook });
-        parts.body.forEach((p, i) => allTextBlocks.push({ type: "body", text: p, bodyIdx: i }));
-        if (parts.takeaway) allTextBlocks.push({ type: "takeaway", text: parts.takeaway });
-        if (parts.challenge) allTextBlocks.push({ type: "challenge", text: parts.challenge });
+        // Collect all raw text in order to split into sentences
+        const allRawText: string[] = [];
+        if (parts.hook) allRawText.push(parts.hook);
+        parts.body.forEach(p => allRawText.push(p));
+        if (parts.takeaway) allRawText.push(parts.takeaway);
+        if (parts.challenge) allRawText.push(parts.challenge);
 
-        // Map each sentence to a block index for highlighting
-        const sentenceToBlock: number[] = [];
-        if (isPlaying && narrationSentences.length > 0) {
-          narrationSentences.forEach(sentence => {
-            const clean = sentence.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
-            let bestBlock = 0;
-            let bestScore = 0;
-            allTextBlocks.forEach((block, bi) => {
-              const blockClean = block.text.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
-              // Score by word overlap
-              const sentWords = clean.split(/\s+/);
-              const matches = sentWords.filter(w => blockClean.includes(w)).length;
-              const score = matches / Math.max(sentWords.length, 1);
-              if (score > bestScore) { bestScore = score; bestBlock = bi; }
+        const fullText = allRawText.join(" ");
+        const allSentences = fullText.match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(Boolean) || [fullText];
+
+        // Render text as sentence spans with per-sentence highlighting
+        const renderSentenceText = (text: string) => {
+          const blockSentences = text.match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(Boolean) || [text];
+          return blockSentences.map((sentence, si) => {
+            // Find global sentence index
+            const globalIdx = allSentences.findIndex((s, gi) => {
+              // Match by content - find first unmatched occurrence
+              return s === sentence && !allSentences.slice(0, gi).filter(prev => prev === sentence).length || s === sentence;
             });
-            sentenceToBlock.push(bestBlock);
+            // More robust: find by accumulating
+            let gIdx = -1;
+            let searchFrom = 0;
+            // Walk through all raw text blocks to find the position
+            for (let bi = 0; bi < allRawText.length; bi++) {
+              const blockSents = allRawText[bi].match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(Boolean) || [allRawText[bi]];
+              for (let bsi = 0; bsi < blockSents.length; bsi++) {
+                if (allRawText[bi] === text && bsi === si) {
+                  gIdx = searchFrom;
+                }
+                searchFrom++;
+              }
+              if (gIdx >= 0) break;
+            }
+
+            const isActive = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 && gIdx === highlightSentenceIdx;
+
+            return (
+              <span
+                key={si}
+                style={{
+                  padding: "2px 4px",
+                  borderRadius: "6px",
+                  transition: "background 0.25s ease, box-shadow 0.25s ease",
+                  ...(isActive ? {
+                    background: activeHighlightPalette.background,
+                    boxShadow: `inset 4px 0 0 ${activeHighlightPalette.border}`,
+                  } : {}),
+                }}
+              >
+                {sentence}{" "}
+              </span>
+            );
           });
-        }
-
-        // Which block is currently being spoken?
-        const activeBlockIdx = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 ? sentenceToBlock[highlightSentenceIdx] ?? -1 : -1;
-
-        const highlightStyle = (blockIdx: number, options?: { borderRadius?: string; padding?: string }): React.CSSProperties => {
-          if (activeBlockIdx === blockIdx) {
-            return {
-              background: activeHighlightPalette.background,
-              borderRadius: options?.borderRadius || "12px",
-              padding: options?.padding || "6px 10px",
-              transition: "background 0.25s ease, box-shadow 0.25s ease, padding 0.25s ease",
-              boxShadow: `inset 4px 0 0 ${activeHighlightPalette.border}`,
-            };
-          }
-          return { transition: "background 0.25s ease, box-shadow 0.25s ease, padding 0.25s ease" };
         };
 
-        let blockCounter = 0;
-        
         return (
           <div className="max-w-[800px] mx-auto" key={currentSlide}>
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
@@ -627,92 +638,65 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 </h2>
 
                 {slide.infographicSvg?.trim() && (
-                  <div className="mb-6 rounded-2xl border border-border bg-secondary/70 p-4 anim-scale-in" style={{ animationDelay: "0.16s" }}>
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-[18px] text-primary">
-                        📊
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[14px] font-bold text-foreground">Module Infographic</p>
-                        <p className="text-[11px] font-semibold text-primary">Visual Aid</p>
-                        <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">
-                          {slide.infographicSvg}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
+                  <InfographicVisualAid
+                    description={slide.infographicSvg}
+                    moduleTitle={slide.moduleTitle}
+                  />
                 )}
 
                 {/* Hook paragraph — special styling */}
-                {parts.hook && (() => {
-                  const bi = blockCounter++;
-                  const isActive = activeBlockIdx === bi;
-                  return (
-                    <div className="mb-5 rounded-lg p-4 anim-fade-in-up"
-                      style={{
-                         ...highlightStyle(bi, { borderRadius: "14px", padding: "16px 18px" }),
-                         borderLeft: isActive ? undefined : "3px solid hsl(var(--primary))",
-                         background: isActive ? activeHighlightPalette.background : "hsl(var(--primary) / 0.06)",
-                        animationDelay: "0.15s",
-                      }}>
-                      <p className="text-[17px] leading-[1.8]" style={{ color: "#374151" }}>
-                        {parts.hook}
-                      </p>
-                    </div>
-                  );
-                })()}
+                {parts.hook && (
+                  <div className="mb-5 rounded-lg p-4 anim-fade-in-up"
+                    style={{
+                      borderLeft: "3px solid hsl(var(--primary))",
+                      background: "hsl(var(--primary) / 0.06)",
+                      animationDelay: "0.15s",
+                    }}>
+                    <p className="text-[17px] leading-[1.8]" style={{ color: "#374151" }}>
+                      {renderSentenceText(parts.hook)}
+                    </p>
+                  </div>
+                )}
 
-                {/* Body paragraphs with stagger + inline highlight */}
-                {parts.body.map((para, pi) => {
-                  const bi = blockCounter++;
-                  return (
-                    <div key={pi} style={highlightStyle(bi)} className="mb-4 anim-fade-in-up">
-                      <p className="text-[17px] leading-[1.8]"
-                        style={{ color: "#374151", animationDelay: `${0.3 + pi * 0.15}s` }}>
-                        {para}
-                      </p>
-                    </div>
-                  );
-                })}
+                {/* Body paragraphs with sentence-level highlight */}
+                {parts.body.map((para, pi) => (
+                  <div key={pi} className="mb-4 anim-fade-in-up">
+                    <p className="text-[17px] leading-[1.8]"
+                      style={{ color: "#374151", animationDelay: `${0.3 + pi * 0.15}s` }}>
+                      {renderSentenceText(para)}
+                    </p>
+                  </div>
+                ))}
 
                 {/* Takeaway box */}
-                {parts.takeaway && (() => {
-                  const bi = blockCounter++;
-                  const isActive = activeBlockIdx === bi;
-                  return (
-                    <div className="mt-6 rounded-lg p-[14px_18px] anim-fade-in-up"
-                      style={{
-                         ...highlightStyle(bi, { borderRadius: "14px", padding: "14px 18px" }),
-                         background: isActive ? activeHighlightPalette.background : "hsl(var(--highlight-yellow-bg))",
-                         borderLeft: isActive ? undefined : "4px solid hsl(var(--highlight-yellow-border))",
-                        animationDelay: "0.5s",
-                      }}>
-                      <p className="text-[11px] font-bold uppercase tracking-[1.5px] mb-1"
-                        style={{ color: "#d97706" }}>
-                        Key Takeaway
-                      </p>
-                      <p className="text-[15px]" style={{ color: "#92400e" }}>
-                        {parts.takeaway}
-                      </p>
-                    </div>
-                  );
-                })()}
+                {parts.takeaway && (
+                  <div className="mt-6 rounded-lg p-[14px_18px] anim-fade-in-up"
+                    style={{
+                      background: "hsl(var(--highlight-yellow-bg))",
+                      borderLeft: "4px solid hsl(var(--highlight-yellow-border))",
+                      animationDelay: "0.5s",
+                    }}>
+                    <p className="text-[11px] font-bold uppercase tracking-[1.5px] mb-1"
+                      style={{ color: "#d97706" }}>
+                      Key Takeaway
+                    </p>
+                    <p className="text-[15px]" style={{ color: "#92400e" }}>
+                      {renderSentenceText(parts.takeaway)}
+                    </p>
+                  </div>
+                )}
 
                 {/* Challenge line */}
-                {parts.challenge && (() => {
-                  const bi = blockCounter++;
-                  return (
-                    <p className="mt-4 pt-3 text-[15px] italic anim-fade-in-up"
-                      style={{
-                        color: "#6b7280",
-                        borderTop: "1px solid #f1f5f9",
-                        animationDelay: "0.6s",
-                         ...highlightStyle(bi, { borderRadius: "10px", padding: "8px 12px" }),
-                      }}>
-                      {parts.challenge}
-                    </p>
-                  );
-                })()}
+                {parts.challenge && (
+                  <p className="mt-4 pt-3 text-[15px] italic anim-fade-in-up"
+                    style={{
+                      color: "#6b7280",
+                      borderTop: "1px solid #f1f5f9",
+                      animationDelay: "0.6s",
+                    }}>
+                    {renderSentenceText(parts.challenge)}
+                  </p>
+                )}
               </div>
 
               <div className="px-8 pb-4 text-right">
