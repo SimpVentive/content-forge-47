@@ -641,9 +641,34 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     switch (slide.type) {
       case "title":
         return (
-          <div className="flex items-center justify-center h-full" key={currentSlide}>
+          <div className="flex flex-col items-center justify-center h-full gap-6" key={currentSlide}>
+            {/* Avatar character card with speech bubble */}
+            <div className="flex items-end gap-4 anim-fade-in-down" style={{ animationDelay: "0s" }}>
+              {/* Avatar */}
+              <div className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center shadow-lg"
+                style={{ background: "linear-gradient(135deg, #6366f1, #a78bfa)" }}>
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              {/* Speech bubble */}
+              <div className="relative bg-white rounded-2xl rounded-bl-md px-5 py-3 shadow-md max-w-[400px]"
+                style={{ animation: "fadeInUp 0.5s ease both", animationDelay: "0.15s" }}>
+                <p className="text-[14px] font-semibold" style={{ color: "#1e293b" }}>
+                  Welcome to <span style={{ color: "#4f46e5" }}>Module {slide.moduleIndex + 1}</span>! 🎓
+                </p>
+                <p className="text-[12px] mt-0.5" style={{ color: "#64748b" }}>
+                  Let's explore this topic together.
+                </p>
+                {/* Bubble tail */}
+                <div className="absolute -left-2 bottom-2 w-0 h-0"
+                  style={{ borderTop: "6px solid transparent", borderBottom: "6px solid transparent", borderRight: "8px solid white" }} />
+              </div>
+            </div>
+
             <div className="w-full max-w-[800px] rounded-2xl p-12 text-center anim-fade-in-down"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+              style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", animationDelay: "0.1s" }}>
               <p className="text-[13px] font-bold text-white/60 uppercase tracking-[3px] mb-4">
                 Module {String(slide.moduleIndex + 1).padStart(2, "0")}
               </p>
