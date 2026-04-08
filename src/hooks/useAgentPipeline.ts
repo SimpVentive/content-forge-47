@@ -115,36 +115,26 @@ export function useAgentPipeline() {
       }
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
-      // ──── AGENT 3: Writer ────
+      // ──── AGENT 3: Writer (per-module calls to avoid truncation) ────
       if (toggles["writer"] !== false) {
         setStatus("writer", "running");
-        addLog("Writer Agent: Drafting Module 1 script...");
-        // Extract module/topic info for writer
-        let writerTopics = "";
+        
+        const durationMinutes = parseInt(params?.duration || "15", 10);
+        const wordsPerTopic = durationMinutes <= 5 ? "60-90" : durationMinutes <= 10 ? "90-120" : durationMinutes <= 20 ? "150-220" : "220-350";
+
+        // Parse modules from architect output
+        let parsedModules: any[] = [];
         try {
           const archParsed = JSON.parse(archResult || "{}");
-          const mods = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
-          writerTopics = mods.map((m: any, mi: number) => {
-            const title = m.module_title || m.title || m.name || `Module ${mi+1}`;
-            const topics = (m.topics || m.sections || m.lessons || []).map((t: any) => {
-              const name = typeof t === "string" ? t : t.topic_title || t.title || t.name || "";
-              const obj = typeof t === "string" ? "" : t.learning_objective || t.objective || "";
-              return `  - Topic: ${name}${obj ? ` | Objective: ${obj}` : ""}`;
-            }).join("\n");
-            return `Module: ${title}\n${topics}`;
-          }).join("\n\n");
-        } catch { writerTopics = courseTitle; }
+          parsedModules = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
+        } catch { parsedModules = []; }
 
-        const durationMinutes = parseInt(params?.duration || "15", 10);
-        const wordsPerTopic = durationMinutes <= 5 ? "60-90" : durationMinutes <= 10 ? "90-120" : "120-180";
+        const writerSystemPrompt = `You are an elite instructional writer who specialises in corporate eLearning that people actually enjoy. Your writing style is: conversational, direct, and energetic — like a brilliant colleague explaining something important over coffee, not a textbook.
 
-        writerResult = await callClaudeWithRetry(
-          `You are an elite instructional writer who specialises in corporate eLearning that people actually enjoy. Your writing style is: conversational, direct, and energetic — like a brilliant colleague explaining something important over coffee, not a textbook.
-
-CRITICAL: Target course duration is ${params?.duration || "15min"}. You MUST scale content length to match this duration exactly.
-- Total word count per topic: ${wordsPerTopic} words.
-- For short courses (3-5 min), be ultra-concise: one sharp hook, one core insight, one takeaway per topic. No filler.
-- For longer courses (30-60 min), expand with more examples, deeper analysis, and richer scenarios.
+CRITICAL: You are writing ONE MODULE of a ${params?.duration || "15min"} course. You MUST write substantial, detailed content.
+- Target word count per topic: ${wordsPerTopic} words. This is MINIMUM — write MORE if the topic warrants it.
+- For longer courses (30-60 min), expand with multiple examples, deeper analysis, step-by-step walkthroughs, and richer real-world scenarios.
+- NEVER truncate or summarize. Write the FULL content for every topic.
 
 Rules you NEVER break:
 - Open every topic with a provocative hook — a shocking stat, a bold claim, a real-world scenario, or a question that makes the learner stop and think
@@ -155,18 +145,54 @@ Rules you NEVER break:
 - Use analogies. Make complex ideas click instantly.
 - End every topic with a challenge or reflection: 'Next time you X, try Y instead'
 - NO passive voice. NO jargon without explanation. NO bullet walls.
-- Format each topic as: Hook (2-3 sentences) → Core concept (3-4 sentences) → Real example (2-3 sentences) → Key Takeaway: (1-2 sentences) → Challenge: (1 sentence)
+- Format each topic as: Hook (2-3 sentences) → Core concept (5-8 sentences for longer courses) → Real example (3-5 sentences) → Key Takeaway: (1-2 sentences) → Challenge: (1 sentence)
 - Use markdown ## headers for each topic title, matching the exact topic names provided.
 - You MUST use content from the source material provided. Do NOT invent unrelated examples.
 
-For the current course, write content that would make a learner lean forward, not lean back.`,
-          `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\n\nModules & Topics:\n${writerTopics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for EVERY topic listed above. Use ## headers matching the topic names exactly. Scale total content to fit ${params?.duration || "15min"}.`,
-          addLog, "Writer Agent"
-        );
+Write content that would make a learner lean forward, not lean back.`;
+
+        if (parsedModules.length === 0) {
+          // Fallback: single call if we can't parse modules
+          addLog("Writer Agent: Drafting all content...");
+          writerResult = await callClaudeWithRetry(
+            writerSystemPrompt,
+            `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"}.`,
+            addLog, "Writer Agent"
+          );
+        } else {
+          // Per-module calls to avoid truncation
+          const moduleResults: string[] = [];
+          for (let mi = 0; mi < parsedModules.length; mi++) {
+            if (isCancelled()) break;
+            const mod = parsedModules[mi];
+            const modTitle = mod.module_title || mod.title || mod.name || `Module ${mi + 1}`;
+            const topics = (mod.topics || mod.sections || mod.lessons || []).map((t: any) => {
+              const name = typeof t === "string" ? t : t.topic_title || t.title || t.name || "";
+              const obj = typeof t === "string" ? "" : t.learning_objective || t.objective || "";
+              return `  - Topic: ${name}${obj ? ` | Objective: ${obj}` : ""}`;
+            }).join("\n");
+
+            addLog(`Writer Agent: Drafting Module ${mi + 1}/${parsedModules.length} — ${modTitle}...`);
+
+            const moduleContent = await callClaudeWithRetry(
+              writerSystemPrompt,
+              `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\n\nModule: ${modTitle}\nTopics:\n${topics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging content for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${wordsPerTopic} words minimum.`,
+              addLog, "Writer Agent"
+            );
+            moduleResults.push(`# ${modTitle}\n\n${moduleContent}`);
+            
+            // Update output progressively
+            writerResult = moduleResults.join("\n\n---\n\n");
+            setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
+            setOutputData((prev) => ({ ...prev, script: writerResult }));
+          }
+          writerResult = moduleResults.join("\n\n---\n\n");
+        }
+        
         setStatus("writer", "complete");
         setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
         setOutputData((prev) => ({ ...prev, script: writerResult }));
-        addLog("Writer Agent: Complete. Module 1 script ready.");
+        addLog(`Writer Agent: Complete. ${parsedModules.length || 1} modules written.`);
       } else {
         setStatus("writer", "idle");
       }
