@@ -15,6 +15,10 @@ const VOICES = [
   { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel", label: "Rachel (Female, Professional)" },
   { id: "pNInz6obpgDQGcFmaJgB", name: "Adam", label: "Adam (Male, Authoritative)" },
   { id: "MF3mGyEYCl7XYWbV9V6O", name: "Elli", label: "Elli (Female, Warm)" },
+  { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah", label: "Sarah (Female, Hindi/Multilingual)" },
+  { id: "onwK4e9ZLuTAKqWW03F9", name: "Daniel", label: "Daniel (Male, Hindi/Multilingual)" },
+  { id: "pFZP5JQG7iQjIQuC4Bku", name: "Lily", label: "Lily (Female, Indian English)" },
+  { id: "TX3LPaxmHKxFdv7VOQHJ", name: "Liam", label: "Liam (Male, Indian English)" },
 ];
 
 function tryParseJSON(raw: string): any | null {
