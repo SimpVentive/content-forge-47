@@ -182,8 +182,11 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       });
     }
 
-    // 3b. Insert video slides for this module
-    const modVideos = insertedVideos.filter(v => v.moduleTitle === mod.title);
+    // 3b. Insert video slides for this module (fuzzy match module titles)
+    const modVideos = insertedVideos.filter(v => 
+      v.moduleTitle === mod.title || 
+      normalizeModuleKey(v.moduleTitle) === normalizeModuleKey(mod.title)
+    );
     modVideos.forEach(vid => {
       slides.push({
         type: "video",
