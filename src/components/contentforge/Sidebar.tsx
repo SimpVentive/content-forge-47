@@ -165,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <input
             value={courseTitle}
             onChange={(e) => setCourseTitle(e.target.value)}
-            className="w-full h-11 border-[1.5px] border-border rounded-xl px-3.5 text-[14px] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors duration-[180ms]"
+            className="w-full h-11 border-[1.5px] border-border rounded-xl px-3.5 text-[14px] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors duration-200"
             placeholder="Enter course title..."
           />
         </div>
@@ -210,7 +210,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="border-2 border-dashed border-primary/25 rounded-xl p-4 text-center cursor-pointer hover:bg-primary/[0.04] hover:border-primary transition-all duration-[180ms] mb-3"
+            className="border-2 border-dashed border-primary/25 rounded-xl p-4 text-center cursor-pointer hover:bg-primary/[0.04] hover:border-primary transition-all duration-200 mb-3"
           >
             <Upload className="w-7 h-7 mx-auto mb-2 text-primary" />
             <p className="text-[13px] font-semibold text-foreground">Drop PPT, PDF or DOCX</p>
@@ -235,7 +235,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             rows={8}
-            className="w-full border-[1.5px] border-border rounded-xl px-3.5 py-3 text-[13px] leading-[1.6] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none transition-colors duration-[180ms]"
+            className="w-full border-[1.5px] border-border rounded-xl px-3.5 py-3 text-[13px] leading-[1.6] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none transition-colors duration-200"
             placeholder="Paste subject matter notes..."
           />
         </div>
@@ -243,7 +243,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isRunning ? (
           <button
             onClick={onStop}
-            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 transition-all duration-[180ms]"
+            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 transition-all duration-200"
           >
             <Square className="w-4 h-4" />
             Stop Generating
@@ -252,7 +252,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onGenerate}
             disabled={!courseTitle.trim() || isExtracting}
-            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-[180ms]"
+            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
           >
             {isExtracting ? (

@@ -1,386 +1,10 @@
-import JSZip from "jszip";
-import { saveAs } from "file-saver";
-import type { RawAgentOutputs } from "@/types/agents";
-
-/* ── helpers ── */
-function tryParseJSON(raw: string): any | null {
-  try { return JSON.parse(raw); } catch {
-    const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (m) { try { return JSON.parse(m[1].trim()); } catch { return null; } }
-    return null;
-  }
-}
-
-function escapeXml(s: unknown): string {
-  const str = typeof s === "string" ? s : JSON.stringify(s) || "";
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function escapeHtml(s: unknown): string {
-  const str = typeof s === "string" ? s : JSON.stringify(s) || "";
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
-function escapeAttribute(s: unknown): string {
-  return escapeXml(s).replace(/'/g, "&#39;");
-}
-
-function escapeJsString(s: unknown): string {
-  return JSON.stringify(typeof s === "string" ? s : JSON.stringify(s) || "");
-}
-
-interface Module { title: string; topics: string[]; }
-
-interface ModuleSection {
-  heading: string;
-  bodyMarkdown: string;
-  bodyHtml: string;
-  moduleContent: string;
-  keyTakeaway: string;
-}
-
-function normalizeTextKey(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/gi, " ").trim();
-}
-
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^[-*+]\s+/gm, "")
-    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/[*_~>#]+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function parseTopicLabel(topic: unknown): string {
-  if (typeof topic === "string") {
-    const trimmed = topic.trim();
-    const parsed = tryParseJSON(trimmed);
-    if (parsed && parsed !== trimmed) {
-      return parseTopicLabel(parsed);
-    }
-    return stripMarkdown(trimmed).replace(/^"|"$/g, "").trim();
-  }
-
-  if (Array.isArray(topic)) {
-    return parseTopicLabel(topic[0] || "");
-  }
-
-  if (topic && typeof topic === "object") {
-    const candidate = [
-      (topic as Record<string, unknown>).topic_name,
-      (topic as Record<string, unknown>).topic_title,
-      (topic as Record<string, unknown>).title,
-      (topic as Record<string, unknown>).topic,
-      (topic as Record<string, unknown>).name,
-      (topic as Record<string, unknown>).label,
-      (topic as Record<string, unknown>).text,
-    ].find((value) => typeof value === "string" && value.trim().length > 0);
-
-    return candidate ? parseTopicLabel(candidate) : stripMarkdown(JSON.stringify(topic));
-  }
-
-  return "";
-}
-
-function splitIntoSentences(text: string): string[] {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) return [];
-  const matches = normalized.match(/[^.!?]+(?:[.!?]+|$)/g) || [];
-  return matches.map((sentence) => sentence.trim()).filter(Boolean);
-}
-
-function getFirstSentences(text: string, count: number): string {
-  const sentences = splitIntoSentences(text);
-  return sentences.slice(0, count).join(" ").trim();
-}
-
-function renderInlineMarkdown(text: string): string {
-  return escapeHtml(text)
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/__(.+?)__/g, "<strong>$1</strong>")
-    .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    .replace(/_([^_]+)_/g, "<em>$1</em>")
-    .replace(/`([^`]+)`/g, "<code>$1</code>")
-    .replace(/\[(.+?)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer">$1</a>');
-}
-
-function markdownToHtml(markdown: string): string {
-  const normalized = markdown.replace(/\r\n/g, "\n").trim();
-  if (!normalized) return "";
-
-  const lines = normalized.split("\n");
-  const htmlParts: string[] = [];
-  let paragraphLines: string[] = [];
-  let listItems: string[] = [];
-
-  const flushParagraph = () => {
-    if (paragraphLines.length === 0) return;
-    htmlParts.push(`<p>${renderInlineMarkdown(paragraphLines.join(" "))}</p>`);
-    paragraphLines = [];
-  };
-
-  const flushList = () => {
-    if (listItems.length === 0) return;
-    htmlParts.push(`<ul>${listItems.map((item) => `<li>${renderInlineMarkdown(item)}</li>`).join("")}</ul>`);
-    listItems = [];
-  };
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-
-    if (!line) {
-      flushParagraph();
-      flushList();
-      continue;
-    }
-
-    if (/^###\s+/.test(line)) {
-      flushParagraph();
-      flushList();
-      htmlParts.push(`<h3>${renderInlineMarkdown(line.replace(/^###\s+/, ""))}</h3>`);
-      continue;
-    }
-
-    if (/^##\s+/.test(line)) {
-      flushParagraph();
-      flushList();
-      htmlParts.push(`<h2>${renderInlineMarkdown(line.replace(/^##\s+/, ""))}</h2>`);
-      continue;
-    }
-
-    if (/^#\s+/.test(line)) {
-      flushParagraph();
-      flushList();
-      htmlParts.push(`<h1>${renderInlineMarkdown(line.replace(/^#\s+/, ""))}</h1>`);
-      continue;
-    }
-
-    if (/^[-*+]\s+/.test(line)) {
-      flushParagraph();
-      listItems.push(line.replace(/^[-*+]\s+/, ""));
-      continue;
-    }
-
-    flushList();
-    paragraphLines.push(line);
-  }
-
-  flushParagraph();
-  flushList();
-
-  return htmlParts.join("\n        ");
-}
-
-function extractTakeaway(markdown: string): { cleanedMarkdown: string; takeaway: string } {
-  const normalized = markdown.replace(/\r\n/g, "\n");
-  const marker = /Key Takeaway:\s*([^\n]+)/i;
-  const match = normalized.match(marker);
-
-  if (!match) {
-    return {
-      cleanedMarkdown: normalized.trim(),
-      takeaway: "",
-    };
-  }
-
-  const takeaway = stripMarkdown(match[1]).trim();
-  const cleanedMarkdown = normalized
-    .replace(marker, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .join("\n")
-    .trim();
-
-  return {
-    cleanedMarkdown,
-    takeaway,
-  };
-}
-
-function parseModules(archRaw: string): Module[] {
-  const data = tryParseJSON(archRaw);
-  if (data?.modules) {
-    return data.modules.map((m: any) => ({
-      title: String(m.title || m.module_title || ""),
-      topics: (m.topics || m.sections || []).map((t: any) => parseTopicLabel(t)).filter(Boolean),
-    }));
-  }
-  const modules: Module[] = [];
-  const lines = archRaw.split("\n");
-  let cur: Module | null = null;
-  for (const line of lines) {
-    const mm = line.match(/^#+\s*(?:Module\s*\d+[:.]\s*)?(.+)/i) || line.match(/^\*\*(?:Module\s*\d+[:.]\s*)?(.+?)\*\*/i);
-    if (mm) { if (cur) modules.push(cur); cur = { title: mm[1].trim(), topics: [] }; }
-    else if (cur && line.match(/^[-*]\s+(.+)/)) { cur.topics.push(parseTopicLabel(line.replace(/^[-*]\s+/, "").trim())); }
-  }
-  if (cur) modules.push(cur);
-  return modules;
-}
-
-function parseScript(writerRaw: string, modules: Module[]): Map<string, ModuleSection[]> {
-  if (!writerRaw) return new Map<string, ModuleSection[]>();
-
-  const typedMap = new Map<string, ModuleSection[]>();
-  const sectionMap = new Map<string, string>();
-  const chunks = writerRaw.split(/^##\s+/m).map((chunk) => chunk.trim()).filter(Boolean);
-
-  for (const chunk of chunks) {
-    const [headingLine, ...bodyLines] = chunk.split("\n");
-    const heading = headingLine?.trim();
-    if (!heading) continue;
-    sectionMap.set(normalizeTextKey(heading), bodyLines.join("\n").trim());
-  }
-
-  modules.forEach((mod) => {
-    const moduleSections: ModuleSection[] = (mod.topics.length > 0 ? mod.topics : [mod.title]).map((topic) => {
-      const heading = parseTopicLabel(topic) || mod.title;
-      const rawMarkdown = sectionMap.get(normalizeTextKey(heading)) || `Content for ${heading}`;
-      const { cleanedMarkdown, takeaway } = extractTakeaway(rawMarkdown);
-      const bodyMarkdown = cleanedMarkdown || rawMarkdown;
-      const plainText = stripMarkdown(bodyMarkdown);
-      return {
-        heading,
-        bodyMarkdown,
-        bodyHtml: markdownToHtml(bodyMarkdown),
-        moduleContent: getFirstSentences(plainText, 3) || plainText || `Key point: ${heading}`,
-        keyTakeaway: takeaway,
-      };
-    });
-
-    typedMap.set(mod.title, moduleSections);
-  });
-
-  return typedMap;
-}
-
-function parseAssessment(assessRaw: string): { question: string; options: string[]; correct: number }[] {
-  const data = tryParseJSON(assessRaw);
-  if (data?.mcq) {
-    return data.mcq.map((q: any) => ({
-      question: q.question || q.stem || "",
-      options: q.options || q.choices || [],
-      correct: typeof q.correct_answer === "number" ? q.correct_answer : 0,
-    }));
-  }
-  return [];
-}
-
-interface NarrationSection {
-  title: string;
-  narration_text: string;
-  word_count: number;
-}
-
-function parseVoiceSections(voiceRaw: string): NarrationSection[] {
-  if (!voiceRaw) return [];
-  const data = tryParseJSON(voiceRaw);
-  return data?.sections || [];
-}
-
-/* ── TTS Generation ── */
-async function generateTTSAudio(text: string, voiceId: string): Promise<ArrayBuffer> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-  const response = await fetch(
-    `${supabaseUrl}/functions/v1/elevenlabs-tts`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: supabaseKey,
-        Authorization: `Bearer ${supabaseKey}`,
-      },
-      body: JSON.stringify({ text: text.slice(0, 5000), voiceId }),
-    }
-  );
-
-  if (!response.ok) {
-    const errData = await response.json().catch(() => null);
-    throw new Error(errData?.error || `TTS failed: ${response.status}`);
-  }
-
-  return response.arrayBuffer();
-}
-
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return btoa(binary);
-}
-
-/* ── SCORM 1.2 XSD schema stubs ── */
-const IMSCP_XSD = `<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-  targetNamespace="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
-  xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
-  elementFormDefault="qualified" version="IMS CP 1.1.2">
-  <xs:element name="manifest"/>
-</xs:schema>`;
-
-const ADLCP_XSD = `<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-  targetNamespace="http://www.adlnet.org/xsd/adlcp_rootv1p2"
-  xmlns="http://www.adlnet.org/xsd/adlcp_rootv1p2"
-  elementFormDefault="qualified" version="ADL SCORM 1.2">
-  <xs:attribute name="scormtype" type="xs:string"/>
-</xs:schema>`;
-
-const IMSMD_XSD = `<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-  targetNamespace="http://www.imsglobal.org/xsd/imsmd_rootv1p2p1"
-  xmlns="http://www.imsglobal.org/xsd/imsmd_rootv1p2p1"
-  elementFormDefault="qualified" version="IMS MD 1.2.2">
-</xs:schema>`;
-
-/* ── SCORM imsmanifest.xml ── */
-function buildManifest(courseTitle: string, modules: Module[]): string {
-  const orgItems = modules.map((m, i) =>
-    `      <item identifier="ITEM_M${i + 1}" identifierref="RES_M${i + 1}">
-        <title>${escapeXml(m.title)}</title>
-      </item>`
-  ).join("\n");
-
-  const resources = modules.map((m, i) =>
-    `    <resource identifier="RES_M${i + 1}" type="webcontent" adlcp:scormType="sco" href="module_${i + 1}.html">
-      <file href="module_${i + 1}.html"/>
-    </resource>`
-  ).join("\n");
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="MANIFEST_001" version="1.0"
-  xmlns="http://www.imsproject.org/xsd/imscp_rootv1p1p2"
-  xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_rootv1p2"
-  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://www.imsproject.org/xsd/imscp_rootv1p1p2 imscp_rootv1p1p2.xsd
-    http://www.imsglobal.org/xsd/imsmd_rootv1p2p1 imsmd_rootv1p2p1.xsd
-    http://www.adlnet.org/xsd/adlcp_rootv1p2 adlcp_rootv1p2.xsd">
-  <metadata>
-    <schema>ADL SCORM</schema>
-    <schemaversion>1.2</schemaversion>
-  </metadata>
-  <organizations default="ORG_001">
-    <organization identifier="ORG_001">
-      <title>${escapeXml(courseTitle)}</title>
-${orgItems}
-    </organization>
-  </organizations>
-  <resources>
-${resources}
-  </resources>
-</manifest>`;
-}
-
-/* ── SCORM API wrapper (lightweight) ── */
-const SCORM_API_JS = `// SCORM 1.2 API wrapper
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Working Smarter - Office Productivity</title>
+  <script>// SCORM 1.2 API wrapper
 var API = null;
 function findAPI(win) {
   var tries = 0;
@@ -421,132 +45,7 @@ function scormSetScore(score) {
     api.LMSCommit("");
   }
 }
-`;
-
-/* ── Module HTML page builder ── */
-function buildModuleHtml(
-  courseTitle: string,
-  mod: Module,
-  moduleIndex: number,
-  totalModules: number,
-  sections: ModuleSection[],
-  quizzes: { question: string; options: string[]; correct: number }[],
-  audioBase64: string | null,
-  narrationText: string
-): string {
-  // Split narration into sentences for highlighting
-  const sentences = narrationText
-    ? narrationText.match(/[^.!?]+[.!?]+[\s]*/g) || [narrationText]
-    : [];
-  const hasSentences = sentences.length > 0 && audioBase64;
-
-  const moduleTopics = sections.map((section) => ({
-    heading: section.heading,
-    moduleContent: section.moduleContent,
-  }));
-
-  const sectionsHtml = sections.map((section, sectionIndex) => `
-      <section class="lesson-section" id="section-${sectionIndex + 1}">
-        <div
-          class="avatar-narrator"
-          data-topic="${escapeAttribute(section.heading)}"
-          data-module-content="${escapeAttribute(section.moduleContent)}"
-          data-system-hint="${escapeAttribute("Focus on the practical benefit to an office worker.")}"
-        >
-          <div class="topic-pill-row">
-            ${moduleTopics.map((topic) => `
-              <button
-                type="button"
-                class="topic-pill${normalizeTextKey(topic.heading) === normalizeTextKey(section.heading) ? " active" : ""}"
-                data-topic="${escapeAttribute(topic.heading)}"
-                data-module-content="${escapeAttribute(topic.moduleContent)}"
-              >${escapeHtml(topic.heading)}</button>`).join("")}
-          </div>
-          <div class="avatar-head">
-            <div class="avatar-circle">SC</div>
-            <div>
-              <p class="avatar-name">Sarah</p>
-              <p class="avatar-role">Your learning guide</p>
-            </div>
-          </div>
-          <div class="speech-bubble">
-            <span data-role="speech-text"></span>
-            <span class="avatar-cursor" aria-hidden="true"></span>
-          </div>
-          <div class="avatar-actions">
-            <button type="button" class="avatar-btn explain-btn" data-action="explain">Explain this</button>
-            <button type="button" class="avatar-btn stop-btn" data-action="stop" hidden>Stop</button>
-            <button type="button" class="avatar-btn example-btn" data-action="example" hidden>Give me an example</button>
-          </div>
-        </div>
-        <div class="section-body">
-          <h2>${escapeHtml(section.heading)}</h2>
-          ${section.bodyHtml}
-        </div>
-        ${section.keyTakeaway ? `
-        <aside class="key-takeaway-card">
-          <div class="key-takeaway-label">Key takeaway</div>
-          <p>${renderInlineMarkdown(section.keyTakeaway)}</p>
-        </aside>` : ""}
-      </section>`).join("\n");
-
-  const audioHtml = audioBase64 ? `
-      <div class="audio-section">
-        <div class="audio-header">
-          <h2>🎧 Listen to Narration</h2>
-          <div class="palette-bar">
-            <span class="palette-label">Highlight:</span>
-            <button class="palette-btn active" data-palette="yellow" onclick="setPalette('yellow')" title="Yellow">
-              <span class="palette-dot" style="background:var(--hl-yellow-bg, #fef9c3);border-color:var(--hl-yellow-border, #fde047)"></span>
-            </button>
-            <button class="palette-btn" data-palette="mint" onclick="setPalette('mint')" title="Mint">
-              <span class="palette-dot" style="background:var(--hl-mint-bg, #d1fae5);border-color:var(--hl-mint-border, #6ee7b7)"></span>
-            </button>
-            <button class="palette-btn" data-palette="sky" onclick="setPalette('sky')" title="Sky">
-              <span class="palette-dot" style="background:var(--hl-sky-bg, #dbeafe);border-color:var(--hl-sky-border, #93c5fd)"></span>
-            </button>
-            <button class="hl-toggle active" id="hlToggle" onclick="toggleHighlight()">On</button>
-          </div>
-        </div>
-        <audio controls class="audio-player" id="moduleAudio" preload="auto">
-          <source src="data:audio/mpeg;base64,${audioBase64}" type="audio/mpeg"/>
-          Your browser does not support the audio element.
-        </audio>
-        <p class="audio-hint">Click play — text highlights sentence by sentence as you listen</p>
-      </div>` : "";
-
-  const quizHtml = quizzes.length > 0 ? `
-      <div class="quiz-section">
-        <h2>Knowledge Check</h2>
-        ${quizzes.map((q, qi) => `
-        <div class="quiz-item" id="q${qi}">
-          <p class="quiz-q"><strong>Q${qi + 1}.</strong> ${escapeHtml(q.question)}</p>
-          ${q.options.map((opt, oi) => `
-          <label class="quiz-opt" data-option-index="${oi}">
-            <input type="radio" name="q${qi}" value="${oi}" onchange="checkAnswer(${qi},${oi},${q.correct})"/>
-            <span>${escapeHtml(typeof opt === "string" ? opt : String(opt))}</span>
-          </label>`).join("")}
-          <p class="quiz-fb" id="fb${qi}"></p>
-        </div>`).join("")}
-      </div>` : "";
-
-  const navPrev = moduleIndex > 0
-    ? `<a href="module_${moduleIndex}.html" class="nav-btn">&larr; Previous</a>`
-    : `<span></span>`;
-  const navNext = moduleIndex < totalModules - 1
-    ? `<a href="module_${moduleIndex + 2}.html" class="nav-btn">Next &rarr;</a>`
-    : `<button class="nav-btn complete-btn" onclick="completeCourse()">Complete Course ✓</button>`;
-
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "";
-  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>${escapeHtml(mod.title)} - ${escapeHtml(courseTitle)}</title>
-  <script>${SCORM_API_JS}<\/script>
+</script>
   <style>
     :root {
       --primary: #4f46e5;
@@ -722,27 +221,144 @@ function buildModuleHtml(
 </head>
 <body onload="scormInit()">
   <div class="header">
-    <div class="meta">${escapeHtml(courseTitle)}</div>
-    <h1>Module ${moduleIndex + 1}: ${escapeHtml(mod.title)}</h1>
-    <div class="progress-bar"><div class="progress-fill" style="width:${Math.round(((moduleIndex + 1) / totalModules) * 100)}%"></div></div>
+    <div class="meta">Office Productivity</div>
+    <h1>Module 1: Working Smarter</h1>
+    <div class="progress-bar"><div class="progress-fill" style="width:33%"></div></div>
   </div>
   <div class="container">
-    ${audioHtml}
-    ${sectionsHtml}
-    ${quizHtml}
+    
+    
+      <section class="lesson-section" id="section-1">
+        <div
+          class="avatar-narrator"
+          data-topic="Inbox triage"
+          data-module-content="Start with the most urgent messages. Batch the rest into scheduled review windows. This prevents constant context switching."
+          data-system-hint="Focus on the practical benefit to an office worker."
+        >
+          <div class="topic-pill-row">
+            
+              <button
+                type="button"
+                class="topic-pill active"
+                data-topic="Inbox triage"
+                data-module-content="Start with the most urgent messages. Batch the rest into scheduled review windows. This prevents constant context switching."
+              >Inbox triage</button>
+              <button
+                type="button"
+                class="topic-pill"
+                data-topic="Meeting hygiene"
+                data-module-content="Use a short agenda before every discussion. Clarify the decision needed Invite only the people required"
+              >Meeting hygiene</button>
+          </div>
+          <div class="avatar-head">
+            <div class="avatar-circle">SC</div>
+            <div>
+              <p class="avatar-name">Sarah</p>
+              <p class="avatar-role">Your learning guide</p>
+            </div>
+          </div>
+          <div class="speech-bubble">
+            <span data-role="speech-text"></span>
+            <span class="avatar-cursor" aria-hidden="true"></span>
+          </div>
+          <div class="avatar-actions">
+            <button type="button" class="avatar-btn explain-btn" data-action="explain">Explain this</button>
+            <button type="button" class="avatar-btn stop-btn" data-action="stop" hidden>Stop</button>
+            <button type="button" class="avatar-btn example-btn" data-action="example" hidden>Give me an example</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <h2>Inbox triage</h2>
+          <p>Start with the most urgent messages. <strong>Batch</strong> the rest into scheduled review windows. This prevents constant context switching.</p>
+        </div>
+        
+        <aside class="key-takeaway-card">
+          <div class="key-takeaway-label">Key takeaway</div>
+          <p>Protecting attention helps you finish more meaningful work.</p>
+        </aside>
+      </section>
+
+      <section class="lesson-section" id="section-2">
+        <div
+          class="avatar-narrator"
+          data-topic="Meeting hygiene"
+          data-module-content="Use a short agenda before every discussion. Clarify the decision needed Invite only the people required"
+          data-system-hint="Focus on the practical benefit to an office worker."
+        >
+          <div class="topic-pill-row">
+            
+              <button
+                type="button"
+                class="topic-pill"
+                data-topic="Inbox triage"
+                data-module-content="Start with the most urgent messages. Batch the rest into scheduled review windows. This prevents constant context switching."
+              >Inbox triage</button>
+              <button
+                type="button"
+                class="topic-pill active"
+                data-topic="Meeting hygiene"
+                data-module-content="Use a short agenda before every discussion. Clarify the decision needed Invite only the people required"
+              >Meeting hygiene</button>
+          </div>
+          <div class="avatar-head">
+            <div class="avatar-circle">SC</div>
+            <div>
+              <p class="avatar-name">Sarah</p>
+              <p class="avatar-role">Your learning guide</p>
+            </div>
+          </div>
+          <div class="speech-bubble">
+            <span data-role="speech-text"></span>
+            <span class="avatar-cursor" aria-hidden="true"></span>
+          </div>
+          <div class="avatar-actions">
+            <button type="button" class="avatar-btn explain-btn" data-action="explain">Explain this</button>
+            <button type="button" class="avatar-btn stop-btn" data-action="stop" hidden>Stop</button>
+            <button type="button" class="avatar-btn example-btn" data-action="example" hidden>Give me an example</button>
+          </div>
+        </div>
+        <div class="section-body">
+          <h2>Meeting hygiene</h2>
+          <p>Use a short agenda before every discussion.</p>
+        <ul><li>Clarify the decision needed</li><li>Invite only the people required</li></ul>
+        </div>
+        
+        <aside class="key-takeaway-card">
+          <div class="key-takeaway-label">Key takeaway</div>
+          <p>Shorter meetings create more time for actual execution.</p>
+        </aside>
+      </section>
+    
+      <div class="quiz-section">
+        <h2>Knowledge Check</h2>
+        
+        <div class="quiz-item" id="q0">
+          <p class="quiz-q"><strong>Q1.</strong> What improves focus?</p>
+          
+          <label class="quiz-opt" data-option-index="0">
+            <input type="radio" name="q0" value="0" onchange="checkAnswer(0,0,1)"/>
+            <span>Constant checking</span>
+          </label>
+          <label class="quiz-opt" data-option-index="1">
+            <input type="radio" name="q0" value="1" onchange="checkAnswer(0,1,1)"/>
+            <span>Scheduled review windows</span>
+          </label>
+          <p class="quiz-fb" id="fb0"></p>
+        </div>
+      </div>
     <div class="nav">
-      ${navPrev}
-      ${navNext}
+      <span></span>
+      <a href="module_2.html" class="nav-btn">Next &rarr;</a>
     </div>
   </div>
   <script>
-    var score = 0, total = ${quizzes.length}, answered = 0;
+    var score = 0, total = 1, answered = 0;
     var hlEnabled = true, hlPalette = 'yellow';
-    var totalSentences = ${hasSentences ? sentences.length : 0};
+    var totalSentences = 0;
     var animId = 0;
-    var avatarSupabaseUrl = ${escapeJsString(supabaseUrl)};
-    var avatarSupabaseKey = ${escapeJsString(supabaseKey)};
-    var avatarExampleHint = ${escapeJsString("Give one vivid real-world workplace example in 2 sentences.")};
+    var avatarSupabaseUrl = "https://licezkkahseilnmswxbc.supabase.co";
+    var avatarSupabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxpY2V6a2thaHNlaWxubXN3eGJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1NjQ5ODYsImV4cCI6MjA5MDE0MDk4Nn0.uihvlJcwnwx6TVjn_0zYkz3j-_SeVhgPBZd9cj378jw";
+    var avatarExampleHint = "Give one vivid real-world workplace example in 2 sentences.";
 
     function checkAnswer(qi, selected, correct) {
       var item = document.getElementById('q' + qi);
@@ -1039,94 +655,6 @@ function buildModuleHtml(
     for (var avatarIndex = 0; avatarIndex < avatarNarrators.length; avatarIndex++) {
       initAvatarNarrator(avatarNarrators[avatarIndex]);
     }
-  <\/script>
+  </script>
 </body>
-</html>`;
-}
-
-/* ── Main export function ── */
-export async function exportScormPackage(
-  courseTitle: string,
-  rawOutputs: RawAgentOutputs,
-  options?: {
-    includeVoice?: boolean;
-    voiceId?: string;
-    onProgress?: (message: string) => void;
-  }
-): Promise<void> {
-  const zip = new JSZip();
-  const includeVoice = options?.includeVoice ?? true;
-  const voiceId = options?.voiceId || "21m00Tcm4TlvDq8ikWAM"; // Rachel default
-  const onProgress = options?.onProgress || (() => {});
-
-  // Parse course data
-  const modules = parseModules(rawOutputs.architect);
-  if (modules.length === 0) {
-    throw new Error("No modules found in the course outline. Please generate the course first.");
-  }
-
-  const scriptMap = parseScript(rawOutputs.writer, modules);
-  const allQuizzes = parseAssessment(rawOutputs.assessment);
-  const voiceSections = parseVoiceSections(rawOutputs.voice);
-
-  // Distribute quizzes across modules
-  const quizzesPerModule = Math.max(1, Math.floor(allQuizzes.length / modules.length));
-
-  // Generate TTS audio for each module if voice data exists
-  const audioBase64Map = new Map<number, string>();
-
-  if (includeVoice && voiceSections.length > 0) {
-    onProgress("Generating voice narration...");
-    for (let i = 0; i < modules.length; i++) {
-      const section = voiceSections[i];
-      if (!section?.narration_text) continue;
-
-      onProgress(`Generating audio for Module ${i + 1}/${modules.length}: ${modules[i].title}`);
-      try {
-        const audioBuffer = await generateTTSAudio(section.narration_text, voiceId);
-        const base64 = arrayBufferToBase64(audioBuffer);
-        audioBase64Map.set(i, base64);
-      } catch (err) {
-        console.warn(`TTS failed for module ${i + 1}:`, err);
-        onProgress(`⚠ Audio skipped for Module ${i + 1} (${(err as Error).message})`);
-      }
-    }
-    onProgress(`Audio generated for ${audioBase64Map.size} of ${modules.length} modules`);
-  }
-
-  // Add SCORM manifest and required XSD schema files
-  zip.file("imsmanifest.xml", buildManifest(courseTitle, modules));
-  zip.file("imscp_rootv1p1p2.xsd", IMSCP_XSD);
-  zip.file("adlcp_rootv1p2.xsd", ADLCP_XSD);
-  zip.file("imsmd_rootv1p2p1.xsd", IMSMD_XSD);
-
-  // Add module HTML pages
-  modules.forEach((mod, i) => {
-    const sections = scriptMap.get(mod.title) || [{
-      heading: mod.topics[0] || mod.title,
-      bodyMarkdown: `Content for ${mod.title}`,
-      bodyHtml: `<p>${escapeHtml(`Content for ${mod.title}`)}</p>`,
-      moduleContent: `Content for ${mod.title}`,
-      keyTakeaway: "",
-    }];
-    const startQ = i * quizzesPerModule;
-    const modQuizzes = allQuizzes.slice(startQ, startQ + quizzesPerModule);
-    const audioBase64 = audioBase64Map.get(i) || null;
-    const narrationText = voiceSections[i]?.narration_text || "";
-    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioBase64, narrationText);
-    zip.file(`module_${i + 1}.html`, html);
-  });
-
-  onProgress("Packaging SCORM ZIP...");
-
-  // Generate and download
-  const blob = await zip.generateAsync({ type: "blob" });
-  const safeName = courseTitle.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 50);
-  saveAs(blob, `${safeName}_SCORM.zip`);
-}
-
-export const __scormTestUtils = {
-  parseModules,
-  parseScript,
-  buildModuleHtml,
-};
+</html>

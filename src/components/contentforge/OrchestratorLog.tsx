@@ -24,10 +24,10 @@ export const OrchestratorLog: React.FC<OrchestratorLogProps> = ({ logs }) => {
     <div>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="text-[14px] font-semibold text-primary flex items-center gap-1 hover:underline transition-all duration-[180ms] mb-2"
+        className="text-[14px] font-semibold text-primary flex items-center gap-1 hover:underline transition-all duration-200 mb-2"
       >
         {isOpen ? "Hide" : "Show"} Orchestrator Log
-        <ChevronDown className={`w-4 h-4 transition-transform duration-[180ms] ${isOpen ? "rotate-180" : ""}`} />
+        <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {isOpen && (

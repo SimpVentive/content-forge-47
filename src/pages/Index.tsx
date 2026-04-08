@@ -135,13 +135,13 @@ const Index = () => {
           {hasOutput && (
             <button
               onClick={() => setShowLearnerPreview(true)}
-              className="h-[44px] px-5 rounded-lg text-[15px] font-bold border-2 border-primary text-primary hover:bg-primary/5 transition-all duration-[180ms] flex items-center gap-2"
+              className="h-[44px] px-5 rounded-lg text-[15px] font-bold border-2 border-primary text-primary hover:bg-primary/5 transition-all duration-200 flex items-center gap-2"
             >
               <Play className="w-4 h-4" />
               Preview as Learner
             </button>
           )}
-          <button className="h-[44px] px-5 bg-primary text-primary-foreground rounded-lg text-[15px] font-bold shadow-btn-primary hover:brightness-110 transition-all duration-[180ms] flex items-center gap-2">
+          <button className="h-[44px] px-5 bg-primary text-primary-foreground rounded-lg text-[15px] font-bold shadow-btn-primary hover:brightness-110 transition-all duration-200 flex items-center gap-2">
             <Plus className="w-4 h-4" />
             New Course
           </button>

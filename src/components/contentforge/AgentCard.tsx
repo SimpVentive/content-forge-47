@@ -51,7 +51,7 @@ export const AgentCard: React.FC<AgentCardProps> = ({ agent, isLast, enabled, on
   return (
     <div className="relative">
       <div
-        className={`bg-card rounded-xl shadow-card hover:shadow-card-hover hover:-translate-y-px transition-all duration-[180ms] flex items-center gap-4 px-5 py-4 ${!enabled ? "opacity-50" : ""}`}
+        className={`bg-card rounded-xl shadow-card hover:shadow-card-hover hover:-translate-y-px transition-all duration-200 flex items-center gap-4 px-5 py-4 ${!enabled ? "opacity-50" : ""}`}
       >
         {/* Toggle */}
         <button

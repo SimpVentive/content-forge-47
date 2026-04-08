@@ -506,7 +506,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                     setActiveTab(tab.key);
                   }
                 }}
-                className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-[180ms] ${
+                className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-200 ${
                   disabled
                     ? "bg-secondary/50 text-muted-foreground/40 cursor-not-allowed"
                     : isPreview
