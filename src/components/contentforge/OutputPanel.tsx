@@ -375,13 +375,21 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
 
   const handleInsertVideo = (video: InsertedVideo) => {
     setInsertedVideos(prev => {
-      if (prev.find(v => v.videoId === video.videoId)) return prev;
+      if (prev.find(v => v.videoId === video.videoId)) {
+        toast.info("Video already inserted");
+        return prev;
+      }
+      toast.success(`"${video.title}" inserted into course`);
       return [...prev, video];
     });
   };
 
   const handleRemoveVideo = (videoId: string) => {
-    setInsertedVideos(prev => prev.filter(v => v.videoId !== videoId));
+    setInsertedVideos(prev => {
+      const video = prev.find(v => v.videoId === videoId);
+      if (video) toast("Video removed from course");
+      return prev.filter(v => v.videoId !== videoId);
+    });
   };
 
   const renderContent = () => {
