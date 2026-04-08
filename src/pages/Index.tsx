@@ -156,6 +156,7 @@ const Index = () => {
             onClose={() => setShowLearnerPreview(false)}
             insertedVideos={previewVideos}
             courseDuration={courseParams?.duration}
+            slideLayout={courseParams?.slideLayout}
           />
         </Suspense>
       )}
@@ -224,7 +225,7 @@ const Index = () => {
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize={30} minSize={15} maxSize={45}>
-          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} workflowClips={workflowClips} courseDuration={courseParams?.duration} />
+          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} workflowClips={workflowClips} courseDuration={courseParams?.duration} slideLayout={courseParams?.slideLayout} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

@@ -2,6 +2,20 @@ import { useState, useCallback, useRef } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
 
+type SlideLayoutParams = {
+  maxLines?: number;
+  minFontSize?: number;
+  lineSpacing?: number;
+};
+
+function buildSlideLayoutInstruction(slideLayout?: SlideLayoutParams): string {
+  const maxLines = slideLayout?.maxLines ?? 10;
+  const minFontSize = slideLayout?.minFontSize ?? 12.5;
+  const lineSpacing = slideLayout?.lineSpacing ?? 2;
+
+  return `Slide readability constraints: no slide should exceed ${maxLines} lines of on-slide text, the minimum font size must be ${minFontSize}px, and line spacing should be ${lineSpacing}. Keep layouts concise and presentation-friendly.`;
+}
+
 const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
@@ -48,7 +62,7 @@ export function useAgentPipeline() {
     setAgentStatuses((prev) => ({ ...prev, [id]: status }));
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean }) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; slideLayout?: SlideLayoutParams }) => {
     cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
@@ -203,8 +217,8 @@ Write content that would make a learner lean forward, not lean back.`;
         setStatus("visual", "running");
         addLog("Visual Design Agent: Generating layout specs for modules...");
         visualResult = await callClaudeWithRetry(
-          'You are a Visual Design Agent for eLearning. Given a course outline and script, produce a detailed visual design plan. For each module, specify: (1) recommended slide layout type, (2) key infographic or diagram description, (3) color palette suggestion, (4) iconography style. Return as JSON: { modules: [{ module_title, slide_layout, infographic_description, color_palette, icon_style }] }',
-          `Course Outline:\n${archResult}\n\nScript:\n${writerResult}`,
+          `You are a Visual Design Agent for eLearning. Given a course outline and script, produce a detailed visual design plan. For each module, specify: (1) recommended slide layout type, (2) key infographic or diagram description, (3) color palette suggestion, (4) iconography style. ${buildSlideLayoutInstruction(params?.slideLayout)} Return as JSON: { modules: [{ module_title, slide_layout, infographic_description, color_palette, icon_style }] }`,
+          `Course Outline:\n${archResult}\n\nScript:\n${writerResult}\n\n${buildSlideLayoutInstruction(params?.slideLayout)}`,
           addLog, "Visual Design Agent"
         );
         setStatus("visual", "complete");
@@ -236,7 +250,7 @@ Write content that would make a learner lean forward, not lean back.`;
             try {
               const svgText = await callClaude(
                 "You are an SVG designer. Generate a complete, self-contained SVG infographic (600x380px). Use ONLY these colors: #4f46e5 (indigo), #7c3aed (violet), #10b981 (emerald), #f59e0b (amber), #f8fafc (light bg), #0f172a (dark text), #ffffff (white). No external fonts — use font-family='system-ui, sans-serif'. No external images. Use only SVG primitives: rect, circle, path, text, line, polygon. Make it visually striking with geometric shapes, icons built from primitives, clear hierarchy. Must look professional and corporate. Return ONLY the SVG markup, nothing else.",
-                `Create an infographic for: ${modTitle}. Layout: ${layoutType}. Key points to visualise: ${topics.join(", ")}. Include the module title at the top in large bold text. Add a small 'ContentForge' label bottom-right in 10px muted text.`
+                `Create an infographic for: ${modTitle}. Layout: ${layoutType}. Key points to visualise: ${topics.join(", ")}. Include the module title at the top in large bold text. Add a small 'ContentForge' label bottom-right in 10px muted text. ${buildSlideLayoutInstruction(params?.slideLayout)}`
               );
               // Extract SVG from response
               const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i);

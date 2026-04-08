@@ -7,6 +7,11 @@ export interface CourseParameters {
   voiceAccent: string;
   duration: string;
   assessmentRequired: boolean;
+  slideLayout: {
+    maxLines: number;
+    minFontSize: number;
+    lineSpacing: number;
+  };
 }
 
 interface CourseParametersDialogProps {
@@ -61,6 +66,9 @@ const DURATIONS = [
   { value: "60min", label: "60 min", minutes: 60 },
 ];
 
+const MAX_LINE_OPTIONS = [8, 9, 10] as const;
+const LINE_SPACING_OPTIONS = [1.5, 2, 2.5] as const;
+
 // Map duration to YouTube video count
 export const DURATION_VIDEO_COUNT: Record<string, number> = {
   "3min": 3,
@@ -85,6 +93,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [voiceAccent, setVoiceAccent] = useState("Rachel");
   const [duration, setDuration] = useState("15min");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
+  const [maxLines, setMaxLines] = useState<CourseParameters["slideLayout"]["maxLines"]>(10);
+  const [minFontSize, setMinFontSize] = useState<CourseParameters["slideLayout"]["minFontSize"]>(12.5);
+  const [lineSpacing, setLineSpacing] = useState<CourseParameters["slideLayout"]["lineSpacing"]>(2);
   const [showMismatchWarning, setShowMismatchWarning] = useState(false);
   const [mismatchType, setMismatchType] = useState<"more" | "less">("more");
 
@@ -112,7 +123,14 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       setShowMismatchWarning(true);
       return;
     }
-    onConfirm({ level, language, voiceAccent, duration, assessmentRequired });
+    onConfirm({
+      level,
+      language,
+      voiceAccent,
+      duration,
+      assessmentRequired,
+      slideLayout: { maxLines, minFontSize, lineSpacing },
+    });
   };
 
   const handleProceedWithContent = () => {
@@ -122,12 +140,26 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     );
     setDuration(closest.value);
     setShowMismatchWarning(false);
-    onConfirm({ level, language, voiceAccent, duration: closest.value, assessmentRequired });
+    onConfirm({
+      level,
+      language,
+      voiceAccent,
+      duration: closest.value,
+      assessmentRequired,
+      slideLayout: { maxLines, minFontSize, lineSpacing },
+    });
   };
 
   const handleProceedWithSelected = () => {
     setShowMismatchWarning(false);
-    onConfirm({ level, language, voiceAccent, duration, assessmentRequired });
+    onConfirm({
+      level,
+      language,
+      voiceAccent,
+      duration,
+      assessmentRequired,
+      slideLayout: { maxLines, minFontSize, lineSpacing },
+    });
   };
 
   return (
@@ -276,6 +308,67 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   {d.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-4">
+            <div>
+              <p className="text-[13px] font-bold text-foreground">Slide Layout Rules</p>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Apply readability constraints during course generation and learner slide rendering.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-[12px] font-bold text-foreground mb-2 block">Max lines per slide</label>
+              <div className="flex flex-wrap gap-2">
+                {MAX_LINE_OPTIONS.map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => setMaxLines(value)}
+                    className={`h-9 px-4 rounded-full text-[13px] font-semibold border-2 transition-all ${
+                      maxLines === value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border text-foreground hover:border-primary/30"
+                    }`}
+                  >
+                    {value} lines
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-[12px] font-bold text-foreground mb-2 block">Minimum font size</label>
+                <input
+                  type="number"
+                  min={12.5}
+                  step={0.5}
+                  value={minFontSize}
+                  onChange={(e) => setMinFontSize(Math.max(12.5, Number(e.target.value) || 12.5))}
+                  className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="text-[12px] font-bold text-foreground mb-2 block">Line spacing</label>
+                <div className="flex flex-wrap gap-2">
+                  {LINE_SPACING_OPTIONS.map((value) => (
+                    <button
+                      key={value}
+                      onClick={() => setLineSpacing(value)}
+                      className={`h-10 px-3 rounded-xl text-[13px] font-semibold border-2 transition-all ${
+                        lineSpacing === value
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-foreground hover:border-primary/30"
+                      }`}
+                    >
+                      {value}x
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 

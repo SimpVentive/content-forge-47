@@ -352,9 +352,14 @@ interface LearnerPreviewProps {
   onClose: () => void;
   insertedVideos?: InsertedVideo[];
   courseDuration?: string;
+  slideLayout?: {
+    maxLines: number;
+    minFontSize: number;
+    lineSpacing: number;
+  };
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, slideLayout }) => {
   const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
   const [showPlacer, setShowPlacer] = useState(false);
   const [highlightEnabled, setHighlightEnabled] = useState(true);
@@ -365,6 +370,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   const unassignedCount = localVideos.filter(v => !v.moduleTitle).length;
   const activeHighlightPalette = HIGHLIGHT_PALETTES[highlightPalette];
+  const slideRules = {
+    maxLines: slideLayout?.maxLines ?? 10,
+    minFontSize: slideLayout?.minFontSize ?? 12.5,
+    lineSpacing: slideLayout?.lineSpacing ?? 2,
+  };
 
   const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, localVideos), [rawOutputs, localVideos]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -688,6 +698,24 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       case "content": {
         const parts = parseContentParts(slide.content || "");
         const moduleLabel = `MODULE ${slide.moduleIndex + 1} — ${slide.moduleTitle}`.toUpperCase();
+        const maxTextBlocks = Math.max(1, Math.floor(slideRules.maxLines / 2));
+        const reservedBlocks = [parts.hook, parts.takeaway, parts.challenge].filter(Boolean).length;
+        const visibleBodySlots = Math.max(1, maxTextBlocks - reservedBlocks);
+        const visibleBody = parts.body.slice(0, visibleBodySlots);
+        const contentTextStyle = {
+          fontSize: `${Math.max(14, slideRules.minFontSize)}px`,
+          lineHeight: slideRules.lineSpacing,
+        } as React.CSSProperties;
+        const supportingTextStyle = {
+          fontSize: `${Math.max(12.5, slideRules.minFontSize)}px`,
+          lineHeight: slideRules.lineSpacing,
+        } as React.CSSProperties;
+        const clampTwoLines = {
+          display: "-webkit-box",
+          WebkitBoxOrient: "vertical",
+          WebkitLineClamp: 2,
+          overflow: "hidden",
+        } as React.CSSProperties;
 
         // Collect all raw text in order to split into sentences
         const allRawText: string[] = [];
@@ -753,7 +781,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <div className="p-8">
                 {/* Module label */}
                 <p className="text-[11px] font-semibold tracking-[2px] mb-2 anim-fade-in-down"
-                  style={{ color: "#4f46e5" }}>
+                  style={{ color: "#4f46e5", fontSize: `${Math.max(12.5, slideRules.minFontSize)}px` }}>
                   {moduleLabel}
                 </p>
                 
@@ -778,17 +806,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       background: "hsl(var(--primary) / 0.06)",
                       animationDelay: "0.15s",
                     }}>
-                    <p className="text-[17px] leading-[1.8]" style={{ color: "#374151" }}>
+                    <p className="text-[17px]" style={{ color: "#374151", ...contentTextStyle, ...clampTwoLines }}>
                       {renderSentenceText(parts.hook)}
                     </p>
                   </div>
                 )}
 
                 {/* Body paragraphs with sentence-level highlight */}
-                {parts.body.map((para, pi) => (
+                {visibleBody.map((para, pi) => (
                   <div key={pi} className="mb-4 anim-fade-in-up">
-                    <p className="text-[17px] leading-[1.8]"
-                      style={{ color: "#374151", animationDelay: `${0.3 + pi * 0.15}s` }}>
+                    <p className="text-[17px]"
+                      style={{ color: "#374151", animationDelay: `${0.3 + pi * 0.15}s`, ...contentTextStyle, ...clampTwoLines }}>
                       {renderSentenceText(para)}
                     </p>
                   </div>
@@ -803,10 +831,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       animationDelay: "0.5s",
                     }}>
                     <p className="text-[11px] font-bold uppercase tracking-[1.5px] mb-1"
-                      style={{ color: "#d97706" }}>
+                      style={{ color: "#d97706", ...supportingTextStyle }}>
                       Key Takeaway
                     </p>
-                    <p className="text-[15px]" style={{ color: "#92400e" }}>
+                    <p className="text-[15px]" style={{ color: "#92400e", ...contentTextStyle, ...clampTwoLines }}>
                       {renderSentenceText(parts.takeaway)}
                     </p>
                   </div>
@@ -819,6 +847,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       color: "#6b7280",
                       borderTop: "1px solid #f1f5f9",
                       animationDelay: "0.6s",
+                      ...contentTextStyle,
+                      ...clampTwoLines,
                     }}>
                     {renderSentenceText(parts.challenge)}
                   </p>

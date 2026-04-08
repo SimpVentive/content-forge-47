@@ -15,6 +15,7 @@ const AVATAR_TEXT = "#3C3489";
 const BUBBLE_BG = "#EEEDFE";
 const BUBBLE_BORDER = "#AFA9EC";
 const BUBBLE_TEXT = "#26215C";
+const AVATAR_PULSE_ANIMATION = "avatarNarratorPulse 600ms ease-in-out infinite alternate";
 
 type RequestMode = "initial" | "example";
 
@@ -22,6 +23,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
   const [speechText, setSpeechText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasCompletedInitialResponse, setHasCompletedInitialResponse] = useState(false);
+  const [hasAvatarImage, setHasAvatarImage] = useState(true);
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const flushIntervalRef = useRef<number | null>(null);
@@ -174,12 +176,33 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
 
   return (
     <section className="flex w-full max-w-2xl flex-col gap-4">
+      <style>
+        {`@keyframes avatarNarratorPulse {
+          from {
+            transform: scale(1);
+          }
+
+          to {
+            transform: scale(1.03);
+          }
+        }`}
+      </style>
       <div className="flex items-center gap-4">
         <div
-          className="flex h-16 w-16 items-center justify-center rounded-full text-lg font-semibold"
+          className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 shadow-sm text-lg font-semibold"
           style={{ backgroundColor: AVATAR_BG, color: AVATAR_TEXT }}
         >
-          SC
+          {hasAvatarImage ? (
+            <img
+              src="/avatar-sarah.jpg"
+              alt="Sarah"
+              className="h-full w-full scale-110 object-cover object-top"
+              style={{ animation: isStreaming ? AVATAR_PULSE_ANIMATION : undefined }}
+              onError={() => setHasAvatarImage(false)}
+            />
+          ) : (
+            "SC"
+          )}
         </div>
         <div className="min-w-0">
           <p className="text-base font-semibold text-foreground">Sarah</p>
