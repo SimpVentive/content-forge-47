@@ -66,6 +66,7 @@ interface VideoClipWorkflowProps {
   language?: string;
   level?: string;
   duration?: string;
+  videoDurationHandling?: "within-course" | "additional-to-course";
   onComplete: (clips: ClipItem[]) => void;
   onSkip: () => void;
 }
@@ -474,7 +475,7 @@ const ClipPlayer: React.FC<{ clips: ClipItem[]; onClose: () => void }> = ({ clip
 /* ═══════════════════════════════════════
    MAIN WORKFLOW ORCHESTRATOR
    ═══════════════════════════════════════ */
-export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, moduleSections, courseTitle, language, level, duration, onComplete, onSkip }) => {
+export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, moduleSections, courseTitle, language, level, duration, videoDurationHandling = "within-course", onComplete, onSkip }) => {
   const [step, setStep] = useState<"ask" | "browse" | "clipRange" | "insertAnother" | "placeChoice" | "review" | "preview" | "done">("ask");
   const [clips, setClips] = useState<ClipItem[]>([]);
   const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
@@ -482,6 +483,7 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
   const [searchQ, setSearchQ] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [youtubeData, setYoutubeData] = useState(() => tryParseJSON(youtubeRaw));
+  const [refreshRound, setRefreshRound] = useState(0);
   const idCounter = useRef(0);
 
   const allModules: { module_title: string; videos: any[] }[] = youtubeData?.modules || [];
@@ -490,11 +492,14 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
     setRefreshing(true);
     try {
       const moduleNames = modules.length > 0 ? modules : [courseTitle];
+      const excludeVideoIds = (youtubeData?.modules || []).flatMap((module: any) => (module.videos || []).map((video: any) => video.videoId));
+      const nextRefreshRound = refreshRound + 1;
       const { data, error } = await supabase.functions.invoke("youtube-search", {
-        body: { modules: moduleNames, courseTitle, language, level, duration },
+        body: { modules: moduleNames, courseTitle, language, level, duration, refreshRound: nextRefreshRound, excludeVideoIds },
       });
       if (!error && data?.modules) {
         setYoutubeData(data);
+        setRefreshRound(nextRefreshRound);
       }
     } catch {}
     setRefreshing(false);
@@ -573,6 +578,7 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
         courseDuration={duration || "15min"}
         onUpdateClip={handleUpdateClip}
         onRemoveClip={handleRemoveClip}
+        videoDurationMode={videoDurationHandling}
         onFinish={() => { onComplete(clips); setStep("done"); }}
         onBack={() => setStep("browse")}
       />
@@ -600,6 +606,11 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
                 <Film className="w-5 h-5 text-destructive" /> Browse YouTube Videos
               </h2>
               <p className="text-[13px] text-muted-foreground mt-0.5">Click a video to play it, then select a clip range to insert</p>
+              <p className="text-[11px] font-semibold mt-1" style={{ color: videoDurationHandling === "within-course" ? "#7c2d12" : "#0f766e" }}>
+                {videoDurationHandling === "within-course"
+                  ? "Video watch-time counts inside the selected course duration."
+                  : "Video watch-time is additional and does not reduce the base course duration."}
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <button

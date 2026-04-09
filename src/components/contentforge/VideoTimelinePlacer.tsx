@@ -24,6 +24,7 @@ interface VideoTimelinePlacerProps {
   clips: ClipItem[];
   modules: ModuleBlock[];
   courseDuration: string; // e.g. "5min", "10min"
+  videoDurationMode?: "within-course" | "additional-to-course";
   onUpdateClip: (id: string, updates: Partial<ClipItem>) => void;
   onRemoveClip: (id: string) => void;
   onFinish: () => void;
@@ -62,7 +63,7 @@ function getClipDurationSec(clip: ClipItem): number {
 }
 
 export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
-  clips, modules, courseDuration, onUpdateClip, onRemoveClip, onFinish, onBack,
+  clips, modules, courseDuration, videoDurationMode = "within-course", onUpdateClip, onRemoveClip, onFinish, onBack,
 }) => {
   const [dragClipId, setDragClipId] = useState<string | null>(null);
   const [hoveredModule, setHoveredModule] = useState<string | null>(null);
@@ -76,26 +77,28 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
 
   // Check for duration warnings
   const warnings: { clipId: string; message: string }[] = [];
-  clips.forEach(clip => {
-    const clipSec = getClipDurationSec(clip);
-    if (clipSec > courseSec) {
+  if (videoDurationMode === "within-course") {
+    clips.forEach(clip => {
+      const clipSec = getClipDurationSec(clip);
+      if (clipSec > courseSec) {
+        warnings.push({
+          clipId: clip.id,
+          message: `"${clip.customName}" is ${formatSec(clipSec)} long but the course is only ${courseMinutes} min. This video exceeds the entire course duration!`,
+        });
+      } else if (clipSec > courseSec * 0.5) {
+        warnings.push({
+          clipId: clip.id,
+          message: `"${clip.customName}" (${formatSec(clipSec)}) takes over half of the ${courseMinutes}-min course. Consider trimming.`,
+        });
+      }
+    });
+
+    if (totalVideoSec > courseSec) {
       warnings.push({
-        clipId: clip.id,
-        message: `"${clip.customName}" is ${formatSec(clipSec)} long but the course is only ${courseMinutes} min. This video exceeds the entire course duration!`,
-      });
-    } else if (clipSec > courseSec * 0.5) {
-      warnings.push({
-        clipId: clip.id,
-        message: `"${clip.customName}" (${formatSec(clipSec)}) takes over half of the ${courseMinutes}-min course. Consider trimming.`,
+        clipId: "__total__",
+        message: `Total video content (${formatSec(totalVideoSec)}) exceeds the ${courseMinutes}-min course duration. Remove or trim some clips.`,
       });
     }
-  });
-
-  if (totalVideoSec > courseSec) {
-    warnings.push({
-      clipId: "__total__",
-      message: `Total video content (${formatSec(totalVideoSec)}) exceeds the ${courseMinutes}-min course duration. Remove or trim some clips.`,
-    });
   }
 
   // Unassigned clips
@@ -129,6 +132,11 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
           </h2>
           <p className="text-[13px] text-muted-foreground mt-1">
             Drag video clips to a module, or click a module's drop zone. Course duration: <strong>{courseMinutes} min</strong>
+          </p>
+          <p className="text-[12px] mt-2" style={{ color: videoDurationMode === "within-course" ? "#b45309" : "#0f766e" }}>
+            {videoDurationMode === "within-course"
+              ? "Placed videos count toward the learner's total course time."
+              : "Placed videos are additional enrichment and sit on top of the base course time."}
           </p>
         </div>
 
@@ -299,16 +307,18 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
               </p>
             </div>
             <div className={`text-[13px] font-bold px-3 py-1 rounded-full ${
-              totalVideoSec > courseSec
+              videoDurationMode === "within-course" && totalVideoSec > courseSec
                 ? "bg-amber-100 text-amber-700"
                 : totalVideoSec > 0
                 ? "bg-emerald-100 text-emerald-700"
                 : "bg-secondary text-muted-foreground"
             }`}>
-              {totalVideoSec > courseSec
+              {videoDurationMode === "within-course" && totalVideoSec > courseSec
                 ? `⚠ ${formatSec(totalVideoSec - courseSec)} over limit`
                 : totalVideoSec > 0
-                ? `✓ ${formatSec(courseSec - totalVideoSec)} remaining`
+                ? videoDurationMode === "within-course"
+                  ? `✓ ${formatSec(Math.max(courseSec - totalVideoSec, 0))} remaining`
+                  : `+ ${formatSec(totalVideoSec)} additional video time`
                 : "No videos placed"}
             </div>
           </div>
@@ -324,7 +334,7 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
           </button>
           <button
             onClick={() => {
-              if (warnings.some(w => w.clipId === "__total__" || clips.some(c => c.id === w.clipId && getClipDurationSec(c) > courseSec))) {
+              if (videoDurationMode === "within-course" && warnings.some(w => w.clipId === "__total__" || clips.some(c => c.id === w.clipId && getClipDurationSec(c) > courseSec))) {
                 if (!confirm("Some videos exceed the course duration. Are you sure you want to continue?")) return;
               }
               onFinish();

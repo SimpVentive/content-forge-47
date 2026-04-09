@@ -320,6 +320,9 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
   const [svg, setSvg] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [showZoomed, setShowZoomed] = useState(false);
+  const [explanation, setExplanation] = useState("");
+  const [explaining, setExplaining] = useState(false);
 
   const generateSvg = useCallback(async () => {
     if (svg || loading) return;
@@ -352,6 +355,35 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
     setExpanded(!expanded);
   };
 
+  const explainImage = useCallback(async () => {
+    if (explaining) return;
+    if (explanation) {
+      setExplanation("");
+      return;
+    }
+
+    setExplaining(true);
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error: fnErr } = await supabase.functions.invoke("claude", {
+        body: {
+          systemPrompt: "You explain infographics for workplace learners. Be concise, practical, and easy to scan. Return plain text with 3 short bullet-style lines: what the image shows, how to read it, and why it matters.",
+          userMessage: `Module: ${moduleTitle}\nInfographic description: ${description}`,
+        },
+      });
+
+      if (fnErr || data?.error) {
+        setExplanation(`What this image shows: ${description}\nHow to read it: follow the visual flow from left to right and connect each block to the learning journey.\nWhy it matters: it gives the learner a quick mental map before they go deeper into the topic.`);
+      } else {
+        setExplanation((data.text || "").trim() || `What this image shows: ${description}`);
+      }
+    } catch {
+      setExplanation(`What this image shows: ${description}\nHow to read it: follow the visual flow from left to right and connect each block to the learning journey.\nWhy it matters: it gives the learner a quick mental map before they go deeper into the topic.`);
+    } finally {
+      setExplaining(false);
+    }
+  }, [description, explanation, explaining, moduleTitle]);
+
   return (
     <div className="mb-6 rounded-2xl border border-border overflow-hidden anim-scale-in" style={{ animationDelay: "0.16s" }}>
       <button
@@ -374,14 +406,39 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
       </button>
       {expanded && (
         <div className="border-t border-border p-4" style={{ minHeight: 200 }}>
+          <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+            <button
+              onClick={explainImage}
+              disabled={explaining}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-primary/30 px-3 text-[12px] font-bold text-primary transition-all hover:bg-primary/5 disabled:opacity-60"
+              type="button"
+            >
+              {explaining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+              {explanation ? "Hide image explanation" : "Explain the image"}
+            </button>
+            <button
+              onClick={() => setShowZoomed(true)}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border px-3 text-[12px] font-bold text-foreground transition-all hover:bg-secondary"
+              type="button"
+            >
+              <ZoomIn className="h-3.5 w-3.5" /> Enlarge image
+            </button>
+          </div>
+
+          {explanation && (
+            <div className="mb-4 rounded-xl border border-primary/15 bg-primary/5 p-3 text-[12px] leading-relaxed text-foreground/85 whitespace-pre-line">
+              {explanation}
+            </div>
+          )}
+
           {loading ? (
-            <div className="flex items-center justify-center h-[200px]">
+            <div className="flex items-center justify-center h-[240px]">
               <Loader2 className="w-6 h-6 text-primary animate-spin" />
               <span className="ml-2 text-[13px] text-muted-foreground">Generating infographic…</span>
             </div>
           ) : svg ? (
             <div
-              className="w-full flex items-center justify-center overflow-hidden"
+              className="w-full flex items-center justify-center overflow-hidden rounded-xl bg-slate-50 p-3"
               dangerouslySetInnerHTML={{ __html: svg }}
             />
           ) : error ? (
@@ -394,6 +451,37 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
           ) : (
             <p className="text-[13px] text-muted-foreground leading-relaxed">{description}</p>
           )}
+        </div>
+      )}
+
+      {showZoomed && (
+        <div className="fixed inset-0 z-[10002] flex items-center justify-center" onClick={() => setShowZoomed(false)}>
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+          <div className="relative w-[min(1100px,94vw)] rounded-3xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[16px] font-bold text-foreground">{moduleTitle} infographic</p>
+                <p className="text-[12px] text-muted-foreground">Expanded for easier reading</p>
+              </div>
+              <button
+                onClick={() => setShowZoomed(false)}
+                className="inline-flex h-10 items-center rounded-xl border border-border px-4 text-[12px] font-bold text-foreground transition-all hover:bg-secondary"
+                type="button"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="max-h-[78vh] overflow-auto rounded-2xl border border-border bg-slate-50 p-4">
+              {svg ? (
+                <div className="mx-auto min-w-[760px] max-w-[960px]" dangerouslySetInnerHTML={{ __html: svg }} />
+              ) : (
+                <div className="flex min-h-[320px] items-center justify-center text-[13px] text-muted-foreground">
+                  Generate the infographic first, then enlarge it here.
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -802,34 +890,34 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
         return (
           <div className="mx-auto max-w-[1140px]" key={currentSlide}>
-            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
-              <div className="relative px-8 pt-12 pb-10 md:px-12 md:pt-16 md:pb-12"
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+              <div className="relative px-6 pt-8 pb-7 md:px-9 md:pt-10 md:pb-9"
                 style={{
                   background: "linear-gradient(180deg, #eef2f7 0%, #dde3ec 100%)",
                   borderRadius: "32px",
                   boxShadow: "0 24px 50px rgba(15,23,42,0.18)",
                 }}>
-                <div className="pointer-events-none absolute left-8 right-8 top-5 h-4 rounded-full md:left-12 md:right-12"
+                <div className="pointer-events-none absolute left-6 right-6 top-4 h-4 rounded-full md:left-9 md:right-9"
                   style={{ background: "linear-gradient(180deg, #d8dee7 0%, #a8b2c2 45%, #eef2f7 100%)", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.85), 0 2px 6px rgba(15,23,42,0.18)" }}
                 />
                 <div className="pointer-events-none absolute left-[18%] top-[10px] h-10 w-4 -translate-x-1/2 rounded-full border-2 border-[#505867] bg-[#f8fafc] md:left-[22%]" />
                 <div className="pointer-events-none absolute right-[18%] top-[10px] h-10 w-4 translate-x-1/2 rounded-full border-2 border-[#505867] bg-[#f8fafc] md:right-[22%]" />
-                <div className="relative overflow-hidden rounded-[8px] border border-[#d8deea] bg-white px-7 py-8 md:px-10 md:py-10"
+                <div className="relative overflow-hidden rounded-[8px] border border-[#d8deea] bg-white px-6 py-6 md:px-8 md:py-7"
                   style={{ boxShadow: "0 16px 30px rgba(15,23,42,0.08)" }}>
                   <div className="absolute inset-0 opacity-[0.22]"
                     style={{ backgroundImage: "linear-gradient(180deg, transparent 0, transparent 35px, #dbe4f0 36px)", backgroundSize: "100% 36px" }}
                   />
                   <div className="relative z-10">
-                    <p className="mb-3 text-[13px] font-extrabold uppercase tracking-[0.18em]"
+                    <p className="mb-2 text-[12px] font-extrabold uppercase tracking-[0.18em]"
                       style={{ color: "#355fa8" }}>
                       {moduleLabel}
                     </p>
-                    <h2 className="mb-7 text-[30px] font-[900] leading-tight"
+                    <h2 className="mb-5 text-[28px] font-[900] leading-tight"
                       style={{ color: "#123d78" }}>
                       {slide.topicTitle}
                     </h2>
 
-                    <div className="space-y-3">
+                    <div className="space-y-2.5">
                       {chartSentenceEntries.map((line, index) => {
                         const isActive = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 && line.sentenceIndex === highlightSentenceIdx;
 

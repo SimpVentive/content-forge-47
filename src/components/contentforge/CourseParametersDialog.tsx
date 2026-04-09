@@ -8,6 +8,7 @@ export interface CourseParameters {
   narratorLanguage: string;
   voiceAccent: string;
   duration: string;
+  videoDurationHandling: "within-course" | "additional-to-course";
   assessmentRequired: boolean;
   slideLayout: {
     maxLines: number;
@@ -95,6 +96,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [narratorLanguage, setNarratorLanguage] = useState("English");
   const [voiceAccent, setVoiceAccent] = useState("Rachel");
   const [duration, setDuration] = useState("15min");
+  const [videoDurationHandling, setVideoDurationHandling] = useState<CourseParameters["videoDurationHandling"]>("within-course");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
   const [maxLines, setMaxLines] = useState<CourseParameters["slideLayout"]["maxLines"]>(10);
   const [minFontSize, setMinFontSize] = useState<CourseParameters["slideLayout"]["minFontSize"]>(12.5);
@@ -133,6 +135,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       narratorLanguage,
       voiceAccent,
       duration,
+      videoDurationHandling,
       assessmentRequired,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
@@ -152,6 +155,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       narratorLanguage,
       voiceAccent,
       duration: closest.value,
+      videoDurationHandling,
       assessmentRequired,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
@@ -166,6 +170,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       narratorLanguage,
       voiceAccent,
       duration,
+      videoDurationHandling,
       assessmentRequired,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
@@ -331,6 +336,49 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   {d.label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
+            <div>
+              <p className="text-[13px] font-bold text-foreground">Video Time Handling</p>
+              <p className="text-[11px] font-medium text-foreground/70 mt-0.5">
+                Decide whether inserted YouTube clips should count inside the selected course duration or be added on top of it.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              <button
+                onClick={() => setVideoDurationHandling("within-course")}
+                className={`rounded-xl border-2 p-3 text-left transition-all ${
+                  videoDurationHandling === "within-course"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/30"
+                }`}
+              >
+                <p className={`text-[13px] font-bold ${videoDurationHandling === "within-course" ? "text-primary" : "text-foreground"}`}>
+                  Videos are part of the {selectedMinutes}-minute course
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                  Use this when the learner's total seat time must stay within the selected duration.
+                </p>
+              </button>
+
+              <button
+                onClick={() => setVideoDurationHandling("additional-to-course")}
+                className={`rounded-xl border-2 p-3 text-left transition-all ${
+                  videoDurationHandling === "additional-to-course"
+                    ? "border-primary bg-primary/10"
+                    : "border-border hover:border-primary/30"
+                }`}
+              >
+                <p className={`text-[13px] font-bold ${videoDurationHandling === "additional-to-course" ? "text-primary" : "text-foreground"}`}>
+                  Videos are extra, over and above the {selectedMinutes}-minute course
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                  Use this when videos are optional enrichment or should not reduce the base teaching time.
+                </p>
+              </button>
             </div>
           </div>
 

@@ -183,6 +183,7 @@ const Index = () => {
             language={courseParams?.textLanguage || courseParams?.language}
             level={courseParams?.level}
             duration={courseParams?.duration}
+            videoDurationHandling={courseParams?.videoDurationHandling}
             onComplete={(clips) => {
               setWorkflowClips(clips);
               setShowVideoWorkflow(false);

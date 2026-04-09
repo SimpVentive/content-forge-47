@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { modules, courseTitle, language, level, duration } = await req.json();
+    const { modules, courseTitle, language, level, duration, refreshRound = 0, excludeVideoIds = [] } = await req.json();
     const apiKey = Deno.env.get("Youtube_Learning");
 
     if (!apiKey) {
@@ -28,27 +28,54 @@ serve(async (req) => {
       "30min": 20, "45min": 30, "60min": 50,
     };
     const maxPerModule = Math.min(durationVideoMap[duration] || 20, 50);
+    const excludedIds = new Set<string>(Array.isArray(excludeVideoIds) ? excludeVideoIds : []);
 
     const results: any[] = [];
 
     for (const mod of modules) {
       const query = `${mod} ${courseTitle} ${language || ""} ${level || ""}`.trim();
-      const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
-      searchUrl.searchParams.set("key", apiKey);
-      searchUrl.searchParams.set("q", query);
-      searchUrl.searchParams.set("part", "snippet");
-      searchUrl.searchParams.set("type", "video");
-      searchUrl.searchParams.set("maxResults", String(maxPerModule));
-      searchUrl.searchParams.set("order", "relevance");
-      searchUrl.searchParams.set("videoEmbeddable", "true");
-      searchUrl.searchParams.set("safeSearch", "strict");
-      if (language && language !== "English") {
-        const langMap: Record<string, string> = { Hindi: "hi", Tamil: "ta", Telugu: "te", Kannada: "kn", Malayalam: "ml", Bengali: "bn", Marathi: "mr", Gujarati: "gu", Punjabi: "pa", Urdu: "ur" };
-        if (langMap[language]) searchUrl.searchParams.set("relevanceLanguage", langMap[language]);
-      }
+      let pageToken = "";
+      let searchData: any = { items: [] };
+      const maxAttempts = Math.max(3, Number(refreshRound) + 2);
 
-      const searchRes = await fetch(searchUrl.toString());
-      const searchData = await searchRes.json();
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const searchUrl = new URL("https://www.googleapis.com/youtube/v3/search");
+        searchUrl.searchParams.set("key", apiKey);
+        searchUrl.searchParams.set("q", query);
+        searchUrl.searchParams.set("part", "snippet");
+        searchUrl.searchParams.set("type", "video");
+        searchUrl.searchParams.set("maxResults", String(maxPerModule));
+        searchUrl.searchParams.set("order", "relevance");
+        searchUrl.searchParams.set("videoEmbeddable", "true");
+        searchUrl.searchParams.set("safeSearch", "strict");
+        if (pageToken) searchUrl.searchParams.set("pageToken", pageToken);
+        if (language && language !== "English") {
+          const langMap: Record<string, string> = { Hindi: "hi", Tamil: "ta", Telugu: "te", Kannada: "kn", Malayalam: "ml", Bengali: "bn", Marathi: "mr", Gujarati: "gu", Punjabi: "pa", Urdu: "ur" };
+          if (langMap[language]) searchUrl.searchParams.set("relevanceLanguage", langMap[language]);
+        }
+
+        const searchRes = await fetch(searchUrl.toString());
+        searchData = await searchRes.json();
+
+        if (searchData.error) {
+          if (searchData.error.errors?.[0]?.reason === "quotaExceeded") {
+            return new Response(
+              JSON.stringify({ error: "YouTube quota exceeded", quota_exceeded: true }),
+              { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+          }
+          throw new Error(searchData.error.message);
+        }
+
+        const candidateIds = (searchData.items || []).map((item: any) => item.id.videoId).filter((videoId: string) => videoId && !excludedIds.has(videoId));
+        const shouldAdvance = attempt < Number(refreshRound) || candidateIds.length < Math.min(maxPerModule, 3);
+
+        if (!shouldAdvance || !searchData.nextPageToken) {
+          break;
+        }
+
+        pageToken = searchData.nextPageToken;
+      }
 
       if (searchData.error) {
         if (searchData.error.errors?.[0]?.reason === "quotaExceeded") {
@@ -60,7 +87,7 @@ serve(async (req) => {
         throw new Error(searchData.error.message);
       }
 
-      const videoIds = (searchData.items || []).map((item: any) => item.id.videoId).filter(Boolean);
+      const videoIds = (searchData.items || []).map((item: any) => item.id.videoId).filter((videoId: string) => videoId && !excludedIds.has(videoId));
       
       if (videoIds.length === 0) {
         results.push({ module_title: mod, videos: [] });
@@ -85,7 +112,9 @@ serve(async (req) => {
         };
       }
 
-      const videos = (searchData.items || []).map((item: any) => {
+      const videos = (searchData.items || [])
+        .filter((item: any) => item.id?.videoId && !excludedIds.has(item.id.videoId))
+        .map((item: any) => {
         const stats = statsMap[item.id.videoId] || {};
         return {
           videoId: item.id.videoId,
