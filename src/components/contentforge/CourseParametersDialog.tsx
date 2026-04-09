@@ -229,8 +229,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
         {/* Header */}
         <div className="px-6 py-4 border-b border-border flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
-              <Settings2 className="w-4.5 h-4.5 text-white" />
+            <div className="w-11 h-11 rounded-full flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #0d7a5f, #1e3a5f)" }}>
+              <Settings2 className="w-5 h-5 text-white" />
             </div>
             <div>
               <h2 className="text-[17px] font-extrabold text-foreground">Course Parameters</h2>
