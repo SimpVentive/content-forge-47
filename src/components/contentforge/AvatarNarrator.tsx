@@ -16,6 +16,7 @@ const BUBBLE_BG = "#EEEDFE";
 const BUBBLE_BORDER = "#AFA9EC";
 const BUBBLE_TEXT = "#26215C";
 const AVATAR_PULSE_ANIMATION = "avatarNarratorPulse 600ms ease-in-out infinite alternate";
+const AVATAR_IDLE_ANIMATION = "avatarNarratorFloat 4.2s ease-in-out infinite";
 
 type RequestMode = "initial" | "example";
 
@@ -205,12 +206,44 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
           to {
             transform: scale(1.03);
           }
+        }
+
+        @keyframes avatarNarratorFloat {
+          0%, 100% {
+            transform: translateY(0px);
+          }
+
+          50% {
+            transform: translateY(-4px);
+          }
+        }
+
+        @keyframes avatarNarratorEnter {
+          0% {
+            opacity: 0;
+            transform: translateY(14px) scale(0.96);
+          }
+
+          100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
+        }
+
+        @keyframes bubbleGlow {
+          0%, 100% {
+            box-shadow: 0 10px 24px rgba(60, 52, 137, 0.08);
+          }
+
+          50% {
+            box-shadow: 0 14px 32px rgba(60, 52, 137, 0.16);
+          }
         }`}
       </style>
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
         <div
           className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 shadow-sm text-lg font-semibold"
-          style={{ backgroundColor: AVATAR_BG, color: AVATAR_TEXT }}
+          style={{ backgroundColor: AVATAR_BG, color: AVATAR_TEXT, animation: isStreaming ? undefined : AVATAR_IDLE_ANIMATION }}
         >
           {hasAvatarImage ? (
             <img
@@ -232,7 +265,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
 
       <div
         className="min-h-36 rounded-[24px] border px-5 py-4 text-sm leading-7 shadow-sm"
-        style={{ backgroundColor: BUBBLE_BG, borderColor: BUBBLE_BORDER, color: BUBBLE_TEXT }}
+        style={{ backgroundColor: BUBBLE_BG, borderColor: BUBBLE_BORDER, color: BUBBLE_TEXT, animation: `avatarNarratorEnter 480ms cubic-bezier(0.22, 1, 0.36, 1) both, ${isStreaming ? "bubbleGlow 1.8s ease-in-out infinite" : "none"}` }}
       >
         <p className="whitespace-pre-wrap break-words">
           {speechText}

@@ -597,6 +597,17 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
 
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+        <style>
+          {`@keyframes videoCardIn {
+            0% { opacity: 0; transform: translateY(14px) scale(0.98); }
+            100% { opacity: 1; transform: translateY(0) scale(1); }
+          }
+
+          @keyframes refreshPanelPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.76; }
+          }`}
+        </style>
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
         <div className="relative bg-card rounded-2xl shadow-2xl w-[750px] max-w-[95vw] max-h-[85vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
           {/* Header */}
@@ -649,7 +660,8 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
           </div>
 
           {/* Videos grid */}
-          <div className="flex-1 overflow-y-auto px-6 pb-5 space-y-4 mt-2">
+          <div className="flex-1 overflow-y-auto px-6 pb-5 space-y-4 mt-2"
+            style={{ animation: refreshing ? "refreshPanelPulse 700ms ease-in-out infinite" : undefined }}>
             {filteredMods.map((mod, mi) => {
               const vids = q ? mod.videos.filter((v: any) => v.title?.toLowerCase().includes(q)) : mod.videos;
               if (vids.length === 0) return null;
@@ -661,9 +673,10 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
                       const isAdded = clips.some(c => c.videoId === video.videoId);
                       return (
                         <div
-                          key={vi}
+                          key={`${video.videoId}-${refreshRound}`}
                           onClick={() => !isAdded && handleSelectVideo(video)}
                           className={`rounded-xl border overflow-hidden cursor-pointer transition-all hover:shadow-md ${isAdded ? "border-primary/40 opacity-60" : "border-border hover:border-primary/30"}`}
+                          style={{ animation: `videoCardIn 340ms cubic-bezier(0.22, 1, 0.36, 1) ${mi * 80 + vi * 35}ms both` }}
                         >
                           <div className="relative">
                             <img src={video.thumbnail} alt={video.title} className="w-full aspect-video object-cover" />

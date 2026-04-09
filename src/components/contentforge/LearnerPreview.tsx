@@ -405,7 +405,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
         </div>
       </button>
       {expanded && (
-        <div className="border-t border-border p-4" style={{ minHeight: 200 }}>
+        <div className="border-t border-border p-4" style={{ minHeight: 200, animation: "infographicExpandIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
           <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
             <button
               onClick={explainImage}
@@ -426,7 +426,8 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
           </div>
 
           {explanation && (
-            <div className="mb-4 rounded-xl border border-primary/15 bg-primary/5 p-3 text-[12px] leading-relaxed text-foreground/85 whitespace-pre-line">
+            <div className="mb-4 rounded-xl border border-primary/15 bg-primary/5 p-3 text-[12px] leading-relaxed text-foreground/85 whitespace-pre-line"
+              style={{ animation: "infographicExpandIn 260ms ease both" }}>
               {explanation}
             </div>
           )}
@@ -457,7 +458,9 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
       {showZoomed && (
         <div className="fixed inset-0 z-[10002] flex items-center justify-center" onClick={() => setShowZoomed(false)}>
           <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div className="relative w-[min(1100px,94vw)] rounded-3xl bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+          <div className="relative w-[min(1100px,94vw)] rounded-3xl bg-white p-5 shadow-2xl"
+            style={{ animation: "infographicZoomIn 240ms cubic-bezier(0.22, 1, 0.36, 1) both" }}
+            onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between gap-4">
               <div>
                 <p className="text-[16px] font-bold text-foreground">{moduleTitle} infographic</p>
@@ -922,7 +925,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         const isActive = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 && line.sentenceIndex === highlightSentenceIdx;
 
                         return (
-                        <div key={`${line.tone}-${index}`} className="flex items-start gap-3">
+                        <div key={`${line.tone}-${index}`} className="flex items-start gap-3"
+                          style={{ animation: `chartLineIn 360ms cubic-bezier(0.22, 1, 0.36, 1) ${120 + index * 55}ms both` }}>
                           <div className="mt-[0.72em] h-2.5 w-2.5 shrink-0 rounded-full"
                             style={{ background: line.tone === "takeaway" ? "#f59e0b" : line.tone === "challenge" ? "#7c3aed" : "#1d4ed8" }}
                           />
@@ -968,6 +972,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     background: "linear-gradient(180deg, rgba(79,70,229,0.1), rgba(124,58,237,0.04))",
                     borderColor: "rgba(99,102,241,0.22)",
                     boxShadow: "0 16px 36px rgba(79, 70, 229, 0.08)",
+                    animation: "guidePanelIn 480ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both",
                   }}
                 >
                   <div className="mb-4 flex items-center gap-3">
@@ -995,10 +1000,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 </div>
 
                 {slide.infographicSvg?.trim() && (
-                  <InfographicVisualAid
-                    description={slide.infographicSvg}
-                    moduleTitle={slide.moduleTitle}
-                  />
+                  <div style={{ animation: "infographicExpandIn 360ms cubic-bezier(0.22, 1, 0.36, 1) 180ms both" }}>
+                    <InfographicVisualAid
+                      description={slide.infographicSvg}
+                      moduleTitle={slide.moduleTitle}
+                    />
+                  </div>
                 )}
 
                 <div className="flex justify-end">
@@ -1172,6 +1179,26 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         @keyframes sheetFlipBackward {
           0% { opacity: 0; transform: perspective(1800px) rotateX(-10deg) rotateY(-14deg) translateY(26px) scale(0.985); transform-origin: top center; }
           100% { opacity: 1; transform: perspective(1800px) rotateX(0deg) rotateY(0deg) translateY(0) scale(1); transform-origin: top center; }
+        }
+
+        @keyframes chartLineIn {
+          0% { opacity: 0; transform: translateY(10px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes guidePanelIn {
+          0% { opacity: 0; transform: translateX(18px) scale(0.98); }
+          100% { opacity: 1; transform: translateX(0) scale(1); }
+        }
+
+        @keyframes infographicExpandIn {
+          0% { opacity: 0; transform: translateY(10px) scale(0.98); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes infographicZoomIn {
+          0% { opacity: 0; transform: translateY(20px) scale(0.96); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
         }`}
       </style>
       {/* TOP BAR */}
