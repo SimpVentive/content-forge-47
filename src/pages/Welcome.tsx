@@ -26,8 +26,8 @@ const Welcome = () => {
   const [introStage, setIntroStage] = useState<"intro" | "settling" | "done">("intro");
 
   useEffect(() => {
-    const settleTimer = window.setTimeout(() => setIntroStage("settling"), 1250);
-    const doneTimer = window.setTimeout(() => setIntroStage("done"), 2350);
+    const settleTimer = window.setTimeout(() => setIntroStage("settling"), 6500);
+    const doneTimer = window.setTimeout(() => setIntroStage("done"), 7300);
 
     return () => {
       window.clearTimeout(settleTimer);
@@ -38,28 +38,42 @@ const Welcome = () => {
   return (
     <div className="min-h-screen bg-background flex flex-col">
       <style>
-        {`@keyframes welcomeLogoIn {
-          0% { opacity: 0; transform: translateY(22px) scale(0.84); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
+        {`@keyframes logoSurge {
+          0%   { opacity: 0; transform: scale(0.18) rotate(-6deg); filter: blur(10px); }
+          55%  { opacity: 1; transform: scale(1.13) rotate(1.5deg); filter: blur(0); }
+          75%  { transform: scale(0.96) rotate(-0.3deg); }
+          100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
         }
 
-        @keyframes welcomeWordmarkIn {
-          0% { opacity: 0; transform: translateY(28px); letter-spacing: 0.08em; }
-          100% { opacity: 1; transform: translateY(0); letter-spacing: 0; }
+        @keyframes logoGlow {
+          0%, 100% { box-shadow: 0 28px 60px rgba(30, 58, 95, 0.18); }
+          50%       { box-shadow: 0 36px 80px rgba(30, 58, 95, 0.38), 0 0 56px rgba(14, 116, 144, 0.25); }
+        }
+
+        @keyframes wordmarkExpand {
+          0%   { opacity: 0; transform: scale(0.28); letter-spacing: -0.14em; filter: blur(4px); }
+          50%  { opacity: 1; transform: scale(1.07); letter-spacing: 0.04em; filter: blur(0); }
+          72%  { transform: scale(0.98); letter-spacing: -0.004em; }
+          100% { opacity: 1; transform: scale(1); letter-spacing: 0; filter: blur(0); }
+        }
+
+        @keyframes taglineReveal {
+          0%   { opacity: 0; transform: translateY(12px); }
+          100% { opacity: 0.7; transform: translateY(0); }
         }
 
         @keyframes welcomeStageExit {
-          0% { opacity: 1; }
-          100% { opacity: 0; visibility: hidden; }
+          0%   { opacity: 1; }
+          100% { opacity: 0; pointer-events: none; }
         }
 
         @keyframes welcomeHeroReveal {
-          0% { opacity: 0; transform: translateY(16px); }
+          0%   { opacity: 0; transform: translateY(16px); }
           100% { opacity: 1; transform: translateY(0); }
         }
 
         @keyframes welcomeCornerLogo {
-          0% { opacity: 0; transform: translateY(-10px) scale(0.9); }
+          0%   { opacity: 0; transform: translateY(-10px) scale(0.9); }
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }`}
       </style>
@@ -68,28 +82,33 @@ const Welcome = () => {
           className="fixed inset-0 z-40 flex items-center justify-center"
           style={{
             background: "linear-gradient(180deg, #f8fafc 0%, #edf3fb 100%)",
-            animation: introStage === "settling" ? "welcomeStageExit 780ms ease forwards" : undefined,
+            animation: introStage === "settling" ? "welcomeStageExit 700ms ease forwards" : undefined,
           }}
         >
           <div className="flex flex-col items-center text-center">
             <div
-              className="mb-7 flex h-36 w-36 items-center justify-center rounded-[34px] border shadow-2xl"
+              className="mb-8 flex h-36 w-36 items-center justify-center rounded-[34px] border"
               style={{
                 background: "linear-gradient(180deg, rgba(255,255,255,0.99), rgba(241,245,249,0.97))",
                 borderColor: "rgba(148,163,184,0.2)",
-                boxShadow: "0 28px 60px rgba(30, 58, 95, 0.18)",
-                animation: "welcomeLogoIn 760ms cubic-bezier(0.22, 1, 0.36, 1) both",
+                animation: "logoSurge 900ms cubic-bezier(0.34, 1.56, 0.64, 1) both, logoGlow 2.8s ease-in-out 1100ms infinite",
               }}
             >
               <img src={contentForgeLogo} alt="ContentForge" className="h-24 w-24 object-contain" />
             </div>
             <h1
-              className="text-[56px] font-[900] tracking-tight leading-none"
-              style={{ animation: "welcomeWordmarkIn 820ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both" }}
+              className="text-[64px] font-[900] tracking-tight leading-none"
+              style={{ animation: "wordmarkExpand 1100ms cubic-bezier(0.34, 1.56, 0.64, 1) 200ms both" }}
             >
               <span className="text-[#1e3a5f]">Content</span>
               <span className="text-[#b8860b]" style={{ textShadow: "0 1px 3px rgba(184,134,11,0.3)" }}>Forge</span>
             </h1>
+            <p
+              className="mt-5 text-[16px] font-medium tracking-wide"
+              style={{ color: "#4a6080", animation: "taglineReveal 700ms ease 1500ms both" }}
+            >
+              AI-Powered eLearning Course Generator
+            </p>
           </div>
         </div>
       )}
