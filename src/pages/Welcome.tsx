@@ -24,6 +24,7 @@ const features = [
 const Welcome = () => {
   const navigate = useNavigate();
   const [introStage, setIntroStage] = useState<"intro" | "settling" | "done">("intro");
+  const displayFont = '"Manrope", "Plus Jakarta Sans", sans-serif';
 
   useEffect(() => {
     const settleTimer = window.setTimeout(() => setIntroStage("settling"), 6500);
@@ -98,13 +99,13 @@ const Welcome = () => {
             </div>
             <h1
               className="text-[64px] font-[900] tracking-tight leading-none"
-              style={{ animation: "wordmarkExpand 1100ms cubic-bezier(0.34, 1.56, 0.64, 1) 200ms both" }}
+              style={{ animation: "wordmarkExpand 1100ms cubic-bezier(0.34, 1.56, 0.64, 1) 200ms both", fontFamily: displayFont }}
             >
               <span className="text-[#1e3a5f]">Content</span>
               <span className="text-[#b8860b]" style={{ textShadow: "0 1px 3px rgba(184,134,11,0.3)" }}>Forge</span>
             </h1>
             <p
-              className="mt-5 text-[16px] font-medium tracking-wide"
+              className="mt-5 text-[17px] font-semibold tracking-[0.02em]"
               style={{ color: "#4a6080", animation: "taglineReveal 700ms ease 1500ms both" }}
             >
               AI-Powered eLearning Course Generator
@@ -147,17 +148,20 @@ const Welcome = () => {
           className="relative max-w-5xl mx-auto px-6 pt-20 pb-20 text-center"
           style={{ animation: introStage === "done" ? "welcomeHeroReveal 620ms cubic-bezier(0.22, 1, 0.36, 1) both" : undefined, opacity: introStage === "done" ? 1 : 0 }}
         >
-          <h1 className="text-[48px] font-[900] tracking-tight leading-tight mb-2">
+          <h1 className="mb-3 text-[52px] font-[900] leading-[1.02] tracking-tight md:text-[58px]"
+            style={{ fontFamily: displayFont }}>
             <span className="text-[#1e3a5f]">Content</span>
             <span className="text-[#b8860b]" style={{ textShadow: "0 1px 3px rgba(184,134,11,0.3)" }}>Forge</span>
           </h1>
-          <p className="text-[18px] text-muted-foreground max-w-xl mx-auto mb-8 leading-relaxed">
+          <p className="mx-auto mb-10 max-w-2xl text-[20px] font-medium leading-[1.75]"
+            style={{ color: "#536a87" }}>
             Transform your raw content into polished, LMS-ready eLearning courses in minutes — powered by a multi-agent AI pipeline.
           </p>
           <div className="flex items-center justify-center gap-4">
             <button
               onClick={() => navigate("/studio")}
-              className="h-14 px-8 rounded-xl text-[16px] font-bold text-primary-foreground bg-primary shadow-lg hover:brightness-110 transition-all flex items-center gap-2"
+              className="h-14 rounded-xl bg-primary px-8 text-[16px] font-extrabold text-primary-foreground shadow-lg transition-all hover:brightness-110 flex items-center gap-2"
+              style={{ fontFamily: displayFont }}
             >
               <Sparkles className="w-5 h-5" />
               Start Creating
@@ -165,7 +169,8 @@ const Welcome = () => {
             </button>
             <button
               onClick={() => navigate("/help")}
-              className="h-14 px-8 rounded-xl text-[16px] font-bold text-foreground border-2 border-border hover:border-primary/40 hover:bg-secondary transition-all flex items-center gap-2"
+              className="h-14 rounded-xl border-2 border-border px-8 text-[16px] font-extrabold text-foreground transition-all hover:border-primary/40 hover:bg-secondary flex items-center gap-2"
+              style={{ fontFamily: displayFont }}
             >
               <HelpCircle className="w-5 h-5" />
               How It Works
@@ -176,7 +181,8 @@ const Welcome = () => {
 
       {/* Features Grid */}
       <div className="max-w-5xl mx-auto px-6 pb-20">
-        <h2 className="text-[24px] font-extrabold text-foreground text-center mb-10">
+        <h2 className="mb-10 text-center text-[28px] font-extrabold text-foreground md:text-[32px]"
+          style={{ fontFamily: displayFont }}>
           Everything you need to build world-class courses
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -185,8 +191,10 @@ const Welcome = () => {
               <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center mb-4 group-hover:bg-primary/15 transition-colors">
                 <f.icon className="w-5 h-5 text-primary" />
               </div>
-              <h3 className="text-[15px] font-bold text-foreground mb-1.5">{f.title}</h3>
-              <p className="text-[13px] text-muted-foreground leading-relaxed">{f.desc}</p>
+              <h3 className="mb-2 text-[18px] font-extrabold text-foreground"
+                style={{ fontFamily: displayFont }}>{f.title}</h3>
+              <p className="text-[15px] leading-[1.8]"
+                style={{ color: "#5d7089" }}>{f.desc}</p>
             </div>
           ))}
         </div>
@@ -195,7 +203,8 @@ const Welcome = () => {
       {/* How it works */}
       <div className="bg-secondary/30 border-t border-border">
         <div className="max-w-5xl mx-auto px-6 py-16">
-          <h2 className="text-[24px] font-extrabold text-foreground text-center mb-10">How It Works</h2>
+          <h2 className="mb-10 text-center text-[28px] font-extrabold text-foreground md:text-[32px]"
+            style={{ fontFamily: displayFont }}>How It Works</h2>
           <div className="flex flex-col md:flex-row gap-6">
             {[
               { step: "1", title: "Upload Your Content", desc: "Paste notes, upload a PDF, or type your course topic. Our Research Agent extracts key themes and learning objectives." },
@@ -206,8 +215,10 @@ const Welcome = () => {
                 <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground font-extrabold text-[18px] flex items-center justify-center mx-auto mb-4">
                   {s.step}
                 </div>
-                <h3 className="text-[15px] font-bold text-foreground mb-2">{s.title}</h3>
-                <p className="text-[13px] text-muted-foreground leading-relaxed">{s.desc}</p>
+                <h3 className="mb-2 text-[18px] font-extrabold text-foreground"
+                  style={{ fontFamily: displayFont }}>{s.title}</h3>
+                <p className="text-[15px] leading-[1.8]"
+                  style={{ color: "#5d7089" }}>{s.desc}</p>
               </div>
             ))}
           </div>
@@ -215,7 +226,8 @@ const Welcome = () => {
       </div>
 
       {/* Footer */}
-      <footer className="py-8 text-center text-[12px] text-muted-foreground border-t border-border">
+      <footer className="border-t border-border py-8 text-center text-[14px] font-medium"
+        style={{ color: "#667b94" }}>
         ContentForge — AI-Powered eLearning Course Generator
       </footer>
     </div>
