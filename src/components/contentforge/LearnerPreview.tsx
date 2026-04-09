@@ -780,60 +780,25 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           overflow: "hidden",
         } as React.CSSProperties;
 
-        // Collect all raw text in order to split into sentences
-        const allRawText: string[] = [];
-        if (parts.hook) allRawText.push(parts.hook);
-        parts.body.forEach(p => allRawText.push(p));
-        if (parts.takeaway) allRawText.push(parts.takeaway);
-        if (parts.challenge) allRawText.push(parts.challenge);
+        const normalizedNarrationSentences = narrationSentences.map((sentence) => stripNarratorMarkdown(sentence));
+        let narrationCursor = 0;
+        const chartSentenceEntries = chartLines.map((line, index) => {
+          const normalizedLine = stripNarratorMarkdown(line.text);
+          let sentenceIndex = -1;
 
-        const fullText = allRawText.join(" ");
-        const allSentences = fullText.match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(Boolean) || [fullText];
-
-        // Render text as sentence spans with per-sentence highlighting
-        const renderSentenceText = (text: string) => {
-          const blockSentences = text.match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(Boolean) || [text];
-          return blockSentences.map((sentence, si) => {
-            // Find global sentence index
-            const globalIdx = allSentences.findIndex((s, gi) => {
-              // Match by content - find first unmatched occurrence
-              return s === sentence && !allSentences.slice(0, gi).filter(prev => prev === sentence).length || s === sentence;
-            });
-            // More robust: find by accumulating
-            let gIdx = -1;
-            let searchFrom = 0;
-            // Walk through all raw text blocks to find the position
-            for (let bi = 0; bi < allRawText.length; bi++) {
-              const blockSents = allRawText[bi].match(/[^.!?]+[.!?]+/g)?.map(s => s.trim()).filter(Boolean) || [allRawText[bi]];
-              for (let bsi = 0; bsi < blockSents.length; bsi++) {
-                if (allRawText[bi] === text && bsi === si) {
-                  gIdx = searchFrom;
-                }
-                searchFrom++;
-              }
-              if (gIdx >= 0) break;
+          for (let i = narrationCursor; i < normalizedNarrationSentences.length; i++) {
+            if (normalizedNarrationSentences[i] === normalizedLine) {
+              sentenceIndex = i;
+              narrationCursor = i + 1;
+              break;
             }
+          }
 
-            const isActive = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 && gIdx === highlightSentenceIdx;
-
-            return (
-              <span
-                key={si}
-                style={{
-                  padding: "2px 4px",
-                  borderRadius: "6px",
-                  transition: "background 0.25s ease, box-shadow 0.25s ease",
-                  ...(isActive ? {
-                    background: activeHighlightPalette.background,
-                    boxShadow: `inset 4px 0 0 ${activeHighlightPalette.border}`,
-                  } : {}),
-                }}
-              >
-                {sentence}{" "}
-              </span>
-            );
-          });
-        };
+          return {
+            ...line,
+            sentenceIndex: sentenceIndex >= 0 ? sentenceIndex : index,
+          };
+        });
 
         return (
           <div className="mx-auto max-w-[1140px]" key={currentSlide}>
@@ -865,7 +830,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </h2>
 
                     <div className="space-y-3">
-                      {chartLines.map((line, index) => (
+                      {chartSentenceEntries.map((line, index) => {
+                        const isActive = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 && line.sentenceIndex === highlightSentenceIdx;
+
+                        return (
                         <div key={`${line.tone}-${index}`} className="flex items-start gap-3">
                           <div className="mt-[0.72em] h-2.5 w-2.5 shrink-0 rounded-full"
                             style={{ background: line.tone === "takeaway" ? "#f59e0b" : line.tone === "challenge" ? "#7c3aed" : "#1d4ed8" }}
@@ -873,20 +841,36 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           <p
                             className="font-[700] tracking-[0.01em]"
                             style={{
-                              color: line.tone === "takeaway" ? "#92400e" : line.tone === "challenge" ? "#5b21b6" : line.tone === "lead" ? "#1e3a8a" : "#2c5ea5",
+                              color: isActive
+                                ? activeHighlightPalette.foreground
+                                : line.tone === "takeaway"
+                                  ? "#92400e"
+                                  : line.tone === "challenge"
+                                    ? "#5b21b6"
+                                    : line.tone === "lead"
+                                      ? "#1e3a8a"
+                                      : "#2c5ea5",
                               ...contentTextStyle,
                               ...clampSingleLine,
+                              padding: "2px 8px",
+                              borderRadius: "10px",
+                              transition: "background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease",
+                              ...(isActive
+                                ? {
+                                    background: activeHighlightPalette.background,
+                                    boxShadow: `inset 4px 0 0 ${activeHighlightPalette.border}`,
+                                  }
+                                : {}),
                             }}
                           >
                             {line.text}
                           </p>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 </div>
-                <div className="pointer-events-none absolute bottom-0 left-[14%] h-28 w-2 rotate-[6deg] rounded-full bg-[#23272f] md:left-[20%]" />
-                <div className="pointer-events-none absolute bottom-0 right-[14%] h-28 w-2 -rotate-[6deg] rounded-full bg-[#23272f] md:right-[20%]" />
               </div>
 
               <div className="space-y-5">
