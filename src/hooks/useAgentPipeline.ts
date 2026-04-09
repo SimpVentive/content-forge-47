@@ -62,7 +62,10 @@ export function useAgentPipeline() {
     setAgentStatuses((prev) => ({ ...prev, [id]: status }));
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; slideLayout?: SlideLayoutParams }) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; slideLayout?: SlideLayoutParams }) => {
+    const textLanguage = params?.textLanguage || params?.language || "English";
+    const narratorLanguage = params?.narratorLanguage || textLanguage;
+
     cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
@@ -77,7 +80,7 @@ export function useAgentPipeline() {
       setAgentStatuses((prev) => ({ ...prev, [id]: "queued" as AgentStatus }));
     });
 
-    addLog(`Orchestrator: Pipeline initiated for '${courseTitle}' (${params?.level || "intermediate"}, ${params?.language || "English"}, ${params?.duration || "15min"})`);
+    addLog(`Orchestrator: Pipeline initiated for '${courseTitle}' (${params?.level || "intermediate"}, text: ${textLanguage}, voice: ${narratorLanguage}, ${params?.duration || "15min"})`);
 
     let researchResult = "";
     let archResult = "";
@@ -95,7 +98,7 @@ export function useAgentPipeline() {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
         researchResult = await callClaudeWithRetry(
-          `You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract key themes, credible knowledge areas, and suggest learning objectives — ALL directly derived from the provided source material. Course level: ${params?.level || "intermediate"}. Language: ${params?.language || "English"}. CRITICAL — Target duration is ${params?.duration || "15min"}. You MUST scale the depth and breadth of content to fill this entire duration. For a ${params?.duration || "15min"} course, generate proportionally more objectives and themes. Return as JSON.`,
+          `You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract key themes, credible knowledge areas, and suggest learning objectives — ALL directly derived from the provided source material. Course level: ${params?.level || "intermediate"}. Language for on-screen text: ${textLanguage}. CRITICAL — Target duration is ${params?.duration || "15min"}. You MUST scale the depth and breadth of content to fill this entire duration. For a ${params?.duration || "15min"} course, generate proportionally more objectives and themes. Return as JSON.`,
           `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content. Target duration: ${params?.duration || "15min"} — scale content accordingly.`,
           addLog, "Research Agent"
         );
@@ -394,8 +397,8 @@ Write content that would make a learner lean forward, not lean back.`;
         setStatus("voice", "running");
         addLog("Voice Agent: Reformatting script for narration...");
         voiceResult = await callClaudeWithRetry(
-          'You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at 130 words per minute. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }',
-          `Script:\n${writerResult}`,
+          `You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at 130 words per minute. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }`,
+          `Script:\n${writerResult}\n\nOn-screen text language: ${textLanguage}\nNarrator language: ${narratorLanguage}`,
           addLog, "Voice Agent"
         );
         setStatus("voice", "complete");

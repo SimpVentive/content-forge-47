@@ -180,7 +180,7 @@ const Index = () => {
             modules={getModuleNames()}
             moduleSections={getModuleSections()}
             courseTitle={courseTitle}
-            language={courseParams?.language}
+            language={courseParams?.textLanguage || courseParams?.language}
             level={courseParams?.level}
             duration={courseParams?.duration}
             onComplete={(clips) => {

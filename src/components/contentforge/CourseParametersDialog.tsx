@@ -4,6 +4,8 @@ import { X, Settings2, AlertTriangle } from "lucide-react";
 export interface CourseParameters {
   level: "basic" | "intermediate" | "advanced";
   language: string;
+  textLanguage: string;
+  narratorLanguage: string;
   voiceAccent: string;
   duration: string;
   assessmentRequired: boolean;
@@ -89,7 +91,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   open, courseTitle, estimatedMinutes, onConfirm, onCancel,
 }) => {
   const [level, setLevel] = useState<CourseParameters["level"]>("intermediate");
-  const [language, setLanguage] = useState("English");
+  const [textLanguage, setTextLanguage] = useState("English");
+  const [narratorLanguage, setNarratorLanguage] = useState("English");
   const [voiceAccent, setVoiceAccent] = useState("Rachel");
   const [duration, setDuration] = useState("15min");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
@@ -125,7 +128,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     }
     onConfirm({
       level,
-      language,
+      language: textLanguage,
+      textLanguage,
+      narratorLanguage,
       voiceAccent,
       duration,
       assessmentRequired,
@@ -142,7 +147,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     setShowMismatchWarning(false);
     onConfirm({
       level,
-      language,
+      language: textLanguage,
+      textLanguage,
+      narratorLanguage,
       voiceAccent,
       duration: closest.value,
       assessmentRequired,
@@ -154,7 +161,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     setShowMismatchWarning(false);
     onConfirm({
       level,
-      language,
+      language: textLanguage,
+      textLanguage,
+      narratorLanguage,
       voiceAccent,
       duration,
       assessmentRequired,
@@ -256,32 +265,46 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
           </div>
 
-          {/* Language */}
-          <div>
-            <label className="text-[13px] font-bold text-foreground mb-1.5 block">Course Language</label>
-            <select
-              value={language}
-              onChange={(e) => setLanguage(e.target.value)}
-              className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
-            >
-              {LANGUAGES.map((l) => (
-                <option key={l.value} value={l.value}>{l.label}</option>
-              ))}
-            </select>
-          </div>
+          <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
+            <div>
+              <label className="text-[13px] font-bold text-foreground mb-1.5 block">For Text on Screen</label>
+              <p className="text-[11px] text-muted-foreground mb-2">Choose the language used for slide content and written course material.</p>
+              <select
+                value={textLanguage}
+                onChange={(e) => setTextLanguage(e.target.value)}
+                className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.value} value={l.value}>{l.label}</option>
+                ))}
+              </select>
+            </div>
 
-          {/* Voice Accent */}
-          <div>
-            <label className="text-[13px] font-bold text-foreground mb-1.5 block">Narration Voice</label>
-            <select
-              value={voiceAccent}
-              onChange={(e) => setVoiceAccent(e.target.value)}
-              className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
-            >
-              {VOICE_ACCENTS.map((v) => (
-                <option key={v.value} value={v.value}>{v.label}</option>
-              ))}
-            </select>
+            <div>
+              <label className="text-[13px] font-bold text-foreground mb-1.5 block">For Voice of Narrator</label>
+              <p className="text-[11px] text-muted-foreground mb-2">Choose the spoken language for narration, then select the narrator voice.</p>
+              <div className="space-y-3">
+                <select
+                  value={narratorLanguage}
+                  onChange={(e) => setNarratorLanguage(e.target.value)}
+                  className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                >
+                  {LANGUAGES.map((l) => (
+                    <option key={l.value} value={l.value}>{l.label}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={voiceAccent}
+                  onChange={(e) => setVoiceAccent(e.target.value)}
+                  className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                >
+                  {VOICE_ACCENTS.map((v) => (
+                    <option key={v.value} value={v.value}>{v.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
           {/* Duration */}

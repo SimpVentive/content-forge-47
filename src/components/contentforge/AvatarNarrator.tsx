@@ -19,8 +19,17 @@ const AVATAR_PULSE_ANIMATION = "avatarNarratorPulse 600ms ease-in-out infinite a
 
 type RequestMode = "initial" | "example";
 
+function buildDefaultSpeech(topic: string, moduleContent: string) {
+  const preview = moduleContent.trim();
+  if (!preview) {
+    return `Click Explain this and Sarah will walk you through ${topic}.`;
+  }
+
+  return `Click Explain this and Sarah will break down ${topic}. Quick preview: ${preview}`;
+}
+
 export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarratorProps) {
-  const [speechText, setSpeechText] = useState("");
+  const [speechText, setSpeechText] = useState(() => buildDefaultSpeech(topic, moduleContent));
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasCompletedInitialResponse, setHasCompletedInitialResponse] = useState(false);
   const [hasAvatarImage, setHasAvatarImage] = useState(true);
@@ -166,6 +175,17 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
       }
     }
   };
+
+  useEffect(() => {
+    setSpeechText(buildDefaultSpeech(topic, moduleContent));
+    setHasCompletedInitialResponse(false);
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    queuedCharactersRef.current = [];
+    pendingCompletionModeRef.current = null;
+    stopFlushLoop();
+    setIsStreaming(false);
+  }, [topic, moduleContent]);
 
   useEffect(() => {
     return () => {

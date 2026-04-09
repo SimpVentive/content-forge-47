@@ -4,6 +4,7 @@ import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
 import { HIGHLIGHT_PALETTES, PreviewActionBar, type HighlightPalette } from "./PreviewActionBar";
+import { AvatarNarrator } from "./AvatarNarrator";
 
 /* ── helpers ── */
 function tryParseJSON(raw: string): any | null {
@@ -42,6 +43,25 @@ function getInfographicDescription(visualModule: any, module: Module): string {
   ].find((value): value is string => typeof value === "string" && value.trim().length > 0);
 
   return candidate?.trim() || buildFallbackInfographicText(module);
+}
+
+function stripNarratorMarkdown(text: string): string {
+  return text
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .replace(/\*(.*?)\*/g, "$1")
+    .replace(/`(.*?)`/g, "$1")
+    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getNarratorExcerpt(text: string, sentenceCount = 3): string {
+  const normalized = stripNarratorMarkdown(text);
+  if (!normalized) return "";
+
+  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`’”]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+  return sentences.slice(0, sentenceCount).join(" ");
 }
 
 type SlideType = "title" | "content" | "assessment" | "summary" | "video";
@@ -698,6 +718,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       case "content": {
         const parts = parseContentParts(slide.content || "");
         const moduleLabel = `MODULE ${slide.moduleIndex + 1} — ${slide.moduleTitle}`.toUpperCase();
+        const narratorSource = [parts.hook, ...parts.body].filter(Boolean).join(" ");
+        const narratorExcerpt = getNarratorExcerpt(narratorSource || slide.content || "");
         const maxTextBlocks = Math.max(1, Math.floor(slideRules.maxLines / 2));
         const reservedBlocks = [parts.hook, parts.takeaway, parts.challenge].filter(Boolean).length;
         const visibleBodySlots = Math.max(1, maxTextBlocks - reservedBlocks);
@@ -790,6 +812,40 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   style={{ color: "#0f172a", animationDelay: "0.1s" }}>
                   {slide.topicTitle}
                 </h2>
+
+                <div className="mb-6 anim-fade-in-up" style={{ animationDelay: "0.12s" }}>
+                  <div
+                    className="rounded-[28px] border p-5 shadow-sm"
+                    style={{
+                      background: "linear-gradient(180deg, rgba(79,70,229,0.08), rgba(124,58,237,0.03))",
+                      borderColor: "rgba(99,102,241,0.18)",
+                      boxShadow: "0 16px 36px rgba(79, 70, 229, 0.08)",
+                    }}
+                  >
+                    <div className="mb-4 flex items-center gap-3">
+                      <div
+                        className="flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-bold"
+                        style={{ background: "rgba(79,70,229,0.14)", color: "#4f46e5" }}
+                      >
+                        S
+                      </div>
+                      <div>
+                        <p className="text-[13px] font-bold uppercase tracking-[0.16em]" style={{ color: "#4f46e5" }}>
+                          Sarah's Guide
+                        </p>
+                        <p className="text-[12px]" style={{ color: "#64748b" }}>
+                          Ask for a concise explanation or a practical example.
+                        </p>
+                      </div>
+                    </div>
+
+                    <AvatarNarrator
+                      topic={slide.topicTitle || slide.moduleTitle}
+                      moduleContent={narratorExcerpt || `This section explains ${slide.topicTitle || slide.moduleTitle}.`}
+                      systemHint="Focus on the practical benefit to an office worker."
+                    />
+                  </div>
+                </div>
 
                 {slide.infographicSvg?.trim() && (
                   <InfographicVisualAid
