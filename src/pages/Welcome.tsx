@@ -1,6 +1,16 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, BookOpen, Mic, Brain, Film, ShieldCheck, ArrowRight, HelpCircle } from "lucide-react";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
+
+const loadedAtLabel = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "2-digit",
+  year: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+}).format(new Date());
 
 const features = [
   { icon: Brain, title: "AI-Powered Agents", desc: "10 specialized agents work together — research, writing, visuals, voice, assessment, and more." },
@@ -13,18 +23,111 @@ const features = [
 
 const Welcome = () => {
   const navigate = useNavigate();
+  const [introStage, setIntroStage] = useState<"intro" | "settling" | "done">("intro");
+
+  useEffect(() => {
+    const settleTimer = window.setTimeout(() => setIntroStage("settling"), 1250);
+    const doneTimer = window.setTimeout(() => setIntroStage("done"), 2350);
+
+    return () => {
+      window.clearTimeout(settleTimer);
+      window.clearTimeout(doneTimer);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      <style>
+        {`@keyframes welcomeLogoIn {
+          0% { opacity: 0; transform: translateY(22px) scale(0.84); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        @keyframes welcomeWordmarkIn {
+          0% { opacity: 0; transform: translateY(28px); letter-spacing: 0.08em; }
+          100% { opacity: 1; transform: translateY(0); letter-spacing: 0; }
+        }
+
+        @keyframes welcomeStageExit {
+          0% { opacity: 1; }
+          100% { opacity: 0; visibility: hidden; }
+        }
+
+        @keyframes welcomeHeroReveal {
+          0% { opacity: 0; transform: translateY(16px); }
+          100% { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes welcomeCornerLogo {
+          0% { opacity: 0; transform: translateY(-10px) scale(0.9); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }`}
+      </style>
+      {introStage !== "done" && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center"
+          style={{
+            background: "linear-gradient(180deg, #f8fafc 0%, #edf3fb 100%)",
+            animation: introStage === "settling" ? "welcomeStageExit 780ms ease forwards" : undefined,
+          }}
+        >
+          <div className="flex flex-col items-center text-center">
+            <div
+              className="mb-7 flex h-36 w-36 items-center justify-center rounded-[34px] border shadow-2xl"
+              style={{
+                background: "linear-gradient(180deg, rgba(255,255,255,0.99), rgba(241,245,249,0.97))",
+                borderColor: "rgba(148,163,184,0.2)",
+                boxShadow: "0 28px 60px rgba(30, 58, 95, 0.18)",
+                animation: "welcomeLogoIn 760ms cubic-bezier(0.22, 1, 0.36, 1) both",
+              }}
+            >
+              <img src={contentForgeLogo} alt="ContentForge" className="h-24 w-24 object-contain" />
+            </div>
+            <h1
+              className="text-[56px] font-[900] tracking-tight leading-none"
+              style={{ animation: "welcomeWordmarkIn 820ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both" }}
+            >
+              <span className="text-[#1e3a5f]">Content</span>
+              <span className="text-[#b8860b]" style={{ textShadow: "0 1px 3px rgba(184,134,11,0.3)" }}>Forge</span>
+            </h1>
+          </div>
+        </div>
+      )}
+
+      <div
+        className="fixed left-4 top-4 z-20"
+        style={{ animation: introStage === "done" ? "welcomeCornerLogo 540ms cubic-bezier(0.22, 1, 0.36, 1) both" : undefined, opacity: introStage === "done" ? 1 : 0 }}
+      >
+        <div
+          className="flex h-24 w-24 items-center justify-center rounded-[24px] border shadow-2xl"
+          style={{
+            background: "linear-gradient(180deg, rgba(255,255,255,0.99), rgba(241,245,249,0.97))",
+            borderColor: "rgba(148, 163, 184, 0.24)",
+            boxShadow: "0 22px 48px rgba(30, 58, 95, 0.18)",
+          }}
+        >
+          <img src={contentForgeLogo} alt="ContentForge" className="h-16 w-16 object-contain" />
+        </div>
+      </div>
+      <div className="fixed right-4 top-4 z-20">
+        <div className="rounded-lg border px-3 py-2 text-[11px] font-semibold shadow-md"
+          style={{
+            background: "rgba(15, 23, 42, 0.88)",
+            borderColor: "rgba(148, 163, 184, 0.35)",
+            color: "#f8fafc",
+            backdropFilter: "blur(10px)",
+          }}
+        >
+          Latest load: {loadedAtLabel}
+        </div>
+      </div>
       {/* Hero */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/10" />
-        <div className="relative max-w-5xl mx-auto px-6 pt-16 pb-20 text-center">
-          <div className="flex justify-center mb-6">
-            <div className="w-20 h-20 rounded-2xl bg-card shadow-xl flex items-center justify-center">
-              <img src={contentForgeLogo} alt="ContentForge" className="w-14 h-14 object-contain" />
-            </div>
-          </div>
+        <div
+          className="relative max-w-5xl mx-auto px-6 pt-20 pb-20 text-center"
+          style={{ animation: introStage === "done" ? "welcomeHeroReveal 620ms cubic-bezier(0.22, 1, 0.36, 1) both" : undefined, opacity: introStage === "done" ? 1 : 0 }}
+        >
           <h1 className="text-[48px] font-[900] tracking-tight leading-tight mb-2">
             <span className="text-[#1e3a5f]">Content</span>
             <span className="text-[#b8860b]" style={{ textShadow: "0 1px 3px rgba(184,134,11,0.3)" }}>Forge</span>

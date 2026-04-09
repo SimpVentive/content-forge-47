@@ -64,6 +64,41 @@ function getNarratorExcerpt(text: string, sentenceCount = 3): string {
   return sentences.slice(0, sentenceCount).join(" ");
 }
 
+function buildFlipChartLines(
+  parts: { hook: string; body: string[]; takeaway: string; challenge: string },
+  maxLines: number
+) {
+  const availableLines = Math.max(4, maxLines - 2);
+  const lines: Array<{ text: string; tone: "lead" | "body" | "takeaway" | "challenge" }> = [];
+
+  const pushSentences = (text: string, tone: "lead" | "body" | "takeaway" | "challenge") => {
+    if (!text || lines.length >= availableLines) return;
+    const normalized = stripNarratorMarkdown(text);
+    const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`’”]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+
+    for (const sentence of sentences) {
+      if (lines.length >= availableLines) break;
+      lines.push({
+        text: sentence.replace(/^Key takeaway:\s*/i, "").replace(/^Challenge:\s*/i, "").trim(),
+        tone,
+      });
+    }
+  };
+
+  pushSentences(parts.hook, "lead");
+  parts.body.forEach((paragraph) => pushSentences(paragraph, "body"));
+
+  if (parts.takeaway && lines.length < availableLines) {
+    pushSentences(`Key takeaway: ${parts.takeaway}`, "takeaway");
+  }
+
+  if (parts.challenge && lines.length < availableLines) {
+    pushSentences(`Challenge: ${parts.challenge}`, "challenge");
+  }
+
+  return lines.slice(0, availableLines);
+}
+
 type SlideType = "title" | "content" | "assessment" | "summary" | "video";
 
 interface Slide {
@@ -406,6 +441,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [muted, setMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
+  const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlsRef = useRef<Record<number, string>>({});
 
@@ -474,6 +510,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     setHighlightSentenceIdx(-1);
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
   }, [currentSlide]);
+
+  useEffect(() => {
+    if (!slideMotion) return;
+    const timeoutId = window.setTimeout(() => setSlideMotion(null), 520);
+    return () => window.clearTimeout(timeoutId);
+  }, [currentSlide, slideMotion]);
 
   // Animate sentence highlight while playing
   const startWordHighlight = useCallback((audio: HTMLAudioElement) => {
@@ -595,11 +637,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   }, [currentSlide]);
 
   const goNext = useCallback(() => {
-    if (currentSlide < totalSlides - 1) setCurrentSlide(c => c + 1);
+    if (currentSlide < totalSlides - 1) {
+      setSlideMotion("forward");
+      setCurrentSlide(c => c + 1);
+    }
   }, [currentSlide, totalSlides]);
 
   const goPrev = useCallback(() => {
-    if (currentSlide > 0) setCurrentSlide(c => c - 1);
+    if (currentSlide > 0) {
+      setSlideMotion("backward");
+      setCurrentSlide(c => c - 1);
+    }
   }, [currentSlide]);
 
   const currentModuleSlides = slides
@@ -720,22 +768,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const moduleLabel = `MODULE ${slide.moduleIndex + 1} — ${slide.moduleTitle}`.toUpperCase();
         const narratorSource = [parts.hook, ...parts.body].filter(Boolean).join(" ");
         const narratorExcerpt = getNarratorExcerpt(narratorSource || slide.content || "");
-        const maxTextBlocks = Math.max(1, Math.floor(slideRules.maxLines / 2));
-        const reservedBlocks = [parts.hook, parts.takeaway, parts.challenge].filter(Boolean).length;
-        const visibleBodySlots = Math.max(1, maxTextBlocks - reservedBlocks);
-        const visibleBody = parts.body.slice(0, visibleBodySlots);
+        const chartLines = buildFlipChartLines(parts, slideRules.maxLines);
         const contentTextStyle = {
           fontSize: `${Math.max(14, slideRules.minFontSize)}px`,
           lineHeight: slideRules.lineSpacing,
         } as React.CSSProperties;
-        const supportingTextStyle = {
-          fontSize: `${Math.max(12.5, slideRules.minFontSize)}px`,
-          lineHeight: slideRules.lineSpacing,
-        } as React.CSSProperties;
-        const clampTwoLines = {
+        const clampSingleLine = {
           display: "-webkit-box",
           WebkitBoxOrient: "vertical",
-          WebkitLineClamp: 2,
+          WebkitLineClamp: 1,
           overflow: "hidden",
         } as React.CSSProperties;
 
@@ -795,56 +836,90 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         };
 
         return (
-          <div className="max-w-[800px] mx-auto" key={currentSlide}>
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              {/* Top accent bar */}
-              <div className="h-[6px]" style={{ background: "linear-gradient(90deg, #4f46e5, #7c3aed)" }} />
-              
-              <div className="p-8">
-                {/* Module label */}
-                <p className="text-[11px] font-semibold tracking-[2px] mb-2 anim-fade-in-down"
-                  style={{ color: "#4f46e5", fontSize: `${Math.max(12.5, slideRules.minFontSize)}px` }}>
-                  {moduleLabel}
-                </p>
-                
-                {/* Topic title */}
-                <h2 className="text-[28px] font-[800] mb-6 anim-fade-in-down"
-                  style={{ color: "#0f172a", animationDelay: "0.1s" }}>
-                  {slide.topicTitle}
-                </h2>
+          <div className="mx-auto max-w-[1140px]" key={currentSlide}>
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start">
+              <div className="relative px-8 pt-12 pb-10 md:px-12 md:pt-16 md:pb-12"
+                style={{
+                  background: "linear-gradient(180deg, #eef2f7 0%, #dde3ec 100%)",
+                  borderRadius: "32px",
+                  boxShadow: "0 24px 50px rgba(15,23,42,0.18)",
+                }}>
+                <div className="pointer-events-none absolute left-8 right-8 top-5 h-4 rounded-full md:left-12 md:right-12"
+                  style={{ background: "linear-gradient(180deg, #d8dee7 0%, #a8b2c2 45%, #eef2f7 100%)", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.85), 0 2px 6px rgba(15,23,42,0.18)" }}
+                />
+                <div className="pointer-events-none absolute left-[18%] top-[10px] h-10 w-4 -translate-x-1/2 rounded-full border-2 border-[#505867] bg-[#f8fafc] md:left-[22%]" />
+                <div className="pointer-events-none absolute right-[18%] top-[10px] h-10 w-4 translate-x-1/2 rounded-full border-2 border-[#505867] bg-[#f8fafc] md:right-[22%]" />
+                <div className="relative overflow-hidden rounded-[8px] border border-[#d8deea] bg-white px-7 py-8 md:px-10 md:py-10"
+                  style={{ boxShadow: "0 16px 30px rgba(15,23,42,0.08)" }}>
+                  <div className="absolute inset-0 opacity-[0.22]"
+                    style={{ backgroundImage: "linear-gradient(180deg, transparent 0, transparent 35px, #dbe4f0 36px)", backgroundSize: "100% 36px" }}
+                  />
+                  <div className="relative z-10">
+                    <p className="mb-3 text-[13px] font-extrabold uppercase tracking-[0.18em]"
+                      style={{ color: "#355fa8" }}>
+                      {moduleLabel}
+                    </p>
+                    <h2 className="mb-7 text-[30px] font-[900] leading-tight"
+                      style={{ color: "#123d78" }}>
+                      {slide.topicTitle}
+                    </h2>
 
-                <div className="mb-6 anim-fade-in-up" style={{ animationDelay: "0.12s" }}>
-                  <div
-                    className="rounded-[28px] border p-5 shadow-sm"
-                    style={{
-                      background: "linear-gradient(180deg, rgba(79,70,229,0.08), rgba(124,58,237,0.03))",
-                      borderColor: "rgba(99,102,241,0.18)",
-                      boxShadow: "0 16px 36px rgba(79, 70, 229, 0.08)",
-                    }}
-                  >
-                    <div className="mb-4 flex items-center gap-3">
-                      <div
-                        className="flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-bold"
-                        style={{ background: "rgba(79,70,229,0.14)", color: "#4f46e5" }}
-                      >
-                        S
-                      </div>
-                      <div>
-                        <p className="text-[13px] font-bold uppercase tracking-[0.16em]" style={{ color: "#4f46e5" }}>
-                          Sarah's Guide
-                        </p>
-                        <p className="text-[12px]" style={{ color: "#64748b" }}>
-                          Ask for a concise explanation or a practical example.
-                        </p>
-                      </div>
+                    <div className="space-y-3">
+                      {chartLines.map((line, index) => (
+                        <div key={`${line.tone}-${index}`} className="flex items-start gap-3">
+                          <div className="mt-[0.72em] h-2.5 w-2.5 shrink-0 rounded-full"
+                            style={{ background: line.tone === "takeaway" ? "#f59e0b" : line.tone === "challenge" ? "#7c3aed" : "#1d4ed8" }}
+                          />
+                          <p
+                            className="font-[700] tracking-[0.01em]"
+                            style={{
+                              color: line.tone === "takeaway" ? "#92400e" : line.tone === "challenge" ? "#5b21b6" : line.tone === "lead" ? "#1e3a8a" : "#2c5ea5",
+                              ...contentTextStyle,
+                              ...clampSingleLine,
+                            }}
+                          >
+                            {line.text}
+                          </p>
+                        </div>
+                      ))}
                     </div>
-
-                    <AvatarNarrator
-                      topic={slide.topicTitle || slide.moduleTitle}
-                      moduleContent={narratorExcerpt || `This section explains ${slide.topicTitle || slide.moduleTitle}.`}
-                      systemHint="Focus on the practical benefit to an office worker."
-                    />
                   </div>
+                </div>
+                <div className="pointer-events-none absolute bottom-0 left-[14%] h-28 w-2 rotate-[6deg] rounded-full bg-[#23272f] md:left-[20%]" />
+                <div className="pointer-events-none absolute bottom-0 right-[14%] h-28 w-2 -rotate-[6deg] rounded-full bg-[#23272f] md:right-[20%]" />
+              </div>
+
+              <div className="space-y-5">
+                <div
+                  className="rounded-[28px] border p-5 shadow-sm"
+                  style={{
+                    background: "linear-gradient(180deg, rgba(79,70,229,0.1), rgba(124,58,237,0.04))",
+                    borderColor: "rgba(99,102,241,0.22)",
+                    boxShadow: "0 16px 36px rgba(79, 70, 229, 0.08)",
+                  }}
+                >
+                  <div className="mb-4 flex items-center gap-3">
+                    <div
+                      className="flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-bold"
+                      style={{ background: "rgba(79,70,229,0.14)", color: "#4f46e5" }}
+                    >
+                      S
+                    </div>
+                    <div>
+                      <p className="text-[13px] font-bold uppercase tracking-[0.16em]" style={{ color: "#4f46e5" }}>
+                        Sarah's Guide
+                      </p>
+                      <p className="text-[12px] font-medium" style={{ color: "#475569" }}>
+                        Narrator panel for quick explanation and examples.
+                      </p>
+                    </div>
+                  </div>
+
+                  <AvatarNarrator
+                    topic={slide.topicTitle || slide.moduleTitle}
+                    moduleContent={narratorExcerpt || `This section explains ${slide.topicTitle || slide.moduleTitle}.`}
+                    systemHint="Focus on the practical benefit to an office worker."
+                  />
                 </div>
 
                 {slide.infographicSvg?.trim() && (
@@ -854,68 +929,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   />
                 )}
 
-                {/* Hook paragraph — special styling */}
-                {parts.hook && (
-                  <div className="mb-5 rounded-lg p-4 anim-fade-in-up"
-                    style={{
-                      borderLeft: "3px solid hsl(var(--primary))",
-                      background: "hsl(var(--primary) / 0.06)",
-                      animationDelay: "0.15s",
-                    }}>
-                    <p className="text-[17px]" style={{ color: "#374151", ...contentTextStyle, ...clampTwoLines }}>
-                      {renderSentenceText(parts.hook)}
-                    </p>
-                  </div>
-                )}
-
-                {/* Body paragraphs with sentence-level highlight */}
-                {visibleBody.map((para, pi) => (
-                  <div key={pi} className="mb-4 anim-fade-in-up">
-                    <p className="text-[17px]"
-                      style={{ color: "#374151", animationDelay: `${0.3 + pi * 0.15}s`, ...contentTextStyle, ...clampTwoLines }}>
-                      {renderSentenceText(para)}
-                    </p>
-                  </div>
-                ))}
-
-                {/* Takeaway box */}
-                {parts.takeaway && (
-                  <div className="mt-6 rounded-lg p-[14px_18px] anim-fade-in-up"
-                    style={{
-                      background: "hsl(var(--highlight-yellow-bg))",
-                      borderLeft: "4px solid hsl(var(--highlight-yellow-border))",
-                      animationDelay: "0.5s",
-                    }}>
-                    <p className="text-[11px] font-bold uppercase tracking-[1.5px] mb-1"
-                      style={{ color: "#d97706", ...supportingTextStyle }}>
-                      Key Takeaway
-                    </p>
-                    <p className="text-[15px]" style={{ color: "#92400e", ...contentTextStyle, ...clampTwoLines }}>
-                      {renderSentenceText(parts.takeaway)}
-                    </p>
-                  </div>
-                )}
-
-                {/* Challenge line */}
-                {parts.challenge && (
-                  <p className="mt-4 pt-3 text-[15px] italic anim-fade-in-up"
-                    style={{
-                      color: "#6b7280",
-                      borderTop: "1px solid #f1f5f9",
-                      animationDelay: "0.6s",
-                      ...contentTextStyle,
-                      ...clampTwoLines,
-                    }}>
-                    {renderSentenceText(parts.challenge)}
-                  </p>
-                )}
-              </div>
-
-              <div className="px-8 pb-4 text-right">
-                <span className="text-[12px] font-semibold px-3 py-1 rounded-full"
-                  style={{ color: "#94a3b8", background: "#f1f5f9" }}>
-                  Slide {currentSlide + 1}
-                </span>
+                <div className="flex justify-end">
+                  <span className="rounded-full px-3 py-1 text-[12px] font-semibold"
+                    style={{ color: "#cbd5e1", background: "rgba(255,255,255,0.08)" }}>
+                    Slide {currentSlide + 1}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -1072,6 +1091,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   return (
     <div className="fixed inset-0 z-[9999] flex flex-col" style={{ background: "#0f172a" }}>
+      <style>
+        {`@keyframes sheetFlipForward {
+          0% { opacity: 0; transform: perspective(1800px) rotateX(-10deg) rotateY(14deg) translateY(26px) scale(0.985); transform-origin: top center; }
+          100% { opacity: 1; transform: perspective(1800px) rotateX(0deg) rotateY(0deg) translateY(0) scale(1); transform-origin: top center; }
+        }
+
+        @keyframes sheetFlipBackward {
+          0% { opacity: 0; transform: perspective(1800px) rotateX(-10deg) rotateY(-14deg) translateY(26px) scale(0.985); transform-origin: top center; }
+          100% { opacity: 1; transform: perspective(1800px) rotateX(0deg) rotateY(0deg) translateY(0) scale(1); transform-origin: top center; }
+        }`}
+      </style>
       {/* TOP BAR */}
       <div className="h-[60px] shrink-0 flex items-center px-6 border-b"
         style={{ background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}>
@@ -1148,7 +1178,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
         {/* CENTER STAGE */}
         <div className="flex-1 overflow-y-auto p-6 md:p-10">
-          {renderSlide()}
+          <div
+            style={{
+              animation: slideMotion === "forward"
+                ? "sheetFlipForward 480ms cubic-bezier(0.22, 1, 0.36, 1)"
+                : slideMotion === "backward"
+                  ? "sheetFlipBackward 480ms cubic-bezier(0.22, 1, 0.36, 1)"
+                  : undefined,
+            }}
+          >
+            {renderSlide()}
+          </div>
         </div>
 
         {/* RIGHT SIDEBAR */}

@@ -268,7 +268,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
             <div>
               <label className="text-[13px] font-bold text-foreground mb-1.5 block">For Text on Screen</label>
-              <p className="text-[11px] text-muted-foreground mb-2">Choose the language used for slide content and written course material.</p>
+              <p className="text-[11px] font-medium text-foreground/70 mb-2">Choose the language used for slide content and written course material.</p>
               <select
                 value={textLanguage}
                 onChange={(e) => setTextLanguage(e.target.value)}
@@ -282,7 +282,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
             <div>
               <label className="text-[13px] font-bold text-foreground mb-1.5 block">For Voice of Narrator</label>
-              <p className="text-[11px] text-muted-foreground mb-2">Choose the spoken language for narration, then select the narrator voice.</p>
+              <p className="text-[11px] font-medium text-foreground/70 mb-2">Choose the spoken language for narration, then select the narrator voice.</p>
               <div className="space-y-3">
                 <select
                   value={narratorLanguage}
@@ -337,7 +337,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-4">
             <div>
               <p className="text-[13px] font-bold text-foreground">Slide Layout Rules</p>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
+              <p className="text-[11px] font-medium text-foreground/70 mt-0.5">
                 Apply readability constraints during course generation and learner slide rendering.
               </p>
             </div>
