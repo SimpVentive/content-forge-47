@@ -111,8 +111,8 @@ const Index = () => {
     <div className="flex flex-col h-screen overflow-hidden bg-background">
       <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6 relative">
         <div className="flex items-center gap-2.5">
-          <div className="w-14 h-14 rounded-xl bg-white flex items-center justify-center shadow-md">
-            <img src={contentForgeLogo} alt="ContentForge" className="w-11 h-11 object-contain" />
+          <div className="flex items-center justify-center">
+            <img src={contentForgeLogo} alt="ContentForge" className="w-16 h-16 object-contain drop-shadow-lg" />
           </div>
         </div>
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 select-none">

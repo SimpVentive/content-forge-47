@@ -88,14 +88,12 @@ const Welcome = () => {
         >
           <div className="flex flex-col items-center text-center">
             <div
-              className="mb-8 flex h-36 w-36 items-center justify-center rounded-[34px] border"
+              className="mb-8 flex items-center justify-center"
               style={{
-                background: "linear-gradient(180deg, rgba(255,255,255,0.99), rgba(241,245,249,0.97))",
-                borderColor: "rgba(148,163,184,0.2)",
                 animation: "logoSurge 900ms cubic-bezier(0.34, 1.56, 0.64, 1) both, logoGlow 2.8s ease-in-out 1100ms infinite",
               }}
             >
-              <img src={contentForgeLogo} alt="ContentForge" className="h-24 w-24 object-contain" />
+              <img src={contentForgeLogo} alt="ContentForge" className="h-44 w-44 object-contain drop-shadow-xl" />
             </div>
             <h1
               className="text-[64px] font-[900] tracking-tight leading-none"
@@ -118,15 +116,8 @@ const Welcome = () => {
         className="fixed left-4 top-4 z-20"
         style={{ animation: introStage === "done" ? "welcomeCornerLogo 540ms cubic-bezier(0.22, 1, 0.36, 1) both" : undefined, opacity: introStage === "done" ? 1 : 0 }}
       >
-        <div
-          className="flex h-24 w-24 items-center justify-center rounded-[24px] border shadow-2xl"
-          style={{
-            background: "linear-gradient(180deg, rgba(255,255,255,0.99), rgba(241,245,249,0.97))",
-            borderColor: "rgba(148, 163, 184, 0.24)",
-            boxShadow: "0 22px 48px rgba(30, 58, 95, 0.18)",
-          }}
-        >
-          <img src={contentForgeLogo} alt="ContentForge" className="h-16 w-16 object-contain" />
+        <div className="flex items-center justify-center">
+          <img src={contentForgeLogo} alt="ContentForge" className="h-20 w-20 object-contain drop-shadow-lg" />
         </div>
       </div>
       <div className="fixed right-4 top-4 z-20">
