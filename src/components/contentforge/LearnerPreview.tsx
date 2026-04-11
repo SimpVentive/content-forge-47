@@ -725,6 +725,7 @@ interface LearnerPreviewProps {
   onClose: () => void;
   insertedVideos?: InsertedVideo[];
   courseDuration?: string;
+  learnerNotesEnabled?: boolean;
   slideLayout?: {
     maxLines: number;
     minFontSize: number;
@@ -752,7 +753,7 @@ function getCourseNotesStorageKey(courseTitle: string): string {
   return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, slideLayout, onUpdateVisualTopic }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = false, slideLayout, onUpdateVisualTopic }) => {
   const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
   const [showPlacer, setShowPlacer] = useState(false);
   const [highlightEnabled, setHighlightEnabled] = useState(true);
@@ -801,6 +802,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   }, [flipStyle, flipStyleStorageKey]);
 
   useEffect(() => {
+    if (!learnerNotesEnabled) {
+      setLearnerNotes("");
+      return;
+    }
+
     try {
       const savedNotes = window.localStorage.getItem(notesStorageKey);
       if (typeof savedNotes === "string") {
@@ -809,15 +815,23 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     } catch {
       // Ignore localStorage issues and keep notes in memory only.
     }
-  }, [notesStorageKey]);
+  }, [learnerNotesEnabled, notesStorageKey]);
 
   useEffect(() => {
+    if (!learnerNotesEnabled) return;
+
     try {
       window.localStorage.setItem(notesStorageKey, learnerNotes);
     } catch {
       // Ignore localStorage issues and keep notes in memory only.
     }
-  }, [learnerNotes, notesStorageKey]);
+  }, [learnerNotes, learnerNotesEnabled, notesStorageKey]);
+
+  useEffect(() => {
+    if (!learnerNotesEnabled && activeSidebarPanel === "notes") {
+      setActiveSidebarPanel("home");
+    }
+  }, [activeSidebarPanel, learnerNotesEnabled]);
 
   const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, localVideos, courseDuration), [rawOutputs, localVideos, courseDuration]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -1103,10 +1117,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         : slide.type === "video"
           ? `${slide.video?.channelTitle || "Curated resource"} for this lesson`
           : `Lesson ${(slide.topicIndex || 0) + 1}${slide.topicPartCount && slide.topicPartCount > 1 ? ` · Part ${(slide.topicPartIndex || 0) + 1} of ${slide.topicPartCount}` : ""}`;
+  const firstContentSlide = currentModuleSlides.find((moduleSlide) => moduleSlide.type === "content");
   const platformNavItems = [
     { id: "home" as const, label: "Home", icon: Home },
     { id: "progress" as const, label: "Progress", icon: BarChart3 },
-    { id: "notes" as const, label: "Notes", icon: NotebookPen },
+    ...(learnerNotesEnabled ? [{ id: "notes" as const, label: "Notes", icon: NotebookPen }] : []),
     { id: "resources" as const, label: "Resources", icon: FolderOpen },
   ];
   const utilityActions = [
@@ -2253,13 +2268,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     >
                       Restart Course
                     </button>
-                    {currentModuleTitleSlide ? (
+                    {currentModuleTitleSlide && currentSlide !== currentModuleTitleSlide.idx ? (
                       <button
                         onClick={() => navigateToSlide(currentModuleTitleSlide.idx)}
                         className="rounded-full border border-white/18 bg-white/8 px-3 py-1.5 text-[11px] font-[800] text-white transition-all hover:bg-white/12"
                         type="button"
                       >
                         Module Overview
+                      </button>
+                    ) : null}
+                    {firstContentSlide ? (
+                      <button
+                        onClick={() => navigateToSlide(firstContentSlide.idx)}
+                        className="rounded-full border border-white/18 bg-white/8 px-3 py-1.5 text-[11px] font-[800] text-white transition-all hover:bg-white/12"
+                        type="button"
+                      >
+                        {currentSlide === firstContentSlide.idx ? "Current Lesson" : "Start Lesson"}
                       </button>
                     ) : null}
                   </div>

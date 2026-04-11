@@ -10,6 +10,7 @@ export interface CourseParameters {
   duration: string;
   videoDurationHandling: "within-course" | "additional-to-course";
   assessmentRequired: boolean;
+  learnerNotesEnabled: boolean;
   slideLayout: {
     maxLines: number;
     minFontSize: number;
@@ -99,6 +100,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [duration, setDuration] = useState("15min");
   const [videoDurationHandling, setVideoDurationHandling] = useState<CourseParameters["videoDurationHandling"]>("within-course");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
+  const [learnerNotesEnabled, setLearnerNotesEnabled] = useState(false);
   const [maxLines, setMaxLines] = useState<CourseParameters["slideLayout"]["maxLines"]>(10);
   const [minFontSize, setMinFontSize] = useState<CourseParameters["slideLayout"]["minFontSize"]>(12.5);
   const [lineSpacing, setLineSpacing] = useState<CourseParameters["slideLayout"]["lineSpacing"]>(2);
@@ -138,6 +140,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       duration,
       videoDurationHandling,
       assessmentRequired,
+      learnerNotesEnabled,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -158,6 +161,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       duration: closest.value,
       videoDurationHandling,
       assessmentRequired,
+      learnerNotesEnabled,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -173,6 +177,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       duration,
       videoDurationHandling,
       assessmentRequired,
+      learnerNotesEnabled,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -363,6 +368,39 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 }`}
               >
                 <p className={`text-[13px] font-bold ${videoDurationHandling === "within-course" ? "text-primary" : "text-foreground"}`}>
+
+            <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
+              <div>
+                <p className="text-[13px] font-bold text-foreground">Learner Tools</p>
+                <p className="text-[11px] font-medium text-foreground/70 mt-0.5">
+                  Decide which learner-side tools appear in the course player preview.
+                </p>
+              </div>
+
+              <button
+                onClick={() => setLearnerNotesEnabled((prev) => !prev)}
+                className={`w-full rounded-xl border-2 p-3 text-left transition-all ${
+                  learnerNotesEnabled
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/30"
+                }`}
+                type="button"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className={`text-[13px] font-bold ${learnerNotesEnabled ? "text-primary" : "text-foreground"}`}>
+                      Enable learner notes
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                      Shows a note-taking panel inside the learner experience. Leave this off unless the course should support learner note capture.
+                    </p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${learnerNotesEnabled ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                    {learnerNotesEnabled ? "On" : "Off"}
+                  </span>
+                </div>
+              </button>
+            </div>
                   Videos are part of the {selectedMinutes}-minute course
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">

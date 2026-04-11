@@ -9,7 +9,8 @@ interface AvatarNarratorProps {
   systemHint: string;
 }
 
-const EXAMPLE_HINT = "Give one vivid real-world workplace example in 2 sentences.";
+const CONCISE_RESPONSE_HINT = "Keep the response concise: maximum 90 words, 4 short paragraphs or fewer, and avoid repetition.";
+const EXAMPLE_HINT = `Give one vivid real-world workplace example in 2 sentences. ${CONCISE_RESPONSE_HINT}`;
 const AVATAR_BG = "#EEEDFE";
 const AVATAR_TEXT = "#3C3489";
 const BUBBLE_BG = "#EEEDFE";
@@ -21,12 +22,13 @@ const AVATAR_IDLE_ANIMATION = "avatarNarratorFloat 4.2s ease-in-out infinite";
 type RequestMode = "initial" | "example";
 
 function buildDefaultSpeech(topic: string, moduleContent: string) {
-  const preview = moduleContent.trim();
+  const preview = moduleContent.trim().replace(/\s+/g, " ");
   if (!preview) {
     return `Click Explain this and Sarah will walk you through ${topic}.`;
   }
 
-  return `Click Explain this and Sarah will break down ${topic}. Quick preview: ${preview}`;
+  const shortenedPreview = preview.length > 180 ? `${preview.slice(0, 177).trimEnd()}...` : preview;
+  return `Click Explain this and Sarah will break down ${topic}. Quick preview: ${shortenedPreview}`;
 }
 
 export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarratorProps) {
@@ -127,7 +129,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
         body: JSON.stringify({
           topic,
           moduleContent,
-          systemHint: mode === "initial" ? systemHint : EXAMPLE_HINT,
+          systemHint: mode === "initial" ? `${systemHint} ${CONCISE_RESPONSE_HINT}` : EXAMPLE_HINT,
         }),
         signal: controller.signal,
       });
@@ -264,7 +266,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
       </div>
 
       <div
-        className="min-h-36 rounded-[24px] border px-5 py-4 text-sm leading-7 shadow-sm"
+        className="min-h-36 max-h-56 overflow-y-auto rounded-[24px] border px-5 py-4 text-sm leading-7 shadow-sm"
         style={{ backgroundColor: BUBBLE_BG, borderColor: BUBBLE_BORDER, color: BUBBLE_TEXT, animation: `avatarNarratorEnter 480ms cubic-bezier(0.22, 1, 0.36, 1) both, ${isStreaming ? "bubbleGlow 1.8s ease-in-out infinite" : "none"}` }}
       >
         <p className="whitespace-pre-wrap break-words">

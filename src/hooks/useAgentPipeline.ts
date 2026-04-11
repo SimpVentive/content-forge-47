@@ -8,6 +8,23 @@ type SlideLayoutParams = {
   lineSpacing?: number;
 };
 
+type TopicDurationPlan = {
+  topicTitle: string;
+  targetWords: number;
+  wordRange: string;
+};
+
+type ModuleDurationPlan = {
+  moduleTitle: string;
+  targetMinutes: number;
+  targetWords: number;
+  topicCount: number;
+  topicWordRange: string;
+  topics: TopicDurationPlan[];
+};
+
+const NARRATION_WORDS_PER_MINUTE = 130;
+
 function parseDurationMinutes(duration?: string): number {
   const parsed = Number.parseInt(duration || "15", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
@@ -43,6 +60,108 @@ function buildSlideLayoutInstruction(slideLayout?: SlideLayoutParams): string {
   const lineSpacing = slideLayout?.lineSpacing ?? 2;
 
   return `Slide readability constraints: no slide should exceed ${maxLines} lines of on-slide text, the minimum font size must be ${minFontSize}px, and line spacing should be ${lineSpacing}. Keep layouts concise and presentation-friendly.`;
+}
+
+function countWords(text: string): number {
+  return (text.match(/\b[\w'’-]+\b/g) || []).length;
+}
+
+function safeNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  }
+  return null;
+}
+
+function getDurationToleranceMinutes(targetMinutes: number): number {
+  return Math.max(0.75, Math.round(targetMinutes * 0.12 * 10) / 10);
+}
+
+function buildDurationPlan(architectRaw: string, targetMinutes: number, targetWords: number): ModuleDurationPlan[] {
+  const parsed = tryParseJson(architectRaw) || {};
+  const modules = parsed.modules || parsed.course_structure?.modules || parsed.course_modules || [];
+
+  if (!Array.isArray(modules) || modules.length === 0) {
+    return [];
+  }
+
+  const provisional = modules.map((module: any, moduleIndex: number) => {
+    const topics = Array.isArray(module?.topics)
+      ? module.topics
+      : Array.isArray(module?.sections)
+        ? module.sections
+        : Array.isArray(module?.lessons)
+          ? module.lessons
+          : [];
+
+    const topicCount = Math.max(1, topics.length || 0);
+    const estimatedMinutes = safeNumber(module?.estimated_minutes) ?? topicCount;
+
+    return {
+      moduleTitle: module?.module_title || module?.title || module?.name || `Module ${moduleIndex + 1}`,
+      topics,
+      topicCount,
+      estimatedMinutes,
+    };
+  });
+
+  const totalEstimated = provisional.reduce((sum, module) => sum + module.estimatedMinutes, 0) || provisional.length;
+  const normalizedMinutes = provisional.map((module) => {
+    const weightedMinutes = (module.estimatedMinutes / totalEstimated) * targetMinutes;
+    return Math.max(0.75, weightedMinutes);
+  });
+
+  const normalizedMinuteTotal = normalizedMinutes.reduce((sum, value) => sum + value, 0) || targetMinutes;
+
+  return provisional.map((module, moduleIndex) => {
+    const targetMinutesForModule = (normalizedMinutes[moduleIndex] / normalizedMinuteTotal) * targetMinutes;
+    const targetWordsForModule = Math.max(120, Math.round((targetMinutesForModule / targetMinutes) * targetWords));
+    const targetWordsPerTopic = Math.max(95, Math.round(targetWordsForModule / module.topicCount));
+    const topicWordRange = `${Math.max(95, Math.floor(targetWordsPerTopic * 0.9))}-${Math.max(110, Math.ceil(targetWordsPerTopic * 1.12))}`;
+
+    const topics = module.topics.length > 0
+      ? module.topics.map((topic: any, topicIndex: number) => {
+          const topicTitle = typeof topic === "string"
+            ? topic
+            : topic?.topic_title || topic?.title || topic?.name || `Topic ${topicIndex + 1}`;
+
+          return {
+            topicTitle,
+            targetWords: targetWordsPerTopic,
+            wordRange: topicWordRange,
+          };
+        })
+      : [{ topicTitle: "Core Content", targetWords: targetWordsPerTopic, wordRange: topicWordRange }];
+
+    return {
+      moduleTitle: module.moduleTitle,
+      targetMinutes: Math.round(targetMinutesForModule * 10) / 10,
+      targetWords: targetWordsForModule,
+      topicCount: module.topicCount,
+      topicWordRange,
+      topics,
+    };
+  });
+}
+
+function findModuleDurationPlan(durationPlan: ModuleDurationPlan[], moduleTitle: string, moduleIndex: number): ModuleDurationPlan | undefined {
+  const normalizedTitle = normalizeTextKey(moduleTitle);
+  return durationPlan.find((module, index) => index === moduleIndex || normalizeTextKey(module.moduleTitle) === normalizedTitle);
+}
+
+function summarizeDurationPlan(durationPlan: ModuleDurationPlan[]): string {
+  if (durationPlan.length === 0) return "No module duration plan available.";
+
+  return durationPlan
+    .map((module) => {
+      const topicSummary = module.topics
+        .map((topic) => `${topic.topicTitle}: ${topic.wordRange} words`)
+        .join(" | ");
+      return `${module.moduleTitle} -> ${module.targetMinutes} min, ~${module.targetWords} words. Topics: ${topicSummary}`;
+    })
+    .join("\n");
 }
 
 function normalizeTextKey(value: string): string {
@@ -161,6 +280,7 @@ export function useAgentPipeline() {
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const durationMinutes = parseDurationMinutes(params?.duration);
     const targetNarrationWords = Math.max(260, durationMinutes * 130);
+    const durationToleranceMinutes = getDurationToleranceMinutes(durationMinutes);
     const structureGuidance = getStructureGuidance(durationMinutes);
     const sophisticationGuidance = getSophisticationGuidance(durationMinutes);
     const instructionalPatternGuidance = getInstructionalPatternGuidance(durationMinutes);
@@ -190,6 +310,7 @@ export function useAgentPipeline() {
     let assessmentResult = "";
     let qualityResult = "";
     let voiceResult = "";
+    let durationPlan: ModuleDurationPlan[] = [];
 
     try {
       // ──── AGENT 1: Research ────
@@ -216,8 +337,8 @@ export function useAgentPipeline() {
         setStatus("architect", "running");
         addLog("Content Architect: Receiving research output...");
         archResult = await callClaudeWithRetry(
-          `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. Return JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`,
-          `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nRecommended Structure: ${structureGuidance}\nSophistication Requirement: ${sophisticationGuidance}\nInstructional Pattern Guidance: ${instructionalPatternGuidance}\n\nBuild the course structure strictly from the above content, scaled to fit the target duration. Make modules feel like meaningful chapters with different jobs to do, and make topics feel teachable, scenario-ready, and presentation-worthy.`,
+          `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. The sum of all module estimated_minutes must land within +/- ${durationToleranceMinutes} minutes of ${durationMinutes}. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. Return JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`,
+          `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nRecommended Structure: ${structureGuidance}\nSophistication Requirement: ${sophisticationGuidance}\nInstructional Pattern Guidance: ${instructionalPatternGuidance}\n\nBuild the course structure strictly from the above content, scaled to fit the target duration. Make modules feel like meaningful chapters with different jobs to do, and make topics feel teachable, scenario-ready, and presentation-worthy.`,
           addLog, "Content Architect"
         );
         setStatus("architect", "complete");
@@ -226,6 +347,10 @@ export function useAgentPipeline() {
           ...prev,
           outline: prev.outline + `\n\n---\n\n## Course Structure\n\n${archResult}`,
         }));
+        durationPlan = buildDurationPlan(archResult, durationMinutes, targetNarrationWords);
+        if (durationPlan.length > 0) {
+          addLog(`Content Architect: Duration plan normalized to ${durationMinutes} min across ${durationPlan.length} modules.`);
+        }
         addLog("Content Architect: Complete. Modules structured.");
       } else {
         setStatus("architect", "idle");
@@ -242,6 +367,8 @@ export function useAgentPipeline() {
           const archParsed = JSON.parse(archResult || "{}");
           parsedModules = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
         } catch { parsedModules = []; }
+
+        durationPlan = durationPlan.length > 0 ? durationPlan : buildDurationPlan(archResult, durationMinutes, targetNarrationWords);
 
         const totalTopics = Math.max(1, parsedModules.reduce((count: number, mod: any) => {
           const topics = mod.topics || mod.sections || mod.lessons || [];
@@ -277,6 +404,7 @@ Rules you NEVER break:
 - Format each topic using markdown prose with this backbone: Hook → Core explanation → Concrete example or scenario → Key Takeaway: → Challenge:. Keep headings limited to the topic title only.
 - Use markdown ## headers for each topic title, matching the exact topic names provided.
 - You MUST use content from the source material provided. Do NOT invent unrelated examples.
+- You MUST respect the supplied runtime plan. Hit the requested word budgets closely so the narration lands within ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target.
 
       Write content that feels expensive, practical, and memorable — something a learner would actually respect, not skim out of obligation.`;
 
@@ -285,7 +413,7 @@ Rules you NEVER break:
           addLog("Writer Agent: Drafting all content...");
           writerResult = await callClaudeWithRetry(
             writerSystemPrompt,
-            `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nPlanned Topic Count: ${totalTopics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"} and reach approximately ${targetNarrationWords} words in total.`,
+            `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nPlanned Topic Count: ${totalTopics}\n\nDuration Plan:\n${summarizeDurationPlan(durationPlan)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"} and reach approximately ${targetNarrationWords} words in total.`,
             addLog, "Writer Agent"
           );
         } else {
@@ -295,6 +423,7 @@ Rules you NEVER break:
             if (isCancelled()) break;
             const mod = parsedModules[mi];
             const modTitle = mod.module_title || mod.title || mod.name || `Module ${mi + 1}`;
+            const moduleDurationPlan = findModuleDurationPlan(durationPlan, modTitle, mi);
             const topicBlueprint = JSON.stringify(mod.topics || mod.sections || mod.lessons || [], null, 2);
             const topics = (mod.topics || mod.sections || mod.lessons || []).map((t: any) => {
               const name = typeof t === "string" ? t : t.topic_title || t.title || t.name || "";
@@ -302,14 +431,15 @@ Rules you NEVER break:
               const pattern = typeof t === "string" ? "" : t.instructional_pattern || "";
               const scenario = typeof t === "string" ? "" : t.scenario_anchor || "";
               const interaction = typeof t === "string" ? "" : t.interaction_type || "";
-              return `  - Topic: ${name}${obj ? ` | Objective: ${obj}` : ""}${pattern ? ` | Pattern: ${pattern}` : ""}${scenario ? ` | Scenario: ${scenario}` : ""}${interaction ? ` | Interaction: ${interaction}` : ""}`;
+              const topicPlan = moduleDurationPlan?.topics.find((planTopic) => normalizeTextKey(planTopic.topicTitle) === normalizeTextKey(name));
+              return `  - Topic: ${name}${obj ? ` | Objective: ${obj}` : ""}${pattern ? ` | Pattern: ${pattern}` : ""}${scenario ? ` | Scenario: ${scenario}` : ""}${interaction ? ` | Interaction: ${interaction}` : ""}${topicPlan ? ` | Target Words: ${topicPlan.wordRange}` : ""}`;
             }).join("\n");
 
             addLog(`Writer Agent: Drafting Module ${mi + 1}/${parsedModules.length} — ${modTitle}...`);
 
             const moduleContent = await callClaudeWithRetry(
               writerSystemPrompt,
-              `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nTopics:\n${topics}\n\nStructured Topic Blueprint JSON:\n${topicBlueprint}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging content for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${wordsPerTopicRange} words minimum so the final course genuinely feels like ${params?.duration || "15min"}. Make this module feel like a coherent chapter with a distinct purpose, not a pile of disconnected notes. Use the topic's objective, scenario_anchor, misconception_to_correct, practice_activity, interaction_type, feedback_focus, and evidence_or_example when present.`,
+              `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nModule Runtime Target: ${moduleDurationPlan?.targetMinutes ?? "auto"} minutes\nModule Word Budget: ${moduleDurationPlan?.targetWords ?? "auto"} words\nModule Topic Word Range: ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange}\nTopics:\n${topics}\n\nStructured Topic Blueprint JSON:\n${topicBlueprint}\n\nDuration Plan JSON:\n${JSON.stringify(moduleDurationPlan || null, null, 2)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging content for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange} words minimum so the final course genuinely feels like ${params?.duration || "15min"}. Make this module feel like a coherent chapter with a distinct purpose, not a pile of disconnected notes. Use the topic's objective, scenario_anchor, misconception_to_correct, practice_activity, interaction_type, feedback_focus, and evidence_or_example when present. Stay close to the module word budget rather than writing evenly by instinct.`,
               addLog, "Writer Agent"
             );
             moduleResults.push(`# ${modTitle}\n\n${moduleContent}`);
@@ -336,8 +466,8 @@ Rules you NEVER break:
         setStatus("quality", "running");
         addLog("Quality Reviewer: Scoring instructional quality and revising weak sections...");
         qualityResult = await callClaudeWithRetry(
-          `You are a Quality Reviewer for premium corporate eLearning. Review the architect plan and draft script with a ruthless instructional-design lens. Score the draft on instructional clarity, realism, interaction quality, learner engagement, and assessment readiness. Then rewrite any weak content so the output feels sharper, more teachable, more scenario-based, and less generic. Return JSON in this exact shape: { instructional_score, realism_score, interaction_score, engagement_score, assessment_readiness_score, strengths: [], issues: [], revision_summary: [], revised_script }. The revised_script must preserve the same module and topic headings while improving the content beneath them.`,
-          `Course Title: ${courseTitle}\n\nArchitect Plan:\n${archResult}\n\nDraft Script:\n${writerResult}\n\nResearch Context:\n${researchResult}\n\nReview the draft against the architect schema. If a topic feels generic, lacks a decision point, ignores a misconception, or misses a practical scenario, fix it in revised_script.`,
+          `You are a Quality Reviewer for premium corporate eLearning. Review the architect plan and draft script with a ruthless instructional-design lens. Score the draft on instructional clarity, realism, interaction quality, learner engagement, assessment readiness, and duration alignment. Then rewrite any weak content so the output feels sharper, more teachable, more scenario-based, and less generic while still landing near the requested runtime. Return JSON in this exact shape: { instructional_score, realism_score, interaction_score, engagement_score, assessment_readiness_score, duration_alignment_score, strengths: [], issues: [], revision_summary: [], revised_script }. The revised_script must preserve the same module and topic headings while improving the content beneath them.`,
+          `Course Title: ${courseTitle}\n\nArchitect Plan:\n${archResult}\n\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nDraft Script:\n${writerResult}\n\nCurrent Draft Word Count: ${countWords(writerResult)}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\n\nResearch Context:\n${researchResult}\n\nReview the draft against the architect schema. If a topic feels generic, lacks a decision point, ignores a misconception, misses a practical scenario, or materially under-runs or over-runs its word budget, fix it in revised_script.`,
           addLog, "Quality Reviewer"
         );
 
@@ -586,10 +716,44 @@ Rules you NEVER break:
         setStatus("voice", "running");
         addLog("Voice Agent: Reformatting script for narration...");
         voiceResult = await callClaudeWithRetry(
-          `You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at 130 words per minute. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }`,
-          `Script:\n${writerResult}\n\nOn-screen text language: ${textLanguage}\nNarrator language: ${narratorLanguage}`,
+          `You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at ${NARRATION_WORDS_PER_MINUTE} words per minute. Preserve section structure, and keep the overall read-time within +/- ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target unless the script makes that impossible. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }`,
+          `Script:\n${writerResult}\n\nOn-screen text language: ${textLanguage}\nNarrator language: ${narratorLanguage}\nTarget Duration Minutes: ${durationMinutes}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}`,
           addLog, "Voice Agent"
         );
+
+        const parsedVoice = tryParseJson(voiceResult);
+        const estimatedDuration = safeNumber(parsedVoice?.estimated_duration_minutes);
+        if (estimatedDuration !== null && Math.abs(estimatedDuration - durationMinutes) > durationToleranceMinutes) {
+          const adjustmentDirection = estimatedDuration < durationMinutes ? "expand" : "compress";
+          addLog(`Voice Agent: Runtime drift detected (${estimatedDuration} min vs ${durationMinutes} min target). Calibrating script...`);
+
+          const calibrationResult = await callClaudeWithRetry(
+            `You are a runtime calibration specialist for eLearning scripts. Your job is to ${adjustmentDirection} the script so the narrated runtime lands within +/- ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target at ${NARRATION_WORDS_PER_MINUTE} words per minute. Preserve the same module and topic headings. Keep the writing high quality, practical, and scenario-based. If expanding, add depth, examples, learner decisions, and coaching language. If compressing, remove repetition and tighten prose without losing key teaching points. Return JSON: { calibrated_script, estimated_duration_minutes, calibration_actions: [] }`,
+            `Course Title: ${courseTitle}\nTarget Duration: ${durationMinutes} minutes\nAllowed Drift: +/- ${durationToleranceMinutes} minutes\nTarget Narration Words: ${targetNarrationWords}\nCurrent Estimated Duration: ${estimatedDuration} minutes\nCurrent Script Word Count: ${countWords(writerResult)}\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nCurrent Script:\n${writerResult}`,
+            addLog,
+            "Voice Agent"
+          );
+
+          const parsedCalibration = tryParseJson(calibrationResult);
+          if (parsedCalibration?.calibrated_script && typeof parsedCalibration.calibrated_script === "string") {
+            writerResult = parsedCalibration.calibrated_script;
+            setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
+            setOutputData((prev) => ({ ...prev, script: writerResult }));
+
+            voiceResult = await callClaudeWithRetry(
+              `You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at ${NARRATION_WORDS_PER_MINUTE} words per minute. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }`,
+              `Script:\n${writerResult}\n\nOn-screen text language: ${textLanguage}\nNarrator language: ${narratorLanguage}\nTarget Duration Minutes: ${durationMinutes}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes`,
+              addLog,
+              "Voice Agent"
+            );
+
+            qualityResult = qualityResult
+              ? `${qualityResult}\n\nDuration Calibration\n${calibrationResult}`
+              : calibrationResult;
+            setRawOutputs((prev) => ({ ...prev, writer: writerResult, quality: qualityResult }));
+          }
+        }
+
         setStatus("voice", "complete");
         setRawOutputs((prev) => ({ ...prev, voice: voiceResult }));
         setOutputData((prev) => ({

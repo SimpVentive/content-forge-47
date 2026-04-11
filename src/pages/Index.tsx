@@ -156,6 +156,7 @@ const Index = () => {
             onClose={() => setShowLearnerPreview(false)}
             insertedVideos={previewVideos}
             courseDuration={courseParams?.duration}
+            learnerNotesEnabled={courseParams?.learnerNotesEnabled}
             slideLayout={courseParams?.slideLayout}
             onUpdateVisualTopic={updateVisualTopicAsset}
           />
