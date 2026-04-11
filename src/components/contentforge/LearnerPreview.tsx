@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, LibraryBig, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle } from "lucide-react";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
@@ -734,6 +734,9 @@ interface LearnerPreviewProps {
 }
 
 const PREVIEW_FLIP_STYLE_STORAGE_KEY = "contentforge.preview.flipStyle.default";
+const PREVIEW_NOTES_STORAGE_KEY_PREFIX = "contentforge.preview.notes";
+
+type SidebarPanel = "home" | "progress" | "notes" | "resources";
 
 function isFlipStyle(value: string | null): value is FlipStyle {
   return value === "dramatic" || value === "subtle" || value === "bound";
@@ -744,6 +747,11 @@ function getCourseFlipStyleStorageKey(courseTitle: string): string {
   return `contentforge.preview.flipStyle.${normalizedTitle || "default"}`;
 }
 
+function getCourseNotesStorageKey(courseTitle: string): string {
+  const normalizedTitle = courseTitle.toLowerCase().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "");
+  return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
+}
+
 export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, slideLayout, onUpdateVisualTopic }) => {
   const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
   const [showPlacer, setShowPlacer] = useState(false);
@@ -751,6 +759,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [highlightPalette, setHighlightPalette] = useState<HighlightPalette>("yellow");
   const [flipStyle, setFlipStyle] = useState<FlipStyle>("dramatic");
   const [visualActionState, setVisualActionState] = useState<Record<string, { regenerating?: boolean; error?: string }>>({});
+  const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>("home");
+  const [learnerNotes, setLearnerNotes] = useState("");
 
   // Sync if parent changes
   useEffect(() => { setLocalVideos(insertedVideos); }, [insertedVideos]);
@@ -758,6 +768,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const unassignedCount = localVideos.filter(v => !v.moduleTitle).length;
   const activeHighlightPalette = HIGHLIGHT_PALETTES[highlightPalette];
   const flipStyleStorageKey = useMemo(() => getCourseFlipStyleStorageKey(courseTitle), [courseTitle]);
+  const notesStorageKey = useMemo(() => getCourseNotesStorageKey(courseTitle), [courseTitle]);
   const slideRules = {
     maxLines: slideLayout?.maxLines ?? 10,
     minFontSize: slideLayout?.minFontSize ?? 12.5,
@@ -788,6 +799,25 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       // Ignore storage issues; preview selection can remain session-only.
     }
   }, [flipStyle, flipStyleStorageKey]);
+
+  useEffect(() => {
+    try {
+      const savedNotes = window.localStorage.getItem(notesStorageKey);
+      if (typeof savedNotes === "string") {
+        setLearnerNotes(savedNotes);
+      }
+    } catch {
+      // Ignore localStorage issues and keep notes in memory only.
+    }
+  }, [notesStorageKey]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(notesStorageKey, learnerNotes);
+    } catch {
+      // Ignore localStorage issues and keep notes in memory only.
+    }
+  }, [learnerNotes, notesStorageKey]);
 
   const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, localVideos, courseDuration), [rawOutputs, localVideos, courseDuration]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -1047,9 +1077,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     ? Math.round((currentModuleSlides.filter((moduleSlide) => visited.has(moduleSlide.idx)).length / currentModuleSlides.length) * 100)
     : 0;
   const currentModuleAssessmentSlide = currentModuleSlides.find((moduleSlide) => moduleSlide.type === "assessment" && moduleSlide.question);
+  const currentModuleTitleSlide = currentModuleSlides.find((moduleSlide) => moduleSlide.type === "title");
+  const currentModuleSummarySlide = currentModuleSlides.find((moduleSlide) => moduleSlide.type === "summary");
+  const currentModuleVideoSlide = currentModuleSlides.find((moduleSlide) => moduleSlide.type === "video");
   const currentModuleAssessment = currentModuleAssessmentSlide?.question;
   const currentModuleVideoCount = currentModuleSlides.filter((moduleSlide) => moduleSlide.type === "video").length;
+  const currentModuleVisualCount = currentModuleSlides.filter((moduleSlide) => moduleSlide.type === "content" && (moduleSlide.visualImageDataUrl || moduleSlide.visualSvg)).length;
   const currentModuleObjectiveCount = Math.min(3, currentModuleTopics.length || currentModule?.topics?.length || 0);
+  const courseCompletion = totalSlides > 0 ? Math.round((visited.size / totalSlides) * 100) : 0;
   const shellPageTitle = slide.type === "title"
     ? currentModule?.title || courseTitle
     : slide.type === "assessment"
@@ -1069,11 +1104,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           ? `${slide.video?.channelTitle || "Curated resource"} for this lesson`
           : `Lesson ${(slide.topicIndex || 0) + 1}${slide.topicPartCount && slide.topicPartCount > 1 ? ` · Part ${(slide.topicPartIndex || 0) + 1} of ${slide.topicPartCount}` : ""}`;
   const platformNavItems = [
-    { label: "Home", icon: Home },
-    { label: "My Courses", icon: LibraryBig },
-    { label: "Progress", icon: BarChart3 },
-    { label: "Notes", icon: NotebookPen },
-    { label: "Resources", icon: FolderOpen },
+    { id: "home" as const, label: "Home", icon: Home },
+    { id: "progress" as const, label: "Progress", icon: BarChart3 },
+    { id: "notes" as const, label: "Notes", icon: NotebookPen },
+    { id: "resources" as const, label: "Resources", icon: FolderOpen },
   ];
   const utilityActions = [
     { label: "Discussion", icon: MessageSquareText },
@@ -1107,6 +1141,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   const currentNarration = getNarrationForSlide(currentSlide);
   const currentVisualKey = slide.type === "content" && slide.topicTitle ? `${slide.moduleTitle}::${slide.topicTitle}` : "";
+
+  const handleSidebarSelect = useCallback((panel: SidebarPanel) => {
+    setActiveSidebarPanel(panel);
+
+    if (panel === "home") {
+      navigateToSlide(0);
+    }
+  }, [navigateToSlide]);
 
   const handleApproveVisual = useCallback(() => {
     if (!onUpdateVisualTopic || slide.type !== "content" || !slide.topicTitle) return;
@@ -2119,10 +2161,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           <div className="px-3 py-4">
             {platformNavItems.map((item, index) => {
               const Icon = item.icon;
-              const isActive = index === 0;
+              const isActive = activeSidebarPanel === item.id;
               return (
                 <button
                   key={item.label}
+                  onClick={() => handleSidebarSelect(item.id)}
                   type="button"
                   className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-semibold transition-all ${isActive ? "bg-white/14 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]" : "text-white/72 hover:bg-white/8 hover:text-white"}`}
                 >
@@ -2188,10 +2231,104 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           <div className="border-t border-white/10 px-4 py-4">
             <div className="rounded-2xl bg-white/8 p-4">
               <div className="mb-2 flex items-center justify-between">
-                <p className="text-[12px] font-[800] text-white">Help Center</p>
+                <p className="text-[12px] font-[800] text-white">
+                  {activeSidebarPanel === "home"
+                    ? "Preview Home"
+                    : activeSidebarPanel === "progress"
+                      ? "Progress Snapshot"
+                      : activeSidebarPanel === "notes"
+                        ? "Learner Notes"
+                        : "Module Resources"}
+                </p>
                 <HelpCircle className="h-4 w-4 text-white/70" />
               </div>
-              <p className="text-[12px] leading-relaxed text-white/65">Notes, resources, and support actions can live here once this becomes a full player rather than a preview.</p>
+              {activeSidebarPanel === "home" ? (
+                <div className="space-y-3 text-[12px] leading-relaxed text-white/70">
+                  <p>This preview is focused on the current learning experience, not LMS-level course browsing.</p>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={() => navigateToSlide(0)}
+                      className="rounded-full bg-white px-3 py-1.5 text-[11px] font-[800] text-[#123d78] transition-all hover:bg-slate-100"
+                      type="button"
+                    >
+                      Restart Course
+                    </button>
+                    {currentModuleTitleSlide ? (
+                      <button
+                        onClick={() => navigateToSlide(currentModuleTitleSlide.idx)}
+                        className="rounded-full border border-white/18 bg-white/8 px-3 py-1.5 text-[11px] font-[800] text-white transition-all hover:bg-white/12"
+                        type="button"
+                      >
+                        Module Overview
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+              {activeSidebarPanel === "progress" ? (
+                <div className="space-y-3 text-[12px] leading-relaxed text-white/70">
+                  <div className="rounded-xl bg-white/8 px-3 py-2">
+                    <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-white/52">Course Completion</p>
+                    <p className="mt-1 text-[24px] font-[900] text-white">{courseCompletion}%</p>
+                    <p>{visited.size} of {totalSlides} screens viewed.</p>
+                  </div>
+                  <div className="rounded-xl bg-white/8 px-3 py-2">
+                    <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-white/52">Current Module</p>
+                    <p className="mt-1 text-[18px] font-[900] text-white">{currentModuleCompletion}%</p>
+                    <p>{currentModuleSlides.filter((moduleSlide) => visited.has(moduleSlide.idx)).length} of {currentModuleSlides.length} screens viewed.</p>
+                  </div>
+                  {currentModuleSummarySlide ? (
+                    <button
+                      onClick={() => navigateToSlide(currentModuleSummarySlide.idx)}
+                      className="rounded-full bg-white px-3 py-1.5 text-[11px] font-[800] text-[#123d78] transition-all hover:bg-slate-100"
+                      type="button"
+                    >
+                      Jump to Module Summary
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+              {activeSidebarPanel === "notes" ? (
+                <div className="space-y-2">
+                  <p className="text-[12px] leading-relaxed text-white/70">These notes are saved locally for this course preview.</p>
+                  <textarea
+                    value={learnerNotes}
+                    onChange={(event) => setLearnerNotes(event.target.value)}
+                    placeholder={`Capture takeaways for ${shellPageTitle}...`}
+                    className="min-h-[128px] w-full rounded-xl border border-white/14 bg-white/10 px-3 py-2 text-[12px] text-white placeholder:text-white/35 focus:border-white/30 focus:outline-none"
+                  />
+                </div>
+              ) : null}
+              {activeSidebarPanel === "resources" ? (
+                <div className="space-y-3 text-[12px] leading-relaxed text-white/70">
+                  <div className="rounded-xl bg-white/8 px-3 py-2">
+                    <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-white/52">Current Module Assets</p>
+                    <p className="mt-1">{currentModuleVideoCount} video resource{currentModuleVideoCount === 1 ? "" : "s"}</p>
+                    <p>{currentModuleVisualCount} visual lesson screen{currentModuleVisualCount === 1 ? "" : "s"}</p>
+                    <p>{currentModuleAssessment ? "Knowledge check available" : "No module quiz yet"}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {currentModuleVideoSlide ? (
+                      <button
+                        onClick={() => navigateToSlide(currentModuleVideoSlide.idx)}
+                        className="rounded-full bg-white px-3 py-1.5 text-[11px] font-[800] text-[#123d78] transition-all hover:bg-slate-100"
+                        type="button"
+                      >
+                        Open Video Resource
+                      </button>
+                    ) : null}
+                    {currentModuleAssessmentSlide ? (
+                      <button
+                        onClick={() => navigateToSlide(currentModuleAssessmentSlide.idx)}
+                        className="rounded-full border border-white/18 bg-white/8 px-3 py-1.5 text-[11px] font-[800] text-white transition-all hover:bg-white/12"
+                        type="button"
+                      >
+                        Open Quiz
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </aside>
@@ -2244,7 +2381,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           </div>
 
           <div className="shrink-0 border-b border-[#d7e1ee] bg-white/80 px-4 py-3 backdrop-blur md:px-6">
-            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
+            <div className="grid gap-3">
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="rounded-2xl border border-[#d8e2ef] bg-[#f7fbff] px-4 py-3 shadow-sm">
                   <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#5f7b9e]">Module Progress</p>
@@ -2261,19 +2398,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <p className="mt-2 text-[24px] font-[900] tracking-tight text-[#123d78]">{currentModuleVideoCount + (currentModuleAssessment ? 1 : 0)}</p>
                   <p className="text-[12px] text-[#7c6a52]">{currentModuleAssessment ? "Quiz included" : "No quiz yet"}{currentModuleVideoCount ? ` · ${currentModuleVideoCount} video` : ""}</p>
                 </div>
-              </div>
-
-              <div className="rounded-[24px] border border-[#d8e2ef] bg-[#f7fbff] px-3 py-3 shadow-sm">
-                <PreviewActionBar
-                  highlightEnabled={highlightEnabled}
-                  highlightPalette={highlightPalette}
-                  flipStyle={flipStyle}
-                  onToggleHighlight={() => setHighlightEnabled(prev => !prev)}
-                  onSelectPalette={setHighlightPalette}
-                  onSelectFlipStyle={setFlipStyle}
-                  onPlaceVideos={unassignedCount > 0 ? () => setShowPlacer(true) : undefined}
-                  unassignedCount={unassignedCount}
-                />
               </div>
             </div>
           </div>
@@ -2447,6 +2571,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           onBack={() => setShowPlacer(false)}
         />
       )}
+
+      <PreviewActionBar
+        highlightEnabled={highlightEnabled}
+        highlightPalette={highlightPalette}
+        flipStyle={flipStyle}
+        onToggleHighlight={() => setHighlightEnabled(prev => !prev)}
+        onSelectPalette={setHighlightPalette}
+        onSelectFlipStyle={setFlipStyle}
+        onPlaceVideos={unassignedCount > 0 ? () => setShowPlacer(true) : undefined}
+        unassignedCount={unassignedCount}
+      />
     </div>
   );
 };
