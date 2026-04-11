@@ -1,5 +1,5 @@
 import React from "react";
-import { Eye, EyeOff, Film, Highlighter } from "lucide-react";
+import { BookOpenText, Eye, EyeOff, Film, Highlighter } from "lucide-react";
 
 export const HIGHLIGHT_PALETTES = {
   yellow: {
@@ -24,11 +24,30 @@ export const HIGHLIGHT_PALETTES = {
 
 export type HighlightPalette = keyof typeof HIGHLIGHT_PALETTES;
 
+export const FLIP_STYLES = {
+  dramatic: {
+    label: "Physical Flip",
+    shortLabel: "Physical",
+  },
+  subtle: {
+    label: "Subtle Flip",
+    shortLabel: "Subtle",
+  },
+  bound: {
+    label: "Bound Flipchart",
+    shortLabel: "Bound",
+  },
+} as const;
+
+export type FlipStyle = keyof typeof FLIP_STYLES;
+
 interface PreviewActionBarProps {
   highlightEnabled: boolean;
   highlightPalette: HighlightPalette;
+  flipStyle: FlipStyle;
   onToggleHighlight: () => void;
   onSelectPalette: (palette: HighlightPalette) => void;
+  onSelectFlipStyle: (style: FlipStyle) => void;
   onPlaceVideos?: () => void;
   unassignedCount?: number;
 }
@@ -36,8 +55,10 @@ interface PreviewActionBarProps {
 export const PreviewActionBar: React.FC<PreviewActionBarProps> = ({
   highlightEnabled,
   highlightPalette,
+  flipStyle,
   onToggleHighlight,
   onSelectPalette,
+  onSelectFlipStyle,
   onPlaceVideos,
   unassignedCount = 0,
 }) => {
@@ -83,6 +104,30 @@ export const PreviewActionBar: React.FC<PreviewActionBarProps> = ({
                 }}
               />
               <span className="hidden xl:inline">{palette.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5 rounded-xl bg-secondary/70 px-2 py-1.5">
+        <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <BookOpenText className="h-4 w-4" />
+        </div>
+        {Object.entries(FLIP_STYLES).map(([key, style]) => {
+          const isActive = flipStyle === key;
+          return (
+            <button
+              key={key}
+              onClick={() => onSelectFlipStyle(key as FlipStyle)}
+              className={`inline-flex items-center gap-2 rounded-xl border px-2.5 py-2 text-[12px] font-semibold transition-all ${
+                isActive
+                  ? "border-primary bg-primary/5 text-foreground"
+                  : "border-border bg-card text-muted-foreground hover:border-primary/30 hover:text-foreground"
+              }`}
+              type="button"
+            >
+              <span className="hidden xl:inline">{style.label}</span>
+              <span className="xl:hidden">{style.shortLabel}</span>
             </button>
           );
         })}

@@ -20,6 +20,7 @@ interface OutputPanelProps {
     minFontSize: number;
     lineSpacing: number;
   };
+  onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
 }
 
 const tabs = [
@@ -133,7 +134,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 };
 
 /* ─── Package Renderer ─── */
-const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number } }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, slideLayout }) => {
+const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, slideLayout, onUpdateVisualTopic }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
   const [checklist, setChecklist] = useState<boolean[]>(
@@ -155,6 +156,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           insertedVideos={insertedVideos}
           courseDuration={courseDuration}
           slideLayout={slideLayout}
+          onUpdateVisualTopic={onUpdateVisualTopic}
         />
       )}
 
@@ -352,7 +354,7 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
   );
 };
 
-export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, slideLayout }) => {
+export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, slideLayout, onUpdateVisualTopic }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
@@ -460,7 +462,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       case "assessment":
         return <AssessmentView raw={content} />;
       case "package":
-        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} insertedVideos={allInsertedVideos} courseDuration={courseDuration} slideLayout={slideLayout} />;
+        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} insertedVideos={allInsertedVideos} courseDuration={courseDuration} slideLayout={slideLayout} onUpdateVisualTopic={onUpdateVisualTopic} />;
       case "script":
         return <ScriptView raw={content} voiceRaw={rawOutputs.voice} />;
       case "outline":
@@ -485,6 +487,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           insertedVideos={allInsertedVideos}
           courseDuration={courseDuration}
           slideLayout={slideLayout}
+          onUpdateVisualTopic={onUpdateVisualTopic}
         />
       )}
 

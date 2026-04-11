@@ -91,6 +91,7 @@ function getDurationMinutes(val: string): number {
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   open, courseTitle, estimatedMinutes, onConfirm, onCancel,
 }) => {
+  const displayFont = '"Manrope", "Plus Jakarta Sans", sans-serif';
   const [level, setLevel] = useState<CourseParameters["level"]>("intermediate");
   const [textLanguage, setTextLanguage] = useState("English");
   const [narratorLanguage, setNarratorLanguage] = useState("English");
@@ -184,14 +185,18 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       {showMismatchWarning && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
           <div className="absolute inset-0 bg-black/40" />
-          <div className="relative w-[500px] max-w-[92vw] bg-card rounded-2xl shadow-2xl overflow-hidden animate-fade-in" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="relative w-[500px] max-w-[92vw] bg-card rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
+            style={{ fontFamily: displayFont }}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="h-1.5 w-full bg-amber-500" />
             <div className="px-8 pt-7 pb-6">
               <div className="flex items-center gap-3 mb-5">
                 <div className="w-12 h-12 rounded-xl bg-amber-500/10 flex items-center justify-center shrink-0">
                   <AlertTriangle className="w-6 h-6 text-amber-500" />
                 </div>
-                <h3 className="text-[18px] font-extrabold text-foreground leading-tight">
+                <h3 className="text-[18px] font-extrabold tracking-tight text-foreground leading-tight">
                   Duration Mismatch
                 </h3>
               </div>
@@ -229,6 +234,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
       <div
         className="relative w-[520px] max-w-[95vw] max-h-[90vh] bg-card rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
+        style={{ fontFamily: displayFont }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -238,7 +244,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               <Settings2 className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h2 className="text-[17px] font-extrabold text-foreground">Course Parameters</h2>
+              <h2 className="text-[17px] font-extrabold tracking-tight text-foreground">Course Parameters</h2>
               <p className="text-[12px] text-muted-foreground truncate max-w-[300px]">{courseTitle}</p>
             </div>
           </div>
@@ -466,13 +472,13 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
         <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="h-10 px-5 rounded-xl text-[13px] font-bold text-foreground border border-border hover:bg-secondary transition-all"
+            className="h-10 px-5 rounded-xl text-[13px] font-extrabold tracking-tight text-foreground border border-border hover:bg-secondary transition-all"
           >
             Cancel
           </button>
           <button
             onClick={handleConfirm}
-            className="h-10 px-6 rounded-xl text-[14px] font-bold text-white shadow-lg hover:brightness-110 transition-all"
+            className="h-10 px-6 rounded-xl text-[14px] font-extrabold tracking-tight text-white shadow-lg hover:brightness-110 transition-all"
             style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
           >
             Generate Course

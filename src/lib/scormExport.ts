@@ -37,6 +37,11 @@ interface ModuleSection {
   bodyHtml: string;
   moduleContent: string;
   keyTakeaway: string;
+  visualImageDataUrl?: string;
+  visualSvg?: string;
+  visualPlacement?: string;
+  visualAltText?: string;
+  screenTemplate?: "dashboard" | "guided-notes" | "scenario" | "media-quiz" | "summary-panel";
 }
 
 function normalizeTextKey(value: string): string {
@@ -175,6 +180,18 @@ function markdownToHtml(markdown: string): string {
   return htmlParts.join("\n        ");
 }
 
+function normalizeSvgMarkup(svg: string): string {
+  return svg.replace(/<svg\b([^>]*)>/i, (_match, attrs) => {
+    const hasPreserveAspectRatio = /preserveAspectRatio=/i.test(attrs);
+    const cleanedAttrs = attrs
+      .replace(/\swidth="[^"]*"/i, "")
+      .replace(/\sheight="[^"]*"/i, "")
+      .replace(/\sstyle="[^"]*"/i, "");
+
+    return `<svg${cleanedAttrs} width="100%" height="100%" style="display:block;width:100%;height:100%;"${hasPreserveAspectRatio ? "" : ' preserveAspectRatio="xMidYMid meet"'}>`;
+  });
+}
+
 function extractTakeaway(markdown: string): { cleanedMarkdown: string; takeaway: string } {
   const normalized = markdown.replace(/\r\n/g, "\n");
   const marker = /Key Takeaway:\s*([^\n]+)/i;
@@ -222,11 +239,46 @@ function parseModules(archRaw: string): Module[] {
   return modules;
 }
 
-function parseScript(writerRaw: string, modules: Module[]): Map<string, ModuleSection[]> {
+function parseVisualSections(visualRaw: string): Map<string, Map<string, { imageDataUrl?: string; svg?: string; placement: string; altText: string; screenTemplate?: "dashboard" | "guided-notes" | "scenario" | "media-quiz" | "summary-panel" }>> {
+  const visualData = tryParseJSON(visualRaw);
+  const modules = visualData?.modules || visualData?.course_visual_plan?.modules || visualData?.module_visuals || [];
+  const visualMap = new Map<string, Map<string, { imageDataUrl?: string; svg?: string; placement: string; altText: string; screenTemplate?: "dashboard" | "guided-notes" | "scenario" | "media-quiz" | "summary-panel" }>>();
+
+  modules.forEach((moduleVisual: any) => {
+    const moduleTitle = String(moduleVisual?.module_title || moduleVisual?.title || moduleVisual?.name || "").trim();
+    if (!moduleTitle) return;
+
+    const topicMap = new Map<string, { imageDataUrl?: string; svg?: string; placement: string; altText: string; screenTemplate?: "dashboard" | "guided-notes" | "scenario" | "media-quiz" | "summary-panel" }>();
+    const topicVisuals = Array.isArray(moduleVisual?.topic_visuals) ? moduleVisual.topic_visuals : [];
+    topicVisuals.forEach((topicVisual: any) => {
+      const topicTitle = String(topicVisual?.topic_title || topicVisual?.title || topicVisual?.name || "").trim();
+      const generatedImageDataUrl = String(topicVisual?.generated_image_data_url || "").trim();
+      const generatedSceneSvg = String(topicVisual?.generated_scene_svg || "").trim();
+      const screenTemplate = topicVisual?.screen_template === "dashboard" || topicVisual?.screen_template === "guided-notes" || topicVisual?.screen_template === "scenario" || topicVisual?.screen_template === "media-quiz" || topicVisual?.screen_template === "summary-panel"
+        ? topicVisual.screen_template
+        : undefined;
+      if (!topicTitle || (!generatedImageDataUrl && !generatedSceneSvg && !screenTemplate)) return;
+      topicMap.set(normalizeTextKey(topicTitle), {
+        imageDataUrl: generatedImageDataUrl || undefined,
+        svg: generatedSceneSvg ? normalizeSvgMarkup(generatedSceneSvg) : undefined,
+        placement: String(topicVisual?.placement || "hero"),
+        altText: String(topicVisual?.alt_text || `AI-generated visual for ${topicTitle}`),
+        screenTemplate,
+      });
+    });
+
+    visualMap.set(normalizeTextKey(moduleTitle), topicMap);
+  });
+
+  return visualMap;
+}
+
+function parseScript(writerRaw: string, modules: Module[], visualRaw?: string): Map<string, ModuleSection[]> {
   if (!writerRaw) return new Map<string, ModuleSection[]>();
 
   const typedMap = new Map<string, ModuleSection[]>();
   const sectionMap = new Map<string, string>();
+  const visualMap = parseVisualSections(visualRaw || "");
   const chunks = writerRaw.split(/^##\s+/m).map((chunk) => chunk.trim()).filter(Boolean);
 
   for (const chunk of chunks) {
@@ -237,18 +289,25 @@ function parseScript(writerRaw: string, modules: Module[]): Map<string, ModuleSe
   }
 
   modules.forEach((mod) => {
+    const moduleVisuals = visualMap.get(normalizeTextKey(mod.title)) || new Map();
     const moduleSections: ModuleSection[] = (mod.topics.length > 0 ? mod.topics : [mod.title]).map((topic) => {
       const heading = parseTopicLabel(topic) || mod.title;
       const rawMarkdown = sectionMap.get(normalizeTextKey(heading)) || `Content for ${heading}`;
       const { cleanedMarkdown, takeaway } = extractTakeaway(rawMarkdown);
       const bodyMarkdown = cleanedMarkdown || rawMarkdown;
       const plainText = stripMarkdown(bodyMarkdown);
+      const visual = moduleVisuals.get(normalizeTextKey(heading));
       return {
         heading,
         bodyMarkdown,
         bodyHtml: markdownToHtml(bodyMarkdown),
         moduleContent: getFirstSentences(plainText, 3) || plainText || `Key point: ${heading}`,
         keyTakeaway: takeaway,
+        visualImageDataUrl: visual?.imageDataUrl,
+        visualSvg: visual?.svg,
+        visualPlacement: visual?.placement,
+        visualAltText: visual?.altText,
+        screenTemplate: visual?.screenTemplate,
       };
     });
 
@@ -445,7 +504,148 @@ function buildModuleHtml(
     moduleContent: section.moduleContent,
   }));
 
-  const sectionsHtml = sections.map((section, sectionIndex) => `
+  const renderDashboardSection = (section: ModuleSection, sectionIndex: number) => {
+    const objectives = moduleTopics.slice(Math.max(0, sectionIndex - 1), Math.max(0, sectionIndex - 1) + 3);
+    return `
+      <section class="lesson-section lesson-template-dashboard" id="section-${sectionIndex + 1}">
+        <div class="dashboard-grid">
+          <div class="dashboard-main-card">
+            <p class="dashboard-eyebrow">Lesson ${sectionIndex + 1}</p>
+            <h2>${escapeHtml(section.heading)}</h2>
+            <p class="dashboard-summary">${escapeHtml(section.moduleContent)}</p>
+            ${section.visualImageDataUrl || section.visualSvg ? `
+            <div class="dashboard-hero-card" aria-label="${escapeAttribute(section.visualAltText || section.heading)}">
+              <div class="dashboard-hero-frame">
+                ${section.visualImageDataUrl
+                  ? `<img src="${escapeAttribute(section.visualImageDataUrl)}" alt="${escapeAttribute(section.visualAltText || section.heading)}" class="section-visual-image"/>`
+                  : section.visualSvg || ""}
+              </div>
+            </div>` : ""}
+            <div class="dashboard-copy-card">
+              ${section.bodyHtml}
+            </div>
+          </div>
+          <div class="dashboard-side-column">
+            <div class="dashboard-info-card">
+              <div class="dashboard-card-label">Learning objectives</div>
+              <div class="dashboard-objectives">
+                ${objectives.map((topic) => `<div class="dashboard-objective"><span class="dashboard-dot"></span><span>${escapeHtml(topic.heading)}</span></div>`).join("")}
+              </div>
+            </div>
+            <div class="dashboard-info-card">
+              <div class="dashboard-card-label">Guided takeaway</div>
+              <p>${renderInlineMarkdown(section.keyTakeaway || section.moduleContent)}</p>
+            </div>
+            <div class="dashboard-info-card dashboard-info-card-warm">
+              <div class="dashboard-card-label">Did you know?</div>
+              <p>${escapeHtml(section.keyTakeaway || getFirstSentences(stripMarkdown(section.bodyMarkdown), 1) || section.moduleContent)}</p>
+            </div>
+          </div>
+        </div>
+      </section>`;
+  };
+
+  const renderScenarioSection = (section: ModuleSection, sectionIndex: number) => {
+    const supportingText = getFirstSentences(stripMarkdown(section.bodyMarkdown), 2) || section.moduleContent;
+    return `
+      <section class="lesson-section lesson-template-scenario" id="section-${sectionIndex + 1}">
+        <div class="scenario-grid">
+          <div class="scenario-main-card">
+            <div class="dashboard-card-label">Scenario</div>
+            <h2>${escapeHtml(section.heading)}</h2>
+            <p class="dashboard-summary">${escapeHtml(section.moduleContent)}</p>
+            <div class="scenario-callout">
+              <div class="dashboard-card-label">What is happening?</div>
+              <p>${escapeHtml(supportingText)}</p>
+            </div>
+            <div class="dashboard-copy-card">
+              ${section.bodyHtml}
+            </div>
+          </div>
+          <div class="scenario-side-column">
+            <div class="dashboard-info-card">
+              <div class="dashboard-card-label">Visual context</div>
+              <div class="dashboard-hero-frame">
+                ${section.visualImageDataUrl
+                  ? `<img src="${escapeAttribute(section.visualImageDataUrl)}" alt="${escapeAttribute(section.visualAltText || section.heading)}" class="section-visual-image"/>`
+                  : section.visualSvg || `<div class="scenario-empty-visual">Scenario visual placeholder</div>`}
+              </div>
+            </div>
+            <div class="dashboard-info-card dashboard-info-card-warm">
+              <div class="dashboard-card-label">Better move</div>
+              <p>${renderInlineMarkdown(section.keyTakeaway || section.moduleContent)}</p>
+            </div>
+          </div>
+        </div>
+      </section>`;
+  };
+
+  const renderMediaQuizSection = (section: ModuleSection, sectionIndex: number) => {
+    const quizPreview = quizzes[sectionIndex] || quizzes[0];
+    return `
+      <section class="lesson-section lesson-template-media-quiz" id="section-${sectionIndex + 1}">
+        <div class="media-quiz-grid">
+          <div class="media-quiz-main-card">
+            <div class="dashboard-card-label">Media Focus</div>
+            <h2>${escapeHtml(section.heading)}</h2>
+            <p class="dashboard-summary">${escapeHtml(section.moduleContent)}</p>
+            <div class="dashboard-hero-card">
+              <div class="dashboard-hero-frame">
+                ${section.visualImageDataUrl
+                  ? `<img src="${escapeAttribute(section.visualImageDataUrl)}" alt="${escapeAttribute(section.visualAltText || section.heading)}" class="section-visual-image"/>`
+                  : section.visualSvg || `<div class="scenario-empty-visual">Media placeholder</div>`}
+              </div>
+            </div>
+            <div class="dashboard-copy-card">
+              ${section.bodyHtml}
+            </div>
+          </div>
+          <div class="dashboard-side-column">
+            <div class="dashboard-info-card">
+              <div class="dashboard-card-label">Quick check</div>
+              ${quizPreview ? `
+              <p class="media-quiz-question">${escapeHtml(quizPreview.question)}</p>
+              <div class="media-quiz-options">
+                ${quizPreview.options.slice(0, 3).map((option, index) => `<div class="media-quiz-option"><strong>${String.fromCharCode(65 + index)}.</strong> ${escapeHtml(option)}</div>`).join("")}
+              </div>` : `<p>No quiz preview available for this screen.</p>`}
+            </div>
+            <div class="dashboard-info-card dashboard-info-card-warm">
+              <div class="dashboard-card-label">Takeaway</div>
+              <p>${renderInlineMarkdown(section.keyTakeaway || section.moduleContent)}</p>
+            </div>
+          </div>
+        </div>
+      </section>`;
+  };
+
+  const renderSummaryPanelSection = (section: ModuleSection, sectionIndex: number) => {
+    const bulletSentences = splitIntoSentences(stripMarkdown(section.bodyMarkdown)).slice(0, 3);
+    return `
+      <section class="lesson-section lesson-template-summary-panel" id="section-${sectionIndex + 1}">
+        <div class="summary-panel-header">
+          <div>
+            <div class="dashboard-card-label">Summary panel</div>
+            <h2>${escapeHtml(section.heading)}</h2>
+          </div>
+        </div>
+        <div class="summary-panel-grid">
+          <div class="summary-panel-card">
+            <div class="dashboard-card-label">Key takeaway</div>
+            <p>${renderInlineMarkdown(section.keyTakeaway || section.moduleContent)}</p>
+          </div>
+          <div class="summary-panel-card">
+            <div class="dashboard-card-label">Signals to remember</div>
+            ${bulletSentences.map((sentence) => `<div class="dashboard-objective"><span class="dashboard-dot"></span><span>${escapeHtml(sentence)}</span></div>`).join("")}
+          </div>
+          <div class="summary-panel-card summary-panel-card-warm">
+            <div class="dashboard-card-label">Apply next</div>
+            <p>${escapeHtml(getFirstSentences(stripMarkdown(section.bodyMarkdown), 1) || section.moduleContent)}</p>
+          </div>
+        </div>
+      </section>`;
+  };
+
+  const sectionsHtml = sections.map((section, sectionIndex) => section.screenTemplate === "dashboard" ? renderDashboardSection(section, sectionIndex) : section.screenTemplate === "scenario" ? renderScenarioSection(section, sectionIndex) : section.screenTemplate === "media-quiz" ? renderMediaQuizSection(section, sectionIndex) : section.screenTemplate === "summary-panel" ? renderSummaryPanelSection(section, sectionIndex) : `
       <section class="lesson-section" id="section-${sectionIndex + 1}">
         <div
           class="avatar-narrator"
@@ -479,9 +679,19 @@ function buildModuleHtml(
             <button type="button" class="avatar-btn example-btn" data-action="example" hidden>Give me an example</button>
           </div>
         </div>
-        <div class="section-body">
+        <div class="section-layout ${section.visualImageDataUrl || section.visualSvg ? `layout-${escapeAttribute(section.visualPlacement || "hero")}` : "layout-text-only"}">
+          ${section.visualImageDataUrl || section.visualSvg ? `
+          <div class="section-visual-card" aria-label="${escapeAttribute(section.visualAltText || section.heading)}">
+            <div class="section-visual-frame">
+              ${section.visualImageDataUrl
+                ? `<img src="${escapeAttribute(section.visualImageDataUrl)}" alt="${escapeAttribute(section.visualAltText || section.heading)}" class="section-visual-image"/>`
+                : section.visualSvg || ""}
+            </div>
+          </div>` : ""}
+          <div class="section-body">
           <h2>${escapeHtml(section.heading)}</h2>
           ${section.bodyHtml}
+          </div>
         </div>
         ${section.keyTakeaway ? `
         <aside class="key-takeaway-card">
@@ -642,6 +852,35 @@ function buildModuleHtml(
     .progress-fill { height: 100%; background: var(--progress-fill, #fbbf24); transition: width 0.3s; }
     .container { max-width: 780px; margin: 0 auto; padding: 32px 24px; }
     .lesson-section { margin-bottom: 32px; padding: 24px; border-radius: 24px; background: var(--card); border: 1px solid var(--border); box-shadow: 0 12px 30px var(--shadow-elevated, rgba(79, 70, 229, 0.06)); }
+    .lesson-template-dashboard { padding: 26px; background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.98)); }
+    .dashboard-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) 260px; align-items: start; }
+    .dashboard-main-card, .dashboard-info-card { border-radius: 20px; border: 1px solid var(--border); background: rgba(255,255,255,0.92); box-shadow: 0 12px 28px var(--shadow-elevated, rgba(79, 70, 229, 0.06)); }
+    .dashboard-main-card { padding: 20px; }
+    .dashboard-side-column { display: grid; gap: 16px; }
+    .scenario-grid, .media-quiz-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) 280px; align-items: start; }
+    .scenario-main-card, .media-quiz-main-card { border-radius: 20px; border: 1px solid var(--border); background: rgba(255,255,255,0.92); box-shadow: 0 12px 28px var(--shadow-elevated, rgba(79, 70, 229, 0.06)); padding: 20px; }
+    .scenario-side-column { display: grid; gap: 16px; }
+    .scenario-callout { margin-top: 16px; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(180deg, #f8fbff, #eef4fa); padding: 16px; }
+    .scenario-empty-visual { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 220px; color: var(--muted); font-size: 14px; text-align: center; padding: 18px; background: linear-gradient(180deg, #f7fafc, #edf2f7); }
+    .media-quiz-question { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 12px; }
+    .media-quiz-options { display: grid; gap: 8px; }
+    .media-quiz-option { border-radius: 12px; border: 1px solid var(--border); background: #fbfdff; padding: 10px 12px; font-size: 13px; color: var(--text); }
+    .summary-panel-header { margin-bottom: 18px; }
+    .summary-panel-grid { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .summary-panel-card { border-radius: 20px; border: 1px solid var(--border); background: rgba(255,255,255,0.96); box-shadow: 0 12px 28px var(--shadow-elevated, rgba(79, 70, 229, 0.06)); padding: 18px; }
+    .summary-panel-card-warm { background: #fff7df; }
+    .dashboard-eyebrow { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.16em; color: #5f7b9e; margin-bottom: 10px; }
+    .dashboard-summary { margin-top: 10px; font-size: 15px; color: var(--muted); }
+    .dashboard-hero-card { margin-top: 18px; overflow: hidden; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(180deg, #eef3f8, #f8fafc); }
+    .dashboard-hero-frame { aspect-ratio: 16 / 10; width: 100%; }
+    .dashboard-hero-frame svg { display: block; width: 100%; height: 100%; }
+    .dashboard-copy-card { margin-top: 18px; border-radius: 18px; border: 1px solid var(--border); background: #fff; padding: 18px; }
+    .dashboard-info-card { padding: 16px; }
+    .dashboard-info-card-warm { background: #fff7df; }
+    .dashboard-card-label { margin-bottom: 10px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.16em; color: #5f7b9e; }
+    .dashboard-objectives { display: grid; gap: 10px; }
+    .dashboard-objective { display: flex; gap: 9px; align-items: flex-start; font-size: 13px; color: var(--text); }
+    .dashboard-dot { width: 10px; height: 10px; border-radius: 999px; background: #f59e0b; margin-top: 4px; flex: 0 0 auto; }
     .topic-pill-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
     .topic-pill { border: 1px solid var(--topic-pill-border, #c7c3f3); background: var(--topic-pill-bg, #f6f4ff); color: var(--topic-pill-text, #3c3489); font-size: 12px; font-weight: 700; padding: 7px 12px; border-radius: 999px; cursor: pointer; transition: all 0.2s ease; }
     .topic-pill.active, .topic-pill:hover { background: var(--topic-pill-active-bg, #eeedfe); border-color: var(--topic-pill-active-border, #afa9ec); }
@@ -659,6 +898,15 @@ function buildModuleHtml(
     .stop-btn, .example-btn { border: 1px solid var(--bubble-border, #AFA9EC); background: var(--card, #fff); color: var(--bubble-text, #26215C); }
     .avatar-btn:hover { transform: translateY(-1px); }
     .avatar-btn[disabled] { opacity: 0.6; cursor: not-allowed; transform: none; }
+    .section-layout { display: grid; gap: 18px; }
+    .layout-side-panel { grid-template-columns: minmax(0, 1fr) 280px; align-items: start; }
+    .layout-inline-card { grid-template-columns: minmax(0, 1fr); }
+    .layout-hero { grid-template-columns: minmax(0, 1fr); }
+    .layout-text-only { grid-template-columns: minmax(0, 1fr); }
+    .section-visual-card { overflow: hidden; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(180deg, #eef3f8, #f8fafc); box-shadow: 0 12px 24px var(--shadow-elevated, rgba(79, 70, 229, 0.06)); }
+    .section-visual-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .section-visual-frame { aspect-ratio: 8 / 5; width: 100%; }
+    .section-visual-frame svg { display: block; width: 100%; height: 100%; }
     .section-body { font-size: 15px; line-height: 1.8; }
     .section-body h2, .section-body h3 { color: var(--text); margin-bottom: 12px; }
     .section-body h2 { font-size: 22px; }
@@ -712,6 +960,10 @@ function buildModuleHtml(
       .header { padding: 24px 20px 19px; }
       .container { padding: 24px 16px; }
       .lesson-section { padding: 18px; }
+      .dashboard-grid { grid-template-columns: 1fr; }
+      .scenario-grid, .media-quiz-grid { grid-template-columns: 1fr; }
+      .summary-panel-grid { grid-template-columns: 1fr; }
+      .layout-side-panel { grid-template-columns: 1fr; }
       .avatar-head { flex-direction: column; align-items: flex-start; gap: 10px; }
       .avatar-actions { flex-direction: column; }
       .avatar-btn { width: 100%; }
@@ -1065,7 +1317,7 @@ export async function exportScormPackage(
     throw new Error("No modules found in the course outline. Please generate the course first.");
   }
 
-  const scriptMap = parseScript(rawOutputs.writer, modules);
+  const scriptMap = parseScript(rawOutputs.writer, modules, rawOutputs.visual);
   const allQuizzes = parseAssessment(rawOutputs.assessment);
   const voiceSections = parseVoiceSections(rawOutputs.voice);
 

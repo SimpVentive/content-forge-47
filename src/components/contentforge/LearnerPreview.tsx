@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, ZoomIn, ZoomOut } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, LibraryBig, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle } from "lucide-react";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
-import { HIGHLIGHT_PALETTES, PreviewActionBar, type HighlightPalette } from "./PreviewActionBar";
+import { FLIP_STYLES, HIGHLIGHT_PALETTES, PreviewActionBar, type FlipStyle, type HighlightPalette } from "./PreviewActionBar";
 import { AvatarNarrator } from "./AvatarNarrator";
 
 /* ── helpers ── */
@@ -107,11 +107,101 @@ interface Slide {
   moduleTitle: string;
   topicIndex?: number;
   topicTitle?: string;
+  topicPartIndex?: number;
+  topicPartCount?: number;
   content?: string;
   infographicSvg?: string;
+  visualImageDataUrl?: string;
+  visualSvg?: string;
+  visualPlacement?: "hero" | "side-panel" | "inline-card";
+  visualAltText?: string;
+  visualPrompt?: string;
+  visualApproved?: boolean;
+  contentTemplate?: ContentTemplate;
   question?: { question: string; options: string[]; correct_answer: string; rationale?: string };
   takeaways?: string[];
   video?: InsertedVideo;
+}
+
+function getDurationMinutes(duration?: string): number {
+  const parsed = Number.parseInt(duration || "15", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
+}
+
+function splitParagraphIntoSentenceChunks(paragraph: string, targetWordsPerChunk: number): string[] {
+  const normalized = paragraph.trim();
+  if (!normalized) return [];
+
+  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`’”]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+  const chunks: string[] = [];
+  let currentChunk: string[] = [];
+  let currentWordCount = 0;
+
+  for (const sentence of sentences) {
+    const sentenceWordCount = sentence.split(/\s+/).filter(Boolean).length;
+    if (currentChunk.length > 0 && currentWordCount + sentenceWordCount > targetWordsPerChunk) {
+      chunks.push(currentChunk.join(" ").trim());
+      currentChunk = [sentence];
+      currentWordCount = sentenceWordCount;
+    } else {
+      currentChunk.push(sentence);
+      currentWordCount += sentenceWordCount;
+    }
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(currentChunk.join(" ").trim());
+  }
+
+  return chunks;
+}
+
+function splitTopicContentIntoSlides(text: string, durationMinutes: number): string[] {
+  const lines = text.split("\n").filter(line => !line.match(/^#{1,3}\s/));
+  const paragraphs = lines.join("\n").trim().split(/\n\n+/).map((paragraph) => paragraph.trim()).filter(Boolean);
+  if (paragraphs.length === 0) return [text.trim()].filter(Boolean);
+
+  const targetWordsPerSlide = durationMinutes <= 5 ? 70 : durationMinutes <= 10 ? 85 : durationMinutes <= 20 ? 100 : 115;
+  const chunks: string[] = [];
+  let currentParagraphs: string[] = [];
+  let currentWordCount = 0;
+
+  const flushChunk = () => {
+    if (currentParagraphs.length === 0) return;
+    chunks.push(currentParagraphs.join("\n\n").trim());
+    currentParagraphs = [];
+    currentWordCount = 0;
+  };
+
+  paragraphs.forEach((paragraph) => {
+    const paragraphWordCount = paragraph.split(/\s+/).filter(Boolean).length;
+
+    if (paragraphWordCount > targetWordsPerSlide * 1.35) {
+      flushChunk();
+      splitParagraphIntoSentenceChunks(paragraph, targetWordsPerSlide).forEach((sentenceChunk) => {
+        if (sentenceChunk) chunks.push(sentenceChunk);
+      });
+      return;
+    }
+
+    if (currentParagraphs.length > 0 && currentWordCount + paragraphWordCount > targetWordsPerSlide) {
+      flushChunk();
+    }
+
+    currentParagraphs.push(paragraph);
+    currentWordCount += paragraphWordCount;
+  });
+
+  flushChunk();
+  return chunks.length > 0 ? chunks : [text.trim()].filter(Boolean);
+}
+
+function getTopicVisual(moduleVisual: any, topicTitle: string) {
+  const topicVisuals = Array.isArray(moduleVisual?.topic_visuals) ? moduleVisual.topic_visuals : [];
+  return topicVisuals.find((visual: any) => {
+    const candidateTitle = visual?.topic_title || visual?.title || visual?.name || "";
+    return candidateTitle && normalizeModuleKey(candidateTitle) === normalizeModuleKey(topicTitle);
+  });
 }
 
 /* ── Parse writer content into structured parts ── */
@@ -149,12 +239,43 @@ function parseContentParts(text: string) {
   return { hook, body, takeaway, challenge };
 }
 
+type ContentTemplate = "dashboard" | "guided-notes" | "scenario" | "media-quiz" | "summary-panel";
+
+function inferContentTemplate(slide: Slide, hasVisual: boolean): ContentTemplate {
+  if (
+    slide.contentTemplate === "dashboard" ||
+    slide.contentTemplate === "guided-notes" ||
+    slide.contentTemplate === "scenario" ||
+    slide.contentTemplate === "media-quiz" ||
+    slide.contentTemplate === "summary-panel"
+  ) {
+    return slide.contentTemplate;
+  }
+  const isModuleOpener = (slide.topicIndex || 0) === 0 && (slide.topicPartIndex || 0) === 0;
+  if ((slide.topicPartCount || 1) > 1 && (slide.topicPartIndex || 0) === (slide.topicPartCount || 1) - 1) return "summary-panel";
+  if (isModuleOpener || hasVisual) return "dashboard";
+  return "guided-notes";
+}
+
+function getTopicLearningObjectives(moduleTopics: string[], topicTitle?: string): string[] {
+  const seeded = topicTitle ? [topicTitle, ...moduleTopics.filter((topic) => topic !== topicTitle)] : moduleTopics;
+  return Array.from(new Set(seeded.filter(Boolean))).slice(0, 3);
+}
+
+function getQuickFact(parts: { hook: string; body: string[]; takeaway: string; challenge: string }): string {
+  if (parts.takeaway) return parts.takeaway;
+  const fallback = [parts.hook, ...parts.body].find(Boolean) || "Focus on the behavior shift that matters most in this lesson.";
+  const sentence = stripNarratorMarkdown(fallback).match(/[^.!?]+[.!?]+|[^.!?]+$/)?.[0]?.trim();
+  return sentence || fallback;
+}
+
 /* ── build slides from agent outputs ── */
-function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = []): { modules: Module[]; slides: Slide[] } {
+function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
   const assessData = tryParseJSON(rawOutputs.assessment);
   const visualData = tryParseJSON(rawOutputs.visual);
+  const durationMinutes = getDurationMinutes(courseDuration);
 
   // Extract modules
   let modules: Module[] = [];
@@ -213,15 +334,37 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       if (!sectionText) {
         sectionText = `Content for "${topic}" will appear here after running the pipeline.`;
       }
-      
-      slides.push({
-        type: "content",
-        moduleIndex: mi,
-        moduleTitle: mod.title,
-        topicIndex: ti,
-        topicTitle: topic,
-        content: sectionText,
-        infographicSvg: ti === 0 ? infographicDescription : undefined,
+
+      const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes);
+      const topicVisual = getTopicVisual(matchedVisualModule, topic);
+      const generatedImageDataUrl = typeof topicVisual?.generated_image_data_url === "string" && topicVisual.generated_image_data_url.trim().length > 0
+        ? topicVisual.generated_image_data_url
+        : undefined;
+      const generatedSceneSvg = typeof topicVisual?.generated_scene_svg === "string" && topicVisual.generated_scene_svg.trim().length > 0
+        ? normalizeSvg(topicVisual.generated_scene_svg)
+        : undefined;
+      const screenTemplate = topicVisual?.screen_template === "dashboard" || topicVisual?.screen_template === "guided-notes" || topicVisual?.screen_template === "scenario" || topicVisual?.screen_template === "media-quiz" || topicVisual?.screen_template === "summary-panel"
+        ? topicVisual.screen_template
+        : undefined;
+      contentChunks.forEach((chunk, chunkIndex) => {
+        slides.push({
+          type: "content",
+          moduleIndex: mi,
+          moduleTitle: mod.title,
+          topicIndex: ti,
+          topicTitle: topic,
+          topicPartIndex: chunkIndex,
+          topicPartCount: contentChunks.length,
+          content: chunk,
+          infographicSvg: ti === 0 && chunkIndex === 0 ? infographicDescription : undefined,
+          visualImageDataUrl: chunkIndex === 0 ? generatedImageDataUrl : undefined,
+          visualSvg: chunkIndex === 0 ? generatedSceneSvg : undefined,
+          visualPlacement: chunkIndex === 0 ? topicVisual?.placement : undefined,
+          visualAltText: chunkIndex === 0 ? topicVisual?.alt_text : undefined,
+          visualPrompt: chunkIndex === 0 ? topicVisual?.image_prompt : undefined,
+          visualApproved: chunkIndex === 0 ? Boolean(topicVisual?.image_approved) : undefined,
+          contentTemplate: chunkIndex === 0 ? screenTemplate : "guided-notes",
+        });
       });
       topicCounter++;
     });
@@ -315,6 +458,20 @@ function extractSVG(text: string): string {
   return "";
 }
 
+function normalizeSvg(svg: string): string {
+  return svg.replace(/<svg\b([^>]*)>/i, (_match, attrs) => {
+    const hasPreserveAspectRatio = /preserveAspectRatio=/i.test(attrs);
+    const cleanedAttrs = attrs
+      .replace(/\swidth="[^"]*"/i, "")
+      .replace(/\sheight="[^"]*"/i, "")
+      .replace(/\sstyle="[^"]*"/i, "");
+
+    return `<svg${cleanedAttrs} width="100%" height="100%" style="display:block;width:100%;height:100%;"${hasPreserveAspectRatio ? "" : ' preserveAspectRatio="xMidYMid meet"'}>`;
+  });
+}
+
+const INFOGRAPHIC_SYSTEM_PROMPT = "You are an elite SVG infographic designer for polished corporate eLearning. Generate a sophisticated, presentation-quality SVG infographic that uses the full canvas confidently, with strong visual hierarchy, large readable headings, 3-5 clearly separated content zones, connectors, icons built only from SVG primitives, and disciplined whitespace. Avoid giant empty margins, tiny text, clip-art aesthetics, or toy layouts. The SVG must be self-contained, 1200x800, with no external fonts or images. Use only these colors: #0f172a, #123d78, #355fa8, #4f46e5, #7c3aed, #10b981, #f59e0b, #e8eef9, #f8fafc, #ffffff. Make it feel like a premium consulting slide, not a simple classroom handout. Return only SVG markup.";
+
 const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string }> = ({ description, moduleTitle }) => {
   const [expanded, setExpanded] = useState(false);
   const [svg, setSvg] = useState("");
@@ -323,6 +480,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
   const [showZoomed, setShowZoomed] = useState(false);
   const [explanation, setExplanation] = useState("");
   const [explaining, setExplaining] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState(1.45);
 
   const generateSvg = useCallback(async () => {
     if (svg || loading) return;
@@ -332,14 +490,14 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
       const { supabase } = await import("@/integrations/supabase/client");
       const { data, error: fnErr } = await supabase.functions.invoke("claude", {
         body: {
-          systemPrompt: "You are an SVG infographic designer. Generate a clean, professional SVG infographic. Use only these colors: #4f46e5 (indigo), #7c3aed (violet), #10b981 (emerald), #f59e0b (amber), #f8fafc (background), #0f172a (text). The SVG must be 600x400px, self-contained, with no external fonts or images. Use geometric shapes, icons made from basic SVG paths, and bold readable text.",
-          userMessage: `Create an infographic for module: "${moduleTitle}". Visual description: ${description}`,
+          systemPrompt: INFOGRAPHIC_SYSTEM_PROMPT,
+          userMessage: `Create an infographic for module: "${moduleTitle}". Visual description: ${description}. Requirements: fill the canvas with a confident layout, use large readable labels, keep copy concise, and make the output feel like a polished modern eLearning visual aid that can still be read clearly when expanded in a learner preview.`,
         },
       });
       if (fnErr || data?.error) {
         setError(true);
       } else {
-        const result = extractSVG(data.text || "");
+        const result = normalizeSvg(extractSVG(data.text || ""));
         if (result) setSvg(result);
         else setError(true);
       }
@@ -384,100 +542,169 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
     }
   }, [description, explanation, explaining, moduleTitle]);
 
+  const updateZoomLevel = (nextZoom: number) => {
+    setZoomLevel(Math.max(1, Math.min(2.4, Number(nextZoom.toFixed(2)))));
+  };
+
   return (
-    <div className="mb-6 rounded-2xl border border-border overflow-hidden anim-scale-in" style={{ animationDelay: "0.16s" }}>
+    <div className="mb-6 overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(30,41,59,0.82))] text-white shadow-[0_24px_54px_rgba(15,23,42,0.26)] anim-scale-in" style={{ animationDelay: "0.16s" }}>
       <button
         onClick={handleToggle}
-        className="w-full flex items-start gap-3 p-4 hover:bg-secondary/50 transition-colors text-left"
-        style={{ background: "hsl(var(--secondary) / 0.7)" }}
+        className="flex w-full items-start gap-4 px-5 py-4 text-left transition-colors hover:bg-white/5"
+        type="button"
       >
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-[18px] text-primary">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-[18px] text-white shadow-inner shadow-white/10">
           📊
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[14px] font-bold text-foreground">Module Infographic</p>
-          <p className="text-[11px] font-semibold text-primary">
-            {expanded ? "Click to collapse" : "Click to view visual aid"}
+          <div className="mb-1 flex flex-wrap items-center gap-2">
+            <span className="rounded-full bg-[#f59e0b]/18 px-2.5 py-1 text-[10px] font-[900] uppercase tracking-[0.18em] text-[#ffd27a]">
+              Visual Aid
+            </span>
+            <span className="text-[10px] font-[800] uppercase tracking-[0.16em] text-slate-300/80">
+              Premium infographic view
+            </span>
+          </div>
+          <p className="text-[15px] font-[900] tracking-tight text-white">Module Infographic</p>
+          <p className="mt-1 text-[12px] font-medium text-slate-300">
+            {expanded ? "Collapse this visual panel" : "Open the module-level infographic and inspect it properly"}
           </p>
         </div>
-        <div className="shrink-0 mt-1">
-          {expanded ? <ZoomOut className="w-4 h-4 text-muted-foreground" /> : <ZoomIn className="w-4 h-4 text-muted-foreground" />}
+        <div className="mt-1 shrink-0 rounded-full border border-white/10 bg-white/5 p-2 text-slate-200">
+          {expanded ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
         </div>
       </button>
       {expanded && (
-        <div className="border-t border-border p-4" style={{ minHeight: 200, animation: "infographicExpandIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
-          <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-            <button
-              onClick={explainImage}
-              disabled={explaining}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-primary/30 px-3 text-[12px] font-bold text-primary transition-all hover:bg-primary/5 disabled:opacity-60"
-              type="button"
-            >
-              {explaining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
-              {explanation ? "Hide image explanation" : "Explain the image"}
-            </button>
-            <button
-              onClick={() => setShowZoomed(true)}
-              className="inline-flex h-9 items-center gap-2 rounded-xl border border-border px-3 text-[12px] font-bold text-foreground transition-all hover:bg-secondary"
-              type="button"
-            >
-              <ZoomIn className="h-3.5 w-3.5" /> Enlarge image
-            </button>
+        <div className="border-t border-white/10 px-5 pb-5 pt-4" style={{ minHeight: 240, animation: "infographicExpandIn 280ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-slate-300/75">Generated visual summary</p>
+              <p className="mt-1 text-[13px] text-slate-300">Built from the module structure and meant to give the learner a fast mental model before the deeper content.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={explainImage}
+                disabled={explaining}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-[#355fa8]/60 bg-[#123d78]/30 px-4 text-[12px] font-[800] text-[#cfe0ff] transition-all hover:bg-[#123d78]/45 disabled:opacity-60"
+                type="button"
+              >
+                {explaining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                {explanation ? "Hide explanation" : "Explain the image"}
+              </button>
+              <button
+                onClick={() => {
+                  updateZoomLevel(1.45);
+                  setShowZoomed(true);
+                }}
+                className="inline-flex h-10 items-center gap-2 rounded-full border border-white/15 bg-white px-4 text-[12px] font-[900] text-[#123d78] transition-all hover:bg-slate-100"
+                type="button"
+              >
+                <ZoomIn className="h-3.5 w-3.5" /> Open focus view
+              </button>
+            </div>
           </div>
 
           {explanation && (
-            <div className="mb-4 rounded-xl border border-primary/15 bg-primary/5 p-3 text-[12px] leading-relaxed text-foreground/85 whitespace-pre-line"
+            <div className="mb-4 whitespace-pre-line rounded-[20px] border border-[#355fa8]/45 bg-[#123d78]/26 p-4 text-[12px] leading-relaxed text-slate-100"
               style={{ animation: "infographicExpandIn 260ms ease both" }}>
               {explanation}
             </div>
           )}
 
           {loading ? (
-            <div className="flex items-center justify-center h-[240px]">
-              <Loader2 className="w-6 h-6 text-primary animate-spin" />
-              <span className="ml-2 text-[13px] text-muted-foreground">Generating infographic…</span>
+            <div className="flex h-[300px] items-center justify-center rounded-[24px] border border-white/10 bg-white/5">
+              <Loader2 className="h-6 w-6 animate-spin text-[#8db8ff]" />
+              <span className="ml-2 text-[13px] text-slate-300">Generating infographic...</span>
             </div>
           ) : svg ? (
-            <div
-              className="w-full flex items-center justify-center overflow-hidden rounded-xl bg-slate-50 p-3"
-              dangerouslySetInnerHTML={{ __html: svg }}
-            />
+            <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(232,238,249,0.98))] p-4 text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#4b6592]">{moduleTitle}</p>
+                  <p className="text-[13px] font-semibold text-[#27446f]">Designed to be read as a compact visual brief</p>
+                </div>
+                <div className="rounded-full bg-white px-3 py-1 text-[11px] font-[800] text-[#355fa8] shadow-sm">
+                  Click focus view for zoom controls
+                </div>
+              </div>
+              <div className="overflow-hidden rounded-[18px] border border-[#d8deea] bg-white p-3 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
+                <div
+                  className="mx-auto aspect-[3/2] w-full max-w-[860px] [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:max-h-full [&_svg]:max-w-full"
+                  dangerouslySetInnerHTML={{ __html: svg }}
+                />
+              </div>
+            </div>
           ) : error ? (
-            <div className="flex flex-col items-center justify-center h-[200px] gap-2">
-              <p className="text-[13px] text-red-500">Failed to generate infographic</p>
-              <button onClick={generateSvg} className="text-[12px] font-semibold text-primary hover:underline">
+            <div className="flex h-[240px] flex-col items-center justify-center gap-2 rounded-[24px] border border-red-400/30 bg-red-500/10">
+              <p className="text-[13px] text-red-200">Failed to generate infographic</p>
+              <button onClick={generateSvg} className="text-[12px] font-semibold text-[#cfe0ff] hover:underline" type="button">
                 Retry
               </button>
             </div>
           ) : (
-            <p className="text-[13px] text-muted-foreground leading-relaxed">{description}</p>
+            <p className="text-[13px] leading-relaxed text-slate-300">{description}</p>
           )}
         </div>
       )}
 
       {showZoomed && (
         <div className="fixed inset-0 z-[10002] flex items-center justify-center" onClick={() => setShowZoomed(false)}>
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
-          <div className="relative w-[min(1100px,94vw)] rounded-3xl bg-white p-5 shadow-2xl"
+          <div className="absolute inset-0 bg-[#020617]/84 backdrop-blur-md" />
+          <div className="relative flex h-[min(92vh,980px)] w-[min(1380px,96vw)] flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#e9eef7_0%,#dbe6f3_100%)] p-5 shadow-[0_36px_120px_rgba(2,6,23,0.58)]"
             style={{ animation: "infographicZoomIn 240ms cubic-bezier(0.22, 1, 0.36, 1) both" }}
             onClick={(event) => event.stopPropagation()}>
-            <div className="mb-4 flex items-center justify-between gap-4">
+            <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-[16px] font-bold text-foreground">{moduleTitle} infographic</p>
-                <p className="text-[12px] text-muted-foreground">Expanded for easier reading</p>
+                <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#4b6592]">Focus View</p>
+                <p className="text-[20px] font-[900] tracking-tight text-[#123d78]">{moduleTitle} infographic</p>
+                <p className="text-[13px] text-[#4b6592]">This is the actual enlarge state. It now supports real zoom instead of just reopening the same cramped frame.</p>
               </div>
-              <button
-                onClick={() => setShowZoomed(false)}
-                className="inline-flex h-10 items-center rounded-xl border border-border px-4 text-[12px] font-bold text-foreground transition-all hover:bg-secondary"
-                type="button"
-              >
-                Close
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => updateZoomLevel(zoomLevel - 0.2)}
+                  className="inline-flex h-10 items-center rounded-full border border-[#c5d3e6] bg-white px-4 text-[12px] font-[900] text-[#123d78] transition-all hover:bg-slate-50"
+                  type="button"
+                >
+                  Zoom out
+                </button>
+                <button
+                  onClick={() => updateZoomLevel(1.45)}
+                  className="inline-flex h-10 items-center rounded-full border border-[#c5d3e6] bg-white px-4 text-[12px] font-[900] text-[#123d78] transition-all hover:bg-slate-50"
+                  type="button"
+                >
+                  Reset
+                </button>
+                <button
+                  onClick={() => updateZoomLevel(zoomLevel + 0.2)}
+                  className="inline-flex h-10 items-center rounded-full border border-[#355fa8] bg-[#123d78] px-4 text-[12px] font-[900] text-white transition-all hover:bg-[#0f3567]"
+                  type="button"
+                >
+                  Zoom in
+                </button>
+                <div className="rounded-full bg-white/85 px-4 py-2 text-[12px] font-[900] text-[#355fa8] shadow-sm">
+                  {Math.round(zoomLevel * 100)}%
+                </div>
+                <button
+                  onClick={() => setShowZoomed(false)}
+                  className="inline-flex h-10 items-center rounded-full border border-[#c5d3e6] bg-white px-4 text-[12px] font-[900] text-[#123d78] transition-all hover:bg-slate-50"
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
             </div>
 
-            <div className="max-h-[78vh] overflow-auto rounded-2xl border border-border bg-slate-50 p-4">
+            <div className="min-h-0 flex-1 overflow-auto rounded-[28px] border border-[#c6d2e3] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.94),rgba(239,244,250,0.98))] p-5">
               {svg ? (
-                <div className="mx-auto min-w-[760px] max-w-[960px]" dangerouslySetInnerHTML={{ __html: svg }} />
+                <div className="mx-auto min-w-fit">
+                  <div className="rounded-[26px] border border-[#d8deea] bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
+                    <div
+                      className="aspect-[3/2] [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:max-h-full [&_svg]:max-w-none"
+                      style={{ width: `${Math.round(900 * zoomLevel)}px` }}
+                      dangerouslySetInnerHTML={{ __html: svg }}
+                    />
+                  </div>
+                </div>
               ) : (
                 <div className="flex min-h-[320px] items-center justify-center text-[13px] text-muted-foreground">
                   Generate the infographic first, then enlarge it here.
@@ -503,26 +730,66 @@ interface LearnerPreviewProps {
     minFontSize: number;
     lineSpacing: number;
   };
+  onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, slideLayout }) => {
+const PREVIEW_FLIP_STYLE_STORAGE_KEY = "contentforge.preview.flipStyle.default";
+
+function isFlipStyle(value: string | null): value is FlipStyle {
+  return value === "dramatic" || value === "subtle" || value === "bound";
+}
+
+function getCourseFlipStyleStorageKey(courseTitle: string): string {
+  const normalizedTitle = courseTitle.toLowerCase().replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "");
+  return `contentforge.preview.flipStyle.${normalizedTitle || "default"}`;
+}
+
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, slideLayout, onUpdateVisualTopic }) => {
   const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
   const [showPlacer, setShowPlacer] = useState(false);
   const [highlightEnabled, setHighlightEnabled] = useState(true);
   const [highlightPalette, setHighlightPalette] = useState<HighlightPalette>("yellow");
+  const [flipStyle, setFlipStyle] = useState<FlipStyle>("dramatic");
+  const [visualActionState, setVisualActionState] = useState<Record<string, { regenerating?: boolean; error?: string }>>({});
 
   // Sync if parent changes
   useEffect(() => { setLocalVideos(insertedVideos); }, [insertedVideos]);
 
   const unassignedCount = localVideos.filter(v => !v.moduleTitle).length;
   const activeHighlightPalette = HIGHLIGHT_PALETTES[highlightPalette];
+  const flipStyleStorageKey = useMemo(() => getCourseFlipStyleStorageKey(courseTitle), [courseTitle]);
   const slideRules = {
     maxLines: slideLayout?.maxLines ?? 10,
     minFontSize: slideLayout?.minFontSize ?? 12.5,
     lineSpacing: slideLayout?.lineSpacing ?? 2,
   };
 
-  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, localVideos), [rawOutputs, localVideos]);
+  useEffect(() => {
+    try {
+      const savedCourseStyle = window.localStorage.getItem(flipStyleStorageKey);
+      const savedDefaultStyle = window.localStorage.getItem(PREVIEW_FLIP_STYLE_STORAGE_KEY);
+      if (isFlipStyle(savedCourseStyle)) {
+        setFlipStyle(savedCourseStyle);
+        return;
+      }
+      if (isFlipStyle(savedDefaultStyle)) {
+        setFlipStyle(savedDefaultStyle);
+      }
+    } catch {
+      // Ignore storage issues and keep the default flip style.
+    }
+  }, [flipStyleStorageKey]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(flipStyleStorageKey, flipStyle);
+      window.localStorage.setItem(PREVIEW_FLIP_STYLE_STORAGE_KEY, flipStyle);
+    } catch {
+      // Ignore storage issues; preview selection can remain session-only.
+    }
+  }, [flipStyle, flipStyleStorageKey]);
+
+  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, localVideos, courseDuration), [rawOutputs, localVideos, courseDuration]);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set([0]));
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
@@ -539,6 +806,21 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
   const progress = ((currentSlide + 1) / totalSlides) * 100;
+  const slideAnimationName = slideMotion
+    ? flipStyle === "subtle"
+      ? slideMotion === "forward"
+        ? "sheetFlipSubtleForward"
+        : "sheetFlipSubtleBackward"
+      : flipStyle === "bound"
+        ? slideMotion === "forward"
+          ? "sheetFlipBoundForward"
+          : "sheetFlipBoundBackward"
+        : slideMotion === "forward"
+          ? "sheetFlipForward"
+          : "sheetFlipBackward"
+    : undefined;
+  const showBinding = flipStyle === "bound";
+  const showStageGlow = Boolean(slideMotion) && flipStyle !== "subtle";
 
   // Get narration sections
   const voiceParsed = tryParseJSON(rawOutputs.voice);
@@ -588,6 +870,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   // Track current sentence index (not word)
   const [highlightSentenceIdx, setHighlightSentenceIdx] = useState(-1);
+
+  const navigateToSlide = useCallback((targetSlide: number) => {
+    if (targetSlide === currentSlide || targetSlide < 0 || targetSlide >= totalSlides) return;
+    setSlideMotion(targetSlide > currentSlide ? "forward" : "backward");
+    setCurrentSlide(targetSlide);
+  }, [currentSlide, totalSlides]);
 
   // Stop audio on slide change
   useEffect(() => {
@@ -729,17 +1017,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   const goNext = useCallback(() => {
     if (currentSlide < totalSlides - 1) {
-      setSlideMotion("forward");
-      setCurrentSlide(c => c + 1);
+      navigateToSlide(currentSlide + 1);
     }
-  }, [currentSlide, totalSlides]);
+  }, [currentSlide, totalSlides, navigateToSlide]);
 
   const goPrev = useCallback(() => {
     if (currentSlide > 0) {
-      setSlideMotion("backward");
-      setCurrentSlide(c => c - 1);
+      navigateToSlide(currentSlide - 1);
     }
-  }, [currentSlide]);
+  }, [currentSlide, navigateToSlide]);
 
   const currentModuleSlides = slides
     .map((s, i) => ({ ...s, idx: i }))
@@ -750,6 +1036,50 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     moduleIndex: mi,
     slides: slides.map((s, i) => ({ ...s, idx: i })).filter(s => s.moduleIndex === mi),
   }));
+
+  const currentModule = modules[slide.moduleIndex] || modules[0];
+  const currentModuleTopics = Array.from(new Set(
+    currentModuleSlides
+      .filter((moduleSlide) => moduleSlide.type === "content" && moduleSlide.topicTitle)
+      .map((moduleSlide) => moduleSlide.topicTitle as string)
+  ));
+  const currentModuleCompletion = currentModuleSlides.length > 0
+    ? Math.round((currentModuleSlides.filter((moduleSlide) => visited.has(moduleSlide.idx)).length / currentModuleSlides.length) * 100)
+    : 0;
+  const currentModuleAssessmentSlide = currentModuleSlides.find((moduleSlide) => moduleSlide.type === "assessment" && moduleSlide.question);
+  const currentModuleAssessment = currentModuleAssessmentSlide?.question;
+  const currentModuleVideoCount = currentModuleSlides.filter((moduleSlide) => moduleSlide.type === "video").length;
+  const currentModuleObjectiveCount = Math.min(3, currentModuleTopics.length || currentModule?.topics?.length || 0);
+  const shellPageTitle = slide.type === "title"
+    ? currentModule?.title || courseTitle
+    : slide.type === "assessment"
+      ? "Knowledge Check"
+      : slide.type === "summary"
+        ? "Module Summary"
+        : slide.type === "video"
+          ? slide.video?.title || "Video Resource"
+          : slide.topicTitle || currentModule?.title || courseTitle;
+  const shellPageSubtitle = slide.type === "title"
+    ? `Module ${slide.moduleIndex + 1} overview and learner setup`
+    : slide.type === "assessment"
+      ? currentModuleAssessment?.question || "Check your understanding before moving on."
+      : slide.type === "summary"
+        ? `Key takeaways and completion for ${currentModule?.title || "this module"}`
+        : slide.type === "video"
+          ? `${slide.video?.channelTitle || "Curated resource"} for this lesson`
+          : `Lesson ${(slide.topicIndex || 0) + 1}${slide.topicPartCount && slide.topicPartCount > 1 ? ` · Part ${(slide.topicPartIndex || 0) + 1} of ${slide.topicPartCount}` : ""}`;
+  const platformNavItems = [
+    { label: "Home", icon: Home },
+    { label: "My Courses", icon: LibraryBig },
+    { label: "Progress", icon: BarChart3 },
+    { label: "Notes", icon: NotebookPen },
+    { label: "Resources", icon: FolderOpen },
+  ];
+  const utilityActions = [
+    { label: "Discussion", icon: MessageSquareText },
+    { label: "Glossary", icon: BookOpenText },
+    { label: "Settings", icon: Settings2 },
+  ];
 
   const formatElapsed = () => {
     const secs = Math.floor((Date.now() - startTime) / 1000);
@@ -776,6 +1106,64 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   };
 
   const currentNarration = getNarrationForSlide(currentSlide);
+  const currentVisualKey = slide.type === "content" && slide.topicTitle ? `${slide.moduleTitle}::${slide.topicTitle}` : "";
+
+  const handleApproveVisual = useCallback(() => {
+    if (!onUpdateVisualTopic || slide.type !== "content" || !slide.topicTitle) return;
+    onUpdateVisualTopic(slide.moduleTitle, slide.topicTitle, {
+      image_approved: !slide.visualApproved,
+    });
+  }, [onUpdateVisualTopic, slide]);
+
+  const handleRegenerateVisual = useCallback(async () => {
+    if (!onUpdateVisualTopic || slide.type !== "content" || !slide.topicTitle || !currentVisualKey) return;
+
+    setVisualActionState((prev) => ({
+      ...prev,
+      [currentVisualKey]: {
+        regenerating: true,
+        error: "",
+      },
+    }));
+
+    try {
+      const { supabase } = await import("@/integrations/supabase/client");
+      const { data, error } = await supabase.functions.invoke("generate-slide-image", {
+        body: {
+          prompt: slide.visualPrompt || `A realistic workplace training scene for ${slide.topicTitle}.`,
+          moduleTitle: slide.moduleTitle,
+          topicTitle: slide.topicTitle,
+          altText: slide.visualAltText || `AI-generated visual for ${slide.topicTitle}`,
+        },
+      });
+
+      if (error || !data?.imageDataUrl) {
+        throw new Error(data?.error || error?.message || "Image regeneration failed");
+      }
+
+      onUpdateVisualTopic(slide.moduleTitle, slide.topicTitle, {
+        generated_image_data_url: data.imageDataUrl,
+        generated_image_mime_type: data.mimeType || "image/png",
+        image_approved: false,
+      });
+
+      setVisualActionState((prev) => ({
+        ...prev,
+        [currentVisualKey]: {
+          regenerating: false,
+          error: "",
+        },
+      }));
+    } catch (error) {
+      setVisualActionState((prev) => ({
+        ...prev,
+        [currentVisualKey]: {
+          regenerating: false,
+          error: error instanceof Error ? error.message : "Image regeneration failed",
+        },
+      }));
+    }
+  }, [currentVisualKey, onUpdateVisualTopic, slide]);
 
   /* ── COMPLETION SCREEN ── */
   if (showCompletion) {
@@ -890,6 +1278,376 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             sentenceIndex: sentenceIndex >= 0 ? sentenceIndex : index,
           };
         });
+        const visualMarkup = slide.visualImageDataUrl ? (
+          <img
+            src={slide.visualImageDataUrl}
+            alt={slide.visualAltText || `${slide.topicTitle} visual`}
+            className="h-full w-full object-cover"
+          />
+        ) : slide.visualSvg ? (
+          <div
+            className="h-full w-full [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:max-h-full [&_svg]:max-w-full"
+            dangerouslySetInnerHTML={{ __html: slide.visualSvg }}
+          />
+        ) : null;
+        const showHeroVisual = Boolean(visualMarkup) && slide.visualPlacement !== "side-panel";
+        const showSideVisual = Boolean(visualMarkup) && slide.visualPlacement === "side-panel";
+        const contentTemplate = inferContentTemplate(slide, Boolean(visualMarkup));
+        const lessonObjectives = getTopicLearningObjectives(currentModuleTopics, slide.topicTitle);
+        const quickFact = getQuickFact(parts);
+        const scenarioLead = parts.body[0] || parts.hook || narratorExcerpt;
+        const scenarioSupport = parts.body[1] || parts.challenge || parts.takeaway || quickFact;
+        const summaryBullets = Array.from(new Set(chartSentenceEntries.map((entry) => entry.text))).slice(0, 4);
+        const visualState = currentVisualKey ? visualActionState[currentVisualKey] : undefined;
+        const visualControls = onUpdateVisualTopic && slide.topicTitle ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleApproveVisual}
+              className={`rounded-full px-3 py-1 text-[11px] font-[800] ${slide.visualApproved ? "bg-emerald-100 text-emerald-700" : "border border-[#d8deea] bg-white text-[#1e3a5f]"}`}
+              type="button"
+            >
+              {slide.visualApproved ? "Unapprove" : "Approve"}
+            </button>
+            <button
+              onClick={handleRegenerateVisual}
+              disabled={visualState?.regenerating}
+              className="inline-flex items-center gap-1 rounded-full border border-[#d8deea] bg-white px-3 py-1 text-[11px] font-[800] text-[#1e3a5f] disabled:opacity-60"
+              type="button"
+            >
+              {visualState?.regenerating ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+              Regenerate
+            </button>
+          </div>
+        ) : null;
+
+        if (contentTemplate === "scenario") {
+          return (
+            <div className="mx-auto max-w-[1180px]" key={currentSlide}>
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)]">
+                  <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Scenario Walkthrough</p>
+                      <h2 className="mt-2 text-[34px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
+                      <p className="mt-1 text-[15px] text-[#5f7898]">{parts.hook || "Work through the situation, spot the signal, and choose the better response."}</p>
+                    </div>
+                    {visualControls}
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+                    <div className="space-y-4">
+                      <div className="rounded-[24px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f7fbff_0%,#edf3f9_100%)] p-5">
+                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Situation</p>
+                        <p className="mt-3 text-[17px] leading-relaxed text-[#24486f]">{scenarioLead}</p>
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
+                          <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">What to Notice</p>
+                          <div className="mt-3 space-y-2.5">
+                            {summaryBullets.slice(0, 3).map((bullet, index) => (
+                              <div key={`${bullet}-${index}`} className="flex items-start gap-2 text-[14px] text-[#24486f]">
+                                <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#2b5fa4]" />
+                                <span>{bullet}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="rounded-[22px] border border-[#f3d9a3] bg-[#fffaf3] p-4 shadow-sm">
+                          <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Better Move</p>
+                          <p className="mt-3 text-[14px] leading-relaxed text-[#6f5b35]">{scenarioSupport}</p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[24px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
+                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Debrief</p>
+                        <p className="mt-3 text-[14px] leading-relaxed text-[#35506f]">{parts.takeaway || quickFact}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-white shadow-sm">
+                        <div className="border-b border-[#e2e8f0] px-4 py-3">
+                          <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Scenario Visual</p>
+                        </div>
+                        <div className="aspect-[4/3] w-full bg-[#eef3f8]">
+                          {visualMarkup ? visualMarkup : <div className="flex h-full items-center justify-center px-6 text-center text-[14px] text-[#607896]">Visual context will appear here when a scenario image is assigned.</div>}
+                        </div>
+                      </div>
+
+                      <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
+                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Coach Prompt</p>
+                        <AvatarNarrator
+                          topic={slide.topicTitle || slide.moduleTitle}
+                          moduleContent={narratorExcerpt || `This scenario explains ${slide.topicTitle || slide.moduleTitle}.`}
+                          systemHint="Coach the learner through the scenario and emphasize the stronger practical response."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        if (contentTemplate === "media-quiz") {
+          return (
+            <div className="mx-auto max-w-[1180px]" key={currentSlide}>
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)]">
+                  <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Media + Quiz Screen</p>
+                      <h2 className="mt-2 text-[34px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
+                      <p className="mt-1 text-[15px] text-[#5f7898]">{parts.hook || narratorExcerpt}</p>
+                    </div>
+                    {visualControls}
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_290px]">
+                    <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-4">
+                      <div className="mb-3 flex items-center justify-between gap-3">
+                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Featured Media</p>
+                        <span className="rounded-full bg-white px-3 py-1 text-[11px] font-[800] text-[#355fa8] shadow-sm">Interactive asset zone</span>
+                      </div>
+                      <div className="overflow-hidden rounded-[18px] border border-[#d8deea] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+                        <div className="aspect-[16/10] w-full bg-[#eef3f8]">
+                          {visualMarkup ? visualMarkup : <div className="flex h-full items-center justify-center px-6 text-center text-[14px] text-[#607896]">Hero media or animation placeholder for this lesson.</div>}
+                        </div>
+                      </div>
+                      <div className="mt-4 rounded-[18px] border border-[#d8e2ef] bg-white p-4">
+                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Key Explanation</p>
+                        <p className="mt-3 text-[14px] leading-relaxed text-[#35506f]">{parts.body[0] || parts.takeaway || narratorExcerpt}</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="rounded-[22px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-4 shadow-sm">
+                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
+                        <div className="mt-3 space-y-3">
+                          {lessonObjectives.map((objective, index) => (
+                            <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
+                              <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
+                              <span>{objective}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
+                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Quick Check</p>
+                        <p className="mt-3 text-[15px] font-[800] leading-snug text-[#123d78]">{currentModuleAssessment?.question || parts.challenge || "Use this area for a quick embedded check."}</p>
+                        <div className="mt-3 space-y-2">
+                          {(currentModuleAssessment?.options || lessonObjectives).slice(0, 3).map((option, index) => (
+                            <div key={`${option}-${index}`} className="rounded-xl border border-[#e2e8f0] bg-[#fbfdff] px-3 py-2 text-[13px] text-[#35506f]">
+                              <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
+                              {option}
+                            </div>
+                          ))}
+                        </div>
+                        {currentModuleAssessmentSlide ? (
+                          <button
+                            onClick={() => navigateToSlide(currentModuleAssessmentSlide.idx)}
+                            className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-[#1d4f93] px-4 text-[13px] font-[800] text-white transition-all hover:bg-[#173f78]"
+                            type="button"
+                          >
+                            Launch Knowledge Check
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="rounded-[22px] border border-[#f2d089] bg-[#fff5d6] p-4 shadow-sm">
+                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Quick Fact</p>
+                        <p className="mt-3 text-[14px] leading-relaxed text-[#6f5b35]">{quickFact}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        if (contentTemplate === "summary-panel") {
+          return (
+            <div className="mx-auto max-w-[1140px]" key={currentSlide}>
+              <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)]">
+                <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Consolidation Screen</p>
+                    <h2 className="mt-2 text-[34px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
+                    <p className="mt-1 text-[15px] text-[#5f7898]">{parts.hook || "Review the core ideas, lock in the takeaway, and carry the behavior forward."}</p>
+                  </div>
+                  {slide.topicPartCount && slide.topicPartCount > 1 ? (
+                    <span className="inline-flex rounded-full bg-[#e8eef9] px-4 py-2 text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592]">
+                      Consolidation View
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-[22px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-4 shadow-sm">
+                    <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">What Matters</p>
+                    <p className="mt-3 text-[14px] leading-relaxed text-[#35506f]">{parts.takeaway || quickFact}</p>
+                  </div>
+                  <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
+                    <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">What to Watch</p>
+                    <div className="mt-3 space-y-2.5">
+                      {summaryBullets.slice(0, 3).map((bullet, index) => (
+                        <div key={`${bullet}-${index}`} className="flex items-start gap-2 text-[14px] text-[#24486f]">
+                          <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#2b5fa4]" />
+                          <span>{bullet}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="rounded-[22px] border border-[#f2d089] bg-[#fff5d6] p-4 shadow-sm">
+                    <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">What to Do Next</p>
+                    <p className="mt-3 text-[14px] leading-relaxed text-[#6f5b35]">{parts.challenge || narratorExcerpt || "Translate the lesson into your next real-world decision."}</p>
+                  </div>
+                </div>
+
+                {slide.infographicSvg?.trim() && (
+                  <div className="mt-5">
+                    <InfographicVisualAid
+                      description={slide.infographicSvg}
+                      moduleTitle={slide.moduleTitle}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        if (contentTemplate === "dashboard") {
+          return (
+            <div className="mx-auto max-w-[1180px]" key={currentSlide}>
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_290px]">
+                <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-5 shadow-[0_22px_54px_rgba(15,23,42,0.1)] md:p-6">
+                  <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">{moduleLabel}</p>
+                      <h2 className="mt-2 text-[34px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
+                      <p className="mt-1 text-[15px] text-[#5f7898]">{parts.hook || narratorExcerpt}</p>
+                    </div>
+                    {slide.topicPartCount && slide.topicPartCount > 1 ? (
+                      <span className="inline-flex rounded-full bg-[#e8eef9] px-4 py-2 text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592]">
+                        Part {(slide.topicPartIndex || 0) + 1} of {slide.topicPartCount}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
+                    <div className="space-y-4">
+                      <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f9fbfe_0%,#eef4fa_100%)] p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Lesson Canvas</p>
+                          {visualControls}
+                        </div>
+                        {visualMarkup ? (
+                          <div className="overflow-hidden rounded-[18px] border border-[#d8deea] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+                            <div className="aspect-[16/10] w-full overflow-hidden bg-[#eef3f8]">
+                              {visualMarkup}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="rounded-[18px] border border-dashed border-[#bfd0e4] bg-white/70 p-6 text-[14px] text-[#607896]">
+                            {parts.body[0] || parts.hook || "This lesson opens with a guided explanation before moving into activities and knowledge checks."}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-2">
+                        <div className="rounded-[22px] border border-[#d8e2ef] bg-[#fbfdff] p-4 shadow-sm">
+                          <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Core Explanation</p>
+                          <div className="mt-3 space-y-2.5">
+                            {chartSentenceEntries.slice(0, 4).map((line, index) => (
+                              <div key={`${line.tone}-${index}`} className="flex items-start gap-2.5 text-[14px] leading-relaxed text-[#24486f]">
+                                <div className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: line.tone === "takeaway" ? "#f59e0b" : line.tone === "challenge" ? "#7c3aed" : "#2b5fa4" }} />
+                                <span>{line.text}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="rounded-[22px] border border-[#d8e2ef] bg-[#fffaf3] p-4 shadow-sm">
+                          <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Guided Coaching</p>
+                          <p className="mt-3 text-[14px] leading-relaxed text-[#5f5a4a]">{parts.challenge || narratorExcerpt || "Think about how this would play out in your own workflow and where you would change your behavior."}</p>
+                          <div className="mt-4 rounded-[18px] border border-[#f3d9a3] bg-white/80 p-3">
+                            <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Key Takeaway</p>
+                            <p className="mt-2 text-[13px] leading-relaxed text-[#6f5b35]">{parts.takeaway || quickFact}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="rounded-[22px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-4 shadow-sm">
+                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
+                        <div className="mt-3 space-y-3">
+                          {lessonObjectives.map((objective, index) => (
+                            <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
+                              <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
+                              <span>{objective}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {currentModuleAssessment ? (
+                        <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
+                          <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Interactive Quiz</p>
+                          <p className="mt-3 text-[15px] font-[800] leading-snug text-[#123d78]">{currentModuleAssessment.question}</p>
+                          <div className="mt-3 space-y-2">
+                            {currentModuleAssessment.options.slice(0, 3).map((option, index) => (
+                              <div key={`${option}-${index}`} className="rounded-xl border border-[#e2e8f0] bg-[#fbfdff] px-3 py-2 text-[13px] text-[#35506f]">
+                                <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
+                                {option}
+                              </div>
+                            ))}
+                          </div>
+                          {currentModuleAssessmentSlide ? (
+                            <button
+                              onClick={() => navigateToSlide(currentModuleAssessmentSlide.idx)}
+                              className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-[#1d4f93] px-4 text-[13px] font-[800] text-white transition-all hover:bg-[#173f78]"
+                              type="button"
+                            >
+                              Open Quiz
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      <div className="rounded-[22px] border border-[#f2d089] bg-[#fff5d6] p-4 shadow-sm">
+                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Did You Know?</p>
+                        <p className="mt-3 text-[14px] leading-relaxed text-[#6f5b35]">{quickFact}</p>
+                      </div>
+
+                      <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
+                        <div className="mb-3 flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8eef9] text-[14px] font-[900] text-[#1d4f93]">
+                            S
+                          </div>
+                          <div>
+                            <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Sarah's Guide</p>
+                            <p className="text-[12px] text-[#607896]">Quick explanation and follow-up example</p>
+                          </div>
+                        </div>
+                        <AvatarNarrator
+                          topic={slide.topicTitle || slide.moduleTitle}
+                          moduleContent={narratorExcerpt || `This section explains ${slide.topicTitle || slide.moduleTitle}.`}
+                          systemHint="Focus on the practical benefit to an office worker."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        }
 
         return (
           <div className="mx-auto max-w-[1140px]" key={currentSlide}>
@@ -911,6 +1669,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     style={{ backgroundImage: "linear-gradient(180deg, transparent 0, transparent 35px, #dbe4f0 36px)", backgroundSize: "100% 36px" }}
                   />
                   <div className="relative z-10">
+                    {showHeroVisual && (
+                      <div className="mb-5 overflow-hidden rounded-[18px] border border-[#d8deea] bg-[#eef3f8] p-3"
+                        aria-label={slide.visualAltText || `${slide.topicTitle} illustration`}>
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="rounded-full bg-[#e8eef9] px-3 py-1 text-[11px] font-[800] uppercase tracking-[0.14em] text-[#4b6592]">AI visual</span>
+                            {slide.visualApproved ? <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-[800] text-emerald-700">Approved</span> : null}
+                          </div>
+                          {visualControls}
+                        </div>
+                        <div className="mx-auto aspect-[8/5] w-full overflow-hidden rounded-[14px]">
+                          {visualMarkup}
+                        </div>
+                        {visualState?.error ? <p className="mt-2 text-[12px] font-semibold text-red-600">{visualState.error}</p> : null}
+                      </div>
+                    )}
                     <p className="mb-2 text-[12px] font-extrabold uppercase tracking-[0.18em]"
                       style={{ color: "#355fa8" }}>
                       {moduleLabel}
@@ -918,6 +1692,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     <h2 className="mb-5 text-[28px] font-[900] leading-tight"
                       style={{ color: "#123d78" }}>
                       {slide.topicTitle}
+                      {slide.topicPartCount && slide.topicPartCount > 1 ? (
+                        <span className="ml-3 inline-flex rounded-full bg-[#e8eef9] px-3 py-1 align-middle text-[11px] font-[800] uppercase tracking-[0.14em] text-[#4b6592]">
+                          Part {(slide.topicPartIndex || 0) + 1} of {slide.topicPartCount}
+                        </span>
+                      ) : null}
                     </h2>
 
                     <div className="space-y-2.5">
@@ -966,6 +1745,27 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               </div>
 
               <div className="space-y-5">
+                {showSideVisual && (
+                  <div className="overflow-hidden rounded-[28px] border p-3 shadow-sm"
+                    style={{
+                      background: "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,245,249,0.98))",
+                      borderColor: "rgba(148,163,184,0.22)",
+                      boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)",
+                    }}
+                    aria-label={slide.visualAltText || `${slide.topicTitle} illustration`}>
+                    <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-full bg-[#e8eef9] px-3 py-1 text-[11px] font-[800] uppercase tracking-[0.14em] text-[#4b6592]">AI visual</span>
+                        {slide.visualApproved ? <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-[800] text-emerald-700">Approved</span> : null}
+                      </div>
+                      {visualControls}
+                    </div>
+                    <div className="mx-auto aspect-[8/5] w-full overflow-hidden rounded-[18px]">
+                      {visualMarkup}
+                    </div>
+                    {visualState?.error ? <p className="mt-2 text-[12px] font-semibold text-red-600">{visualState.error}</p> : null}
+                  </div>
+                )}
                 <div
                   className="rounded-[28px] border p-5 shadow-sm"
                   style={{
@@ -1169,16 +1969,121 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col" style={{ background: "#0f172a" }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5" style={{ background: "linear-gradient(180deg, #dfe8f2 0%, #cfdbe8 100%)" }}>
       <style>
         {`@keyframes sheetFlipForward {
-          0% { opacity: 0; transform: perspective(1800px) rotateX(-10deg) rotateY(14deg) translateY(26px) scale(0.985); transform-origin: top center; }
-          100% { opacity: 1; transform: perspective(1800px) rotateX(0deg) rotateY(0deg) translateY(0) scale(1); transform-origin: top center; }
+          0% {
+            opacity: 0.55;
+            transform: perspective(2200px) rotateX(88deg) translateY(64px) scaleY(0.92);
+            transform-origin: top center;
+            box-shadow: 0 34px 60px rgba(15, 23, 42, 0.24);
+          }
+          45% {
+            opacity: 0.94;
+            transform: perspective(2200px) rotateX(18deg) translateY(8px) scaleY(1.01);
+            transform-origin: top center;
+            box-shadow: 0 22px 42px rgba(15, 23, 42, 0.18);
+          }
+          100% {
+            opacity: 1;
+            transform: perspective(2200px) rotateX(0deg) translateY(0) scaleY(1);
+            transform-origin: top center;
+            box-shadow: 0 0 0 rgba(15, 23, 42, 0);
+          }
         }
 
         @keyframes sheetFlipBackward {
-          0% { opacity: 0; transform: perspective(1800px) rotateX(-10deg) rotateY(-14deg) translateY(26px) scale(0.985); transform-origin: top center; }
-          100% { opacity: 1; transform: perspective(1800px) rotateX(0deg) rotateY(0deg) translateY(0) scale(1); transform-origin: top center; }
+          0% {
+            opacity: 0.5;
+            transform: perspective(2200px) rotateX(76deg) translateY(50px) scaleY(0.94);
+            transform-origin: top center;
+            box-shadow: 0 28px 52px rgba(15, 23, 42, 0.22);
+          }
+          45% {
+            opacity: 0.92;
+            transform: perspective(2200px) rotateX(14deg) translateY(6px) scaleY(1.01);
+            transform-origin: top center;
+            box-shadow: 0 18px 38px rgba(15, 23, 42, 0.16);
+          }
+          100% {
+            opacity: 1;
+            transform: perspective(2200px) rotateX(0deg) translateY(0) scaleY(1);
+            transform-origin: top center;
+            box-shadow: 0 0 0 rgba(15, 23, 42, 0);
+          }
+        }
+
+        @keyframes sheetFlipSubtleForward {
+          0% {
+            opacity: 0.78;
+            transform: perspective(1600px) rotateX(18deg) translateY(18px) scale(0.992);
+            transform-origin: top center;
+          }
+          100% {
+            opacity: 1;
+            transform: perspective(1600px) rotateX(0deg) translateY(0) scale(1);
+            transform-origin: top center;
+          }
+        }
+
+        @keyframes sheetFlipSubtleBackward {
+          0% {
+            opacity: 0.82;
+            transform: perspective(1600px) rotateX(12deg) translateY(12px) scale(0.994);
+            transform-origin: top center;
+          }
+          100% {
+            opacity: 1;
+            transform: perspective(1600px) rotateX(0deg) translateY(0) scale(1);
+            transform-origin: top center;
+          }
+        }
+
+        @keyframes sheetFlipBoundForward {
+          0% {
+            opacity: 0.5;
+            transform: perspective(2400px) rotateX(84deg) translateY(56px) scaleY(0.93) rotateZ(0.3deg);
+            transform-origin: top center;
+            box-shadow: 0 32px 56px rgba(15, 23, 42, 0.24);
+          }
+          48% {
+            opacity: 0.96;
+            transform: perspective(2400px) rotateX(16deg) translateY(6px) scaleY(1.01) rotateZ(0deg);
+            transform-origin: top center;
+            box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+          }
+          100% {
+            opacity: 1;
+            transform: perspective(2400px) rotateX(0deg) translateY(0) scaleY(1) rotateZ(0deg);
+            transform-origin: top center;
+            box-shadow: 0 0 0 rgba(15, 23, 42, 0);
+          }
+        }
+
+        @keyframes sheetFlipBoundBackward {
+          0% {
+            opacity: 0.56;
+            transform: perspective(2400px) rotateX(72deg) translateY(44px) scaleY(0.95) rotateZ(-0.25deg);
+            transform-origin: top center;
+            box-shadow: 0 24px 48px rgba(15, 23, 42, 0.22);
+          }
+          48% {
+            opacity: 0.94;
+            transform: perspective(2400px) rotateX(14deg) translateY(5px) scaleY(1.01) rotateZ(0deg);
+            transform-origin: top center;
+            box-shadow: 0 14px 28px rgba(15, 23, 42, 0.16);
+          }
+          100% {
+            opacity: 1;
+            transform: perspective(2400px) rotateX(0deg) translateY(0) scaleY(1) rotateZ(0deg);
+            transform-origin: top center;
+            box-shadow: 0 0 0 rgba(15, 23, 42, 0);
+          }
+        }
+
+        @keyframes flipchartStageGlow {
+          0% { opacity: 0.42; transform: scaleY(0.86); }
+          100% { opacity: 0; transform: scaleY(1.08); }
         }
 
         @keyframes chartLineIn {
@@ -1201,190 +2106,314 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }`}
       </style>
-      {/* TOP BAR */}
-      <div className="h-[60px] shrink-0 flex items-center px-6 border-b"
-        style={{ background: "rgba(255,255,255,0.05)", borderColor: "rgba(255,255,255,0.1)" }}>
-        <p className="text-[16px] font-bold text-white truncate max-w-[240px]">{courseTitle}</p>
-        <div className="flex-1 mx-6">
-          <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-300" style={{ width: `${progress}%`, background: "#4f46e5" }} />
+      <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[30px] border border-[#c7d6ea] bg-[#edf3f9] shadow-[0_40px_120px_rgba(15,23,42,0.28)]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.86),rgba(237,243,249,0)_45%)]" />
+
+        <aside className="relative hidden w-[260px] shrink-0 flex-col border-r border-[#335f99]/40 bg-[linear-gradient(180deg,#1d4f93_0%,#173f78_38%,#12345f_100%)] text-white md:flex">
+          <div className="border-b border-white/10 px-5 py-5">
+            <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-white/55">ContentForge LMS</p>
+            <p className="mt-1 text-[18px] font-[900] tracking-tight">{courseTitle}</p>
+            <p className="mt-1 text-[12px] text-white/65">Structured learner preview with persistent navigation and course utilities.</p>
           </div>
-        </div>
-        <div className="flex items-center gap-4">
-          {score.total > 0 && (
-            <span className="text-[13px] font-semibold text-emerald-400">Score: {score.correct}/{score.total}</span>
-          )}
-          <span className="text-[13px] text-white/50">Slide {currentSlide + 1} of {totalSlides}</span>
-          <button onClick={onClose} className="text-[14px] text-white/50 hover:text-white transition-colors">
-            Exit Preview
-          </button>
-        </div>
-      </div>
 
-      <PreviewActionBar
-        highlightEnabled={highlightEnabled}
-        highlightPalette={highlightPalette}
-        onToggleHighlight={() => setHighlightEnabled(prev => !prev)}
-        onSelectPalette={setHighlightPalette}
-        onPlaceVideos={unassignedCount > 0 ? () => setShowPlacer(true) : undefined}
-        unassignedCount={unassignedCount}
-      />
+          <div className="px-3 py-4">
+            {platformNavItems.map((item, index) => {
+              const Icon = item.icon;
+              const isActive = index === 0;
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-semibold transition-all ${isActive ? "bg-white/14 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]" : "text-white/72 hover:bg-white/8 hover:text-white"}`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {item.label}
+                </button>
+              );
+            })}
+          </div>
 
-      {/* MAIN */}
-      <div className="flex-1 flex min-h-0">
-        {/* LEFT SIDEBAR */}
-        <div className="w-[220px] shrink-0 overflow-y-auto p-4 hidden md:block"
-          style={{ background: "rgba(0,0,0,0.3)" }}>
-          <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-3">Course Contents</p>
-          {toc.map((mod, mi) => (
-            <div key={mi} className="mb-3">
-              <p className={`text-[13px] font-semibold text-white mb-1 pl-2 border-l-2 ${
-                slide.moduleIndex === mi ? "border-[#4f46e5]" : "border-transparent"
-              }`}>
-                {mod.title}
-              </p>
-              <div className="space-y-0.5 ml-2">
-                {mod.slides.map((s) => (
-                  <button
-                    key={s.idx}
-                    onClick={() => setCurrentSlide(s.idx)}
-                    className={`w-full text-left text-[12px] px-2 py-1 rounded flex items-center gap-2 transition-colors ${
-                      s.idx === currentSlide ? "text-white bg-white/10" : "text-white/50 hover:text-white/70"
-                    }`}
-                  >
-                    {visited.has(s.idx) && s.idx !== currentSlide ? (
-                      <Check className="w-3 h-3 text-emerald-400 shrink-0" />
-                    ) : s.idx === currentSlide ? (
-                      <div className="w-2 h-2 rounded-full bg-[#4f46e5] shrink-0" />
-                    ) : s.type === "video" ? (
-                      <div className="w-2 h-2 rounded-full bg-[#ef4444] shrink-0" />
-                    ) : (
-                      <div className="w-2 h-2 rounded-full bg-white/20 shrink-0" />
-                    )}
-                    <span className="truncate">
-                      {s.type === "title" ? "Introduction" :
-                        s.type === "assessment" ? "Knowledge Check" :
-                        s.type === "summary" ? "Summary" :
-                        s.type === "video" ? `▶ ${s.topicTitle?.slice(0, 25) || "Video"}` :
-                        s.topicTitle || `Topic ${(s.topicIndex || 0) + 1}`}
-                    </span>
-                  </button>
-                ))}
+          <div className="min-h-0 flex-1 overflow-y-auto border-t border-white/10 px-4 py-4">
+            <div className="mb-4 rounded-2xl bg-white/8 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
+              <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-white/55">Current Module</p>
+              <p className="mt-2 text-[15px] font-[900] leading-snug text-white">{currentModule?.title || "Course Overview"}</p>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/12">
+                <div className="h-full rounded-full bg-[#8ec5ff]" style={{ width: `${currentModuleCompletion}%` }} />
+              </div>
+              <div className="mt-2 flex items-center justify-between text-[11px] text-white/60">
+                <span>{currentModuleCompletion}% viewed</span>
+                <span>{currentModuleSlides.filter((moduleSlide) => visited.has(moduleSlide.idx)).length}/{currentModuleSlides.length} screens</span>
               </div>
             </div>
-          ))}
-        </div>
 
-        {/* CENTER STAGE */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-10">
-          <div
-            style={{
-              animation: slideMotion === "forward"
-                ? "sheetFlipForward 480ms cubic-bezier(0.22, 1, 0.36, 1)"
-                : slideMotion === "backward"
-                  ? "sheetFlipBackward 480ms cubic-bezier(0.22, 1, 0.36, 1)"
-                  : undefined,
-            }}
-          >
-            {renderSlide()}
+            <p className="mb-3 text-[11px] font-[900] uppercase tracking-[0.18em] text-white/48">Lesson Map</p>
+            {toc.map((mod, mi) => (
+              <div key={mi} className="mb-3 rounded-2xl border border-white/8 bg-white/4 p-2.5">
+                <p className={`mb-2 px-2 text-[13px] font-[800] ${slide.moduleIndex === mi ? "text-white" : "text-white/68"}`}>
+                  {mod.title}
+                </p>
+                <div className="space-y-1">
+                  {mod.slides.map((s) => (
+                    <button
+                      key={s.idx}
+                      onClick={() => navigateToSlide(s.idx)}
+                      className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-[12px] transition-all ${s.idx === currentSlide ? "bg-white text-[#143a6f] shadow-sm" : "text-white/72 hover:bg-white/10 hover:text-white"}`}
+                      type="button"
+                    >
+                      {visited.has(s.idx) && s.idx !== currentSlide ? (
+                        <Check className={`h-3 w-3 shrink-0 ${s.idx === currentSlide ? "text-[#143a6f]" : "text-emerald-300"}`} />
+                      ) : s.idx === currentSlide ? (
+                        <div className="h-2 w-2 shrink-0 rounded-full bg-[#1d4f93]" />
+                      ) : s.type === "video" ? (
+                        <div className="h-2 w-2 shrink-0 rounded-full bg-[#f97316]" />
+                      ) : s.type === "assessment" ? (
+                        <div className="h-2 w-2 shrink-0 rounded-full bg-[#fbbf24]" />
+                      ) : (
+                        <div className="h-2 w-2 shrink-0 rounded-full bg-white/25" />
+                      )}
+                      <span className="truncate">
+                        {s.type === "title" ? "Introduction" :
+                          s.type === "assessment" ? "Knowledge Check" :
+                          s.type === "summary" ? "Summary" :
+                          s.type === "video" ? `Video: ${s.topicTitle?.slice(0, 20) || "Resource"}` :
+                          s.topicTitle || `Topic ${(s.topicIndex || 0) + 1}`}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
 
-        {/* RIGHT SIDEBAR */}
-        <div className="w-[200px] shrink-0 overflow-y-auto p-4 hidden lg:block"
-          style={{ background: "rgba(0,0,0,0.2)" }}>
-          <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-3">Narration Script</p>
-          {currentNarration ? (
-            <p className="text-[12px] text-white/60 leading-relaxed whitespace-pre-wrap">
-              {currentNarration.replace(/\[.*?\]/g, "").slice(0, 500)}
-            </p>
-          ) : (
-            <p className="text-[12px] text-white/30 italic">No narration for this slide type</p>
-          )}
-          <div className="mt-6">
-            <p className="text-[11px] font-bold text-white/40 uppercase tracking-wider mb-2">Resources</p>
-            <p className="text-[12px] text-white/30 italic">No resources attached</p>
+          <div className="border-t border-white/10 px-4 py-4">
+            <div className="rounded-2xl bg-white/8 p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-[12px] font-[800] text-white">Help Center</p>
+                <HelpCircle className="h-4 w-4 text-white/70" />
+              </div>
+              <p className="text-[12px] leading-relaxed text-white/65">Notes, resources, and support actions can live here once this becomes a full player rather than a preview.</p>
+            </div>
+          </div>
+        </aside>
+
+        <div className="relative min-w-0 flex flex-1 flex-col overflow-hidden">
+          <div className="shrink-0 border-b border-[#31598d] bg-[linear-gradient(135deg,#1d4f93_0%,#2b5fa4_55%,#1a4a89_100%)] px-5 py-4 text-white md:px-7">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-[12px] font-semibold text-white/70">
+                  <span>{currentModule?.title || courseTitle}</span>
+                  <span>›</span>
+                  <span className="truncate">{shellPageTitle}</span>
+                </div>
+                <p className="mt-2 text-[24px] font-[900] tracking-tight">{shellPageTitle}</p>
+                <p className="mt-1 max-w-[760px] text-[13px] text-white/72">{shellPageSubtitle}</p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                {utilityActions.map((action) => {
+                  const Icon = action.icon;
+                  return (
+                    <button
+                      key={action.label}
+                      type="button"
+                      className="inline-flex h-10 items-center gap-2 rounded-full border border-white/14 bg-white/8 px-4 text-[12px] font-[800] text-white/90 transition-all hover:bg-white/14"
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      {action.label}
+                    </button>
+                  );
+                })}
+                <div className="ml-1 flex items-center gap-3 rounded-full bg-white px-2 py-1 pr-3 text-[#143a6f] shadow-sm">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e7eef8] text-[12px] font-[900]">
+                    AL
+                  </div>
+                  <div>
+                    <p className="text-[12px] font-[900] leading-none">Alex</p>
+                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5d769a]">Learner</p>
+                  </div>
+                </div>
+                <button
+                  onClick={onClose}
+                  className="inline-flex h-10 items-center gap-2 rounded-full border border-white/14 bg-white/8 px-4 text-[12px] font-[800] text-white/90 transition-all hover:bg-white/14"
+                  type="button"
+                >
+                  <X className="h-3.5 w-3.5" /> Exit Preview
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="shrink-0 border-b border-[#d7e1ee] bg-white/80 px-4 py-3 backdrop-blur md:px-6">
+            <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_420px] xl:items-center">
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-[#d8e2ef] bg-[#f7fbff] px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#5f7b9e]">Module Progress</p>
+                  <p className="mt-2 text-[24px] font-[900] tracking-tight text-[#123d78]">{currentModuleCompletion}%</p>
+                  <p className="text-[12px] text-[#607896]">{currentModuleSlides.filter((moduleSlide) => visited.has(moduleSlide.idx)).length} of {currentModuleSlides.length} screens visited</p>
+                </div>
+                <div className="rounded-2xl border border-[#d8e2ef] bg-[#fdfdfd] px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#5f7b9e]">Learning Focus</p>
+                  <p className="mt-2 text-[24px] font-[900] tracking-tight text-[#123d78]">{currentModuleObjectiveCount}</p>
+                  <p className="text-[12px] text-[#607896]">Core lesson objectives highlighted in this module</p>
+                </div>
+                <div className="rounded-2xl border border-[#d8e2ef] bg-[#fffaf0] px-4 py-3 shadow-sm">
+                  <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Activities</p>
+                  <p className="mt-2 text-[24px] font-[900] tracking-tight text-[#123d78]">{currentModuleVideoCount + (currentModuleAssessment ? 1 : 0)}</p>
+                  <p className="text-[12px] text-[#7c6a52]">{currentModuleAssessment ? "Quiz included" : "No quiz yet"}{currentModuleVideoCount ? ` · ${currentModuleVideoCount} video` : ""}</p>
+                </div>
+              </div>
+
+              <div className="rounded-[24px] border border-[#d8e2ef] bg-[#f7fbff] px-3 py-3 shadow-sm">
+                <PreviewActionBar
+                  highlightEnabled={highlightEnabled}
+                  highlightPalette={highlightPalette}
+                  flipStyle={flipStyle}
+                  onToggleHighlight={() => setHighlightEnabled(prev => !prev)}
+                  onSelectPalette={setHighlightPalette}
+                  onSelectFlipStyle={setFlipStyle}
+                  onPlaceVideos={unassignedCount > 0 ? () => setShowPlacer(true) : undefined}
+                  unassignedCount={unassignedCount}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#f4f7fb_0%,#e9f0f7_100%)] px-5 py-6 md:px-8 md:py-8">
+            <div className="mx-auto mb-5 grid max-w-[1260px] gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="rounded-[26px] border border-[#d6e1ef] bg-white/88 px-5 py-4 shadow-sm backdrop-blur">
+                <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Lesson Context</p>
+                <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-[#48627f]">
+                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Module {slide.moduleIndex + 1}</span>
+                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Screen {currentSlide + 1} of {totalSlides}</span>
+                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Estimated {courseDuration || "15min"}</span>
+                </div>
+              </div>
+              <div className="rounded-[26px] border border-[#d6e1ef] bg-white/88 px-5 py-4 shadow-sm backdrop-blur">
+                <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Learning Objectives</p>
+                <div className="mt-3 space-y-2">
+                  {(currentModuleTopics.length > 0 ? currentModuleTopics : currentModule?.topics || []).slice(0, 3).map((topic, index) => (
+                    <div key={`${topic}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
+                      <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
+                      <span>{topic}</span>
+                    </div>
+                  ))}
+                  {currentModuleTopics.length === 0 && !(currentModule?.topics || []).length && (
+                    <p className="text-[13px] text-[#6a809c]">Objectives will appear once topic structure is available.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="relative mx-auto max-w-[1280px] [perspective:2200px]">
+              {showStageGlow && (
+                <div
+                  className="pointer-events-none absolute inset-x-10 top-10 z-0 h-24 rounded-full blur-3xl"
+                  style={{
+                    background: "radial-gradient(circle, rgba(148,163,184,0.42) 0%, rgba(15,23,42,0) 72%)",
+                    animation: "flipchartStageGlow 520ms ease-out both",
+                  }}
+                />
+              )}
+              {showBinding && (
+                <div className="pointer-events-none absolute inset-x-12 top-1 z-20 hidden md:block">
+                  <div className="mx-auto h-2 max-w-[980px] rounded-full bg-white/25" />
+                  <div className="mx-auto mt-1 flex max-w-[900px] items-center justify-between px-10">
+                    {Array.from({ length: 8 }).map((_, index) => (
+                      <div
+                        key={index}
+                        className="h-6 w-4 rounded-b-full border-2 border-slate-300/80 border-t-0 bg-transparent"
+                        style={{ boxShadow: "0 2px 4px rgba(15,23,42,0.12)" }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div
+                className="relative z-10 [transform-style:preserve-3d]"
+                style={{
+                  animation: slideAnimationName
+                    ? `${slideAnimationName} 520ms cubic-bezier(0.2, 0.88, 0.24, 1)`
+                    : undefined,
+                  transformOrigin: "top center",
+                  willChange: slideMotion ? "transform, opacity" : undefined,
+                }}
+              >
+                {renderSlide()}
+              </div>
+              <div className="pointer-events-none absolute bottom-[-18px] left-1/2 z-0 h-10 w-[82%] -translate-x-1/2 rounded-full bg-black/15 blur-2xl" />
+              <div className="pointer-events-none absolute bottom-[-26px] left-1/2 z-0 h-6 w-[68%] -translate-x-1/2 rounded-full bg-black/20 blur-3xl" />
+            </div>
+          </div>
+
+          <div className="absolute bottom-[80px] left-1/2 z-40 -translate-x-1/2">
+            {currentNarration ? (
+              <div className="flex items-center gap-3 rounded-full border border-[#d6e1ef] bg-white/92 px-5 py-2.5 text-[#123d78] shadow-[0_16px_42px_rgba(15,23,42,0.16)] backdrop-blur">
+                <button
+                  onClick={() => {
+                    if (audioLoading) return;
+                    if (audioRef.current && isPlaying) {
+                      audioRef.current.pause();
+                    } else if (audioRef.current && !isPlaying) {
+                      audioRef.current.play().catch(() => {});
+                    } else {
+                      playNarration();
+                    }
+                  }}
+                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#123d78] text-white transition-colors hover:bg-[#0f3567]"
+                  type="button"
+                >
+                  {audioLoading ? (
+                    <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  ) : isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </button>
+                <WaveformBars playing={isPlaying} />
+                <button onClick={() => setMuted(!muted)} className="text-[#5f7b9e] transition-colors hover:text-[#123d78]" type="button">
+                  {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                </button>
+                <span className="text-[11px] font-semibold text-[#5f7b9e]">
+                  {audioLoading ? "Loading..." : isPlaying ? "Playing narration" : "Play narration"} · Sarah
+                </span>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="shrink-0 border-t border-[#d7e1ee] bg-white/90 px-5 py-4 backdrop-blur md:px-7">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <button
+                onClick={goPrev}
+                disabled={currentSlide === 0}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#c9d8ea] bg-white px-5 text-[14px] font-semibold text-[#123d78] transition-all hover:bg-[#f7fbff] disabled:opacity-40"
+                type="button"
+              >
+                <ChevronLeft className="h-4 w-4" /> Previous
+              </button>
+
+              <div className="flex flex-col items-center gap-2">
+                <div className="flex items-center gap-1.5">
+                  {currentModuleSlides.map((s) => (
+                    <button
+                      key={s.idx}
+                      onClick={() => navigateToSlide(s.idx)}
+                      className={`h-2.5 w-2.5 rounded-full transition-all ${s.idx === currentSlide ? "scale-125 bg-[#1d4f93]" : visited.has(s.idx) ? "bg-[#8ba8c9]" : "bg-[#d5deea]"}`}
+                      type="button"
+                    />
+                  ))}
+                </div>
+                <span className="text-[12px] font-semibold text-[#5f7b9e]">Slide {currentSlide + 1} of {totalSlides} · Score {score.correct}/{score.total || 0}</span>
+              </div>
+
+              <button
+                onClick={goNext}
+                disabled={currentSlide === totalSlides - 1}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1d4f93] px-5 text-[14px] font-semibold text-white transition-all hover:bg-[#173f78] disabled:opacity-40"
+                type="button"
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* NARRATION AUDIO CONTROLS — floating player */}
-      <div className="absolute bottom-[72px] left-1/2 -translate-x-1/2 z-50">
-        {currentNarration ? (
-          <div className="flex items-center gap-3 px-5 py-2.5 rounded-full"
-            style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(12px)" }}>
-            <button
-              onClick={() => {
-                if (audioLoading) return;
-                if (audioRef.current && isPlaying) {
-                  audioRef.current.pause();
-                } else if (audioRef.current && !isPlaying) {
-                  audioRef.current.play().catch(() => {});
-                } else {
-                  playNarration();
-                }
-              }}
-              className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
-            >
-              {audioLoading ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            </button>
-            <WaveformBars playing={isPlaying} />
-            <button onClick={() => setMuted(!muted)} className="text-white/60 hover:text-white transition-colors">
-              {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-            </button>
-            <span className="text-[11px] text-white/40">
-              {audioLoading ? "Loading…" : isPlaying ? "Playing" : "Click ▶ to play"} · Sarah
-            </span>
-          </div>
-        ) : (
-          <p className="text-[12px] text-white/30 italic">No narration for this slide</p>
-        )}
-      </div>
-
-      {/* BOTTOM NAV */}
-      <div className="h-[60px] shrink-0 flex items-center justify-between px-6 border-t"
-        style={{ background: "rgba(0,0,0,0.4)", borderColor: "rgba(255,255,255,0.1)" }}>
-        <button
-          onClick={goPrev}
-          disabled={currentSlide === 0}
-          className="h-10 px-5 rounded-lg border border-white/20 text-white text-[14px] font-semibold flex items-center gap-2 disabled:opacity-30 hover:bg-white/5 transition-all"
-        >
-          <ChevronLeft className="w-4 h-4" /> Previous
-        </button>
-
-        {/* Dot nav for current module */}
-        <div className="flex items-center gap-1.5">
-          {currentModuleSlides.map((s) => (
-            <button
-              key={s.idx}
-              onClick={() => setCurrentSlide(s.idx)}
-              className={`w-2.5 h-2.5 rounded-full transition-all ${
-                s.idx === currentSlide ? "bg-[#4f46e5] scale-125" :
-                visited.has(s.idx) ? "bg-white/50" : "bg-white/20"
-              }`}
-            />
-          ))}
-        </div>
-
-        <button
-          onClick={goNext}
-          disabled={currentSlide === totalSlides - 1}
-          className="h-10 px-5 rounded-lg text-white text-[14px] font-semibold flex items-center gap-2 disabled:opacity-30 hover:brightness-110 transition-all"
-          style={{ background: "#4f46e5" }}
-        >
-          Next <ChevronRight className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* Close button */}
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 text-white/50 hover:text-white text-[14px] flex items-center gap-1 z-50"
-      >
-        <X className="w-4 h-4" /> Close
-      </button>
 
       {/* VideoTimelinePlacer overlay */}
       {showPlacer && (

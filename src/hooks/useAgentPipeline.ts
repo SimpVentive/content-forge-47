@@ -8,12 +8,45 @@ type SlideLayoutParams = {
   lineSpacing?: number;
 };
 
+function parseDurationMinutes(duration?: string): number {
+  const parsed = Number.parseInt(duration || "15", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
+}
+
+function getStructureGuidance(durationMinutes: number): string {
+  if (durationMinutes <= 3) return "1 focused module with 2-3 topics total.";
+  if (durationMinutes <= 5) return "1-2 modules with 3-4 topics total.";
+  if (durationMinutes <= 10) return "2-3 modules with 5-7 topics total.";
+  if (durationMinutes <= 15) return "3-4 modules with 7-10 topics total.";
+  if (durationMinutes <= 20) return "4-5 modules with 10-12 topics total.";
+  if (durationMinutes <= 30) return "5-6 modules with 14-18 topics total.";
+  if (durationMinutes <= 45) return "6-7 modules with 18-24 topics total.";
+  return "7-8 modules with 24-30 topics total.";
+}
+
+function getSophisticationGuidance(durationMinutes: number): string {
+  if (durationMinutes <= 5) return "Even in a short course, include at least one tension point, one concrete workplace scenario, and one memorable decision or behavior shift.";
+  if (durationMinutes <= 15) return "Each module should have a clear promise, realistic scenario context, a practical framework, and at least one contrast between weak and strong practice.";
+  if (durationMinutes <= 30) return "Build a polished learning journey with escalating complexity, multiple scenario moments, strong transitions, and a balance of explanation, demonstration, and application.";
+  return "Treat the experience like premium corporate learning: layered module arcs, realistic decision points, recurring themes, practical frameworks, and varied instructional treatments that avoid repetition.";
+}
+
+function getInstructionalPatternGuidance(durationMinutes: number): string {
+  if (durationMinutes <= 10) return "Use a mix of scenario opener, concept explanation, and practical behavior shift. Avoid making every topic feel identical.";
+  if (durationMinutes <= 20) return "Vary topic treatments across scenario walkthroughs, myth-vs-reality reframes, process demos, good-vs-bad contrasts, and concise action checklists.";
+  return "Intentionally vary the instructional pattern across modules: case study, decision-point analysis, process walkthrough, manager coaching moment, customer scenario, misconception reset, and practical checklist.";
+}
+
 function buildSlideLayoutInstruction(slideLayout?: SlideLayoutParams): string {
   const maxLines = slideLayout?.maxLines ?? 10;
   const minFontSize = slideLayout?.minFontSize ?? 12.5;
   const lineSpacing = slideLayout?.lineSpacing ?? 2;
 
   return `Slide readability constraints: no slide should exceed ${maxLines} lines of on-slide text, the minimum font size must be ${minFontSize}px, and line spacing should be ${lineSpacing}. Keep layouts concise and presentation-friendly.`;
+}
+
+function normalizeTextKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/gi, " ").trim();
 }
 
 const initialStatuses = (): Record<string, AgentStatus> =>
@@ -62,9 +95,58 @@ export function useAgentPipeline() {
     setAgentStatuses((prev) => ({ ...prev, [id]: status }));
   }, []);
 
+  const updateVisualTopicAsset = useCallback((moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => {
+    setRawOutputs((prev) => {
+      try {
+        const visualData = JSON.parse(prev.visual || "{}");
+        const modules = Array.isArray(visualData.modules) ? visualData.modules : [];
+        const normalizedModuleTitle = normalizeTextKey(moduleTitle);
+        const normalizedTopicTitle = normalizeTextKey(topicTitle);
+
+        const updatedModules = modules.map((moduleVisual: any) => {
+          const candidateModuleTitle = moduleVisual?.module_title || moduleVisual?.title || moduleVisual?.name || "";
+          if (normalizeTextKey(candidateModuleTitle) !== normalizedModuleTitle) {
+            return moduleVisual;
+          }
+
+          const topicVisuals = Array.isArray(moduleVisual?.topic_visuals) ? moduleVisual.topic_visuals : [];
+          return {
+            ...moduleVisual,
+            topic_visuals: topicVisuals.map((topicVisual: any) => {
+              const candidateTopicTitle = topicVisual?.topic_title || topicVisual?.title || topicVisual?.name || "";
+              if (normalizeTextKey(candidateTopicTitle) !== normalizedTopicTitle) {
+                return topicVisual;
+              }
+
+              return {
+                ...topicVisual,
+                ...updates,
+              };
+            }),
+          };
+        });
+
+        return {
+          ...prev,
+          visual: JSON.stringify({
+            ...visualData,
+            modules: updatedModules,
+          }),
+        };
+      } catch {
+        return prev;
+      }
+    });
+  }, []);
+
   const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; slideLayout?: SlideLayoutParams }) => {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
+    const durationMinutes = parseDurationMinutes(params?.duration);
+    const targetNarrationWords = Math.max(260, durationMinutes * 130);
+    const structureGuidance = getStructureGuidance(durationMinutes);
+    const sophisticationGuidance = getSophisticationGuidance(durationMinutes);
+    const instructionalPatternGuidance = getInstructionalPatternGuidance(durationMinutes);
 
     cancelledRef.current = false;
     setIsRunning(true);
@@ -98,8 +180,8 @@ export function useAgentPipeline() {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
         researchResult = await callClaudeWithRetry(
-          `You are a Research Agent. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or use generic content. Extract key themes, credible knowledge areas, and suggest learning objectives — ALL directly derived from the provided source material. Course level: ${params?.level || "intermediate"}. Language for on-screen text: ${textLanguage}. CRITICAL — Target duration is ${params?.duration || "15min"}. You MUST scale the depth and breadth of content to fill this entire duration. For a ${params?.duration || "15min"} course, generate proportionally more objectives and themes. Return as JSON.`,
-          `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content. Target duration: ${params?.duration || "15min"} — scale content accordingly.`,
+          `You are a Research Agent for premium corporate eLearning. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or drift into generic training filler. Extract the knowledge, tensions, examples, and practical behaviors that could support a sophisticated learner experience. Course level: ${params?.level || "intermediate"}. Language for on-screen text: ${textLanguage}. CRITICAL — Target duration is ${params?.duration || "15min"}. The finished learner experience must feel like approximately ${durationMinutes} minutes of content, which means around ${targetNarrationWords} words of narration/script across the course. Generate enough depth to support that runtime. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Return JSON with these keys: source_summary, key_themes, learner_problems, stakes_and_consequences, common_misconceptions, practical_behaviors, scenario_opportunities, evidence_and_examples, learning_objectives.`,
+          `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content. Target duration: ${params?.duration || "15min"}. Approximate narration budget: ${targetNarrationWords} words. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Find material that can support realistic scenarios, decisions, contrasts between weak and strong practice, and memorable learner takeaways.`,
           addLog, "Research Agent"
         );
         setStatus("research", "complete");
@@ -116,8 +198,8 @@ export function useAgentPipeline() {
         setStatus("architect", "running");
         addLog("Content Architect: Receiving research output...");
         archResult = await callClaudeWithRetry(
-          `You are a Content Architect. Given research output AND source material, create a full course structure with modules and Bloom's taxonomy levels. You MUST use the topics and content from the source material. Do NOT invent unrelated topics. CRITICAL: The target course duration is ${params?.duration || "15min"}. Scale the number of modules and topics proportionally — a 3min course should have 1-2 modules with 2-3 topics total, a 60min course should have 6-8 modules with many topics. Return as JSON.`,
-          `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\n\nBuild the course structure strictly from the above content, scaled to fit the target duration.`,
+          `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. Return JSON in this shape: { course_promise, audience, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`,
+          `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nRecommended Structure: ${structureGuidance}\nSophistication Requirement: ${sophisticationGuidance}\nInstructional Pattern Guidance: ${instructionalPatternGuidance}\n\nBuild the course structure strictly from the above content, scaled to fit the target duration. Make modules feel like meaningful chapters with different jobs to do, and make topics feel teachable, scenario-ready, and presentation-worthy.`,
           addLog, "Content Architect"
         );
         setStatus("architect", "complete");
@@ -135,9 +217,6 @@ export function useAgentPipeline() {
       // ──── AGENT 3: Writer (per-module calls to avoid truncation) ────
       if (toggles["writer"] !== false) {
         setStatus("writer", "running");
-        
-        const durationMinutes = parseInt(params?.duration || "15", 10);
-        const wordsPerTopic = durationMinutes <= 5 ? "60-90" : durationMinutes <= 10 ? "90-120" : durationMinutes <= 20 ? "150-220" : "220-350";
 
         // Parse modules from architect output
         let parsedModules: any[] = [];
@@ -146,12 +225,23 @@ export function useAgentPipeline() {
           parsedModules = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
         } catch { parsedModules = []; }
 
-        const writerSystemPrompt = `You are an elite instructional writer who specialises in corporate eLearning that people actually enjoy. Your writing style is: conversational, direct, and energetic — like a brilliant colleague explaining something important over coffee, not a textbook.
+        const totalTopics = Math.max(1, parsedModules.reduce((count: number, mod: any) => {
+          const topics = mod.topics || mod.sections || mod.lessons || [];
+          return count + Math.max(1, topics.length || 0);
+        }, 0));
+        const targetWordsPerTopic = Math.max(110, Math.ceil(targetNarrationWords / totalTopics));
+        const wordsPerTopicRange = `${Math.max(110, Math.floor(targetWordsPerTopic * 0.9))}-${Math.ceil(targetWordsPerTopic * 1.15)}`;
+
+        const writerSystemPrompt = `You are an elite instructional writer who specialises in premium corporate eLearning that people actually enjoy. Your writing style is conversational, direct, vivid, and smart — like a brilliant colleague explaining something important over coffee, not a textbook.
 
 CRITICAL: You are writing ONE MODULE of a ${params?.duration || "15min"} course. You MUST write substantial, detailed content.
-- Target word count per topic: ${wordsPerTopic} words. This is MINIMUM — write MORE if the topic warrants it.
+- Total narration/script budget for the whole course: about ${targetNarrationWords} words.
+- Total topic count planned: ${totalTopics}.
+- Target word count per topic: ${wordsPerTopicRange} words. This is MINIMUM — write MORE if the topic warrants it.
 - For longer courses (30-60 min), expand with multiple examples, deeper analysis, step-by-step walkthroughs, and richer real-world scenarios.
 - NEVER truncate or summarize. Write the FULL content for every topic.
+      - Sophistication target: ${sophisticationGuidance}
+      - Variation target: ${instructionalPatternGuidance}
 
 Rules you NEVER break:
 - Open every topic with a provocative hook — a shocking stat, a bold claim, a real-world scenario, or a question that makes the learner stop and think
@@ -162,18 +252,20 @@ Rules you NEVER break:
 - Use analogies. Make complex ideas click instantly.
 - End every topic with a challenge or reflection: 'Next time you X, try Y instead'
 - NO passive voice. NO jargon without explanation. NO bullet walls.
-- Format each topic as: Hook (2-3 sentences) → Core concept (5-8 sentences for longer courses) → Real example (3-5 sentences) → Key Takeaway: (1-2 sentences) → Challenge: (1 sentence)
+      - Do NOT make every topic feel structurally identical. Vary the treatment based on the instructional pattern and topic need.
+      - Across a module, include a mix of these techniques when appropriate: scenario walkthrough, misconception reset, process breakdown, weak-vs-strong contrast, manager coaching moment, customer-facing example, concise checklist.
+      - Format each topic using markdown prose with this backbone: Hook → Core explanation → Concrete example or scenario → Key Takeaway: → Challenge:. Keep headings limited to the topic title only.
 - Use markdown ## headers for each topic title, matching the exact topic names provided.
 - You MUST use content from the source material provided. Do NOT invent unrelated examples.
 
-Write content that would make a learner lean forward, not lean back.`;
+      Write content that feels expensive, practical, and memorable — something a learner would actually respect, not skim out of obligation.`;
 
         if (parsedModules.length === 0) {
           // Fallback: single call if we can't parse modules
           addLog("Writer Agent: Drafting all content...");
           writerResult = await callClaudeWithRetry(
             writerSystemPrompt,
-            `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"}.`,
+            `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nPlanned Topic Count: ${totalTopics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"} and reach approximately ${targetNarrationWords} words in total.`,
             addLog, "Writer Agent"
           );
         } else {
@@ -193,7 +285,7 @@ Write content that would make a learner lean forward, not lean back.`;
 
             const moduleContent = await callClaudeWithRetry(
               writerSystemPrompt,
-              `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\n\nModule: ${modTitle}\nTopics:\n${topics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging content for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${wordsPerTopic} words minimum.`,
+              `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nTopics:\n${topics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging content for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${wordsPerTopicRange} words minimum so the final course genuinely feels like ${params?.duration || "15min"}. Make this module feel like a coherent chapter with a distinct purpose, not a pile of disconnected notes. Use the topic's objective, scenario anchor, and evidence/example when present.`,
               addLog, "Writer Agent"
             );
             moduleResults.push(`# ${modTitle}\n\n${moduleContent}`);
@@ -220,8 +312,8 @@ Write content that would make a learner lean forward, not lean back.`;
         setStatus("visual", "running");
         addLog("Visual Design Agent: Generating layout specs for modules...");
         visualResult = await callClaudeWithRetry(
-          `You are a Visual Design Agent for eLearning. Given a course outline and script, produce a detailed visual design plan. For each module, specify: (1) recommended slide layout type, (2) key infographic or diagram description, (3) color palette suggestion, (4) iconography style. ${buildSlideLayoutInstruction(params?.slideLayout)} Return as JSON: { modules: [{ module_title, slide_layout, infographic_description, color_palette, icon_style }] }`,
-          `Course Outline:\n${archResult}\n\nScript:\n${writerResult}\n\n${buildSlideLayoutInstruction(params?.slideLayout)}`,
+          `You are a Visual Design Agent for premium corporate eLearning. Given a course outline and script, produce a visual design plan that feels intentional, modern, and presentation-grade. For each module, specify: (1) recommended slide layout type, (2) key infographic or diagram description, (3) color palette suggestion, (4) iconography style, and (5) topic-level realism plan. The realism plan must use ONLY AI-generated original visuals, never stock photography or copyrighted images. Do NOT assign imagery to every topic. Select only the slides that truly benefit from realism, usually about 20-35% of topics, prioritising scenarios, workplace conversations, customer interactions, environmental context, and moments where the learner benefits from seeing a situation. Also ensure the infographic_description is ambitious enough to produce a sophisticated visual, not a simple poster. Return JSON: { modules: [{ module_title, slide_layout, infographic_description, color_palette, icon_style, composition_notes, topic_visuals: [{ topic_title, screen_template, image_needed, image_style, image_prompt, placement, alt_text }] }] }. Valid screen_template values: dashboard, guided-notes, scenario, media-quiz, summary-panel. Use dashboard for module openers, visual-first lessons, and lessons that should feel like an LMS page with cards. Use guided-notes for more linear explanation screens. Use scenario for decision-oriented workplace moments. Use media-quiz for lessons that should combine a hero asset with an embedded knowledge check feel. Use summary-panel for wrap-up or consolidation screens. Valid placements: hero, side-panel, inline-card. Valid image_style values: realistic-office, realistic-customer, realistic-teamwork, realistic-device-demo. ${buildSlideLayoutInstruction(params?.slideLayout)}`,
+          `Course Outline:\n${archResult}\n\nScript:\n${writerResult}\n\n${buildSlideLayoutInstruction(params?.slideLayout)}\n\nDesign goal: avoid generic e-learning blandness. Make each module feel like it has a visual thesis, a deliberate information hierarchy, and at least one premium infographic concept that could stand on its own in an executive presentation. Explicitly assign a screen_template for each topic so the renderer does not have to guess, and vary those templates across the course instead of defaulting everything to the same structure.`,
           addLog, "Visual Design Agent"
         );
         setStatus("visual", "complete");
@@ -233,13 +325,13 @@ Write content that would make a learner lean forward, not lean back.`;
         addLog("Visual Design Agent: Complete. Design plan ready.");
 
         // ── SVG Generation Pass ──
-        addLog("Visual Design Agent: Generating SVG infographics...");
+        addLog("Visual Design Agent: Generating SVG infographics and AI scene visuals...");
         try {
           const visParsed = JSON.parse(visualResult || "{}");
           const visModules = visParsed.modules || [];
           const archParsed = JSON.parse(archResult || "{}");
           const archMods = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
-          
+
           const svgs: string[] = [];
           for (let si = 0; si < Math.min(visModules.length, archMods.length); si++) {
             if (isCancelled()) break;
@@ -252,8 +344,8 @@ Write content that would make a learner lean forward, not lean back.`;
             addLog(`Visual Design Agent: Generating SVG ${si+1}/${visModules.length}...`);
             try {
               const svgText = await callClaude(
-                "You are an SVG designer. Generate a complete, self-contained SVG infographic (600x380px). Use ONLY these colors: #4f46e5 (indigo), #7c3aed (violet), #10b981 (emerald), #f59e0b (amber), #f8fafc (light bg), #0f172a (dark text), #ffffff (white). No external fonts — use font-family='system-ui, sans-serif'. No external images. Use only SVG primitives: rect, circle, path, text, line, polygon. Make it visually striking with geometric shapes, icons built from primitives, clear hierarchy. Must look professional and corporate. Return ONLY the SVG markup, nothing else.",
-                `Create an infographic for: ${modTitle}. Layout: ${layoutType}. Key points to visualise: ${topics.join(", ")}. Include the module title at the top in large bold text. Add a small 'ContentForge' label bottom-right in 10px muted text. ${buildSlideLayoutInstruction(params?.slideLayout)}`
+                "You are an elite SVG designer for premium corporate learning. Generate a complete, self-contained SVG infographic (1200x800px). Use ONLY these colors: #0f172a, #123d78, #355fa8, #4f46e5, #7c3aed, #10b981, #f59e0b, #e8eef9, #f8fafc, #ffffff. No external fonts. Use font-family='system-ui, sans-serif'. No external images. Use only SVG primitives. The infographic must use the canvas fully, have strong hierarchy, large readable labels, deliberate spacing, and a polished consulting-slide feel. Avoid giant blank areas or tiny unreadable text. Return ONLY the SVG markup, nothing else.",
+                `Create an infographic for: ${modTitle}. Layout: ${layoutType}. Key points to visualise: ${topics.join(", ")}. Include the module title prominently. Build a sophisticated visual narrative rather than a simple checklist. Add a small 'ContentForge' label bottom-right in subtle text. ${buildSlideLayoutInstruction(params?.slideLayout)}`
               );
               // Extract SVG from response
               const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i);
@@ -261,8 +353,53 @@ Write content that would make a learner lean forward, not lean back.`;
             } catch {
               svgs.push("");
             }
+
+            const topicVisuals = Array.isArray(vm?.topic_visuals) ? vm.topic_visuals : [];
+            if (topicVisuals.length > 0) {
+              for (let ti = 0; ti < topicVisuals.length; ti++) {
+                if (isCancelled()) break;
+                const topicVisual = topicVisuals[ti];
+                if (!topicVisual?.image_needed) continue;
+
+                const topicTitle = topicVisual.topic_title || topics[ti] || `Topic ${ti + 1}`;
+                addLog(`Visual Design Agent: Generating image ${si + 1}.${ti + 1} — ${topicTitle}...`);
+
+                try {
+                  const { data: imageData, error: imageError } = await supabase.functions.invoke("generate-slide-image", {
+                    body: {
+                      prompt: topicVisual.image_prompt || `A realistic workplace scene illustrating ${topicTitle}.`,
+                      style: topicVisual.image_style || "realistic-office",
+                      altText: topicVisual.alt_text || `AI-generated visual illustrating ${topicTitle}.`,
+                      moduleTitle: modTitle,
+                      topicTitle,
+                    },
+                  });
+
+                  if (!imageError && imageData?.imageDataUrl) {
+                    topicVisual.generated_image_data_url = imageData.imageDataUrl;
+                    topicVisual.generated_image_mime_type = imageData.mimeType || "image/png";
+                    topicVisual.image_approved = false;
+                    continue;
+                  }
+                } catch {
+                  // Fall back to generated SVG scene below if raster image generation fails.
+                }
+
+                try {
+                  const sceneSvgText = await callClaude(
+                    "You are an SVG scene designer for corporate learning. Generate a complete, self-contained SVG visual scene (800x520px). The result must be an original AI-generated illustration only, never based on any copyrighted photo or branded asset. Style goal: polished semi-realistic corporate scene, with believable office environments, people silhouettes or simplified characters, devices, tables, glass walls, notebooks, and workspaces. Use only SVG primitives and gradients. No external fonts, no external images. Use system-ui, sans-serif if text is needed, but prefer visual storytelling over labels. Keep it professional, diverse, contemporary, and uncluttered. Return ONLY SVG markup.",
+                    `Create an original AI-generated slide visual for corporate training. Module: ${modTitle}. Topic: ${topicTitle}. Style: ${topicVisual.image_style || "realistic-office"}. Placement intent: ${topicVisual.placement || "side-panel"}. Scene brief: ${topicVisual.image_prompt || `A realistic workplace scene illustrating ${topicTitle}.`}. Accessibility alt text target: ${topicVisual.alt_text || `AI-generated visual illustrating ${topicTitle}.`}. Do not include any copyrighted logos, brands, or identifiable trademarked products.`
+                  );
+                  const sceneSvgMatch = sceneSvgText.match(/<svg[\s\S]*?<\/svg>/i);
+                  topicVisual.generated_scene_svg = sceneSvgMatch ? sceneSvgMatch[0] : "";
+                  topicVisual.image_approved = false;
+                } catch {
+                  topicVisual.generated_scene_svg = "";
+                }
+              }
+            }
           }
-          
+
           // Update visual output with SVGs
           const updatedVisual = { ...visParsed, generatedSvgs: svgs };
           const updatedVisualStr = JSON.stringify(updatedVisual);
@@ -463,5 +600,5 @@ Write content that would make a learner lean forward, not lean back.`;
     status: agentStatuses[a.id] || "idle",
   }));
 
-  return { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline };
+  return { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline, updateVisualTopicAsset };
 }

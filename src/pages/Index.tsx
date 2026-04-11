@@ -43,7 +43,7 @@ const Index = () => {
   const [workflowClips, setWorkflowClips] = useState<any[]>([]);
   const prevIsRunning = useRef(false);
 
-  const { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline } = useAgentPipeline();
+  const { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline, updateVisualTopicAsset } = useAgentPipeline();
 
   useEffect(() => {
     if (prevIsRunning.current && !isRunning && rawOutputs.youtube) {
@@ -157,6 +157,7 @@ const Index = () => {
             insertedVideos={previewVideos}
             courseDuration={courseParams?.duration}
             slideLayout={courseParams?.slideLayout}
+            onUpdateVisualTopic={updateVisualTopicAsset}
           />
         </Suspense>
       )}
@@ -226,7 +227,7 @@ const Index = () => {
         <ResizableHandle withHandle />
 
         <ResizablePanel defaultSize={30} minSize={15} maxSize={45}>
-          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} workflowClips={workflowClips} courseDuration={courseParams?.duration} slideLayout={courseParams?.slideLayout} />
+          <OutputPanel outputData={outputData} rawOutputs={rawOutputs} courseTitle={courseTitle} workflowClips={workflowClips} courseDuration={courseParams?.duration} slideLayout={courseParams?.slideLayout} onUpdateVisualTopic={updateVisualTopicAsset} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
