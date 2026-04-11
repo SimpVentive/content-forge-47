@@ -49,11 +49,28 @@ function normalizeTextKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/gi, " ").trim();
 }
 
+function tryParseJson(raw: string): any | null {
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const fencedMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (!fencedMatch) return null;
+
+    try {
+      return JSON.parse(fencedMatch[1].trim());
+    } catch {
+      return null;
+    }
+  }
+}
+
 const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
-const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", voice: "", assembly: "" });
+const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", quality: "", voice: "", assembly: "" });
 
 const timestamp = () => {
   const d = new Date();
@@ -171,6 +188,7 @@ export function useAgentPipeline() {
     let animResult = "";
     let complianceResult = "";
     let assessmentResult = "";
+    let qualityResult = "";
     let voiceResult = "";
 
     try {
@@ -198,7 +216,7 @@ export function useAgentPipeline() {
         setStatus("architect", "running");
         addLog("Content Architect: Receiving research output...");
         archResult = await callClaudeWithRetry(
-          `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. Return JSON in this shape: { course_promise, audience, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`,
+          `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. Return JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`,
           `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nRecommended Structure: ${structureGuidance}\nSophistication Requirement: ${sophisticationGuidance}\nInstructional Pattern Guidance: ${instructionalPatternGuidance}\n\nBuild the course structure strictly from the above content, scaled to fit the target duration. Make modules feel like meaningful chapters with different jobs to do, and make topics feel teachable, scenario-ready, and presentation-worthy.`,
           addLog, "Content Architect"
         );
@@ -252,9 +270,11 @@ Rules you NEVER break:
 - Use analogies. Make complex ideas click instantly.
 - End every topic with a challenge or reflection: 'Next time you X, try Y instead'
 - NO passive voice. NO jargon without explanation. NO bullet walls.
-      - Do NOT make every topic feel structurally identical. Vary the treatment based on the instructional pattern and topic need.
-      - Across a module, include a mix of these techniques when appropriate: scenario walkthrough, misconception reset, process breakdown, weak-vs-strong contrast, manager coaching moment, customer-facing example, concise checklist.
-      - Format each topic using markdown prose with this backbone: Hook → Core explanation → Concrete example or scenario → Key Takeaway: → Challenge:. Keep headings limited to the topic title only.
+- Do NOT make every topic feel structurally identical. Vary the treatment based on the instructional pattern and topic need.
+- Across a module, include a mix of these techniques when appropriate: scenario walkthrough, misconception reset, process breakdown, weak-vs-strong contrast, manager coaching moment, customer-facing example, concise checklist.
+- Use the architect blueprint explicitly. Every topic should visibly honour its learning_objective, misconception_to_correct, scenario_anchor, practice_activity, interaction_type, and feedback_focus when those fields are present.
+- Make the learner do mental work. Include at least one decision prompt, judgment call, or “what would you do?” moment in each topic, written naturally inside the prose.
+- Format each topic using markdown prose with this backbone: Hook → Core explanation → Concrete example or scenario → Key Takeaway: → Challenge:. Keep headings limited to the topic title only.
 - Use markdown ## headers for each topic title, matching the exact topic names provided.
 - You MUST use content from the source material provided. Do NOT invent unrelated examples.
 
@@ -275,17 +295,21 @@ Rules you NEVER break:
             if (isCancelled()) break;
             const mod = parsedModules[mi];
             const modTitle = mod.module_title || mod.title || mod.name || `Module ${mi + 1}`;
+            const topicBlueprint = JSON.stringify(mod.topics || mod.sections || mod.lessons || [], null, 2);
             const topics = (mod.topics || mod.sections || mod.lessons || []).map((t: any) => {
               const name = typeof t === "string" ? t : t.topic_title || t.title || t.name || "";
               const obj = typeof t === "string" ? "" : t.learning_objective || t.objective || "";
-              return `  - Topic: ${name}${obj ? ` | Objective: ${obj}` : ""}`;
+              const pattern = typeof t === "string" ? "" : t.instructional_pattern || "";
+              const scenario = typeof t === "string" ? "" : t.scenario_anchor || "";
+              const interaction = typeof t === "string" ? "" : t.interaction_type || "";
+              return `  - Topic: ${name}${obj ? ` | Objective: ${obj}` : ""}${pattern ? ` | Pattern: ${pattern}` : ""}${scenario ? ` | Scenario: ${scenario}` : ""}${interaction ? ` | Interaction: ${interaction}` : ""}`;
             }).join("\n");
 
             addLog(`Writer Agent: Drafting Module ${mi + 1}/${parsedModules.length} — ${modTitle}...`);
 
             const moduleContent = await callClaudeWithRetry(
               writerSystemPrompt,
-              `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nTopics:\n${topics}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging content for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${wordsPerTopicRange} words minimum so the final course genuinely feels like ${params?.duration || "15min"}. Make this module feel like a coherent chapter with a distinct purpose, not a pile of disconnected notes. Use the topic's objective, scenario anchor, and evidence/example when present.`,
+              `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nTopics:\n${topics}\n\nStructured Topic Blueprint JSON:\n${topicBlueprint}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging content for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${wordsPerTopicRange} words minimum so the final course genuinely feels like ${params?.duration || "15min"}. Make this module feel like a coherent chapter with a distinct purpose, not a pile of disconnected notes. Use the topic's objective, scenario_anchor, misconception_to_correct, practice_activity, interaction_type, feedback_focus, and evidence_or_example when present.`,
               addLog, "Writer Agent"
             );
             moduleResults.push(`# ${modTitle}\n\n${moduleContent}`);
@@ -307,12 +331,40 @@ Rules you NEVER break:
       }
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
+      // ──── AGENT 3b: Quality Reviewer ────
+      if (toggles["quality"] !== false) {
+        setStatus("quality", "running");
+        addLog("Quality Reviewer: Scoring instructional quality and revising weak sections...");
+        qualityResult = await callClaudeWithRetry(
+          `You are a Quality Reviewer for premium corporate eLearning. Review the architect plan and draft script with a ruthless instructional-design lens. Score the draft on instructional clarity, realism, interaction quality, learner engagement, and assessment readiness. Then rewrite any weak content so the output feels sharper, more teachable, more scenario-based, and less generic. Return JSON in this exact shape: { instructional_score, realism_score, interaction_score, engagement_score, assessment_readiness_score, strengths: [], issues: [], revision_summary: [], revised_script }. The revised_script must preserve the same module and topic headings while improving the content beneath them.`,
+          `Course Title: ${courseTitle}\n\nArchitect Plan:\n${archResult}\n\nDraft Script:\n${writerResult}\n\nResearch Context:\n${researchResult}\n\nReview the draft against the architect schema. If a topic feels generic, lacks a decision point, ignores a misconception, or misses a practical scenario, fix it in revised_script.`,
+          addLog, "Quality Reviewer"
+        );
+
+        const qualityParsed = tryParseJson(qualityResult);
+        if (qualityParsed?.revised_script && typeof qualityParsed.revised_script === "string") {
+          writerResult = qualityParsed.revised_script;
+        }
+
+        setStatus("quality", "complete");
+        setRawOutputs((prev) => ({ ...prev, writer: writerResult, quality: qualityResult }));
+        setOutputData((prev) => ({
+          ...prev,
+          script: writerResult,
+          outline: prev.outline + `\n\n---\n\n## Quality Review\n\n${qualityResult}`,
+        }));
+        addLog("Quality Reviewer: Complete. Revised script passed forward to downstream agents.");
+      } else {
+        setStatus("quality", "idle");
+      }
+
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 4: Visual Design ────
       if (toggles["visual"] !== false) {
         setStatus("visual", "running");
         addLog("Visual Design Agent: Generating layout specs for modules...");
         visualResult = await callClaudeWithRetry(
-          `You are a Visual Design Agent for premium corporate eLearning. Given a course outline and script, produce a visual design plan that feels intentional, modern, and presentation-grade. For each module, specify: (1) recommended slide layout type, (2) key infographic or diagram description, (3) color palette suggestion, (4) iconography style, and (5) topic-level realism plan. The realism plan must use ONLY AI-generated original visuals, never stock photography or copyrighted images. Do NOT assign imagery to every topic. Select only the slides that truly benefit from realism, usually about 20-35% of topics, prioritising scenarios, workplace conversations, customer interactions, environmental context, and moments where the learner benefits from seeing a situation. Also ensure the infographic_description is ambitious enough to produce a sophisticated visual, not a simple poster. Return JSON: { modules: [{ module_title, slide_layout, infographic_description, color_palette, icon_style, composition_notes, topic_visuals: [{ topic_title, screen_template, image_needed, image_style, image_prompt, placement, alt_text }] }] }. Valid screen_template values: dashboard, guided-notes, scenario, media-quiz, summary-panel. Use dashboard for module openers, visual-first lessons, and lessons that should feel like an LMS page with cards. Use guided-notes for more linear explanation screens. Use scenario for decision-oriented workplace moments. Use media-quiz for lessons that should combine a hero asset with an embedded knowledge check feel. Use summary-panel for wrap-up or consolidation screens. Valid placements: hero, side-panel, inline-card. Valid image_style values: realistic-office, realistic-customer, realistic-teamwork, realistic-device-demo. ${buildSlideLayoutInstruction(params?.slideLayout)}`,
+          `You are a Visual Design Agent for premium corporate eLearning. Given a course outline and script, produce a visual design plan that feels intentional, modern, and presentation-grade. For each module, specify: (1) recommended slide layout type, (2) key infographic or diagram description, (3) color palette suggestion, (4) iconography style, and (5) topic-level realism plan. The realism plan must use ONLY AI-generated original visuals, never stock photography or copyrighted images. Do NOT assign imagery to every topic. Select only the slides that truly benefit from realism, usually about 20-35% of topics, prioritising scenarios, workplace conversations, customer interactions, environmental context, and moments where the learner benefits from seeing a situation. Also ensure the infographic_description is ambitious enough to produce a sophisticated visual, not a simple poster. Return JSON: { modules: [{ module_title, slide_layout, infographic_description, color_palette, icon_style, composition_notes, topic_visuals: [{ topic_title, screen_template, image_needed, image_style, image_prompt, placement, alt_text, interaction_emphasis }] }] }. Valid screen_template values: dashboard, guided-notes, scenario, media-quiz, summary-panel. Use dashboard for module openers, visual-first lessons, and lessons that should feel like an LMS page with cards. Use guided-notes for more linear explanation screens. Use scenario for decision-oriented workplace moments. Use media-quiz for lessons that should combine a hero asset with an embedded knowledge check feel. Use summary-panel for wrap-up or consolidation screens. Valid placements: hero, side-panel, inline-card. Valid image_style values: realistic-office, realistic-customer, realistic-teamwork, realistic-device-demo. ${buildSlideLayoutInstruction(params?.slideLayout)}`,
           `Course Outline:\n${archResult}\n\nScript:\n${writerResult}\n\n${buildSlideLayoutInstruction(params?.slideLayout)}\n\nDesign goal: avoid generic e-learning blandness. Make each module feel like it has a visual thesis, a deliberate information hierarchy, and at least one premium infographic concept that could stand on its own in an executive presentation. Explicitly assign a screen_template for each topic so the renderer does not have to guess, and vary those templates across the course instead of defaulting everything to the same structure.`,
           addLog, "Visual Design Agent"
         );
@@ -418,8 +470,8 @@ Rules you NEVER break:
         setStatus("animation", "running");
         addLog("Animation Agent: Writing interaction notes...");
         animResult = await callClaudeWithRetry(
-          'You are an Animation Agent for eLearning. Given a course script and visual design plan, write animation and interaction notes for each module. For each section specify: (1) animation type (entrance, transition, emphasis), (2) timing in seconds, (3) interaction type (click, hover, drag, quiz trigger), (4) any scenario or branching logic. Keep it practical for tools like Articulate Storyline or Adobe Captivate. Return as a structured list.',
-          `Script:\n${writerResult}\n\nVisual Design Plan:\n${visualResult}`,
+          'You are an Animation Agent for eLearning. Given a course architecture, script, and visual design plan, write animation and interaction notes for each module. For each topic or section specify: (1) animation type (entrance, transition, emphasis), (2) timing in seconds, (3) interaction type (click, hover, drag, quiz trigger, scenario decision, reveal), (4) branching or feedback logic, and (5) the learner action the interaction is reinforcing. Keep it practical for tools like Articulate Storyline or Adobe Captivate. Return as a structured list grouped by module.',
+          `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nVisual Design Plan:\n${visualResult}`,
           addLog, "Animation Agent"
         );
         setStatus("animation", "complete");
@@ -516,8 +568,8 @@ Rules you NEVER break:
         setStatus("assessment", "running");
         addLog("Assessment Agent: Generating 10 MCQs + 3 scenarios...");
         assessmentResult = await callClaudeWithRetry(
-          'You are an Assessment Design Agent. Given a course script and learning objectives, create a comprehensive assessment. Generate: (1) 10 multiple choice questions with 4 options each and correct answer marked, (2) 3 scenario-based questions with a situation description and 3 response options, (3) 1 reflection exercise with an open-ended prompt. Tag each question with the relevant Bloom\'s taxonomy level. Return as JSON: { mcq: [{ question, options: [], correct_answer, blooms_level }], scenarios: [{ situation, options: [], best_response, rationale }], reflection: { prompt, guidance } }',
-          `Script:\n${writerResult}\n\nLearning Objectives:\n${researchResult}`,
+          'You are an Assessment Design Agent. Given a course script, architecture, and learning objectives, create a comprehensive assessment. Generate: (1) 10 multiple choice questions with 4 options each, correct answer marked, rationale, and common wrong-answer trap, (2) 3 scenario-based questions with a situation description, 3 response options, best_response, and coaching rationale, (3) 1 reflection exercise with an open-ended prompt, and (4) embedded_interactions: a list of 4-8 in-course interaction ideas aligned to specific topics, each with topic_title, interaction_type, prompt, expected_response, and feedback_focus. Tag each question with the relevant Bloom\'s taxonomy level. Return as JSON: { mcq: [{ question, options: [], correct_answer, rationale, wrong_answer_trap, blooms_level }], scenarios: [{ situation, options: [], best_response, rationale, blooms_level }], reflection: { prompt, guidance }, embedded_interactions: [{ topic_title, interaction_type, prompt, expected_response, feedback_focus }] }',
+          `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nLearning Objectives:\n${researchResult}`,
           addLog, "Assessment Agent"
         );
         setStatus("assessment", "complete");
@@ -562,9 +614,9 @@ Rules you NEVER break:
       if (toggles["assembly"] !== false) {
         setStatus("assembly", "running");
         addLog("Final Assembly: Packaging all outputs...");
-        const assemblyInput = `Course Title: ${courseTitle}\n\nOutline:\n${archResult}\n\nScript:\n${writerResult}\n\nVisual Plan:\n${visualResult}\n\nAssessment:\n${assessmentResult}\n\nNarration:\n${voiceResult}\n\nCompliance:\n${complianceResult}`;
+        const assemblyInput = `Course Title: ${courseTitle}\n\nOutline:\n${archResult}\n\nScript:\n${writerResult}\n\nVisual Plan:\n${visualResult}\n\nAssessment:\n${assessmentResult}\n\nQuality Review:\n${qualityResult}\n\nNarration:\n${voiceResult}\n\nCompliance:\n${complianceResult}`;
         const assemblyResult = await callClaudeWithRetry(
-          'You are a Final Assembly Agent for eLearning. Given the full course output (outline, script, assessment, narration, visual plan), produce a final course package summary. Include: (1) Course metadata — title, total modules, total topics, estimated completion time, difficulty level, (2) SCORM manifest summary — list of all assets needed (slides, audio files, images, assessments), (3) LMS deployment checklist — 10-item checklist of steps to publish to an LMS, (4) Quality assurance summary — confirm all agents completed and list any gaps. Return as JSON: { metadata: {}, scorm_manifest: { assets: [] }, deployment_checklist: [], qa_summary: { agents_completed: [], gaps: [] } }',
+          'You are a Final Assembly Agent for eLearning. Given the full course output (outline, script, assessment, narration, visual plan, quality review), produce a final course package summary. Include: (1) Course metadata — title, total modules, total topics, estimated completion time, difficulty level, (2) SCORM manifest summary — list of all assets needed (slides, audio files, images, assessments), (3) LMS deployment checklist — 10-item checklist of steps to publish to an LMS, (4) Quality assurance summary — confirm all agents completed, include key quality scores, and list any remaining gaps. Return as JSON: { metadata: {}, scorm_manifest: { assets: [] }, deployment_checklist: [], qa_summary: { agents_completed: [], quality_scores: {}, gaps: [] } }',
           assemblyInput,
           addLog, "Final Assembly"
         );
@@ -572,7 +624,7 @@ Rules you NEVER break:
         setRawOutputs((prev) => ({ ...prev, assembly: assemblyResult }));
         setOutputData((prev) => ({ ...prev, package: assemblyResult }));
         addLog("Final Assembly: Complete. Course package ready for LMS deployment.");
-        addLog("Orchestrator: All 9 agents complete. Pipeline finished successfully.");
+        addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
       } else {
         setStatus("assembly", "idle");
       }
