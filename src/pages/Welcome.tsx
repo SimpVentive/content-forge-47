@@ -121,23 +121,16 @@ const Welcome = () => {
         >
           <div className="flex flex-col items-center text-center">
             <div
-              className="mb-9 flex h-56 w-56 items-center justify-center overflow-hidden rounded-[42px] border"
+              className="mb-9"
               style={{
-                background: "radial-gradient(circle at 50% 42%, rgba(255,255,255,0.92) 0%, rgba(242,247,252,0.76) 38%, rgba(231,238,247,0.64) 68%, rgba(226,233,242,0.44) 100%)",
-                borderColor: "rgba(148,163,184,0.16)",
-                backdropFilter: "blur(22px)",
-                animation: "logoSurge 900ms cubic-bezier(0.34, 1.56, 0.64, 1) both, logoGlow 2.8s ease-in-out 1100ms infinite, logoFloat 4.2s ease-in-out 1300ms infinite",
+                animation: "logoSurge 900ms cubic-bezier(0.34, 1.56, 0.64, 1) both, logoFloat 4.2s ease-in-out 1300ms infinite",
               }}
             >
-              <div
-                className="absolute h-44 w-44 rounded-full"
-                style={{ background: "radial-gradient(circle, rgba(112,160,199,0.22) 0%, rgba(112,160,199,0.08) 48%, rgba(112,160,199,0) 76%)" }}
-              />
               <img
                 src={contentForgeLogo}
                 alt="ContentForge"
-                className="relative h-40 w-40 object-contain"
-                style={{ mixBlendMode: "multiply", filter: "drop-shadow(0 14px 30px rgba(30,58,95,0.12))" }}
+                className="h-52 w-52 object-contain"
+                style={{ filter: "drop-shadow(0 18px 40px rgba(30,58,95,0.18))" }}
               />
             </div>
             <h1
@@ -176,17 +169,7 @@ const Welcome = () => {
         className="fixed left-4 top-4 z-20"
         style={{ animation: introStage === "done" ? "welcomeCornerLogo 540ms cubic-bezier(0.22, 1, 0.36, 1) both" : undefined, opacity: introStage === "done" ? 1 : 0 }}
       >
-        <div
-          className="flex h-24 w-24 items-center justify-center rounded-[24px] border shadow-2xl"
-          style={{
-            background: "radial-gradient(circle at 50% 42%, rgba(255,255,255,0.9) 0%, rgba(242,247,252,0.74) 44%, rgba(231,238,247,0.55) 100%)",
-            borderColor: "rgba(148, 163, 184, 0.2)",
-            boxShadow: "0 22px 48px rgba(30, 58, 95, 0.14)",
-            backdropFilter: "blur(18px)",
-          }}
-        >
-          <img src={contentForgeLogo} alt="ContentForge" className="h-16 w-16 object-contain" style={{ mixBlendMode: "multiply" }} />
-        </div>
+        <img src={contentForgeLogo} alt="ContentForge" className="h-20 w-20 object-contain" style={{ filter: "drop-shadow(0 8px 20px rgba(30,58,95,0.16))" }} />
       </div>
       <div className="fixed right-4 top-4 z-20">
         <div className="rounded-lg border px-3 py-2 text-[11px] font-semibold shadow-md"
@@ -214,26 +197,12 @@ const Welcome = () => {
           style={{ animation: introStage === "done" ? "welcomeHeroReveal 620ms cubic-bezier(0.22, 1, 0.36, 1) both" : undefined, opacity: introStage === "done" ? 1 : 0 }}
         >
           <div className="mb-8 flex justify-center" style={{ animation: introStage === "done" ? "heroLogoReveal 720ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both" : undefined }}>
-            <div
-              className="relative flex h-48 w-48 items-center justify-center overflow-hidden rounded-[40px] border"
-              style={{
-                background: "radial-gradient(circle at 50% 42%, rgba(255,255,255,0.94) 0%, rgba(242,247,252,0.8) 42%, rgba(231,238,247,0.58) 100%)",
-                borderColor: "rgba(148,163,184,0.18)",
-                boxShadow: "0 28px 64px rgba(30, 58, 95, 0.14)",
-                backdropFilter: "blur(20px)",
-              }}
-            >
-              <div
-                className="absolute inset-0"
-                style={{ background: "radial-gradient(circle, rgba(112,160,199,0.16) 0%, rgba(112,160,199,0.08) 45%, rgba(112,160,199,0) 78%)" }}
-              />
-              <img
-                src={contentForgeLogo}
-                alt="ContentForge"
-                className="relative h-34 w-34 object-contain md:h-36 md:w-36"
-                style={{ mixBlendMode: "multiply", filter: "drop-shadow(0 18px 30px rgba(30,58,95,0.12))" }}
-              />
-            </div>
+            <img
+              src={contentForgeLogo}
+              alt="ContentForge"
+              className="h-44 w-44 object-contain md:h-52 md:w-52"
+              style={{ filter: "drop-shadow(0 20px 40px rgba(30,58,95,0.18))" }}
+            />
           </div>
           <h1 className="mb-3 text-[52px] font-[900] leading-[1.02] tracking-tight md:text-[58px]"
             style={{
