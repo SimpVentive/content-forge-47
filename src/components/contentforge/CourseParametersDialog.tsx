@@ -297,7 +297,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       )}
 
       <div
-        className="relative w-[1080px] max-w-[96vw] max-h-[92vh] rounded-[28px] shadow-2xl overflow-hidden animate-fade-in border border-white/30"
+        className="relative w-[1080px] max-w-[96vw] h-[92vh] max-h-[92vh] rounded-[28px] shadow-2xl overflow-hidden animate-fade-in border border-white/30"
         style={{ fontFamily: displayFont }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -321,7 +321,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </div>
 
               {/* Body */}
-              <div className="px-6 py-5 space-y-5 overflow-y-scroll [scrollbar-gutter:stable] pr-4 flex-1">
+              <div className="px-6 py-5 space-y-5 overflow-y-auto [scrollbar-gutter:stable] pr-4 flex-1">
           {/* Course Level */}
           <div>
             <label className="text-[13px] font-bold text-foreground mb-2 flex items-center gap-1.5">

@@ -7,6 +7,7 @@ export type AvatarTrainer = {
 
 export const AVATAR_TRAINERS: AvatarTrainer[] = [
   { id: "priya", name: "Priya", region: "india", subtitle: "India trainer" },
+  { id: "indira", name: "Indira", region: "india", subtitle: "India trainer" },
   { id: "arjun", name: "Arjun", region: "india", subtitle: "India trainer" },
   { id: "neha", name: "Neha", region: "india", subtitle: "India trainer" },
   { id: "rohan", name: "Rohan", region: "india", subtitle: "India trainer" },
@@ -44,6 +45,7 @@ export type TrainerMedia = {
 
 const DEFAULT_TRAINER_IMAGE_PROMPTS: Record<string, string> = {
   priya: "realistic professional indian woman corporate trainer headshot, studio lighting, clean office background",
+  indira: "realistic professional indian woman corporate trainer in navy blazer, office background, studio lighting",
   arjun: "realistic professional indian man corporate trainer headshot, studio lighting, clean office background",
   neha: "realistic professional indian woman learning consultant headshot, studio lighting, clean office background",
   rohan: "realistic professional indian man learning consultant headshot, studio lighting, clean office background",
@@ -53,6 +55,7 @@ const DEFAULT_TRAINER_IMAGE_PROMPTS: Record<string, string> = {
 
 const LOCAL_TRAINER_IMAGE_PATHS: Record<string, string> = {
   priya: "/trainers/priya.png",
+  indira: "/trainers/indira.png",
   arjun: "/trainers/arjun.png",
   neha: "/trainers/neha.png",
   rohan: "/trainers/rohan.png",
