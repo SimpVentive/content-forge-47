@@ -51,6 +51,15 @@ const DEFAULT_TRAINER_IMAGE_PROMPTS: Record<string, string> = {
   emma: "realistic professional female corporate trainer headshot, studio lighting, clean office background",
 };
 
+const LOCAL_TRAINER_IMAGE_PATHS: Record<string, string> = {
+  priya: "/trainers/priya.png",
+  arjun: "/trainers/arjun.png",
+  neha: "/trainers/neha.png",
+  rohan: "/trainers/rohan.png",
+  daniel: "/trainers/daniel.png",
+  emma: "/trainers/emma.png",
+};
+
 function getDefaultTrainerImageUrl(trainerId: string): string {
   const prompt = DEFAULT_TRAINER_IMAGE_PROMPTS[trainerId] || "realistic professional trainer headshot, studio lighting";
   return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=640&height=640&seed=${encodeURIComponent(trainerId)}&model=flux&nologo=true`;
@@ -60,8 +69,10 @@ export function getTrainerMedia(trainerId: string, env: Record<string, string | 
   const suffix = trainerId.toUpperCase();
   const videoUrl = env[`VITE_AVATAR_VIDEO_URL_${suffix}`]?.trim() || env.VITE_AVATAR_VIDEO_URL?.trim() || undefined;
   const posterUrl = env[`VITE_AVATAR_VIDEO_POSTER_URL_${suffix}`]?.trim() || env.VITE_AVATAR_VIDEO_POSTER_URL?.trim() || undefined;
+  const localImageUrl = LOCAL_TRAINER_IMAGE_PATHS[trainerId];
 
   const imageUrl = env[`VITE_AVATAR_IMAGE_URL_${suffix}`]?.trim()
+    || localImageUrl
     || env.VITE_AVATAR_IMAGE_URL?.trim()
     || getDefaultTrainerImageUrl(trainerId);
 

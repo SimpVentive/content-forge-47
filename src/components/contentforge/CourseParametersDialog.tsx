@@ -411,15 +411,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                           type="button"
                         >
                           <div className="relative h-[78px] w-full overflow-hidden bg-[#dfe8f6]">
-                            <div className="absolute inset-0 flex items-center justify-center text-[17px] font-[900] text-[#5b6f95]">
-                              {trainer.name.slice(0, 2).toUpperCase()}
-                            </div>
                             <img
                               src={trainerMedia.imageUrl}
                               alt={trainer.name}
-                              className="h-full w-full object-cover"
+                              className={`h-full w-full object-cover transition-transform duration-300 ${selected ? "scale-[1.08]" : "scale-100"}`}
                               onError={(event) => {
-                                event.currentTarget.style.display = "none";
+                                event.currentTarget.src = "/placeholder.svg";
                               }}
                             />
                             {selected ? (
@@ -771,6 +768,24 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Narrator Voice:</span> {selectedVoiceLabel}</p>
                     <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Instructor:</span> {selectedTrainer.name}</p>
                     <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Duration:</span> {selectedDurationLabel}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-2xl border border-white/30 bg-white/10 backdrop-blur-sm">
+                  <div className="relative h-[230px] w-full overflow-hidden">
+                    <img
+                      key={selectedTrainer.id}
+                      src={selectedTrainerImage}
+                      alt={`${selectedTrainer.name} preview`}
+                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.03]"
+                      onError={(event) => {
+                        event.currentTarget.src = "/placeholder.svg";
+                      }}
+                    />
+                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-4 pb-3 pt-10">
+                      <p className="text-[11px] uppercase tracking-[0.14em] text-white/80">Instructor Preview</p>
+                      <p className="text-[22px] font-[900] leading-none text-white mt-1">{selectedTrainer.name}</p>
+                    </div>
                   </div>
                 </div>
               </div>
