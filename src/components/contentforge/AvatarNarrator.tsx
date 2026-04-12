@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -7,6 +8,10 @@ interface AvatarNarratorProps {
   topic: string;
   moduleContent: string;
   systemHint: string;
+  trainerName?: string;
+  avatarImageUrl?: string;
+  avatarVideoUrl?: string;
+  avatarPosterUrl?: string;
 }
 
 const CONCISE_RESPONSE_HINT = "Keep the response concise: maximum 90 words, 4 short paragraphs or fewer, and avoid repetition.";
@@ -21,21 +26,30 @@ const AVATAR_IDLE_ANIMATION = "avatarNarratorFloat 4.2s ease-in-out infinite";
 
 type RequestMode = "initial" | "example";
 
-function buildDefaultSpeech(topic: string, moduleContent: string) {
+function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: string) {
   const preview = moduleContent.trim().replace(/\s+/g, " ");
   if (!preview) {
-    return `Click Explain this and Sarah will walk you through ${topic}.`;
+    return `Click Explain this and ${trainerName} will walk you through ${topic}.`;
   }
 
   const shortenedPreview = preview.length > 180 ? `${preview.slice(0, 177).trimEnd()}...` : preview;
-  return `Click Explain this and Sarah will break down ${topic}. Quick preview: ${shortenedPreview}`;
+  return `Click Explain this and ${trainerName} will break down ${topic}. Quick preview: ${shortenedPreview}`;
 }
 
-export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarratorProps) {
-  const [speechText, setSpeechText] = useState(() => buildDefaultSpeech(topic, moduleContent));
+export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl }: AvatarNarratorProps) {
+  const [speechText, setSpeechText] = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasCompletedInitialResponse, setHasCompletedInitialResponse] = useState(false);
   const [hasAvatarImage, setHasAvatarImage] = useState(true);
+  const [videoMuted, setVideoMuted] = useState(true);
+  const [videoPlaying, setVideoPlaying] = useState(true);
+  const avatarVideoRef = useRef<HTMLVideoElement | null>(null);
+  const trainerInitials = trainerName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || "")
+    .join("") || "AV";
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const flushIntervalRef = useRef<number | null>(null);
@@ -180,7 +194,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
   };
 
   useEffect(() => {
-    setSpeechText(buildDefaultSpeech(topic, moduleContent));
+    setSpeechText(buildDefaultSpeech(topic, moduleContent, trainerName));
     setHasCompletedInitialResponse(false);
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
@@ -188,7 +202,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
     pendingCompletionModeRef.current = null;
     stopFlushLoop();
     setIsStreaming(false);
-  }, [topic, moduleContent]);
+  }, [topic, moduleContent, trainerName]);
 
   useEffect(() => {
     return () => {
@@ -196,6 +210,35 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
       stopFlushLoop();
     };
   }, []);
+
+  useEffect(() => {
+    setHasAvatarImage(true);
+  }, [avatarImageUrl, trainerName]);
+
+  useEffect(() => {
+    if (!avatarVideoUrl || !avatarVideoRef.current) return;
+
+    const video = avatarVideoRef.current;
+    video.currentTime = 0;
+    video.play().then(() => {
+      setVideoPlaying(true);
+    }).catch(() => {
+      setVideoPlaying(false);
+    });
+  }, [avatarVideoUrl, topic, moduleContent]);
+
+  const toggleVideoPlayback = () => {
+    const video = avatarVideoRef.current;
+    if (!video) return;
+
+    if (video.paused) {
+      video.play().then(() => setVideoPlaying(true)).catch(() => setVideoPlaying(false));
+      return;
+    }
+
+    video.pause();
+    setVideoPlaying(false);
+  };
 
   return (
     <section className="flex w-full max-w-2xl flex-col gap-4">
@@ -242,28 +285,67 @@ export function AvatarNarrator({ topic, moduleContent, systemHint }: AvatarNarra
           }
         }`}
       </style>
-      <div className="flex items-center gap-4" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
-        <div
-          className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 shadow-sm text-lg font-semibold"
-          style={{ backgroundColor: AVATAR_BG, color: AVATAR_TEXT, animation: isStreaming ? undefined : AVATAR_IDLE_ANIMATION }}
-        >
-          {hasAvatarImage ? (
-            <img
-              src="/avatar-sarah.jpg"
-              alt="Sarah"
-              className="h-full w-full scale-110 object-cover object-top"
-              style={{ animation: isStreaming ? AVATAR_PULSE_ANIMATION : undefined }}
-              onError={() => setHasAvatarImage(false)}
-            />
-          ) : (
-            "SC"
-          )}
+      {avatarVideoUrl ? (
+        <div className="relative overflow-hidden rounded-[20px] border border-[#d8deea] bg-black shadow-[0_14px_30px_rgba(15,23,42,0.2)]" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+          <video
+            ref={avatarVideoRef}
+            src={avatarVideoUrl}
+            poster={avatarPosterUrl}
+            className="aspect-[3/4] w-full max-h-[320px] object-cover"
+            autoPlay
+            playsInline
+            muted={videoMuted}
+            controls={false}
+            preload="metadata"
+            onPlay={() => setVideoPlaying(true)}
+            onPause={() => setVideoPlaying(false)}
+            onEnded={() => setVideoPlaying(false)}
+          />
+          <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/35 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
+            <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+            Lip-sync mode
+          </div>
+          <button
+            type="button"
+            onClick={toggleVideoPlayback}
+            className="absolute right-14 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/55"
+            aria-label={videoPlaying ? "Pause avatar narration" : "Play avatar narration"}
+          >
+            {videoPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setVideoMuted((prev) => !prev)}
+            className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur transition-colors hover:bg-black/55"
+            aria-label={videoMuted ? "Unmute avatar video" : "Mute avatar video"}
+          >
+            {videoMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+          </button>
         </div>
-        <div className="min-w-0">
-          <p className="text-base font-semibold text-foreground">Sarah</p>
-          <p className="text-sm text-muted-foreground">Your learning guide</p>
+      ) : (
+        <div className="flex items-center gap-4" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+          <div
+            className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 shadow-sm text-lg font-semibold"
+            style={{ backgroundColor: AVATAR_BG, color: AVATAR_TEXT, animation: isStreaming ? undefined : AVATAR_IDLE_ANIMATION }}
+          >
+            {hasAvatarImage ? (
+              <img
+                src={avatarImageUrl || "/avatar-sarah.jpg"}
+                alt={trainerName}
+                className="h-full w-full scale-110 object-cover object-top"
+                style={{ animation: isStreaming ? AVATAR_PULSE_ANIMATION : undefined }}
+                onError={() => setHasAvatarImage(false)}
+              />
+            ) : (
+              trainerInitials
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-base font-semibold text-foreground">{trainerName}</p>
+            <p className="text-sm text-muted-foreground">Your learning guide</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div
         className="min-h-36 max-h-56 overflow-y-auto rounded-[24px] border px-5 py-4 text-sm leading-7 shadow-sm"

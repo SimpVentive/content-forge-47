@@ -1,5 +1,7 @@
-import React, { useState, useMemo } from "react";
-import { X, Settings2, AlertTriangle } from "lucide-react";
+import React, { useState, useMemo, useEffect } from "react";
+import { X, Settings2, AlertTriangle, Info, Check } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage } from "@/lib/avatarTrainers";
 
 export interface CourseParameters {
   level: "basic" | "intermediate" | "advanced";
@@ -7,10 +9,15 @@ export interface CourseParameters {
   textLanguage: string;
   narratorLanguage: string;
   voiceAccent: string;
+  avatarTrainerId: string;
   duration: string;
   videoDurationHandling: "within-course" | "additional-to-course";
   assessmentRequired: boolean;
   learnerNotesEnabled: boolean;
+  resourcesPanelEnabled: boolean;
+  glossaryEnabled: boolean;
+  discussionEnabled: boolean;
+  assessmentIntensity: "light" | "standard" | "deep";
   slideLayout: {
     maxLines: number;
     minFontSize: number;
@@ -72,6 +79,11 @@ const DURATIONS = [
 
 const MAX_LINE_OPTIONS = [8, 9, 10] as const;
 const LINE_SPACING_OPTIONS = [1.5, 2, 2.5] as const;
+const ASSESSMENT_INTENSITY_OPTIONS = [
+  { value: "light", label: "Light", desc: "Fewer checks" },
+  { value: "standard", label: "Standard", desc: "Balanced" },
+  { value: "deep", label: "Deep", desc: "More checks" },
+] as const;
 
 // Map duration to YouTube video count
 export const DURATION_VIDEO_COUNT: Record<string, number> = {
@@ -89,25 +101,57 @@ function getDurationMinutes(val: string): number {
   return DURATIONS.find(d => d.value === val)?.minutes ?? 15;
 }
 
+const InfoHint: React.FC<{ text: string }> = ({ text }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button
+        type="button"
+        className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary"
+        aria-label="More information"
+      >
+        <Info className="h-3.5 w-3.5" />
+      </button>
+    </TooltipTrigger>
+    <TooltipContent className="max-w-[260px] text-[11px] leading-relaxed">{text}</TooltipContent>
+  </Tooltip>
+);
+
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   open, courseTitle, estimatedMinutes, onConfirm, onCancel,
 }) => {
-  const displayFont = '"Manrope", "Plus Jakarta Sans", sans-serif';
+  const displayFont = '"Plus Jakarta Sans", "Manrope", sans-serif';
   const [level, setLevel] = useState<CourseParameters["level"]>("intermediate");
   const [textLanguage, setTextLanguage] = useState("English");
   const [narratorLanguage, setNarratorLanguage] = useState("English");
   const [voiceAccent, setVoiceAccent] = useState("Rachel");
+  const [avatarTrainerId, setAvatarTrainerId] = useState(() => getDefaultTrainerIdForLanguage("English"));
+  const [trainerAutoMode, setTrainerAutoMode] = useState(true);
   const [duration, setDuration] = useState("15min");
   const [videoDurationHandling, setVideoDurationHandling] = useState<CourseParameters["videoDurationHandling"]>("within-course");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
   const [learnerNotesEnabled, setLearnerNotesEnabled] = useState(false);
+  const [resourcesPanelEnabled, setResourcesPanelEnabled] = useState(true);
+  const [glossaryEnabled, setGlossaryEnabled] = useState(true);
+  const [discussionEnabled, setDiscussionEnabled] = useState(true);
+  const [assessmentIntensity, setAssessmentIntensity] = useState<CourseParameters["assessmentIntensity"]>("standard");
   const [maxLines, setMaxLines] = useState<CourseParameters["slideLayout"]["maxLines"]>(10);
   const [minFontSize, setMinFontSize] = useState<CourseParameters["slideLayout"]["minFontSize"]>(12.5);
   const [lineSpacing, setLineSpacing] = useState<CourseParameters["slideLayout"]["lineSpacing"]>(2);
   const [showMismatchWarning, setShowMismatchWarning] = useState(false);
   const [mismatchType, setMismatchType] = useState<"more" | "less">("more");
+  const avatarEnv = import.meta.env as Record<string, string | undefined>;
 
   const selectedMinutes = getDurationMinutes(duration);
+  const selectedLevelLabel = LEVELS.find((item) => item.value === level)?.label || "Intermediate";
+  const selectedVoiceLabel = VOICE_ACCENTS.find((voice) => voice.value === voiceAccent)?.label || voiceAccent;
+  const selectedDurationLabel = DURATIONS.find((item) => item.value === duration)?.label || "15 min";
+  const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
+  const selectedTrainerImage = getTrainerMedia(selectedTrainer.id, avatarEnv).imageUrl;
+
+  useEffect(() => {
+    if (!trainerAutoMode) return;
+    setAvatarTrainerId(getDefaultTrainerIdForLanguage(narratorLanguage));
+  }, [narratorLanguage, trainerAutoMode]);
 
   // Check for mismatch when user tries to generate
   const mismatchInfo = useMemo(() => {
@@ -137,10 +181,15 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       textLanguage,
       narratorLanguage,
       voiceAccent,
+      avatarTrainerId,
       duration,
       videoDurationHandling,
       assessmentRequired,
       learnerNotesEnabled,
+      resourcesPanelEnabled,
+      glossaryEnabled,
+      discussionEnabled,
+      assessmentIntensity,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -158,10 +207,15 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       textLanguage,
       narratorLanguage,
       voiceAccent,
+      avatarTrainerId,
       duration: closest.value,
       videoDurationHandling,
       assessmentRequired,
       learnerNotesEnabled,
+      resourcesPanelEnabled,
+      glossaryEnabled,
+      discussionEnabled,
+      assessmentIntensity,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -174,10 +228,15 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       textLanguage,
       narratorLanguage,
       voiceAccent,
+      avatarTrainerId,
       duration,
       videoDurationHandling,
       assessmentRequired,
       learnerNotesEnabled,
+      resourcesPanelEnabled,
+      glossaryEnabled,
+      discussionEnabled,
+      assessmentIntensity,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -238,31 +297,37 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       )}
 
       <div
-        className="relative w-[520px] max-w-[95vw] max-h-[90vh] bg-card rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
+        className="relative w-[1080px] max-w-[96vw] max-h-[92vh] rounded-[28px] shadow-2xl overflow-hidden animate-fade-in border border-white/30"
         style={{ fontFamily: displayFont }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-full flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #0d7a5f, #1e3a5f)" }}>
-              <Settings2 className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h2 className="text-[17px] font-extrabold tracking-tight text-foreground">Course Parameters</h2>
-              <p className="text-[12px] text-muted-foreground truncate max-w-[300px]">{courseTitle}</p>
-            </div>
-          </div>
-          <button onClick={onCancel} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors">
-            <X className="w-4 h-4 text-muted-foreground" />
-          </button>
-        </div>
+        <TooltipProvider delayDuration={150}>
+          <div className="grid h-full lg:grid-cols-[1.03fr_0.97fr]">
+            <div className="flex min-h-0 flex-col bg-[linear-gradient(180deg,#f7f9ff_0%,#f1f4fb_100%)]">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-[#d9dfef] flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #0e8ca8, #1f5a89)" }}>
+                    <Settings2 className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-[35px] leading-none font-[900] tracking-tight text-[#1d2f57]">Course Setup</h2>
+                    <p className="text-[12px] text-[#51648e] truncate max-w-[330px] mt-0.5">{courseTitle}</p>
+                  </div>
+                </div>
+                <button onClick={onCancel} className="w-8 h-8 rounded-lg hover:bg-[#e8edf8] flex items-center justify-center transition-colors">
+                  <X className="w-4 h-4 text-[#6a7da5]" />
+                </button>
+              </div>
 
-        {/* Body */}
-        <div className="px-6 py-5 space-y-5 overflow-y-auto max-h-[calc(90vh-140px)]">
+              {/* Body */}
+              <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
           {/* Course Level */}
           <div>
-            <label className="text-[13px] font-bold text-foreground mb-2 block">Course Level</label>
+            <label className="text-[13px] font-bold text-foreground mb-2 flex items-center gap-1.5">
+              Course Level
+              <InfoHint text="Controls how basic or advanced the generated explanations should be." />
+            </label>
             <div className="grid grid-cols-3 gap-2">
               {LEVELS.map((l) => (
                 <button
@@ -319,20 +384,74 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     <option key={v.value} value={v.value}>{v.label}</option>
                   ))}
                 </select>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[12px] font-bold text-foreground">Trainer Avatar</p>
+                    <InfoHint text="Choose the virtual trainer shown to learners. Indian languages default to Indian trainers in auto mode." />
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      {trainerAutoMode ? "Auto" : "Manual"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {AVATAR_TRAINERS.map((trainer) => {
+                      const selected = avatarTrainerId === trainer.id;
+                      const preferredForLanguage = isIndianLanguage(narratorLanguage)
+                        ? trainer.region === "india"
+                        : trainer.region === "global";
+
+                      return (
+                        <button
+                          key={trainer.id}
+                          onClick={() => {
+                            setAvatarTrainerId(trainer.id);
+                            setTrainerAutoMode(false);
+                          }}
+                          className={`rounded-xl border-2 p-2.5 text-left transition-all ${
+                            selected ? "border-primary bg-primary/10" : "border-border hover:border-primary/30"
+                          }`}
+                          type="button"
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-[11px] font-bold text-foreground overflow-hidden">
+                              <span className="absolute text-[11px] font-bold text-foreground">{trainer.name.slice(0, 2).toUpperCase()}</span>
+                              <img
+                                src={getTrainerMedia(trainer.id, avatarEnv).imageUrl}
+                                alt={trainer.name}
+                                className="h-8 w-8 rounded-full object-cover"
+                                onError={(event) => {
+                                  event.currentTarget.style.display = "none";
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className={`truncate text-[12px] font-bold ${selected ? "text-primary" : "text-foreground"}`}>{trainer.name}</p>
+                              <p className="text-[10px] text-muted-foreground">{trainer.subtitle}</p>
+                            </div>
+                          </div>
+                          {preferredForLanguage ? (
+                            <p className="mt-2 text-[10px] font-semibold text-emerald-600">Recommended for {narratorLanguage}</p>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Duration */}
           <div>
-            <label className="text-[13px] font-bold text-foreground mb-2 block">
-              Target Duration
+            <div className="mb-2 flex items-center gap-1.5">
+              <label className="text-[13px] font-bold text-foreground">Target Duration</label>
+              <InfoHint text="Sets the overall learner seat-time target for the generated course." />
               {estimatedMinutes && estimatedMinutes > 0 && (
-                <span className="ml-2 text-[11px] font-normal text-muted-foreground">
+                <span className="ml-1 text-[11px] font-normal text-muted-foreground">
                   (Content estimate: ~{estimatedMinutes} min)
                 </span>
               )}
-            </label>
+            </div>
             <div className="flex flex-wrap gap-2">
               {DURATIONS.map((d) => (
                 <button
@@ -352,7 +471,10 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
           <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
             <div>
-              <p className="text-[13px] font-bold text-foreground">Video Time Handling</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[13px] font-bold text-foreground">Video Time Handling</p>
+                <InfoHint text="Choose whether video clips should consume course duration or be extra runtime." />
+              </div>
               <p className="text-[11px] font-medium text-foreground/70 mt-0.5">
                 Decide whether inserted YouTube clips should count inside the selected course duration or be added on top of it.
               </p>
@@ -366,41 +488,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     ? "border-primary bg-primary/10"
                     : "border-border hover:border-primary/30"
                 }`}
-              >
-                <p className={`text-[13px] font-bold ${videoDurationHandling === "within-course" ? "text-primary" : "text-foreground"}`}>
-
-            <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
-              <div>
-                <p className="text-[13px] font-bold text-foreground">Learner Tools</p>
-                <p className="text-[11px] font-medium text-foreground/70 mt-0.5">
-                  Decide which learner-side tools appear in the course player preview.
-                </p>
-              </div>
-
-              <button
-                onClick={() => setLearnerNotesEnabled((prev) => !prev)}
-                className={`w-full rounded-xl border-2 p-3 text-left transition-all ${
-                  learnerNotesEnabled
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/30"
-                }`}
                 type="button"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className={`text-[13px] font-bold ${learnerNotesEnabled ? "text-primary" : "text-foreground"}`}>
-                      Enable learner notes
-                    </p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
-                      Shows a note-taking panel inside the learner experience. Leave this off unless the course should support learner note capture.
-                    </p>
-                  </div>
-                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${learnerNotesEnabled ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
-                    {learnerNotesEnabled ? "On" : "Off"}
-                  </span>
-                </div>
-              </button>
-            </div>
+                <p className={`text-[13px] font-bold ${videoDurationHandling === "within-course" ? "text-primary" : "text-foreground"}`}>
                   Videos are part of the {selectedMinutes}-minute course
                 </p>
                 <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
@@ -415,6 +505,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     ? "border-primary bg-primary/10"
                     : "border-border hover:border-primary/30"
                 }`}
+                type="button"
               >
                 <p className={`text-[13px] font-bold ${videoDurationHandling === "additional-to-course" ? "text-primary" : "text-foreground"}`}>
                   Videos are extra, over and above the {selectedMinutes}-minute course
@@ -426,9 +517,122 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
           </div>
 
+          <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[13px] font-bold text-foreground">Learner Tools</p>
+                <InfoHint text="Enable or disable learner-facing helpers like Notes and quick-action shortcuts." />
+              </div>
+              <p className="text-[11px] font-medium text-foreground/70 mt-0.5">
+                Decide which learner-side tools appear in the course player preview.
+              </p>
+            </div>
+
+            <button
+              onClick={() => setLearnerNotesEnabled((prev) => !prev)}
+              className={`w-full rounded-xl border-2 p-3 text-left transition-all ${
+                learnerNotesEnabled
+                  ? "border-primary bg-primary/5"
+                  : "border-border hover:border-primary/30"
+              }`}
+              type="button"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <p className={`text-[13px] font-bold ${learnerNotesEnabled ? "text-primary" : "text-foreground"}`}>
+                      Enable learner notes
+                    </p>
+                    <InfoHint text="Adds a Notes tab where learners can capture personal notes while taking the course." />
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+                    Shows a note-taking panel inside the learner experience.
+                  </p>
+                </div>
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${learnerNotesEnabled ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                  {learnerNotesEnabled ? "On" : "Off"}
+                </span>
+              </div>
+            </button>
+
+            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+              <button
+                onClick={() => setResourcesPanelEnabled((prev) => !prev)}
+                className={`rounded-xl border-2 p-3 text-left transition-all ${
+                  resourcesPanelEnabled
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/30"
+                }`}
+                type="button"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-[13px] font-bold ${resourcesPanelEnabled ? "text-primary" : "text-foreground"}`}>Resources panel</p>
+                      <InfoHint text="Learner-facing panel: shows resources to the learner during playback, not to course creators." />
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Navigation visibility</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${resourcesPanelEnabled ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                    {resourcesPanelEnabled ? "On" : "Off"}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setGlossaryEnabled((prev) => !prev)}
+                className={`rounded-xl border-2 p-3 text-left transition-all ${
+                  glossaryEnabled
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/30"
+                }`}
+                type="button"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-[13px] font-bold ${glossaryEnabled ? "text-primary" : "text-foreground"}`}>Glossary shortcut</p>
+                      <InfoHint text="Shows or hides the Glossary action button in the learner header." />
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Header action button</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${glossaryEnabled ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                    {glossaryEnabled ? "On" : "Off"}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setDiscussionEnabled((prev) => !prev)}
+                className={`rounded-xl border-2 p-3 text-left transition-all md:col-span-2 ${
+                  discussionEnabled
+                    ? "border-primary bg-primary/5"
+                    : "border-border hover:border-primary/30"
+                }`}
+                type="button"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-[13px] font-bold ${discussionEnabled ? "text-primary" : "text-foreground"}`}>Discussion shortcut</p>
+                      <InfoHint text="Shows or hides the Discussion action button in the learner header." />
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground">Header action button</p>
+                  </div>
+                  <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${discussionEnabled ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground"}`}>
+                    {discussionEnabled ? "On" : "Off"}
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+
           <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-4">
             <div>
-              <p className="text-[13px] font-bold text-foreground">Slide Layout Rules</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[13px] font-bold text-foreground">Slide Layout Rules</p>
+                <InfoHint text="Readability limits to keep generated slide text legible on learner screens." />
+              </div>
               <p className="text-[11px] font-medium text-foreground/70 mt-0.5">
                 Apply readability constraints during course generation and learner slide rendering.
               </p>
@@ -490,8 +694,29 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           {/* Assessment Toggle */}
           <div className="flex items-center justify-between bg-secondary/50 rounded-xl p-4">
             <div>
-              <p className="text-[13px] font-bold text-foreground">Assessment</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[13px] font-bold text-foreground">Assessment</p>
+                <InfoHint text="Adds quiz and scenario checks to evaluate learner understanding." />
+              </div>
               <p className="text-[11px] text-muted-foreground">Generate quizzes and scenario-based questions</p>
+              {assessmentRequired ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {ASSESSMENT_INTENSITY_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => setAssessmentIntensity(option.value)}
+                      className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all ${
+                        assessmentIntensity === option.value
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:border-primary/30"
+                      }`}
+                      type="button"
+                    >
+                      {option.label} · {option.desc}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
             <button
               onClick={() => setAssessmentRequired(!assessmentRequired)}
@@ -504,24 +729,64 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               }`} />
             </button>
           </div>
-        </div>
+              </div>
 
-        {/* Footer */}
-        <div className="px-6 py-4 border-t border-border flex justify-end gap-3">
-          <button
-            onClick={onCancel}
-            className="h-10 px-5 rounded-xl text-[13px] font-extrabold tracking-tight text-foreground border border-border hover:bg-secondary transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleConfirm}
-            className="h-10 px-6 rounded-xl text-[14px] font-extrabold tracking-tight text-white shadow-lg hover:brightness-110 transition-all"
-            style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
-          >
-            Generate Course
-          </button>
-        </div>
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-[#d9dfef] flex justify-between gap-3 bg-white/75">
+                <button
+                  onClick={onCancel}
+                  className="h-10 min-w-[120px] px-5 rounded-full text-[14px] font-[800] tracking-tight text-[#2a3f67] border border-[#cfd7ea] bg-[#f5f7fd] hover:bg-[#ecf0fa] transition-all"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleConfirm}
+                  className="h-10 px-6 rounded-full text-[14px] font-extrabold tracking-tight text-white shadow-lg hover:brightness-110 transition-all"
+                  style={{ background: "linear-gradient(135deg, #4f46e5, #6b4fd8)" }}
+                >
+                  Launch Course
+                </button>
+              </div>
+            </div>
+
+            <aside className="hidden lg:flex min-h-0 flex-col justify-between p-7 text-white border-l border-white/20"
+              style={{ background: "radial-gradient(circle at 18% 18%, #6f76d9 0%, #483f9e 42%, #2e296c 100%)" }}>
+              <div>
+                <div className="flex items-start justify-between">
+                  <h3 className="text-[34px] leading-none font-[900] tracking-tight">Course Summary</h3>
+                  <span className="text-white/80 text-[20px]">•••</span>
+                </div>
+                <div className="mt-4 h-px bg-white/25" />
+
+                <div className="mt-5 rounded-2xl bg-white/95 text-[#1f2e55] p-5 shadow-[0_18px_32px_rgba(7,8,32,0.28)]">
+                  <p className="text-[26px] leading-none font-[900] mb-3">{selectedLevelLabel} Level</p>
+                  <div className="space-y-2.5 text-[14px]">
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Text Language:</span> {textLanguage}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Narration Language:</span> {narratorLanguage}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Narrator Voice:</span> {selectedVoiceLabel}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Instructor:</span> {selectedTrainer.name}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Duration:</span> {selectedDurationLabel}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-2xl bg-white/12 border border-white/20 p-4 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={selectedTrainerImage}
+                    alt={selectedTrainer.name}
+                    className="h-16 w-16 rounded-xl object-cover border border-white/45"
+                  />
+                  <div>
+                    <p className="text-[12px] uppercase tracking-[0.16em] text-white/70 font-[800]">Selected Instructor</p>
+                    <p className="text-[22px] leading-none font-[900] mt-1">{selectedTrainer.name}</p>
+                    <p className="text-[13px] text-white/75 mt-1">{learnerNotesEnabled ? "Notes enabled" : "Notes disabled"} · {assessmentRequired ? "Assessment enabled" : "Assessment off"}</p>
+                  </div>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </TooltipProvider>
       </div>
     </div>
   );

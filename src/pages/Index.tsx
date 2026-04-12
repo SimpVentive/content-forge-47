@@ -157,6 +157,11 @@ const Index = () => {
             insertedVideos={previewVideos}
             courseDuration={courseParams?.duration}
             learnerNotesEnabled={courseParams?.learnerNotesEnabled}
+            resourcesPanelEnabled={courseParams?.resourcesPanelEnabled}
+            glossaryEnabled={courseParams?.glossaryEnabled}
+            discussionEnabled={courseParams?.discussionEnabled}
+            assessmentIntensity={courseParams?.assessmentIntensity}
+            avatarTrainerId={courseParams?.avatarTrainerId}
             slideLayout={courseParams?.slideLayout}
             onUpdateVisualTopic={updateVisualTopicAsset}
           />

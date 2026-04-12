@@ -1,7 +1,7 @@
 import React from "react";
 import { AgentCard } from "./AgentCard";
 import { AgentInfo } from "@/types/agents";
-import { Zap } from "lucide-react";
+import { Loader2, Zap } from "lucide-react";
 
 interface AgentPipelineProps {
   agents: AgentInfo[];
@@ -39,6 +39,17 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
           The E-Learning Content is now orchestrated using multiple agents. You can manage the Pipeline flow by selecting the tools you want to use for the development of the E-Learning content.
         </p>
       </div>
+
+      {isRunning && (
+        <div className="mb-5 rounded-xl border border-primary/25 bg-primary/10 px-5 py-4 shadow-card animate-fade-in">
+          <div className="flex items-center gap-2.5">
+            <Loader2 className="h-4.5 w-4.5 text-primary animate-spin" />
+            <p className="text-[14px] font-bold text-foreground">
+              Hang on tight - AI is orchestrating your E-Learning Course Content
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Agent cards */}
       <div className="space-y-0">

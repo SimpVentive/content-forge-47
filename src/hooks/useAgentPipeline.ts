@@ -8,6 +8,15 @@ type SlideLayoutParams = {
   lineSpacing?: number;
 };
 
+type AssessmentIntensity = "light" | "standard" | "deep";
+
+type AssessmentTargets = {
+  mcqCount: number;
+  scenarioCount: number;
+  interactionMin: number;
+  interactionMax: number;
+};
+
 type TopicDurationPlan = {
   topicTitle: string;
   targetWords: number;
@@ -52,6 +61,45 @@ function getInstructionalPatternGuidance(durationMinutes: number): string {
   if (durationMinutes <= 10) return "Use a mix of scenario opener, concept explanation, and practical behavior shift. Avoid making every topic feel identical.";
   if (durationMinutes <= 20) return "Vary topic treatments across scenario walkthroughs, myth-vs-reality reframes, process demos, good-vs-bad contrasts, and concise action checklists.";
   return "Intentionally vary the instructional pattern across modules: case study, decision-point analysis, process walkthrough, manager coaching moment, customer scenario, misconception reset, and practical checklist.";
+}
+
+function getAssessmentTargets(
+  durationMinutes: number,
+  intensity: AssessmentIntensity,
+  moduleCount: number,
+  topicCount: number
+): AssessmentTargets {
+  const baseMcq = durationMinutes <= 5
+    ? 3
+    : durationMinutes <= 10
+      ? 5
+      : durationMinutes <= 15
+        ? 7
+        : durationMinutes <= 20
+          ? 9
+          : durationMinutes <= 30
+            ? 12
+            : durationMinutes <= 45
+              ? 16
+              : 20;
+  const intensityMultiplier: Record<AssessmentIntensity, number> = {
+    light: 0.75,
+    standard: 1,
+    deep: 1.3,
+  };
+  const moduleCoverageFloor = Math.min(Math.max(1, moduleCount), 8);
+  const topicCap = Math.max(moduleCoverageFloor, Math.min(24, Math.ceil(Math.max(topicCount, moduleCount) * 1.1)));
+  const mcqCount = Math.min(
+    topicCap,
+    Math.max(moduleCoverageFloor, Math.max(2, Math.round(baseMcq * intensityMultiplier[intensity])))
+  );
+
+  const baseScenarios = durationMinutes <= 10 ? 1 : durationMinutes <= 20 ? 2 : durationMinutes <= 45 ? 3 : 4;
+  const scenarioCount = Math.min(6, Math.max(1, baseScenarios + (intensity === "deep" ? 1 : 0)));
+  const interactionMin = Math.max(4, Math.round(mcqCount * 0.5));
+  const interactionMax = Math.max(interactionMin + 2, Math.min(12, Math.round(mcqCount * 0.9) + scenarioCount));
+
+  return { mcqCount, scenarioCount, interactionMin, interactionMax };
 }
 
 function buildSlideLayoutInstruction(slideLayout?: SlideLayoutParams): string {
@@ -275,10 +323,11 @@ export function useAgentPipeline() {
     });
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; slideLayout?: SlideLayoutParams }) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams }) => {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const durationMinutes = parseDurationMinutes(params?.duration);
+    const assessmentIntensity: AssessmentIntensity = params?.assessmentIntensity || "standard";
     const targetNarrationWords = Math.max(260, durationMinutes * 130);
     const durationToleranceMinutes = getDurationToleranceMinutes(durationMinutes);
     const structureGuidance = getStructureGuidance(durationMinutes);
@@ -696,10 +745,31 @@ Rules you NEVER break:
       // ──── AGENT 7: Assessment ────
       if (toggles["assessment"] !== false) {
         setStatus("assessment", "running");
-        addLog("Assessment Agent: Generating 10 MCQs + 3 scenarios...");
+        const parsedArch = tryParseJson(archResult) || {};
+        const archModules = Array.isArray(parsedArch?.modules)
+          ? parsedArch.modules
+          : Array.isArray(parsedArch?.course_structure?.modules)
+            ? parsedArch.course_structure.modules
+            : [];
+        const moduleCount = Math.max(1, durationPlan.length || archModules.length || 1);
+        const topicCountFromPlan = durationPlan.reduce((sum, modulePlan) => sum + Math.max(1, modulePlan.topicCount), 0);
+        const topicCountFromArch = archModules.reduce((sum: number, module: any) => {
+          const topics = Array.isArray(module?.topics)
+            ? module.topics
+            : Array.isArray(module?.sections)
+              ? module.sections
+              : Array.isArray(module?.lessons)
+                ? module.lessons
+                : [];
+          return sum + Math.max(1, topics.length || 0);
+        }, 0);
+        const topicCount = Math.max(moduleCount, topicCountFromPlan || topicCountFromArch || moduleCount);
+        const assessmentTargets = getAssessmentTargets(durationMinutes, assessmentIntensity, moduleCount, topicCount);
+
+        addLog(`Assessment Agent: Generating ${assessmentTargets.mcqCount} MCQs + ${assessmentTargets.scenarioCount} scenarios (${assessmentIntensity} intensity)...`);
         assessmentResult = await callClaudeWithRetry(
-          'You are an Assessment Design Agent. Given a course script, architecture, and learning objectives, create a comprehensive assessment. Generate: (1) 10 multiple choice questions with 4 options each, correct answer marked, rationale, and common wrong-answer trap, (2) 3 scenario-based questions with a situation description, 3 response options, best_response, and coaching rationale, (3) 1 reflection exercise with an open-ended prompt, and (4) embedded_interactions: a list of 4-8 in-course interaction ideas aligned to specific topics, each with topic_title, interaction_type, prompt, expected_response, and feedback_focus. Tag each question with the relevant Bloom\'s taxonomy level. Return as JSON: { mcq: [{ question, options: [], correct_answer, rationale, wrong_answer_trap, blooms_level }], scenarios: [{ situation, options: [], best_response, rationale, blooms_level }], reflection: { prompt, guidance }, embedded_interactions: [{ topic_title, interaction_type, prompt, expected_response, feedback_focus }] }',
-          `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nLearning Objectives:\n${researchResult}`,
+          'You are an Assessment Design Agent. Given course script, architecture, and learning objectives, create a comprehensive assessment bank sized to the requested runtime and module complexity. Rules: (1) Question volume must scale with module/topic size; avoid token quizzes. (2) Spread MCQs across modules proportionally. (3) Include module_title and topic_title on every MCQ and scenario so the renderer can map items correctly. Generate: (1) requested number of multiple choice questions with 4 options each, correct answer marked, rationale, and common wrong-answer trap, (2) requested number of scenario-based questions with a situation description, 3 response options, best_response, and coaching rationale, (3) 1 reflection exercise with an open-ended prompt, and (4) embedded_interactions list in requested range aligned to specific topics. Tag each question with Bloom\'s taxonomy level. Return JSON: { mcq: [{ module_title, topic_title, question, options: [], correct_answer, rationale, wrong_answer_trap, blooms_level }], scenarios: [{ module_title, topic_title, situation, options: [], best_response, rationale, blooms_level }], reflection: { prompt, guidance }, embedded_interactions: [{ module_title, topic_title, interaction_type, prompt, expected_response, feedback_focus }], metadata: { target_mcq_count, target_scenario_count, module_count, topic_count, assessment_intensity } }',
+          `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nLearning Objectives:\n${researchResult}\n\nTarget Duration Minutes: ${durationMinutes}\nAssessment Intensity: ${assessmentIntensity}\nModule Count: ${moduleCount}\nTopic Count: ${topicCount}\nTarget MCQ Count: ${assessmentTargets.mcqCount}\nTarget Scenario Count: ${assessmentTargets.scenarioCount}\nTarget Embedded Interactions Range: ${assessmentTargets.interactionMin}-${assessmentTargets.interactionMax}`,
           addLog, "Assessment Agent"
         );
         setStatus("assessment", "complete");

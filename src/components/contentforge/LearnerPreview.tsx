@@ -5,6 +5,7 @@ import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
 import { FLIP_STYLES, HIGHLIGHT_PALETTES, PreviewActionBar, type FlipStyle, type HighlightPalette } from "./PreviewActionBar";
 import { AvatarNarrator } from "./AvatarNarrator";
+import { AVATAR_TRAINERS, getTrainerMedia } from "@/lib/avatarTrainers";
 
 /* ── helpers ── */
 function tryParseJSON(raw: string): any | null {
@@ -117,6 +118,7 @@ interface Slide {
   visualAltText?: string;
   visualPrompt?: string;
   visualApproved?: boolean;
+  wasTrimmedForLayout?: boolean;
   contentTemplate?: ContentTemplate;
   question?: { question: string; options: string[]; correct_answer: string; rationale?: string };
   takeaways?: string[];
@@ -156,19 +158,50 @@ function splitParagraphIntoSentenceChunks(paragraph: string, targetWordsPerChunk
   return chunks;
 }
 
-function splitTopicContentIntoSlides(text: string, durationMinutes: number): string[] {
-  const lines = text.split("\n").filter(line => !line.match(/^#{1,3}\s/));
-  const paragraphs = lines.join("\n").trim().split(/\n\n+/).map((paragraph) => paragraph.trim()).filter(Boolean);
-  if (paragraphs.length === 0) return [text.trim()].filter(Boolean);
+function truncateToWordLimit(text: string, maxWords: number): string {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return text.trim();
+  return `${words.slice(0, maxWords).join(" ").trim()}...`;
+}
 
-  const targetWordsPerSlide = durationMinutes <= 5 ? 70 : durationMinutes <= 10 ? 85 : durationMinutes <= 20 ? 100 : 115;
-  const chunks: string[] = [];
+function isTruncatedByWordLimit(text: string, maxWords: number): boolean {
+  return text.split(/\s+/).filter(Boolean).length > maxWords;
+}
+
+type SlideContentChunk = {
+  text: string;
+  wasTrimmed: boolean;
+};
+
+function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxLines = 10): SlideContentChunk[] {
+  const lines = text
+    .split("\n")
+    .filter((line) => !line.match(/^#{1,3}\s/))
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !line.match(/^[-*#]+$/));
+  const paragraphs = lines.join("\n").trim().split(/\n\n+/).map((paragraph) => paragraph.trim()).filter(Boolean);
+  if (paragraphs.length === 0) {
+    const fallback = text.trim();
+    return fallback
+      ? [{ text: truncateToWordLimit(fallback, Math.max(36, maxLines * 9)), wasTrimmed: isTruncatedByWordLimit(fallback, Math.max(36, maxLines * 9)) }]
+      : [];
+  }
+
+  const targetWordsByDuration = durationMinutes <= 5 ? 70 : durationMinutes <= 10 ? 85 : durationMinutes <= 20 ? 100 : 115;
+  const approxWordsPerLine = 9;
+  const lineBudgetWordLimit = Math.max(36, maxLines * approxWordsPerLine);
+  const targetWordsPerSlide = Math.min(targetWordsByDuration, lineBudgetWordLimit);
+  const chunks: SlideContentChunk[] = [];
   let currentParagraphs: string[] = [];
   let currentWordCount = 0;
 
   const flushChunk = () => {
     if (currentParagraphs.length === 0) return;
-    chunks.push(currentParagraphs.join("\n\n").trim());
+    const combined = currentParagraphs.join("\n\n").trim();
+    chunks.push({
+      text: truncateToWordLimit(combined, lineBudgetWordLimit),
+      wasTrimmed: isTruncatedByWordLimit(combined, lineBudgetWordLimit),
+    });
     currentParagraphs = [];
     currentWordCount = 0;
   };
@@ -179,7 +212,12 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number): str
     if (paragraphWordCount > targetWordsPerSlide * 1.35) {
       flushChunk();
       splitParagraphIntoSentenceChunks(paragraph, targetWordsPerSlide).forEach((sentenceChunk) => {
-        if (sentenceChunk) chunks.push(sentenceChunk);
+        if (sentenceChunk) {
+          chunks.push({
+            text: truncateToWordLimit(sentenceChunk, lineBudgetWordLimit),
+            wasTrimmed: isTruncatedByWordLimit(sentenceChunk, lineBudgetWordLimit),
+          });
+        }
       });
       return;
     }
@@ -193,7 +231,15 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number): str
   });
 
   flushChunk();
-  return chunks.length > 0 ? chunks : [text.trim()].filter(Boolean);
+  if (chunks.length > 0) return chunks;
+
+  const fallback = text.trim();
+  return fallback
+    ? [{
+        text: truncateToWordLimit(fallback, lineBudgetWordLimit),
+        wasTrimmed: isTruncatedByWordLimit(fallback, lineBudgetWordLimit),
+      }]
+    : [];
 }
 
 function getTopicVisual(moduleVisual: any, topicTitle: string) {
@@ -240,6 +286,7 @@ function parseContentParts(text: string) {
 }
 
 type ContentTemplate = "dashboard" | "guided-notes" | "scenario" | "media-quiz" | "summary-panel";
+type AssessmentIntensity = "light" | "standard" | "deep";
 
 function inferContentTemplate(slide: Slide, hasVisual: boolean): ContentTemplate {
   if (
@@ -269,8 +316,87 @@ function getQuickFact(parts: { hook: string; body: string[]; takeaway: string; c
   return sentence || fallback;
 }
 
+function getTargetCourseQuestionCount(durationMinutes: number, intensity: AssessmentIntensity): number {
+  const base = durationMinutes <= 5
+    ? 3
+    : durationMinutes <= 10
+      ? 5
+      : durationMinutes <= 15
+        ? 7
+        : durationMinutes <= 20
+          ? 9
+          : durationMinutes <= 30
+            ? 12
+            : durationMinutes <= 45
+              ? 16
+              : 20;
+
+  const multiplier: Record<AssessmentIntensity, number> = {
+    light: 0.75,
+    standard: 1,
+    deep: 1.25,
+  };
+
+  return Math.max(2, Math.round(base * multiplier[intensity]));
+}
+
+function allocateQuestionsPerModule(modules: Module[], totalQuestions: number): number[] {
+  if (modules.length === 0 || totalQuestions <= 0) return [];
+
+  const weights = modules.map((module) => Math.max(1, module.topics.length || 1));
+  const totalWeight = weights.reduce((sum, weight) => sum + weight, 0) || modules.length;
+  const counts = new Array(modules.length).fill(0);
+
+  let remaining = totalQuestions;
+  if (totalQuestions >= modules.length) {
+    for (let i = 0; i < modules.length; i++) counts[i] = 1;
+    remaining -= modules.length;
+  }
+
+  const fractional: Array<{ index: number; fraction: number }> = [];
+  for (let i = 0; i < modules.length; i++) {
+    if (remaining <= 0) {
+      fractional.push({ index: i, fraction: 0 });
+      continue;
+    }
+    const raw = (weights[i] / totalWeight) * remaining;
+    const whole = Math.floor(raw);
+    counts[i] += whole;
+    fractional.push({ index: i, fraction: raw - whole });
+  }
+
+  let assigned = counts.reduce((sum, value) => sum + value, 0);
+  let leftovers = totalQuestions - assigned;
+  fractional.sort((a, b) => b.fraction - a.fraction);
+
+  let pointer = 0;
+  while (leftovers > 0 && fractional.length > 0) {
+    counts[fractional[pointer % fractional.length].index] += 1;
+    leftovers -= 1;
+    pointer += 1;
+  }
+
+  return counts;
+}
+
+function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[] {
+  const normalizedTitle = normalizeModuleKey(module.title);
+  const normalizedTopics = new Set(module.topics.map((topic) => normalizeModuleKey(topic)));
+
+  return mcqs
+    .map((question, index) => ({ question, index }))
+    .filter(({ question }) => {
+      const questionModuleTitle = question?.module_title || question?.module || question?.moduleTitle || "";
+      const questionTopicTitle = question?.topic_title || question?.topic || question?.topicTitle || "";
+      const moduleMatch = questionModuleTitle && normalizeModuleKey(questionModuleTitle) === normalizedTitle;
+      const topicMatch = questionTopicTitle && normalizedTopics.has(normalizeModuleKey(questionTopicTitle));
+      return Boolean(moduleMatch || topicMatch);
+    })
+    .map(({ index }) => index);
+}
+
 /* ── build slides from agent outputs ── */
-function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string): { modules: Module[]; slides: Slide[] } {
+function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
   const assessData = tryParseJSON(rawOutputs.assessment);
@@ -294,7 +420,10 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   }
 
   // Extract MCQs
-  const mcqs = assessData?.mcq || [];
+  const mcqs = Array.isArray(assessData?.mcq) ? assessData.mcq : [];
+  const maxQuestionCount = Math.min(mcqs.length, getTargetCourseQuestionCount(durationMinutes, assessmentIntensity));
+  const questionsPerModule = allocateQuestionsPerModule(modules, maxQuestionCount);
+  const usedQuestionIndexes = new Set<number>();
 
   // Extract infographic descriptions from visual agent
   const visualModules = visualData?.modules || visualData?.course_visual_plan?.modules || visualData?.module_visuals || [];
@@ -335,7 +464,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         sectionText = `Content for "${topic}" will appear here after running the pipeline.`;
       }
 
-      const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes);
+      const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes, maxLines);
       const topicVisual = getTopicVisual(matchedVisualModule, topic);
       const generatedImageDataUrl = typeof topicVisual?.generated_image_data_url === "string" && topicVisual.generated_image_data_url.trim().length > 0
         ? topicVisual.generated_image_data_url
@@ -355,7 +484,8 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
           topicTitle: topic,
           topicPartIndex: chunkIndex,
           topicPartCount: contentChunks.length,
-          content: chunk,
+          content: chunk.text,
+          wasTrimmedForLayout: chunk.wasTrimmed,
           infographicSvg: ti === 0 && chunkIndex === 0 ? infographicDescription : undefined,
           visualImageDataUrl: chunkIndex === 0 ? generatedImageDataUrl : undefined,
           visualSvg: chunkIndex === 0 ? generatedSceneSvg : undefined,
@@ -369,14 +499,36 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       topicCounter++;
     });
 
-    // 3. Assessment slide
-    const mcq = mcqs[mi % mcqs.length];
-    if (mcq) {
-      slides.push({
-        type: "assessment",
-        moduleIndex: mi,
-        moduleTitle: mod.title,
-        question: mcq,
+    // 3. Assessment slides (proportional to module size and duration)
+    const desiredQuestionCount = questionsPerModule[mi] || 0;
+    if (desiredQuestionCount > 0) {
+      const moduleMatchedIndexes = findModuleMatchedQuestionIndexes(mcqs, mod).filter((questionIndex) => !usedQuestionIndexes.has(questionIndex));
+      const selectedIndexes: number[] = [];
+
+      for (const questionIndex of moduleMatchedIndexes) {
+        if (selectedIndexes.length >= desiredQuestionCount) break;
+        selectedIndexes.push(questionIndex);
+        usedQuestionIndexes.add(questionIndex);
+      }
+
+      if (selectedIndexes.length < desiredQuestionCount) {
+        for (let questionIndex = 0; questionIndex < mcqs.length; questionIndex++) {
+          if (selectedIndexes.length >= desiredQuestionCount) break;
+          if (usedQuestionIndexes.has(questionIndex)) continue;
+          selectedIndexes.push(questionIndex);
+          usedQuestionIndexes.add(questionIndex);
+        }
+      }
+
+      selectedIndexes.forEach((questionIndex) => {
+        const mcq = mcqs[questionIndex];
+        if (!mcq) return;
+        slides.push({
+          type: "assessment",
+          moduleIndex: mi,
+          moduleTitle: mod.title,
+          question: mcq,
+        });
       });
     }
 
@@ -726,6 +878,11 @@ interface LearnerPreviewProps {
   insertedVideos?: InsertedVideo[];
   courseDuration?: string;
   learnerNotesEnabled?: boolean;
+  resourcesPanelEnabled?: boolean;
+  glossaryEnabled?: boolean;
+  discussionEnabled?: boolean;
+  assessmentIntensity?: AssessmentIntensity;
+  avatarTrainerId?: string;
   slideLayout?: {
     maxLines: number;
     minFontSize: number;
@@ -753,7 +910,15 @@ function getCourseNotesStorageKey(courseTitle: string): string {
   return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = false, slideLayout, onUpdateVisualTopic }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = false, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, slideLayout, onUpdateVisualTopic }) => {
+  const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
+  const avatarEnv = import.meta.env as Record<string, string | undefined>;
+  const trainerMedia = getTrainerMedia(selectedTrainer.id, avatarEnv);
+  const avatarVideoUrl = trainerMedia.videoUrl;
+  const avatarPosterUrl = trainerMedia.posterUrl;
+  const avatarImageUrl = trainerMedia.imageUrl;
+  const trainerName = selectedTrainer.name;
+  const hasAvatarVideoNarration = Boolean(avatarVideoUrl);
   const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
   const [showPlacer, setShowPlacer] = useState(false);
   const [highlightEnabled, setHighlightEnabled] = useState(true);
@@ -833,7 +998,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     }
   }, [activeSidebarPanel, learnerNotesEnabled]);
 
-  const { modules, slides } = React.useMemo(() => buildSlides(rawOutputs, localVideos, courseDuration), [rawOutputs, localVideos, courseDuration]);
+  const { modules, slides } = React.useMemo(
+    () => buildSlides(rawOutputs, localVideos, courseDuration, slideRules.maxLines, assessmentIntensity),
+    [rawOutputs, localVideos, courseDuration, slideRules.maxLines, assessmentIntensity]
+  );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set([0]));
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
@@ -865,6 +1033,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     : undefined;
   const showBinding = flipStyle === "bound";
   const showStageGlow = Boolean(slideMotion) && flipStyle !== "subtle";
+  const slideAnimationDuration = flipStyle === "dramatic" ? 900 : flipStyle === "bound" ? 620 : 480;
 
   // Get narration sections
   const voiceParsed = tryParseJSON(rawOutputs.voice);
@@ -1117,16 +1286,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         : slide.type === "video"
           ? `${slide.video?.channelTitle || "Curated resource"} for this lesson`
           : `Lesson ${(slide.topicIndex || 0) + 1}${slide.topicPartCount && slide.topicPartCount > 1 ? ` · Part ${(slide.topicPartIndex || 0) + 1} of ${slide.topicPartCount}` : ""}`;
+  const layoutTrimNotice = slide.type === "content" && slide.wasTrimmedForLayout;
   const firstContentSlide = currentModuleSlides.find((moduleSlide) => moduleSlide.type === "content");
   const platformNavItems = [
     { id: "home" as const, label: "Home", icon: Home },
     { id: "progress" as const, label: "Progress", icon: BarChart3 },
     ...(learnerNotesEnabled ? [{ id: "notes" as const, label: "Notes", icon: NotebookPen }] : []),
-    { id: "resources" as const, label: "Resources", icon: FolderOpen },
+    ...(resourcesPanelEnabled ? [{ id: "resources" as const, label: "Resources", icon: FolderOpen }] : []),
   ];
   const utilityActions = [
-    { label: "Discussion", icon: MessageSquareText },
-    { label: "Glossary", icon: BookOpenText },
+    ...(discussionEnabled ? [{ label: "Discussion", icon: MessageSquareText }] : []),
+    ...(glossaryEnabled ? [{ label: "Glossary", icon: BookOpenText }] : []),
     { label: "Settings", icon: Settings2 },
   ];
 
@@ -1438,6 +1608,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           topic={slide.topicTitle || slide.moduleTitle}
                           moduleContent={narratorExcerpt || `This scenario explains ${slide.topicTitle || slide.moduleTitle}.`}
                           systemHint="Coach the learner through the scenario and emphasize the stronger practical response."
+                          trainerName={trainerName}
+                          avatarImageUrl={avatarImageUrl}
+                          avatarVideoUrl={avatarVideoUrl}
+                          avatarPosterUrl={avatarPosterUrl}
                         />
                       </div>
                     </div>
@@ -1688,7 +1862,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                             S
                           </div>
                           <div>
-                            <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Sarah's Guide</p>
+                            <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">{trainerName}'s Guide</p>
                             <p className="text-[12px] text-[#607896]">Quick explanation and follow-up example</p>
                           </div>
                         </div>
@@ -1696,6 +1870,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           topic={slide.topicTitle || slide.moduleTitle}
                           moduleContent={narratorExcerpt || `This section explains ${slide.topicTitle || slide.moduleTitle}.`}
                           systemHint="Focus on the practical benefit to an office worker."
+                          trainerName={trainerName}
+                          avatarImageUrl={avatarImageUrl}
+                          avatarVideoUrl={avatarVideoUrl}
+                          avatarPosterUrl={avatarPosterUrl}
                         />
                       </div>
                     </div>
@@ -1841,7 +2019,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </div>
                     <div>
                       <p className="text-[13px] font-bold uppercase tracking-[0.16em]" style={{ color: "#4f46e5" }}>
-                        Sarah's Guide
+                        {trainerName}'s Guide
                       </p>
                       <p className="text-[12px] font-medium" style={{ color: "#475569" }}>
                         Narrator panel for quick explanation and examples.
@@ -1853,6 +2031,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     topic={slide.topicTitle || slide.moduleTitle}
                     moduleContent={narratorExcerpt || `This section explains ${slide.topicTitle || slide.moduleTitle}.`}
                     systemHint="Focus on the practical benefit to an office worker."
+                    trainerName={trainerName}
+                    avatarImageUrl={avatarImageUrl}
+                    avatarVideoUrl={avatarVideoUrl}
+                    avatarPosterUrl={avatarPosterUrl}
                   />
                 </div>
 
@@ -2030,16 +2212,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       <style>
         {`@keyframes sheetFlipForward {
           0% {
-            opacity: 0.55;
-            transform: perspective(2200px) rotateX(88deg) translateY(64px) scaleY(0.92);
+            opacity: 0.8;
+            transform: perspective(2200px) rotateX(22deg) translateY(10px) scaleY(0.992);
             transform-origin: top center;
-            box-shadow: 0 34px 60px rgba(15, 23, 42, 0.24);
+            box-shadow: 0 14px 24px rgba(15, 23, 42, 0.14);
           }
-          45% {
-            opacity: 0.94;
-            transform: perspective(2200px) rotateX(18deg) translateY(8px) scaleY(1.01);
+          58% {
+            opacity: 0.98;
+            transform: perspective(2200px) rotateX(-3deg) translateY(-7px) scaleY(1.005);
             transform-origin: top center;
-            box-shadow: 0 22px 42px rgba(15, 23, 42, 0.18);
+            box-shadow: 0 8px 14px rgba(15, 23, 42, 0.1);
+          }
+          82% {
+            opacity: 1;
+            transform: perspective(2200px) rotateX(1deg) translateY(-1px) scaleY(1.001);
+            transform-origin: top center;
+            box-shadow: 0 4px 8px rgba(15, 23, 42, 0.06);
           }
           100% {
             opacity: 1;
@@ -2051,16 +2239,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
         @keyframes sheetFlipBackward {
           0% {
-            opacity: 0.5;
-            transform: perspective(2200px) rotateX(76deg) translateY(50px) scaleY(0.94);
+            opacity: 0.8;
+            transform: perspective(2200px) rotateX(20deg) translateY(9px) scaleY(0.994);
             transform-origin: top center;
-            box-shadow: 0 28px 52px rgba(15, 23, 42, 0.22);
+            box-shadow: 0 12px 22px rgba(15, 23, 42, 0.12);
           }
-          45% {
-            opacity: 0.92;
-            transform: perspective(2200px) rotateX(14deg) translateY(6px) scaleY(1.01);
+          56% {
+            opacity: 0.98;
+            transform: perspective(2200px) rotateX(-2deg) translateY(-6px) scaleY(1.004);
             transform-origin: top center;
-            box-shadow: 0 18px 38px rgba(15, 23, 42, 0.16);
+            box-shadow: 0 7px 12px rgba(15, 23, 42, 0.08);
+          }
+          80% {
+            opacity: 1;
+            transform: perspective(2200px) rotateX(1deg) translateY(-1px) scaleY(1.001);
+            transform-origin: top center;
+            box-shadow: 0 3px 6px rgba(15, 23, 42, 0.05);
           }
           100% {
             opacity: 1;
@@ -2368,6 +2562,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 </div>
                 <p className="mt-2 text-[24px] font-[900] tracking-tight">{shellPageTitle}</p>
                 <p className="mt-1 max-w-[760px] text-[13px] text-white/72">{shellPageSubtitle}</p>
+                {layoutTrimNotice ? (
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#facc15]/55 bg-[#fff7cc] px-3 py-1 text-[11px] font-[900] uppercase tracking-[0.08em] text-[#8a5a00]">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Trimmed to fit {slideRules.maxLines}-line layout
+                  </div>
+                ) : null}
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -2480,7 +2680,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 className="relative z-10 [transform-style:preserve-3d]"
                 style={{
                   animation: slideAnimationName
-                    ? `${slideAnimationName} 520ms cubic-bezier(0.2, 0.88, 0.24, 1)`
+                    ? `${slideAnimationName} ${slideAnimationDuration}ms cubic-bezier(0.2, 0.88, 0.24, 1)`
                     : undefined,
                   transformOrigin: "top center",
                   willChange: slideMotion ? "transform, opacity" : undefined,
@@ -2494,7 +2694,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           </div>
 
           <div className="absolute bottom-[80px] left-1/2 z-40 -translate-x-1/2">
-            {currentNarration ? (
+            {currentNarration && !hasAvatarVideoNarration ? (
               <div className="flex items-center gap-3 rounded-full border border-[#d6e1ef] bg-white/92 px-5 py-2.5 text-[#123d78] shadow-[0_16px_42px_rgba(15,23,42,0.16)] backdrop-blur">
                 <button
                   onClick={() => {
@@ -2519,7 +2719,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                 </button>
                 <span className="text-[11px] font-semibold text-[#5f7b9e]">
-                  {audioLoading ? "Loading..." : isPlaying ? "Playing narration" : "Play narration"} · Sarah
+                  {audioLoading ? "Loading..." : isPlaying ? "Playing narration" : "Play narration"} · {trainerName}
                 </span>
               </div>
             ) : null}
