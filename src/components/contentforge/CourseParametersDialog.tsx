@@ -41,29 +41,29 @@ const LEVELS = [
 
 const LANGUAGES = [
   { value: "English", label: "English" },
-  { value: "Hindi", label: "Hindi (a�a�+a�a��a�a��)" },
-  { value: "Tamil", label: "Tamil (a��a��a�+a��a��)" },
-  { value: "Telugu", label: "Telugu (a��a��a��a��a��a��)" },
-  { value: "Kannada", label: "Kannada (a��a��a��a��a��)" },
-  { value: "Malayalam", label: "Malayalam (a��a��a��a�+a��a��)" },
-  { value: "Bengali", label: "Bengali (a��a�+a��a��a�+)" },
-  { value: "Marathi", label: "Marathi (a�a�a�+a��a��)" },
-  { value: "Gujarati", label: "Gujarati (a��a��a��a��a�+a��a��)" },
-  { value: "Punjabi", label: "Punjabi (a��a��a��a�+a��a��)" },
-  { value: "Urdu", label: "Urdu (+�+�+�+�)" },
+  { value: "Hindi", label: "Hindi" },
+  { value: "Tamil", label: "Tamil" },
+  { value: "Telugu", label: "Telugu" },
+  { value: "Kannada", label: "Kannada" },
+  { value: "Malayalam", label: "Malayalam" },
+  { value: "Bengali", label: "Bengali" },
+  { value: "Marathi", label: "Marathi" },
+  { value: "Gujarati", label: "Gujarati" },
+  { value: "Punjabi", label: "Punjabi" },
+  { value: "Urdu", label: "Urdu" },
 ];
 
 const VOICE_ACCENTS = [
-  { value: "Rachel", voiceId: "21m00Tcm4TlvDq8ikWAM", label: "Rachel G�� American Female (Professional)" },
-  { value: "Adam", voiceId: "pNInz6obpgDQGcFmaJgB", label: "Adam G�� American Male (Authoritative)" },
-  { value: "Elli", voiceId: "MF3mGyEYCl7XYWbV9V6O", label: "Elli G�� American Female (Warm)" },
-  { value: "Sarah", voiceId: "EXAVITQu4vr4xnSDxMaL", label: "Sarah G�� American Female (Soft)" },
-  { value: "Charlie", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie G�� Australian Male (Casual)" },
-  { value: "George", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George G�� British Male (Formal)" },
-  { value: "Matilda", voiceId: "XrExE9yKIg1WjnnlVkGX", label: "Matilda G�� American Female (Friendly)" },
-  { value: "Brian", voiceId: "nPczCjzI2devNBz1zQrb", label: "Brian G�� American Male (Deep)" },
-  { value: "Lily", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily G�� British Female (Narrative)" },
-  { value: "Daniel", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel G�� British Male (Warm)" },
+  { value: "Rachel", voiceId: "21m00Tcm4TlvDq8ikWAM", label: "Rachel - American Female (Professional)" },
+  { value: "Adam", voiceId: "pNInz6obpgDQGcFmaJgB", label: "Adam - American Male (Authoritative)" },
+  { value: "Elli", voiceId: "MF3mGyEYCl7XYWbV9V6O", label: "Elli - American Female (Warm)" },
+  { value: "Sarah", voiceId: "EXAVITQu4vr4xnSDxMaL", label: "Sarah - American Female (Soft)" },
+  { value: "Charlie", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie - Australian Male (Casual)" },
+  { value: "George", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George - British Male (Formal)" },
+  { value: "Matilda", voiceId: "XrExE9yKIg1WjnnlVkGX", label: "Matilda - American Female (Friendly)" },
+  { value: "Brian", voiceId: "nPczCjzI2devNBz1zQrb", label: "Brian - American Male (Deep)" },
+  { value: "Lily", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily - British Female (Narrative)" },
+  { value: "Daniel", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel - British Male (Warm)" },
 ];
 
 const DURATIONS = [
@@ -321,7 +321,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </div>
 
               {/* Body */}
-              <div className="px-6 py-5 space-y-5 overflow-y-auto flex-1">
+              <div className="px-6 py-5 space-y-5 overflow-y-scroll [scrollbar-gutter:stable] pr-4 flex-1">
           {/* Course Level */}
           <div>
             <label className="text-[13px] font-bold text-foreground mb-2 flex items-center gap-1.5">
@@ -714,7 +714,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                       }`}
                       type="button"
                     >
-                      {option.label} -+ {option.desc}
+                      {option.label} - {option.desc}
                     </button>
                   ))}
                 </div>
@@ -756,7 +756,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               <div>
                 <div className="flex items-start justify-between">
                   <h3 className="text-[34px] leading-none font-[900] tracking-tight">Course Summary</h3>
-                  <span className="text-white/80 text-[20px]">G��G��G��</span>
+                  <span className="text-white/80 text-[20px]">...</span>
                 </div>
                 <div className="mt-4 h-px bg-white/25" />
 
@@ -772,12 +772,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 </div>
 
                 <div className="mt-4 overflow-hidden rounded-2xl border border-white/30 bg-white/10 backdrop-blur-sm">
-                  <div className="relative h-[230px] w-full overflow-hidden">
+                  <div className="relative h-[280px] w-full overflow-hidden bg-[#1b2442]">
                     <img
                       key={selectedTrainer.id}
                       src={selectedTrainerImage}
                       alt={`${selectedTrainer.name} preview`}
-                      className="h-full w-full object-cover transition-transform duration-300 hover:scale-[1.03]"
+                      className="h-full w-full object-contain transition-transform duration-300 hover:scale-[1.02]"
                       onError={(event) => {
                         event.currentTarget.src = "/placeholder.svg";
                       }}
@@ -800,7 +800,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   <div>
                     <p className="text-[12px] uppercase tracking-[0.16em] text-white/70 font-[800]">Selected Instructor</p>
                     <p className="text-[22px] leading-none font-[900] mt-1">{selectedTrainer.name}</p>
-                    <p className="text-[13px] text-white/75 mt-1">{learnerNotesEnabled ? "Notes enabled" : "Notes disabled"} -+ {assessmentRequired ? "Assessment enabled" : "Assessment off"}</p>
+                    <p className="text-[13px] text-white/75 mt-1">{learnerNotesEnabled ? "Notes enabled" : "Notes disabled"} - {assessmentRequired ? "Assessment enabled" : "Assessment off"}</p>
                   </div>
                 </div>
               </div>
