@@ -41,29 +41,29 @@ const LEVELS = [
 
 const LANGUAGES = [
   { value: "English", label: "English" },
-  { value: "Hindi", label: "Hindi (हिन्दी)" },
-  { value: "Tamil", label: "Tamil (தமிழ்)" },
-  { value: "Telugu", label: "Telugu (తెలుగు)" },
-  { value: "Kannada", label: "Kannada (ಕನ್ನಡ)" },
-  { value: "Malayalam", label: "Malayalam (മലയാളം)" },
-  { value: "Bengali", label: "Bengali (বাংলা)" },
-  { value: "Marathi", label: "Marathi (मराठी)" },
-  { value: "Gujarati", label: "Gujarati (ગુજરાતી)" },
-  { value: "Punjabi", label: "Punjabi (ਪੰਜਾਬੀ)" },
-  { value: "Urdu", label: "Urdu (اردو)" },
+  { value: "Hindi", label: "Hindi (a�a�+a�a��a�a��)" },
+  { value: "Tamil", label: "Tamil (a��a��a�+a��a��)" },
+  { value: "Telugu", label: "Telugu (a��a��a��a��a��a��)" },
+  { value: "Kannada", label: "Kannada (a��a��a��a��a��)" },
+  { value: "Malayalam", label: "Malayalam (a��a��a��a�+a��a��)" },
+  { value: "Bengali", label: "Bengali (a��a�+a��a��a�+)" },
+  { value: "Marathi", label: "Marathi (a�a�a�+a��a��)" },
+  { value: "Gujarati", label: "Gujarati (a��a��a��a��a�+a��a��)" },
+  { value: "Punjabi", label: "Punjabi (a��a��a��a�+a��a��)" },
+  { value: "Urdu", label: "Urdu (+�+�+�+�)" },
 ];
 
 const VOICE_ACCENTS = [
-  { value: "Rachel", voiceId: "21m00Tcm4TlvDq8ikWAM", label: "Rachel — American Female (Professional)" },
-  { value: "Adam", voiceId: "pNInz6obpgDQGcFmaJgB", label: "Adam — American Male (Authoritative)" },
-  { value: "Elli", voiceId: "MF3mGyEYCl7XYWbV9V6O", label: "Elli — American Female (Warm)" },
-  { value: "Sarah", voiceId: "EXAVITQu4vr4xnSDxMaL", label: "Sarah — American Female (Soft)" },
-  { value: "Charlie", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie — Australian Male (Casual)" },
-  { value: "George", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George — British Male (Formal)" },
-  { value: "Matilda", voiceId: "XrExE9yKIg1WjnnlVkGX", label: "Matilda — American Female (Friendly)" },
-  { value: "Brian", voiceId: "nPczCjzI2devNBz1zQrb", label: "Brian — American Male (Deep)" },
-  { value: "Lily", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily — British Female (Narrative)" },
-  { value: "Daniel", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel — British Male (Warm)" },
+  { value: "Rachel", voiceId: "21m00Tcm4TlvDq8ikWAM", label: "Rachel G�� American Female (Professional)" },
+  { value: "Adam", voiceId: "pNInz6obpgDQGcFmaJgB", label: "Adam G�� American Male (Authoritative)" },
+  { value: "Elli", voiceId: "MF3mGyEYCl7XYWbV9V6O", label: "Elli G�� American Female (Warm)" },
+  { value: "Sarah", voiceId: "EXAVITQu4vr4xnSDxMaL", label: "Sarah G�� American Female (Soft)" },
+  { value: "Charlie", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie G�� Australian Male (Casual)" },
+  { value: "George", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George G�� British Male (Formal)" },
+  { value: "Matilda", voiceId: "XrExE9yKIg1WjnnlVkGX", label: "Matilda G�� American Female (Friendly)" },
+  { value: "Brian", voiceId: "nPczCjzI2devNBz1zQrb", label: "Brian G�� American Male (Deep)" },
+  { value: "Lily", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily G�� British Female (Narrative)" },
+  { value: "Daniel", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel G�� British Male (Warm)" },
 ];
 
 const DURATIONS = [
@@ -271,8 +271,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 whereas you are asking for a{" "}
                 <span className="font-bold text-primary">{selectedMinutes} min</span> e-learning course.
                 {mismatchType === "more"
-                  ? " The selected duration is longer than what the content supports — the AI may need to pad with supplementary material."
-                  : " The selected duration is shorter — the AI will need to condense and prioritize key topics."}
+                  ? " The selected duration is longer than what the content supports G�� the AI may need to pad with supplementary material."
+                  : " The selected duration is shorter G�� the AI will need to condense and prioritize key topics."}
               </p>
               <p className="text-[14px] font-semibold text-foreground mb-5">What would you like to do?</p>
 
@@ -282,13 +282,13 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   className="w-full h-[52px] rounded-xl text-[14px] font-bold text-white transition-all flex items-center justify-center gap-2 shadow-lg hover:brightness-110"
                   style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
                 >
-                  📄 Proceed based on the content outline uploaded (~{estimatedMinutes} min)
+                  =��� Proceed based on the content outline uploaded (~{estimatedMinutes} min)
                 </button>
                 <button
                   onClick={handleProceedWithSelected}
                   className="w-full h-[52px] rounded-xl text-[14px] font-bold text-foreground border-2 border-border hover:bg-secondary/60 transition-all flex items-center justify-center gap-2"
                 >
-                  ⏱️ Go with the duration I have selected ({selectedMinutes} min)
+                  GŦn+� Go with the duration I have selected ({selectedMinutes} min)
                 </button>
               </div>
             </div>
@@ -387,18 +387,16 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5">
-                    <p className="text-[12px] font-bold text-foreground">Trainer Avatar</p>
+                    <p className="text-[12px] font-bold text-foreground">Select Your Instructor</p>
                     <InfoHint text="Choose the virtual trainer shown to learners. Indian languages default to Indian trainers in auto mode." />
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
                       {trainerAutoMode ? "Auto" : "Manual"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                     {AVATAR_TRAINERS.map((trainer) => {
                       const selected = avatarTrainerId === trainer.id;
-                      const preferredForLanguage = isIndianLanguage(narratorLanguage)
-                        ? trainer.region === "india"
-                        : trainer.region === "global";
+                      const trainerMedia = getTrainerMedia(trainer.id, avatarEnv);
 
                       return (
                         <button
@@ -407,35 +405,42 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                             setAvatarTrainerId(trainer.id);
                             setTrainerAutoMode(false);
                           }}
-                          className={`rounded-xl border-2 p-2.5 text-left transition-all ${
-                            selected ? "border-primary bg-primary/10" : "border-border hover:border-primary/30"
+                          className={`overflow-hidden rounded-xl border-2 bg-card text-left transition-all ${
+                            selected ? "border-primary shadow-[0_0_0_2px_rgba(14,140,168,0.15)]" : "border-border hover:border-primary/40"
                           }`}
                           type="button"
                         >
-                          <div className="flex items-center gap-2.5">
-                            <div className="relative flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-[11px] font-bold text-foreground overflow-hidden">
-                              <span className="absolute text-[11px] font-bold text-foreground">{trainer.name.slice(0, 2).toUpperCase()}</span>
-                              <img
-                                src={getTrainerMedia(trainer.id, avatarEnv).imageUrl}
-                                alt={trainer.name}
-                                className="h-8 w-8 rounded-full object-cover"
-                                onError={(event) => {
-                                  event.currentTarget.style.display = "none";
-                                }}
-                              />
+                          <div className="relative h-[78px] w-full overflow-hidden bg-[#dfe8f6]">
+                            <div className="absolute inset-0 flex items-center justify-center text-[17px] font-[900] text-[#5b6f95]">
+                              {trainer.name.slice(0, 2).toUpperCase()}
                             </div>
-                            <div className="min-w-0">
-                              <p className={`truncate text-[12px] font-bold ${selected ? "text-primary" : "text-foreground"}`}>{trainer.name}</p>
-                              <p className="text-[10px] text-muted-foreground">{trainer.subtitle}</p>
-                            </div>
+                            <img
+                              src={trainerMedia.imageUrl}
+                              alt={trainer.name}
+                              className="h-full w-full object-cover"
+                              onError={(event) => {
+                                event.currentTarget.style.display = "none";
+                              }}
+                            />
+                            {selected ? (
+                              <span className="absolute bottom-1.5 right-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0ea5c8] text-[12px] font-black text-white shadow">
+                                ✓
+                              </span>
+                            ) : null}
                           </div>
-                          {preferredForLanguage ? (
-                            <p className="mt-2 text-[10px] font-semibold text-emerald-600">Recommended for {narratorLanguage}</p>
-                          ) : null}
+                          <div className="px-2 py-1.5">
+                            <p className={`truncate text-[12px] font-bold ${selected ? "text-primary" : "text-foreground"}`}>{trainer.name}</p>
+                            <p className="text-[10px] text-muted-foreground">{trainer.region === "india" ? "India trainer" : "Global trainer"}</p>
+                          </div>
                         </button>
                       );
                     })}
                   </div>
+                  <p className="text-[10px] font-semibold text-[#3f8f73]">
+                    {isIndianLanguage(narratorLanguage)
+                      ? `Recommended for ${narratorLanguage}: India trainers`
+                      : `Recommended for ${narratorLanguage}: Global trainers`}
+                  </p>
                 </div>
               </div>
             </div>
@@ -712,7 +717,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                       }`}
                       type="button"
                     >
-                      {option.label} · {option.desc}
+                      {option.label} -+ {option.desc}
                     </button>
                   ))}
                 </div>
@@ -754,7 +759,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               <div>
                 <div className="flex items-start justify-between">
                   <h3 className="text-[34px] leading-none font-[900] tracking-tight">Course Summary</h3>
-                  <span className="text-white/80 text-[20px]">•••</span>
+                  <span className="text-white/80 text-[20px]">G��G��G��</span>
                 </div>
                 <div className="mt-4 h-px bg-white/25" />
 
@@ -780,7 +785,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   <div>
                     <p className="text-[12px] uppercase tracking-[0.16em] text-white/70 font-[800]">Selected Instructor</p>
                     <p className="text-[22px] leading-none font-[900] mt-1">{selectedTrainer.name}</p>
-                    <p className="text-[13px] text-white/75 mt-1">{learnerNotesEnabled ? "Notes enabled" : "Notes disabled"} · {assessmentRequired ? "Assessment enabled" : "Assessment off"}</p>
+                    <p className="text-[13px] text-white/75 mt-1">{learnerNotesEnabled ? "Notes enabled" : "Notes disabled"} -+ {assessmentRequired ? "Assessment enabled" : "Assessment off"}</p>
                   </div>
                 </div>
               </div>

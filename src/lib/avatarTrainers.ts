@@ -42,6 +42,20 @@ export type TrainerMedia = {
   posterUrl?: string;
 };
 
+const DEFAULT_TRAINER_IMAGE_PROMPTS: Record<string, string> = {
+  priya: "realistic professional indian woman corporate trainer headshot, studio lighting, clean office background",
+  arjun: "realistic professional indian man corporate trainer headshot, studio lighting, clean office background",
+  neha: "realistic professional indian woman learning consultant headshot, studio lighting, clean office background",
+  rohan: "realistic professional indian man learning consultant headshot, studio lighting, clean office background",
+  daniel: "realistic professional male corporate trainer headshot, studio lighting, clean office background",
+  emma: "realistic professional female corporate trainer headshot, studio lighting, clean office background",
+};
+
+function getDefaultTrainerImageUrl(trainerId: string): string {
+  const prompt = DEFAULT_TRAINER_IMAGE_PROMPTS[trainerId] || "realistic professional trainer headshot, studio lighting";
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(prompt)}?width=640&height=640&seed=${encodeURIComponent(trainerId)}&model=flux&nologo=true`;
+}
+
 export function getTrainerMedia(trainerId: string, env: Record<string, string | undefined>): TrainerMedia {
   const suffix = trainerId.toUpperCase();
   const videoUrl = env[`VITE_AVATAR_VIDEO_URL_${suffix}`]?.trim() || env.VITE_AVATAR_VIDEO_URL?.trim() || undefined;
@@ -49,7 +63,7 @@ export function getTrainerMedia(trainerId: string, env: Record<string, string | 
 
   const imageUrl = env[`VITE_AVATAR_IMAGE_URL_${suffix}`]?.trim()
     || env.VITE_AVATAR_IMAGE_URL?.trim()
-    || `https://api.dicebear.com/9.x/personas/svg?seed=${encodeURIComponent(trainerId)}`;
+    || getDefaultTrainerImageUrl(trainerId);
 
   return { imageUrl, videoUrl, posterUrl };
 }
