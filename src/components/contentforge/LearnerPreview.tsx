@@ -1023,9 +1023,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [muted, setMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
+  const [voiceActivityLevel, setVoiceActivityLevel] = useState(0);
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlsRef = useRef<Record<number, string>>({});
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const lipSyncFrameRef = useRef<number>(0);
+  const analyserDataRef = useRef<Uint8Array | null>(null);
 
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
@@ -1054,6 +1060,95 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   // Word highlight state
   const [highlightWordIdx, setHighlightWordIdx] = useState(-1);
   const animFrameRef = useRef<number>(0);
+
+  const stopLipSync = useCallback(() => {
+    if (lipSyncFrameRef.current) {
+      cancelAnimationFrame(lipSyncFrameRef.current);
+      lipSyncFrameRef.current = 0;
+    }
+
+    if (mediaSourceRef.current) {
+      try {
+        mediaSourceRef.current.disconnect();
+      } catch {
+        // Ignore disconnect teardown errors.
+      }
+      mediaSourceRef.current = null;
+    }
+
+    if (analyserRef.current) {
+      try {
+        analyserRef.current.disconnect();
+      } catch {
+        // Ignore disconnect teardown errors.
+      }
+      analyserRef.current = null;
+    }
+
+    analyserDataRef.current = null;
+    setVoiceActivityLevel(0);
+  }, []);
+
+  const startLipSync = useCallback(async (audio: HTMLAudioElement) => {
+    stopLipSync();
+
+    try {
+      const AudioContextCtor = window.AudioContext
+        || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+
+      if (!AudioContextCtor) {
+        setVoiceActivityLevel(audio.paused ? 0 : 0.35);
+        return;
+      }
+
+      const audioContext = audioContextRef.current || new AudioContextCtor();
+      audioContextRef.current = audioContext;
+
+      if (audioContext.state === "suspended") {
+        await audioContext.resume();
+      }
+
+      const analyser = audioContext.createAnalyser();
+      analyser.fftSize = 256;
+      analyser.smoothingTimeConstant = 0.82;
+
+      const mediaSource = audioContext.createMediaElementSource(audio);
+      mediaSource.connect(analyser);
+      analyser.connect(audioContext.destination);
+
+      analyserRef.current = analyser;
+      mediaSourceRef.current = mediaSource;
+      analyserDataRef.current = new Uint8Array(analyser.frequencyBinCount);
+
+      let smoothedLevel = 0;
+
+      const tick = () => {
+        if (audio.paused || audio.ended || !analyserRef.current || !analyserDataRef.current) {
+          setVoiceActivityLevel(0);
+          lipSyncFrameRef.current = 0;
+          return;
+        }
+
+        analyserRef.current.getByteTimeDomainData(analyserDataRef.current);
+
+        let squareSum = 0;
+        for (let index = 0; index < analyserDataRef.current.length; index += 1) {
+          const centered = (analyserDataRef.current[index] - 128) / 128;
+          squareSum += centered * centered;
+        }
+
+        const rms = Math.sqrt(squareSum / Math.max(1, analyserDataRef.current.length));
+        const normalized = Math.max(0, Math.min(1, (rms - 0.012) / 0.11));
+        smoothedLevel = smoothedLevel * 0.62 + normalized * 0.38;
+        setVoiceActivityLevel(smoothedLevel);
+        lipSyncFrameRef.current = requestAnimationFrame(tick);
+      };
+
+      lipSyncFrameRef.current = requestAnimationFrame(tick);
+    } catch {
+      setVoiceActivityLevel(audio.paused ? 0 : 0.35);
+    }
+  }, [stopLipSync]);
 
   // Narration text for current slide - with fallback to slide content
   const getNarrationForSlide = useCallback((slideIdx: number) => {
@@ -1113,7 +1208,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     setHighlightWordIdx(-1);
     setHighlightSentenceIdx(-1);
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-  }, [currentSlide]);
+    stopLipSync();
+  }, [currentSlide, stopLipSync]);
 
   useEffect(() => {
     if (!slideMotion) return;
@@ -1156,10 +1252,23 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const wireAudio = useCallback((audio: HTMLAudioElement) => {
     audio.muted = muted;
     audioRef.current = audio;
-    audio.onplay = () => { setIsPlaying(true); startWordHighlight(audio); };
-    audio.onended = () => { setIsPlaying(false); setHighlightWordIdx(-1); setHighlightSentenceIdx(-1); };
-    audio.onpause = () => { setIsPlaying(false); if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
-  }, [muted, startWordHighlight]);
+    audio.onplay = () => {
+      setIsPlaying(true);
+      startWordHighlight(audio);
+      void startLipSync(audio);
+    };
+    audio.onended = () => {
+      setIsPlaying(false);
+      setHighlightWordIdx(-1);
+      setHighlightSentenceIdx(-1);
+      stopLipSync();
+    };
+    audio.onpause = () => {
+      setIsPlaying(false);
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+      stopLipSync();
+    };
+  }, [muted, startLipSync, startWordHighlight, stopLipSync]);
 
   // Fetch and play TTS on demand (user gesture)
   const playNarration = useCallback(async () => {
@@ -1217,6 +1326,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       audioRef.current.muted = muted;
     }
   }, [muted]);
+
+  useEffect(() => () => {
+    stopLipSync();
+    if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+      void audioContextRef.current.close();
+    }
+  }, [stopLipSync]);
 
   // Mark visited
   useEffect(() => {
@@ -1629,6 +1745,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           avatarPosterUrl={avatarPosterUrl}
                           isVoiceActive={isPlaying}
                           isVoiceLoading={audioLoading}
+                          voiceActivityLevel={voiceActivityLevel}
                         />
                       </div>
                     </div>
@@ -1687,6 +1804,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                             avatarPosterUrl={avatarPosterUrl}
                             isVoiceActive={isPlaying}
                             isVoiceLoading={audioLoading}
+                            voiceActivityLevel={voiceActivityLevel}
                           />
                         </div>
                       </div>
@@ -2051,6 +2169,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     avatarPosterUrl={avatarPosterUrl}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
+                    voiceActivityLevel={voiceActivityLevel}
                   />
                 </div>
 

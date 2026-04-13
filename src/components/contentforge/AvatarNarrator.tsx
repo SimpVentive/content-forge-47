@@ -13,6 +13,7 @@ interface AvatarNarratorProps {
   avatarPosterUrl?: string;
   isVoiceActive?: boolean;
   isVoiceLoading?: boolean;
+  voiceActivityLevel?: number;
 }
 
 const CONCISE_RESPONSE_HINT = "Keep the response concise: maximum 90 words, 4 short paragraphs or fewer, and avoid repetition.";
@@ -22,8 +23,6 @@ const AVATAR_TEXT = "#3C3489";
 const BUBBLE_BG = "#EEEDFE";
 const BUBBLE_BORDER = "#AFA9EC";
 const BUBBLE_TEXT = "#26215C";
-const AVATAR_PULSE_ANIMATION = "avatarNarratorPulse 600ms ease-in-out infinite alternate";
-const AVATAR_IDLE_ANIMATION = "avatarNarratorFloat 4.2s ease-in-out infinite";
 
 type RequestMode = "initial" | "example";
 
@@ -37,7 +36,7 @@ function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: s
   return `Tap the explain icon and ${trainerName} will break down ${topic}. Quick preview: ${shortenedPreview}`;
 }
 
-export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl, isVoiceActive, isVoiceLoading }: AvatarNarratorProps) {
+export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl, isVoiceActive, isVoiceLoading, voiceActivityLevel = 0 }: AvatarNarratorProps) {
   const [speechText, setSpeechText] = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasCompletedInitialResponse, setHasCompletedInitialResponse] = useState(false);
@@ -60,6 +59,13 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const mouthHoldTimeoutRef = useRef<number | null>(null);
   const [isMouthHold, setIsMouthHold] = useState(false);
   const isTalking = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
+  const normalizedVoiceLevel = Math.max(0, Math.min(1, voiceActivityLevel));
+  const mouthOpenLevel = isTalking
+    ? Math.max(isVoiceLoading ? 0.38 : 0.08, normalizedVoiceLevel)
+    : 0;
+  const mouthWidth = 34 + mouthOpenLevel * 16;
+  const mouthHeight = 4 + mouthOpenLevel * 22;
+  const mouthOpacity = isTalking ? 0.88 : 0.18;
 
   const clearMouthHoldTimeout = () => {
     if (mouthHoldTimeoutRef.current !== null) {
@@ -270,27 +276,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   return (
     <section className="flex w-full flex-col items-center gap-3">
       <style>
-        {`@keyframes avatarNarratorPulse {
-          from {
-            transform: scale(1);
-          }
-
-          to {
-            transform: scale(1.03);
-          }
-        }
-
-        @keyframes avatarNarratorFloat {
-          0%, 100% {
-            transform: translateY(0px);
-          }
-
-          50% {
-            transform: translateY(-4px);
-          }
-        }
-
-        @keyframes avatarNarratorEnter {
+        {`@keyframes avatarNarratorEnter {
           0% {
             opacity: 0;
             transform: translateY(14px) scale(0.96);
@@ -403,11 +389,6 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
                 src={avatarImageUrl || "/avatar-sarah.jpg"}
                 alt={trainerName}
                 className="h-full w-full object-cover object-top"
-                style={{
-                  animation: isTalking
-                    ? `${AVATAR_PULSE_ANIMATION}, avatarJawBob 220ms ease-in-out infinite`
-                    : AVATAR_IDLE_ANIMATION,
-                }}
                 onError={() => setHasAvatarImage(false)}
               />
             ) : (
@@ -416,13 +397,37 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
               </div>
             )}
 
-            {hasAvatarImage && isTalking && (
-              <div className="pointer-events-none absolute left-1/2 top-[48%] h-[20px] w-[64px] -translate-x-1/2 overflow-hidden rounded-full border border-black/30 bg-black/10">
+            {hasAvatarImage && (
+              <div className="pointer-events-none absolute left-1/2 top-[68%] h-[38px] w-[104px] -translate-x-1/2 -translate-y-1/2">
                 <div
-                  className="absolute inset-0 rounded-full"
+                  className="absolute left-1/2 top-1/2 rounded-[999px] border border-[#2d1714]/35"
                   style={{
-                    background: "radial-gradient(circle at 50% 48%, rgba(12, 12, 14, 0.82) 0%, rgba(30, 30, 33, 0.62) 60%, rgba(30, 30, 33, 0.14) 100%)",
-                    animation: "avatarLipSync 160ms linear infinite",
+                    width: `${mouthWidth}px`,
+                    height: `${mouthHeight}px`,
+                    opacity: mouthOpacity,
+                    background: "radial-gradient(circle at 50% 40%, rgba(42, 14, 18, 0.98) 0%, rgba(78, 23, 28, 0.9) 62%, rgba(42, 16, 18, 0.12) 100%)",
+                    boxShadow: isTalking ? "0 2px 10px rgba(0,0,0,0.24)" : "none",
+                    transform: `translate(-50%, -50%) scaleY(${0.7 + mouthOpenLevel * 0.85})`,
+                    transition: "width 80ms linear, height 80ms linear, opacity 80ms linear, transform 80ms linear",
+                  }}
+                />
+                <div
+                  className="absolute left-1/2 top-1/2 h-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+                  style={{
+                    width: `${mouthWidth + 10}px`,
+                    background: "rgba(110, 54, 48, 0.46)",
+                    opacity: isTalking ? 0.18 : 0.36,
+                    transition: "width 80ms linear, opacity 80ms linear",
+                  }}
+                />
+                <div
+                  className="absolute left-1/2 top-[46%] h-[8px] -translate-x-1/2 -translate-y-1/2 rounded-full"
+                  style={{
+                    width: `${Math.max(14, mouthWidth - 10)}px`,
+                    background: "rgba(244, 181, 194, 0.32)",
+                    opacity: isTalking ? 0.42 : 0,
+                    filter: "blur(0.4px)",
+                    transition: "width 80ms linear, opacity 80ms linear",
                   }}
                 />
               </div>
