@@ -2819,37 +2819,35 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
               <div className="flex items-center gap-2.5 self-end lg:self-auto">
                 {currentNarration && !hasAvatarVideoNarration ? (
-                  <>
-                    <button
-                      onClick={() => {
-                        if (audioLoading) return;
-                        if (audioRef.current && isPlaying) {
-                          audioRef.current.pause();
-                        } else if (audioRef.current && !isPlaying) {
-                          audioRef.current.play().catch(() => {});
-                        } else {
-                          playNarration();
-                        }
-                      }}
-                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#c9d8ea] bg-white px-4 text-[13px] font-semibold text-[#123d78] transition-all hover:bg-[#f7fbff]"
-                      type="button"
-                    >
-                      {audioLoading ? (
-                        <div className="h-4 w-4 rounded-full border-2 border-[#123d78]/30 border-t-[#123d78] animate-spin" />
-                      ) : isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      <span>{audioLoading ? "Loading" : isPlaying ? "Pause Explain" : "Explain"}</span>
-                    </button>
-
-                    <button
-                      onClick={() => setMuted(!muted)}
-                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#c9d8ea] bg-white text-[#123d78] transition-all hover:bg-[#f7fbff]"
-                      type="button"
-                      aria-label={muted ? "Unmute narration" : "Mute narration"}
-                    >
-                      {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                    </button>
-                  </>
+                  <button
+                    onClick={() => {
+                      if (audioLoading) return;
+                      if (audioRef.current && isPlaying) {
+                        audioRef.current.pause();
+                      } else if (audioRef.current && !isPlaying) {
+                        audioRef.current.play().catch(() => {});
+                      } else {
+                        playNarration();
+                      }
+                    }}
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#c9d8ea] bg-white px-4 text-[13px] font-semibold text-[#123d78] transition-all hover:bg-[#f7fbff]"
+                    type="button"
+                  >
+                    {audioLoading ? (
+                      <div className="h-4 w-4 rounded-full border-2 border-[#123d78]/30 border-t-[#123d78] animate-spin" />
+                    ) : isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                    <span>{audioLoading ? "Loading" : isPlaying ? "Pause Explain" : "Explain"}</span>
+                  </button>
                 ) : null}
+
+                <button
+                  onClick={() => setMuted(!muted)}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#c9d8ea] bg-white text-[#123d78] transition-all hover:bg-[#f7fbff]"
+                  type="button"
+                  aria-label={muted ? "Unmute narration" : "Mute narration"}
+                >
+                  {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                </button>
 
                 <button
                   onClick={goNext}

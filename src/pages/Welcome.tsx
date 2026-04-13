@@ -195,12 +195,20 @@ const Welcome = () => {
           <img
             src="/unitol-logo.svg"
             alt="UniTol Training Solutions Pvt Ltd"
-            className="h-12 w-auto object-contain sm:h-14"
+            className="h-14 w-auto object-contain sm:h-16"
             loading="lazy"
           />
-          <p className="text-center text-[13px] font-bold sm:text-[15px]" style={{ color: "#1e3a5f" }}>
-            This is an offering from UniTol Training Solutions Pvt Ltd, India
-          </p>
+          <div className="flex flex-col items-center sm:items-start">
+            <p className="text-[11px] font-medium tracking-wide" style={{ color: "#4a6080" }}>
+              This is an offering from
+            </p>
+            <p className="text-[16px] font-extrabold leading-tight" style={{ color: "#1e3a5f" }}>
+              UniTol Training Solutions Pvt Ltd&nbsp;
+              <span className="text-[14px] font-semibold" style={{ color: "#4a6080" }}>
+                (www.UniTol.in)
+              </span>
+            </p>
+          </div>
         </div>
       </div>
       {/* Hero */}

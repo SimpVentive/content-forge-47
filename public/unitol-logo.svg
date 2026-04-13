@@ -1,17 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 360" role="img" aria-labelledby="title desc">
-  <title id="title">UniTol Training Solutions Pvt Ltd logo</title>
-  <desc id="desc">Abstract U mark with UniTol wordmark blocks</desc>
-  <rect width="1400" height="360" fill="#e8e8e8"/>
-
-  <!-- Icon block -->
-  <rect x="40" y="42" width="170" height="250" fill="#5daad3"/>
-  <path d="M210 42h220v250H210c-92 0-140-68-140-125S118 42 210 42z" fill="#52b867"/>
-  <path d="M260 84h145v182h-145z" fill="#ea923d"/>
-  <path d="M324 84h30v115l-30-10V84z" fill="#52b867"/>
-  <path d="M260 250h145v70H260z" fill="#ea923d"/>
-
-  <!-- Wordmark bars -->
-  <rect x="500" y="44" width="820" height="228" fill="#030f63"/>
-  <rect x="500" y="286" width="640" height="52" fill="#030f63"/>
-  <rect x="1160" y="286" width="160" height="52" fill="#030f63"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" role="img" aria-labelledby="unitol-title">
+  <title id="unitol-title">UniTol Training Solutions</title>
+  
+  <!-- Logo: 4-square grid with colors, plus dark blue bar -->
+  <!-- Top-left: Green -->
+  <rect x="0" y="0" width="28" height="28" fill="#52B867"/>
+  <!-- Top-right: Orange/Red -->
+  <rect x="32" y="0" width="28" height="28" fill="#E8922A"/>
+  <!-- Bottom-left: Red/Orange -->
+  <rect x="0" y="32" width="28" height="28" fill="#E85D3A"/>
+  <!-- Bottom-right: Dark blue -->
+  <rect x="32" y="32" width="28" height="28" fill="#0D1559"/>
+  
+  <!-- Dark blue bar on right -->
+  <rect x="68" y="0" width="32" height="60" fill="#0D1559"/>
+  
+  <!-- Wordmark text -->
+  <text x="110" y="32" font-family="'Arial','Helvetica',sans-serif" font-size="32" font-weight="700" fill="#0D1559">UniTol</text>
+  <text x="110" y="55" font-family="'Arial','Helvetica',sans-serif" font-size="12" font-weight="500" fill="#0D1559" letter-spacing="1">TRAINING SOLUTIONS</text>
 </svg>
