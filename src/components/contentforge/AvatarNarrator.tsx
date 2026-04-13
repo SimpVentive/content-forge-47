@@ -1,7 +1,6 @@
 ﻿import { useEffect, useRef, useState } from "react";
-import { Lightbulb, MessageCircle, Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 interface AvatarNarratorProps {
@@ -12,6 +11,8 @@ interface AvatarNarratorProps {
   avatarImageUrl?: string;
   avatarVideoUrl?: string;
   avatarPosterUrl?: string;
+  isVoiceActive?: boolean;
+  isVoiceLoading?: boolean;
 }
 
 const CONCISE_RESPONSE_HINT = "Keep the response concise: maximum 90 words, 4 short paragraphs or fewer, and avoid repetition.";
@@ -36,7 +37,7 @@ function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: s
   return `Tap the explain icon and ${trainerName} will break down ${topic}. Quick preview: ${shortenedPreview}`;
 }
 
-export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl }: AvatarNarratorProps) {
+export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl, isVoiceActive, isVoiceLoading }: AvatarNarratorProps) {
   const [speechText, setSpeechText] = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasCompletedInitialResponse, setHasCompletedInitialResponse] = useState(false);
@@ -58,7 +59,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const pendingCompletionModeRef = useRef<RequestMode | null>(null);
   const mouthHoldTimeoutRef = useRef<number | null>(null);
   const [isMouthHold, setIsMouthHold] = useState(false);
-  const isTalking = isStreaming || isMouthHold;
+  const isTalking = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
 
   const clearMouthHoldTimeout = () => {
     if (mouthHoldTimeoutRef.current !== null) {
@@ -462,44 +463,6 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center justify-center gap-2.5">
-        <Button
-          type="button"
-          onClick={() => void runNarration("initial")}
-          disabled={isStreaming}
-          className={cn("h-9 rounded-full border px-3", isStreaming && "opacity-70")}
-          style={{ backgroundColor: "#FFFFFF", borderColor: BUBBLE_BORDER, color: AVATAR_TEXT }}
-          aria-label="Explain this topic"
-        >
-          <MessageCircle className="mr-1.5 h-4 w-4" /> Explain
-        </Button>
-
-        {isStreaming && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={stopStreaming}
-            className="h-9 rounded-full border px-3"
-            style={{ borderColor: "#fecaca", color: "#991b1b", backgroundColor: "#fff1f2" }}
-            aria-label="Stop explanation"
-          >
-            <Square className="mr-1.5 h-3.5 w-3.5 fill-current" /> Stop
-          </Button>
-        )}
-
-        {hasCompletedInitialResponse && !isStreaming && (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => void runNarration("example")}
-            className="h-9 rounded-full border px-3"
-            style={{ backgroundColor: AVATAR_BG, borderColor: BUBBLE_BORDER, color: AVATAR_TEXT }}
-            aria-label="Get a practical example"
-          >
-            <Lightbulb className="mr-1.5 h-4 w-4" /> Example
-          </Button>
-        )}
-      </div>
     </section>
   );
 }

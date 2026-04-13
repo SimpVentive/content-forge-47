@@ -600,23 +600,6 @@ const Confetti: React.FC = () => {
   );
 };
 
-/* Waveform Bars */
-const WaveformBars: React.FC<{ playing: boolean }> = ({ playing }) => (
-  <div className="flex items-end gap-[3px] h-5">
-    {[0, 1, 2, 3].map(i => (
-      <div
-        key={i}
-        className="w-[3px] rounded-full"
-        style={{
-          backgroundColor: "#4f46e5",
-          height: playing ? undefined : "4px",
-          animation: playing ? `waveBar 0.6s ease-in-out ${i * 0.1}s infinite` : "none",
-        }}
-      />
-    ))}
-  </div>
-);
-
 /* Infographic Visual Aid (on-demand SVG generation) */
 function extractSVG(text: string): string {
   const svgMatch = text.match(/<svg[\s\S]*?<\/svg>/i);
@@ -1644,6 +1627,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           avatarImageUrl={avatarImageUrl}
                           avatarVideoUrl={avatarVideoUrl}
                           avatarPosterUrl={avatarPosterUrl}
+                          isVoiceActive={isPlaying}
+                          isVoiceLoading={audioLoading}
                         />
                       </div>
                     </div>
@@ -1700,6 +1685,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                             avatarImageUrl={avatarImageUrl}
                             avatarVideoUrl={avatarVideoUrl}
                             avatarPosterUrl={avatarPosterUrl}
+                            isVoiceActive={isPlaying}
+                            isVoiceLoading={audioLoading}
                           />
                         </div>
                       </div>
@@ -2062,6 +2049,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     avatarImageUrl={avatarImageUrl}
                     avatarVideoUrl={avatarVideoUrl}
                     avatarPosterUrl={avatarPosterUrl}
+                    isVoiceActive={isPlaying}
+                    isVoiceLoading={audioLoading}
                   />
                 </div>
 
@@ -2803,38 +2792,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             </div>
           </div>
 
-          <div className="absolute bottom-[80px] left-1/2 z-40 -translate-x-1/2">
-            {currentNarration && !hasAvatarVideoNarration ? (
-              <div className="flex items-center gap-3 rounded-full border border-[#d6e1ef] bg-white/92 px-5 py-2.5 text-[#123d78] shadow-[0_16px_42px_rgba(15,23,42,0.16)] backdrop-blur">
-                <button
-                  onClick={() => {
-                    if (audioLoading) return;
-                    if (audioRef.current && isPlaying) {
-                      audioRef.current.pause();
-                    } else if (audioRef.current && !isPlaying) {
-                      audioRef.current.play().catch(() => {});
-                    } else {
-                      playNarration();
-                    }
-                  }}
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-[#123d78] text-white transition-colors hover:bg-[#0f3567]"
-                  type="button"
-                >
-                  {audioLoading ? (
-                    <div className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  ) : isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                </button>
-                <WaveformBars playing={isPlaying} />
-                <button onClick={() => setMuted(!muted)} className="text-[#5f7b9e] transition-colors hover:text-[#123d78]" type="button">
-                  {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                </button>
-                <span className="text-[11px] font-semibold text-[#5f7b9e]">
-                  {audioLoading ? "Loading..." : isPlaying ? "Playing narration" : "Play narration"} - {trainerName}
-                </span>
-              </div>
-            ) : null}
-          </div>
-
           <div className="shrink-0 border-t border-[#d7e1ee] bg-white/90 px-5 py-4 backdrop-blur md:px-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <button
@@ -2860,14 +2817,49 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 <span className="text-[12px] font-semibold text-[#5f7b9e]">Slide {currentSlide + 1} of {totalSlides} - Score {score.correct}/{score.total || 0}</span>
               </div>
 
-              <button
-                onClick={goNext}
-                disabled={currentSlide === totalSlides - 1}
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1d4f93] px-5 text-[14px] font-semibold text-white transition-all hover:bg-[#173f78] disabled:opacity-40"
-                type="button"
-              >
-                Next <ChevronRight className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2.5 self-end lg:self-auto">
+                {currentNarration && !hasAvatarVideoNarration ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        if (audioLoading) return;
+                        if (audioRef.current && isPlaying) {
+                          audioRef.current.pause();
+                        } else if (audioRef.current && !isPlaying) {
+                          audioRef.current.play().catch(() => {});
+                        } else {
+                          playNarration();
+                        }
+                      }}
+                      className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#c9d8ea] bg-white px-4 text-[13px] font-semibold text-[#123d78] transition-all hover:bg-[#f7fbff]"
+                      type="button"
+                    >
+                      {audioLoading ? (
+                        <div className="h-4 w-4 rounded-full border-2 border-[#123d78]/30 border-t-[#123d78] animate-spin" />
+                      ) : isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                      <span>{audioLoading ? "Loading" : isPlaying ? "Pause Explain" : "Explain"}</span>
+                    </button>
+
+                    <button
+                      onClick={() => setMuted(!muted)}
+                      className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#c9d8ea] bg-white text-[#123d78] transition-all hover:bg-[#f7fbff]"
+                      type="button"
+                      aria-label={muted ? "Unmute narration" : "Mute narration"}
+                    >
+                      {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                    </button>
+                  </>
+                ) : null}
+
+                <button
+                  onClick={goNext}
+                  disabled={currentSlide === totalSlides - 1}
+                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1d4f93] px-5 text-[14px] font-semibold text-white transition-all hover:bg-[#173f78] disabled:opacity-40"
+                  type="button"
+                >
+                  Next <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
