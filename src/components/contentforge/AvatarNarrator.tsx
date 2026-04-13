@@ -56,6 +56,16 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const queuedCharactersRef = useRef<string[]>([]);
   const currentRequestRef = useRef(0);
   const pendingCompletionModeRef = useRef<RequestMode | null>(null);
+  const mouthHoldTimeoutRef = useRef<number | null>(null);
+  const [isMouthHold, setIsMouthHold] = useState(false);
+  const isTalking = isStreaming || isMouthHold;
+
+  const clearMouthHoldTimeout = () => {
+    if (mouthHoldTimeoutRef.current !== null) {
+      window.clearTimeout(mouthHoldTimeoutRef.current);
+      mouthHoldTimeoutRef.current = null;
+    }
+  };
 
   const stopFlushLoop = () => {
     if (flushIntervalRef.current !== null) {
@@ -67,6 +77,11 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const finalizeStream = () => {
     stopFlushLoop();
     setIsStreaming(false);
+    clearMouthHoldTimeout();
+    mouthHoldTimeoutRef.current = window.setTimeout(() => {
+      setIsMouthHold(false);
+      mouthHoldTimeoutRef.current = null;
+    }, 1200);
 
     if (pendingCompletionModeRef.current === "initial") {
       setHasCompletedInitialResponse(true);
@@ -94,6 +109,8 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const resetForRequest = () => {
     queuedCharactersRef.current = [];
     pendingCompletionModeRef.current = null;
+    clearMouthHoldTimeout();
+    setIsMouthHold(true);
     setSpeechText("");
     setIsStreaming(true);
     startFlushLoop();
@@ -102,9 +119,11 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const handleFailure = (mode: RequestMode) => {
     queuedCharactersRef.current = [];
     pendingCompletionModeRef.current = null;
+    clearMouthHoldTimeout();
     stopFlushLoop();
     setSpeechText(`Here is the key point: ${moduleContent}`);
     setIsStreaming(false);
+    setIsMouthHold(false);
 
     if (mode === "initial") {
       setHasCompletedInitialResponse(true);
@@ -116,8 +135,10 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     abortControllerRef.current = null;
     queuedCharactersRef.current = [];
     pendingCompletionModeRef.current = null;
+    clearMouthHoldTimeout();
     stopFlushLoop();
     setIsStreaming(false);
+    setIsMouthHold(false);
   };
 
   const runNarration = async (mode: RequestMode) => {
@@ -200,14 +221,17 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     abortControllerRef.current = null;
     queuedCharactersRef.current = [];
     pendingCompletionModeRef.current = null;
+    clearMouthHoldTimeout();
     stopFlushLoop();
     setIsStreaming(false);
+    setIsMouthHold(false);
   }, [topic, moduleContent, trainerName]);
 
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
       stopFlushLoop();
+      clearMouthHoldTimeout();
     };
   }, []);
 
@@ -379,7 +403,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
                 alt={trainerName}
                 className="h-full w-full object-cover object-top"
                 style={{
-                  animation: isStreaming
+                  animation: isTalking
                     ? `${AVATAR_PULSE_ANIMATION}, avatarJawBob 220ms ease-in-out infinite`
                     : AVATAR_IDLE_ANIMATION,
                 }}
@@ -391,21 +415,21 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
               </div>
             )}
 
-            {hasAvatarImage && isStreaming && (
-              <div className="pointer-events-none absolute left-1/2 top-[63%] h-[18px] w-[56px] -translate-x-1/2 overflow-hidden rounded-full">
+            {hasAvatarImage && isTalking && (
+              <div className="pointer-events-none absolute left-1/2 top-[48%] h-[20px] w-[64px] -translate-x-1/2 overflow-hidden rounded-full border border-black/30 bg-black/10">
                 <div
                   className="absolute inset-0 rounded-full"
                   style={{
-                    background: "radial-gradient(circle at 50% 48%, rgba(24, 24, 27, 0.78) 0%, rgba(39, 39, 42, 0.58) 58%, rgba(39, 39, 42, 0.14) 100%)",
-                    animation: "avatarLipSync 190ms linear infinite",
+                    background: "radial-gradient(circle at 50% 48%, rgba(12, 12, 14, 0.82) 0%, rgba(30, 30, 33, 0.62) 60%, rgba(30, 30, 33, 0.14) 100%)",
+                    animation: "avatarLipSync 160ms linear infinite",
                   }}
                 />
               </div>
             )}
 
             <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/40 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
-              <span className={cn("inline-block h-2 w-2 rounded-full", isStreaming ? "bg-emerald-400" : "bg-slate-300")} />
-              {isStreaming ? "Speaking" : "Ready"}
+              <span className={cn("inline-block h-2 w-2 rounded-full", isTalking ? "bg-emerald-400" : "bg-slate-300")} />
+              {isTalking ? "Speaking" : "Ready"}
             </div>
 
             <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/60 px-4 pb-4 pt-10">
