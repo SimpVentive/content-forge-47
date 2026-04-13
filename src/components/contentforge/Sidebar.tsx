@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (isBinaryFile(file.name)) {
       // Show extracting state
       setIsExtracting(true);
-      setInputText(`ðŸ“„ Extracting content from ${file.name}...`);
+      setInputText(`[Document] Extracting content from ${file.name}...`);
 
       try {
         const base64 = await readFileAsBase64(file);
@@ -108,15 +108,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (data?.error) throw new Error(data.error);
 
         if (data?.unsupported) {
-          setInputText(`ðŸ“„ Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nâš  ${data.message || "Please paste the content directly."}`);
+          setInputText(`[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nWarning: ${data.message || "Please paste the content directly."}`);
         } else if (data?.text && data.text.length > 0) {
           setInputText(data.text);
         } else {
-          setInputText(`ðŸ“„ Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nCould not extract text. You can paste additional notes below.`);
+          setInputText(`[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nCould not extract text. You can paste additional notes below.`);
         }
       } catch (err) {
         console.error("Document extraction error:", err);
-        setInputText(`ðŸ“„ Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nâš  Could not extract content automatically. Please paste the key topics and notes manually below.`);
+        setInputText(`[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nWarning: Could not extract content automatically. Please paste the key topics and notes manually below.`);
       } finally {
         setIsExtracting(false);
       }
@@ -125,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (text && text.length > 0) {
         setInputText(text);
       } else {
-        setInputText(`ðŸ“„ Uploaded: ${file.name} â€” Could not extract text. Try pasting content directly.`);
+        setInputText(`[Document] Uploaded: ${file.name} - Could not extract text. Try pasting content directly.`);
       }
     }
 
@@ -174,7 +174,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {showTitleConfirm && (
           <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 animate-fade-in">
             <p className="text-[13px] font-semibold text-foreground mb-2">
-              ðŸ“‹ Is this the course you are creating?
+              Is this the course you are creating?
             </p>
             <p className="text-[15px] font-bold text-primary mb-3">"{suggestedTitle}"</p>
             <div className="flex gap-2">

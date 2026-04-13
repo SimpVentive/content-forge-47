@@ -440,7 +440,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                             {selected ? (
                               <span className="absolute bottom-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-black text-white shadow"
                                 style={{ background: "#2563EB" }}>
-                                âœ“
+                                <Check className="h-3.5 w-3.5" />
                               </span>
                             ) : null}
                           </div>

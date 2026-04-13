@@ -46,7 +46,7 @@ function tryParseJSON(raw: string): any | null {
   }
 }
 
-/* â”€â”€â”€ Assessment Renderer â”€â”€â”€ */
+/* Assessment Renderer */
 const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
   const data = tryParseJSON(raw);
   if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
@@ -106,7 +106,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
                   })}
                 </div>
                 {s.rationale && (
-                  <p className="text-[12px] text-muted-foreground mt-2 italic">ðŸ’¡ {s.rationale}</p>
+                  <p className="text-[12px] text-muted-foreground mt-2 italic">Tip: {s.rationale}</p>
                 )}
               </div>
             ))}
@@ -134,7 +134,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
   );
 };
 
-/* â”€â”€â”€ Package Renderer â”€â”€â”€ */
+/* Package Renderer */
 const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, slideLayout, onUpdateVisualTopic }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
@@ -171,10 +171,10 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         <h3 className="text-[18px] font-extrabold text-foreground mb-4">{meta.title || "Course Package"}</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Modules", value: meta.total_modules || meta.modules || "â€”", icon: Layers },
-            { label: "Topics", value: meta.total_topics || meta.topics || "â€”", icon: BarChart3 },
-            { label: "Duration", value: meta.estimated_completion_time || meta.duration || "â€”", icon: Clock },
-            { label: "Difficulty", value: meta.difficulty_level || meta.difficulty || "â€”", icon: AlertTriangle },
+            { label: "Modules", value: meta.total_modules || meta.modules || "-", icon: Layers },
+            { label: "Topics", value: meta.total_topics || meta.topics || "-", icon: BarChart3 },
+            { label: "Duration", value: meta.estimated_completion_time || meta.duration || "-", icon: Clock },
+            { label: "Difficulty", value: meta.difficulty_level || meta.difficulty || "-", icon: AlertTriangle },
           ].map((stat) => (
             <div key={stat.label} className="bg-secondary/50 rounded-xl p-3 text-center">
               <stat.icon className="w-4 h-4 mx-auto text-primary mb-1" />
@@ -192,7 +192,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           <div className="bg-secondary/50 rounded-xl p-3 space-y-1">
             {data.scorm_manifest.assets.map((asset: string | { name?: string; type?: string }, i: number) => (
               <div key={i} className="flex items-center gap-2 text-[13px] text-foreground/80">
-                <span className="text-primary">ðŸ“„</span>
+                <span className="text-primary">File</span>
                 {typeof asset === "string" ? asset : asset.name || JSON.stringify(asset)}
               </div>
             ))}
@@ -249,7 +249,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       )}
 
-      {/* 6. Action Buttons â€” Preview + Export */}
+      {/* 6. Action Buttons - Preview + Export */}
       <div className="flex gap-3">
         <button
           onClick={() => setShowLearnerPreview(true)}
@@ -280,14 +280,14 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           className="flex-1 h-12 rounded-xl text-[15px] font-bold text-primary-foreground flex items-center justify-center gap-2 bg-primary hover:brightness-110 transition-all disabled:opacity-60"
         >
           {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {exporting ? "Generating audio & exportingâ€¦" : "Export SCORM Package"}
+          {exporting ? "Generating audio and exporting..." : "Export SCORM Package"}
         </button>
       </div>
     </div>
   );
 };
 
-/* â”€â”€â”€ Script Renderer (highlights narration cues + voice preview) â”€â”€â”€ */
+/* Script Renderer (highlights narration cues + voice preview) */
 const ScriptView: React.FC<{ raw: string; voiceRaw: string }> = ({ raw, voiceRaw }) => {
   const parts = raw.split(/(\[(?:PAUSE[^]]*?|EMPHASIZE|SLOW DOWN|SPEED UP|WHISPER|EXCITED)\])/gi);
   return (
@@ -309,7 +309,7 @@ const ScriptView: React.FC<{ raw: string; voiceRaw: string }> = ({ raw, voiceRaw
   );
 };
 
-/* â”€â”€â”€ Outline Renderer with Infographics â”€â”€â”€ */
+/* Outline Renderer with Infographics */
 const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }> = ({ raw, archRaw, visualRaw }) => {
   // Split outline into sections
   const sections = raw.split(/\n---\n/);
@@ -324,7 +324,7 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
         <div key={i} className="text-[14px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{section.trim()}</div>
       ))}
 
-      {/* 2. Visual Assets â€” Infographic Gallery */}
+      {/* 2. Visual Assets - Infographic Gallery */}
       {archRaw && visualRaw && (
         <InfographicPreview archRaw={archRaw} visualRaw={visualRaw} />
       )}

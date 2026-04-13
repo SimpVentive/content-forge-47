@@ -7,7 +7,7 @@ import { FLIP_STYLES, HIGHLIGHT_PALETTES, PreviewActionBar, type FlipStyle, type
 import { AvatarNarrator } from "./AvatarNarrator";
 import { AVATAR_TRAINERS, getTrainerMedia } from "@/lib/avatarTrainers";
 
-/* â”€â”€ helpers â”€â”€ */
+/* helpers */
 function tryParseJSON(raw: string): any | null {
   try { return JSON.parse(raw); } catch {
     const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -16,7 +16,7 @@ function tryParseJSON(raw: string): any | null {
   }
 }
 
-/* â”€â”€ types â”€â”€ */
+/* types */
 interface Module {
   title: string;
   topics: string[];
@@ -73,7 +73,7 @@ function getNarratorExcerpt(text: string, sentenceCount = 3): string {
   const normalized = stripNarratorMarkdown(text);
   if (!normalized) return "";
 
-  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`â€™â€]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
   return sentences.slice(0, sentenceCount).join(" ");
 }
 
@@ -87,7 +87,7 @@ function buildFlipChartLines(
   const pushSentences = (text: string, tone: "lead" | "body" | "takeaway" | "challenge") => {
     if (!text || lines.length >= availableLines) return;
     const normalized = stripNarratorMarkdown(text);
-    const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`â€™â€]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+    const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
 
     for (const sentence of sentences) {
       if (lines.length >= availableLines) break;
@@ -146,7 +146,7 @@ function splitParagraphIntoSentenceChunks(paragraph: string, targetWordsPerChunk
   const normalized = paragraph.trim();
   if (!normalized) return [];
 
-  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`â€™â€]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
   const chunks: string[] = [];
   let currentChunk: string[] = [];
   let currentWordCount = 0;
@@ -262,7 +262,7 @@ function getTopicVisual(moduleVisual: any, topicTitle: string) {
   });
 }
 
-/* â”€â”€ Parse writer content into structured parts â”€â”€ */
+/* Parse writer content into structured parts */
 function parseContentParts(text: string) {
   const lines = text
     .split("\n")
@@ -283,8 +283,8 @@ function parseContentParts(text: string) {
   paragraphs.forEach((p, i) => {
     if (i === 0) {
       hook = safeLearnerText(p);
-    } else if (p.match(/^(Key Takeaway|Takeaway|Remember|ðŸ’¡)/i)) {
-      takeaway = safeLearnerText(p.replace(/^(Key Takeaway:|Takeaway:|Remember:|ðŸ’¡\s*)/i, "").trim());
+    } else if (p.match(/^(Key Takeaway|Takeaway|Remember|Tip)/i)) {
+      takeaway = safeLearnerText(p.replace(/^(Key Takeaway:|Takeaway:|Remember:|Tip:\s*)/i, "").trim());
     } else if (p.match(/^(Challenge:|Next time|Try this:)/i) || (i === paragraphs.length - 1 && p.length < 120)) {
       challenge = safeLearnerText(p.replace(/^(Challenge:\s*)/i, "").trim());
     } else {
@@ -415,7 +415,7 @@ function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[]
     .map(({ index }) => index);
 }
 
-/* â”€â”€ build slides from agent outputs â”€â”€ */
+/* build slides from agent outputs */
 function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
@@ -430,7 +430,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     modules = mods.map((m: any, mi: number) => ({
       title: m.module_title || m.title || m.name || `Module ${mi + 1}`,
       topics: (m.topics || m.sections || m.lessons || []).map((t: any, ti: number) =>
-        typeof t === "string" ? t : t.topic_name || t.topic_title || t.title || t.name || `Module ${mi + 1} â€” Part ${ti + 1}`
+        typeof t === "string" ? t : t.topic_name || t.topic_title || t.title || t.name || `Module ${mi + 1} - Part ${ti + 1}`
       ),
     }));
   }
@@ -473,7 +473,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     // 1. Title slide
     slides.push({ type: "title", moduleIndex: mi, moduleTitle: mod.title });
 
-    // 2. Content slides â€” one per topic
+    // 2. Content slides - one per topic
     mod.topics.forEach((topic, ti) => {
       // Try to match writer section by topic name
       let sectionText = writerSections[topic.toLowerCase()] || "";
@@ -579,7 +579,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   return { modules, slides };
 }
 
-/* â”€â”€ Confetti animation â”€â”€ */
+/* Confetti animation */
 const Confetti: React.FC = () => {
   const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4"];
   return (
@@ -600,7 +600,7 @@ const Confetti: React.FC = () => {
   );
 };
 
-/* â”€â”€ Waveform Bars â”€â”€ */
+/* Waveform Bars */
 const WaveformBars: React.FC<{ playing: boolean }> = ({ playing }) => (
   <div className="flex items-end gap-[3px] h-5">
     {[0, 1, 2, 3].map(i => (
@@ -617,7 +617,7 @@ const WaveformBars: React.FC<{ playing: boolean }> = ({ playing }) => (
   </div>
 );
 
-/* â”€â”€ Infographic Visual Aid (on-demand SVG generation) â”€â”€ */
+/* Infographic Visual Aid (on-demand SVG generation) */
 function extractSVG(text: string): string {
   const svgMatch = text.match(/<svg[\s\S]*?<\/svg>/i);
   if (svgMatch) return svgMatch[0];
@@ -726,7 +726,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
         type="button"
       >
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-[18px] text-white shadow-inner shadow-white/10">
-          ðŸ“Š
+          AI
         </div>
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -1072,7 +1072,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [highlightWordIdx, setHighlightWordIdx] = useState(-1);
   const animFrameRef = useRef<number>(0);
 
-  // Narration text for current slide â€” with fallback to slide content
+  // Narration text for current slide - with fallback to slide content
   const getNarrationForSlide = useCallback((slideIdx: number) => {
     const s = slides[slideIdx];
     if (!s || s.type !== "content") return "";
@@ -1144,7 +1144,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     const totalWords = narrationWords.length;
     if (!totalSentences || !totalWords) return;
 
-    // Pre-compute cumulative word counts per sentence to map audio progress â†’ sentence
+    // Pre-compute cumulative word counts per sentence to map audio progress to a sentence
     const sentenceWordCounts = narrationSentences.map(s => s.split(/\s+/).length);
     const cumulativeWords: number[] = [];
     sentenceWordCounts.reduce((acc, count, i) => {
@@ -1314,7 +1314,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         ? `Key takeaways and completion for ${currentModule?.title || "this module"}`
         : slide.type === "video"
           ? `${slide.video?.channelTitle || "Curated resource"} for this lesson`
-          : `Lesson ${(slide.topicIndex || 0) + 1}${slide.topicPartCount && slide.topicPartCount > 1 ? ` Â· Part ${(slide.topicPartIndex || 0) + 1} of ${slide.topicPartCount}` : ""}`;
+          : `Lesson ${(slide.topicIndex || 0) + 1}${slide.topicPartCount && slide.topicPartCount > 1 ? ` - Part ${(slide.topicPartIndex || 0) + 1} of ${slide.topicPartCount}` : ""}`;
   const layoutTrimNotice = slide.type === "content" && slide.wasTrimmedForLayout;
   const firstContentSlide = currentModuleSlides.find((moduleSlide) => moduleSlide.type === "content");
   const platformNavItems = [
@@ -1421,7 +1421,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     }
   }, [currentVisualKey, onUpdateVisualTopic, slide]);
 
-  /* â”€â”€ COMPLETION SCREEN â”€â”€ */
+  /* COMPLETION SCREEN */
   if (showCompletion) {
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: "#0f172a" }}>
@@ -1452,7 +1452,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     );
   }
 
-  /* â”€â”€ SLIDE RENDERERS â”€â”€ */
+  /* SLIDE RENDERERS */
   const renderSlide = () => {
     switch (slide.type) {
       case "title":
@@ -1472,7 +1472,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <div className="relative bg-white rounded-2xl rounded-bl-md px-5 py-3 shadow-md max-w-[400px]"
                 style={{ animation: "fadeInUp 0.5s ease both", animationDelay: "0.15s" }}>
                 <p className="text-[14px] font-semibold" style={{ color: "#1e293b" }}>
-                  Welcome to <span style={{ color: "#4f46e5" }}>Module {slide.moduleIndex + 1}</span>! ðŸŽ“
+                  Welcome to <span style={{ color: "#4f46e5" }}>Module {slide.moduleIndex + 1}</span>!
                 </p>
                 <p className="text-[12px] mt-0.5" style={{ color: "#64748b" }}>
                   Let's explore this topic together.
@@ -1500,7 +1500,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
       case "content": {
         const parts = parseContentParts(slide.content || "");
-        const moduleLabel = `MODULE ${slide.moduleIndex + 1} â€” ${slide.moduleTitle}`.toUpperCase();
+        const moduleLabel = `MODULE ${slide.moduleIndex + 1} - ${slide.moduleTitle}`.toUpperCase();
         const narratorSource = [parts.hook, ...parts.body].filter(Boolean).join(" ");
         const narratorExcerpt = getNarratorExcerpt(narratorSource || slide.content || "");
         const chartLines = buildFlipChartLines(parts, slideRules.maxLines);
@@ -2224,7 +2224,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <div className="mt-4 space-y-3">
                     {q.rationale && (
                       <p className="text-[14px] bg-slate-50 rounded-xl p-4" style={{ color: "#64748b" }}>
-                        ðŸ’¡ {q.rationale}
+                        Tip: {q.rationale}
                       </p>
                     )}
                     <button
@@ -2232,7 +2232,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       className="w-full h-12 rounded-xl text-[15px] font-bold text-white"
                       style={{ background: "#4f46e5" }}
                     >
-                      Next Slide â†’
+                      Next Slide -&gt;
                     </button>
                   </div>
                 )}
@@ -2264,7 +2264,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               {slide.moduleIndex < modules.length - 1 ? (
                 <button onClick={goNext}
                   className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all">
-                  Next Module â†’
+                  Next Module -&gt;
                 </button>
               ) : (
                 <button onClick={() => setShowCompletion(true)}
@@ -2293,7 +2293,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               </div>
               <div className="px-7 pt-3 pb-3">
                 <h2 className="text-[22px] font-bold text-white">{vid.title}</h2>
-                <p className="text-[13px] text-white/60 mt-1">{vid.channelTitle} Â· {durStr}</p>
+                <p className="text-[13px] text-white/60 mt-1">{vid.channelTitle} - {durStr}</p>
               </div>
               <div className="px-5 pb-4">
                 <iframe
@@ -2305,7 +2305,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 />
               </div>
               <div className="px-7 pb-5">
-                <p className="text-[11px] text-white/40">Source: YouTube â€” included for educational purposes</p>
+                <p className="text-[11px] text-white/40">Source: YouTube - included for educational purposes</p>
               </div>
             </div>
           </div>
@@ -2667,7 +2667,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[12px] font-semibold text-white/70">
                   <span>{currentModule?.title || courseTitle}</span>
-                  <span>â€º</span>
+                  <span>&gt;</span>
                   <span className="truncate">{shellPageTitle}</span>
                 </div>
                 <p className="mt-2 text-[24px] font-[900] tracking-tight">{shellPageTitle}</p>
@@ -2730,7 +2730,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 <div className="rounded-2xl border border-[#d8e2ef] bg-[#fffaf0] px-4 py-3 shadow-sm">
                   <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Activities</p>
                   <p className="mt-2 text-[24px] font-[900] tracking-tight text-[#123d78]">{currentModuleVideoCount + (currentModuleAssessment ? 1 : 0)}</p>
-                  <p className="text-[12px] text-[#7c6a52]">{currentModuleAssessment ? "Quiz included" : "No quiz yet"}{currentModuleVideoCount ? ` Â· ${currentModuleVideoCount} video` : ""}</p>
+                  <p className="text-[12px] text-[#7c6a52]">{currentModuleAssessment ? "Quiz included" : "No quiz yet"}{currentModuleVideoCount ? ` - ${currentModuleVideoCount} video` : ""}</p>
                 </div>
               </div>
             </div>
@@ -2829,7 +2829,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                 </button>
                 <span className="text-[11px] font-semibold text-[#5f7b9e]">
-                  {audioLoading ? "Loading..." : isPlaying ? "Playing narration" : "Play narration"} Â· {trainerName}
+                  {audioLoading ? "Loading..." : isPlaying ? "Playing narration" : "Play narration"} - {trainerName}
                 </span>
               </div>
             ) : null}
@@ -2857,7 +2857,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     />
                   ))}
                 </div>
-                <span className="text-[12px] font-semibold text-[#5f7b9e]">Slide {currentSlide + 1} of {totalSlides} Â· Score {score.correct}/{score.total || 0}</span>
+                <span className="text-[12px] font-semibold text-[#5f7b9e]">Slide {currentSlide + 1} of {totalSlides} - Score {score.correct}/{score.total || 0}</span>
               </div>
 
               <button

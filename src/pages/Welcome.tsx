@@ -13,7 +13,7 @@ const loadedAtLabel = new Intl.DateTimeFormat("en-US", {
 }).format(new Date());
 
 const features = [
-  { icon: Brain, title: "AI-Powered Agents", desc: "10 specialized agents work together â€” research, writing, visuals, voice, assessment, and more." },
+  { icon: Brain, title: "AI-Powered Agents", desc: "10 specialized agents work together - research, writing, visuals, voice, assessment, and more." },
   { icon: BookOpen, title: "Structured Courses", desc: "Bloom's taxonomy-aligned modules with hooks, body content, and key takeaways." },
   { icon: Film, title: "YouTube Integration", desc: "Find, clip, and embed relevant videos directly into your course timeline." },
   { icon: Mic, title: "Narration & Voice", desc: "AI-generated narration scripts with text-to-speech and sentence highlighting." },
@@ -246,7 +246,7 @@ const Welcome = () => {
           </h1>
           <p className="mx-auto mb-10 max-w-2xl text-[20px] font-medium leading-[1.75]"
             style={{ color: "#536a87" }}>
-            Transform your raw content into polished, LMS-ready eLearning courses in minutes â€” powered by a multi-agent AI pipeline.
+            Transform your raw content into polished, LMS-ready eLearning courses in minutes - powered by a multi-agent AI pipeline.
           </p>
           <div className="flex items-center justify-center gap-4">
             <button
