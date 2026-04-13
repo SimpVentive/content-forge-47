@@ -1,5 +1,5 @@
 ﻿import { useEffect, useRef, useState } from "react";
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Lightbulb, MessageCircle, Pause, Play, Square, Volume2, VolumeX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -29,11 +29,11 @@ type RequestMode = "initial" | "example";
 function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: string) {
   const preview = moduleContent.trim().replace(/\s+/g, " ");
   if (!preview) {
-    return `Click Explain this and ${trainerName} will walk you through ${topic}.`;
+    return `Tap the explain icon and ${trainerName} will walk you through ${topic}.`;
   }
 
   const shortenedPreview = preview.length > 180 ? `${preview.slice(0, 177).trimEnd()}...` : preview;
-  return `Click Explain this and ${trainerName} will break down ${topic}. Quick preview: ${shortenedPreview}`;
+  return `Tap the explain icon and ${trainerName} will break down ${topic}. Quick preview: ${shortenedPreview}`;
 }
 
 export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl }: AvatarNarratorProps) {
@@ -243,7 +243,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const captionText = speechText.trim().replace(/\s+/g, " ").slice(0, 80);
 
   return (
-    <section className="flex w-full flex-col gap-4">
+    <section className="flex w-full flex-col items-center gap-3">
       <style>
         {`@keyframes avatarNarratorPulse {
           from {
@@ -288,12 +288,12 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
         }`}
       </style>
       {avatarVideoUrl ? (
-        <div className="relative overflow-hidden rounded-[22px] border border-[#d8deea] bg-black shadow-[0_14px_30px_rgba(15,23,42,0.2)]" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+        <div className="relative w-full max-w-[360px] overflow-hidden rounded-[22px] border border-[#d8deea] bg-black shadow-[0_14px_30px_rgba(15,23,42,0.2)]" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
           <video
             ref={avatarVideoRef}
             src={avatarVideoUrl}
             poster={avatarPosterUrl}
-            className="aspect-[9/13] w-full max-h-[560px] object-cover object-top"
+            className="aspect-[9/12] w-full max-h-[420px] object-cover object-top"
             autoPlay
             playsInline
             muted={videoMuted}
@@ -330,7 +330,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
           </div>
         </div>
       ) : (
-        <div className="w-full overflow-hidden rounded-[20px] border border-[#d8deea] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.12)]" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+        <div className="w-full max-w-[360px] overflow-hidden rounded-[20px] border border-[#d8deea] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.12)]" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
           <div className="relative aspect-[3/4] w-full bg-[#eef2ff]">
             {hasAvatarImage ? (
               <img
@@ -366,7 +366,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
       )}
 
       <div
-        className="min-h-36 max-h-60 overflow-y-auto rounded-[24px] border px-5 py-4 text-[14px] leading-7 shadow-sm"
+        className="min-h-28 max-h-44 w-full max-w-[540px] overflow-y-auto rounded-[24px] border px-5 py-4 text-[14px] leading-7 shadow-sm"
         style={{ backgroundColor: BUBBLE_BG, borderColor: BUBBLE_BORDER, color: BUBBLE_TEXT, animation: `avatarNarratorEnter 480ms cubic-bezier(0.22, 1, 0.36, 1) both, ${isStreaming ? "bubbleGlow 1.8s ease-in-out infinite" : "none"}` }}
       >
         <p className="whitespace-pre-wrap break-words">
@@ -381,15 +381,16 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
         </p>
       </div>
 
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-center justify-center gap-2.5">
         <Button
           type="button"
           onClick={() => void runNarration("initial")}
           disabled={isStreaming}
-          className={cn("rounded-full px-5", isStreaming && "opacity-70")}
-          style={{ backgroundColor: AVATAR_TEXT, color: "#FFFFFF" }}
+          className={cn("h-9 rounded-full border px-3", isStreaming && "opacity-70")}
+          style={{ backgroundColor: "#FFFFFF", borderColor: BUBBLE_BORDER, color: AVATAR_TEXT }}
+          aria-label="Explain this topic"
         >
-          Explain this
+          <MessageCircle className="mr-1.5 h-4 w-4" /> Explain
         </Button>
 
         {isStreaming && (
@@ -397,10 +398,11 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
             type="button"
             variant="outline"
             onClick={stopStreaming}
-            className="rounded-full px-5"
-            style={{ borderColor: BUBBLE_BORDER, color: BUBBLE_TEXT }}
+            className="h-9 rounded-full border px-3"
+            style={{ borderColor: "#fecaca", color: "#991b1b", backgroundColor: "#fff1f2" }}
+            aria-label="Stop explanation"
           >
-            Stop
+            <Square className="mr-1.5 h-3.5 w-3.5 fill-current" /> Stop
           </Button>
         )}
 
@@ -409,10 +411,11 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
             type="button"
             variant="outline"
             onClick={() => void runNarration("example")}
-            className="rounded-full px-5"
+            className="h-9 rounded-full border px-3"
             style={{ backgroundColor: AVATAR_BG, borderColor: BUBBLE_BORDER, color: AVATAR_TEXT }}
+            aria-label="Get a practical example"
           >
-            Give me an example
+            <Lightbulb className="mr-1.5 h-4 w-4" /> Example
           </Button>
         )}
       </div>

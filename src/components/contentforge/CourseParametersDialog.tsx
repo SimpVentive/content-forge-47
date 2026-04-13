@@ -256,6 +256,10 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     });
   };
 
+  const handleDismissMismatch = () => {
+    setShowMismatchWarning(false);
+  };
+
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -305,6 +309,13 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   style={{ fontFamily: buttonFont, color: "#2563EB", borderColor: "#2563EB", backgroundColor: "#FFFFFF" }}
                 >
                   Keep my selected duration ({selectedMinutes} min)
+                </button>
+                <button
+                  onClick={handleDismissMismatch}
+                  className="w-full h-[44px] rounded-lg text-[13px] font-medium transition-all duration-200 ease-in-out hover:bg-secondary"
+                  style={{ fontFamily: buttonFont, color: "#475569", backgroundColor: "#F8FAFC" }}
+                >
+                  Cancel
                 </button>
               </div>
             </div>
