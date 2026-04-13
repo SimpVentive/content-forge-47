@@ -1,20 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 420 120" role="img" aria-labelledby="unitol-title">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 180" role="img" aria-labelledby="unitol-title">
   <title id="unitol-title">UniTol Training Solutions</title>
   
-  <!-- Logo: 4-square grid with colors, plus dark blue bar -->
-  <!-- Top-left: Green -->
-  <rect x="0" y="0" width="28" height="28" fill="#52B867"/>
-  <!-- Top-right: Orange/Red -->
-  <rect x="32" y="0" width="28" height="28" fill="#E8922A"/>
-  <!-- Bottom-left: Red/Orange -->
-  <rect x="0" y="32" width="28" height="28" fill="#E85D3A"/>
-  <!-- Bottom-right: Dark blue -->
-  <rect x="32" y="32" width="28" height="28" fill="#0D1559"/>
+  <!-- U shape (blue) -->
+  <path d="M 20 20 Q 20 100 60 130 Q 80 150 100 150 L 100 50 Q 100 20 70 20 L 30 20 Q 20 20 20 30 L 20 20 Z" fill="none" stroke="#4A90E2" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
   
-  <!-- Dark blue bar on right -->
-  <rect x="68" y="0" width="32" height="60" fill="#0D1559"/>
+  <!-- T shape (green) - overlapping -->
+  <path d="M 80 10 L 140 10 M 110 10 L 110 120 Q 110 150 85 160" fill="none" stroke="#52B867" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
   
-  <!-- Wordmark text -->
-  <text x="110" y="32" font-family="'Arial','Helvetica',sans-serif" font-size="32" font-weight="700" fill="#0D1559">UniTol</text>
-  <text x="110" y="55" font-family="'Arial','Helvetica',sans-serif" font-size="12" font-weight="500" fill="#0D1559" letter-spacing="1">TRAINING SOLUTIONS</text>
+  <!-- S shape (orange) - overlapping -->
+  <path d="M 140 60 Q 160 60 160 80 Q 160 100 140 110 Q 120 120 100 120 M 140 140 Q 160 140 160 160 Q 160 180 140 180 Q 110 180 90 170" fill="none" stroke="#F39C12" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+  
+  <!-- Text: UniTol -->
+  <text x="180" y="90" font-family="'Segoe UI', Arial, sans-serif" font-size="58" font-weight="700" fill="#0D1559">UniTol</text>
+  
+  <!-- Text: TRAINING SOLUTIONS -->
+  <text x="180" y="125" font-family="'Segoe UI', Arial, sans-serif" font-size="14" font-weight="500" fill="#0D1559" letter-spacing="2">TRAINING SOLUTIONS</text>
 </svg>
