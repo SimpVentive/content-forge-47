@@ -277,6 +277,47 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
           }
         }
 
+        @keyframes avatarLipSync {
+          0% {
+            transform: translateY(0) scaleX(1) scaleY(0.75);
+            opacity: 0.45;
+          }
+
+          20% {
+            transform: translateY(1px) scaleX(1.04) scaleY(1.08);
+            opacity: 0.7;
+          }
+
+          45% {
+            transform: translateY(0) scaleX(0.92) scaleY(0.62);
+            opacity: 0.5;
+          }
+
+          70% {
+            transform: translateY(1px) scaleX(1.08) scaleY(1.22);
+            opacity: 0.78;
+          }
+
+          100% {
+            transform: translateY(0) scaleX(1) scaleY(0.7);
+            opacity: 0.42;
+          }
+        }
+
+        @keyframes avatarJawBob {
+          0%, 100% {
+            transform: translateY(0);
+          }
+
+          40% {
+            transform: translateY(1px);
+          }
+
+          75% {
+            transform: translateY(2px);
+          }
+        }
+
         @keyframes bubbleGlow {
           0%, 100% {
             box-shadow: 0 10px 24px rgba(60, 52, 137, 0.08);
@@ -337,12 +378,28 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
                 src={avatarImageUrl || "/avatar-sarah.jpg"}
                 alt={trainerName}
                 className="h-full w-full object-cover object-top"
-                style={{ animation: isStreaming ? AVATAR_PULSE_ANIMATION : AVATAR_IDLE_ANIMATION }}
+                style={{
+                  animation: isStreaming
+                    ? `${AVATAR_PULSE_ANIMATION}, avatarJawBob 220ms ease-in-out infinite`
+                    : AVATAR_IDLE_ANIMATION,
+                }}
                 onError={() => setHasAvatarImage(false)}
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center text-4xl font-bold" style={{ color: AVATAR_TEXT }}>
                 {trainerInitials}
+              </div>
+            )}
+
+            {hasAvatarImage && isStreaming && (
+              <div className="pointer-events-none absolute left-1/2 top-[63%] h-[18px] w-[56px] -translate-x-1/2 overflow-hidden rounded-full">
+                <div
+                  className="absolute inset-0 rounded-full"
+                  style={{
+                    background: "radial-gradient(circle at 50% 48%, rgba(24, 24, 27, 0.78) 0%, rgba(39, 39, 42, 0.58) 58%, rgba(39, 39, 42, 0.14) 100%)",
+                    animation: "avatarLipSync 190ms linear infinite",
+                  }}
+                />
               </div>
             )}
 
