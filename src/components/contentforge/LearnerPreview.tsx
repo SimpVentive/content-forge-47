@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle } from "lucide-react";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
@@ -1031,7 +1031,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const lipSyncFrameRef = useRef<number>(0);
-  const analyserDataRef = useRef<Uint8Array | null>(null);
+  const analyserDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
 
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
@@ -1647,7 +1647,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         ) : null;
         const showHeroVisual = Boolean(visualMarkup) && slide.visualPlacement !== "side-panel";
         const showSideVisual = Boolean(visualMarkup) && slide.visualPlacement === "side-panel";
-        const contentTemplate: ContentTemplate = "guided-notes";
+        const contentTemplate: ContentTemplate = inferContentTemplate(slide, Boolean(visualMarkup));
         const lessonObjectives = getTopicLearningObjectives(currentModuleTopics, slide.topicTitle);
         const quickFact = getQuickFact(parts);
         const scenarioLead = parts.body[0] || parts.hook || narratorExcerpt;
