@@ -254,12 +254,31 @@ async function callClaude(systemPrompt: string, userMessage: string): Promise<st
   return data.text;
 }
 
+async function callClaudeWithTimeout(systemPrompt: string, userMessage: string, timeoutMs = 120000): Promise<string> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race<string>([
+      callClaude(systemPrompt, userMessage),
+      new Promise<string>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new Error(`Claude call timed out after ${Math.round(timeoutMs / 1000)}s`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
+
 async function callClaudeWithRetry(systemPrompt: string, userMessage: string, addLog: (msg: string) => void, agentName: string): Promise<string> {
   try {
-    return await callClaude(systemPrompt, userMessage);
+    return await callClaudeWithTimeout(systemPrompt, userMessage);
   } catch (err) {
-    addLog(`${agentName}: Error — retrying...`);
-    return await callClaude(systemPrompt, userMessage);
+    addLog(`${agentName}: Error — retrying once...`);
+    return await callClaudeWithTimeout(systemPrompt, userMessage);
   }
 }
 
@@ -402,15 +421,35 @@ export function useAgentPipeline() {
       if (toggles["research"] !== false) {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
-        researchResult = await callClaudeWithRetry(
-          `You are a Research Agent for premium corporate eLearning. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or drift into generic training filler. Extract the knowledge, tensions, examples, and practical behaviors that could support a sophisticated learner experience. Course level: ${params?.level || "intermediate"}. Language for on-screen text: ${textLanguage}. CRITICAL — Target duration is ${params?.duration || "15min"}. The finished learner experience must feel like approximately ${durationMinutes} minutes of content, which means around ${targetNarrationWords} words of narration/script across the course. Generate enough depth to support that runtime. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Return JSON with these keys: source_summary, key_themes, learner_problems, stakes_and_consequences, common_misconceptions, practical_behaviors, scenario_opportunities, evidence_and_examples, learning_objectives.`,
-          `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content. Target duration: ${params?.duration || "15min"}. Approximate narration budget: ${targetNarrationWords} words. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Find material that can support realistic scenarios, decisions, contrasts between weak and strong practice, and memorable learner takeaways.`,
-          addLog, "Research Agent"
-        );
-        setStatus("research", "complete");
-        setRawOutputs((prev) => ({ ...prev, research: researchResult }));
-        setOutputData((prev) => ({ ...prev, outline: `## Research Output\n\n${researchResult}` }));
-        addLog("Research Agent: Complete. 8 objectives identified.");
+        try {
+          researchResult = await callClaudeWithRetry(
+            `You are a Research Agent for premium corporate eLearning. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or drift into generic training filler. Extract the knowledge, tensions, examples, and practical behaviors that could support a sophisticated learner experience. Course level: ${params?.level || "intermediate"}. Language for on-screen text: ${textLanguage}. CRITICAL — Target duration is ${params?.duration || "15min"}. The finished learner experience must feel like approximately ${durationMinutes} minutes of content, which means around ${targetNarrationWords} words of narration/script across the course. Generate enough depth to support that runtime. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Return JSON with these keys: source_summary, key_themes, learner_problems, stakes_and_consequences, common_misconceptions, practical_behaviors, scenario_opportunities, evidence_and_examples, learning_objectives.`,
+            `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content. Target duration: ${params?.duration || "15min"}. Approximate narration budget: ${targetNarrationWords} words. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Find material that can support realistic scenarios, decisions, contrasts between weak and strong practice, and memorable learner takeaways.`,
+            addLog, "Research Agent"
+          );
+          setStatus("research", "complete");
+          setRawOutputs((prev) => ({ ...prev, research: researchResult }));
+          setOutputData((prev) => ({ ...prev, outline: `## Research Output\n\n${researchResult}` }));
+          addLog("Research Agent: Complete. 8 objectives identified.");
+        } catch (researchErr) {
+          const fallbackSource = inputText.trim().slice(0, 6000);
+          researchResult = JSON.stringify({
+            source_summary: fallbackSource || `Source notes for ${courseTitle}`,
+            key_themes: [],
+            learner_problems: [],
+            stakes_and_consequences: [],
+            common_misconceptions: [],
+            practical_behaviors: [],
+            scenario_opportunities: [],
+            evidence_and_examples: [],
+            learning_objectives: [],
+            fallback_mode: true,
+          });
+          setStatus("research", "error");
+          setRawOutputs((prev) => ({ ...prev, research: researchResult }));
+          setOutputData((prev) => ({ ...prev, outline: `## Research Output (Fallback)\n\n${researchResult}` }));
+          addLog(`Research Agent: Failed (${(researchErr as Error).message}). Continuing with source-material fallback.`);
+        }
       } else {
         setStatus("research", "idle");
       }
