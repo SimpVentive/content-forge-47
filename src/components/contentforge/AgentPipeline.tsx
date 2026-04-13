@@ -12,7 +12,7 @@ interface AgentPipelineProps {
 
 export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning, agentToggles, setAgentToggles }) => {
   return (
-    <div className="max-w-[720px] mx-auto">
+    <div className="max-w-[720px] mx-auto relative">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -41,12 +41,16 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
       </div>
 
       {isRunning && (
-        <div className="mb-5 rounded-xl border border-primary/25 bg-primary/10 px-5 py-4 shadow-card animate-fade-in">
-          <div className="flex items-center gap-2.5">
-            <Loader2 className="h-4.5 w-4.5 text-primary animate-spin" />
-            <p className="text-[14px] font-bold text-foreground">
-              Hang on tight - AI is orchestrating your E-Learning Course Content
-            </p>
+        <div className="pointer-events-none fixed inset-0 z-[70] flex items-center justify-center px-4">
+          <div className="pointer-events-auto w-full max-w-[460px] rounded-xl border border-primary/30 bg-white px-5 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.2)] animate-fade-in">
+            <div className="flex items-center gap-3">
+              <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-primary/10">
+                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              </div>
+              <p className="text-[18px] font-extrabold leading-snug text-foreground">
+                Hang on tight. AI is orchestrating your E-Learning course.
+              </p>
+            </div>
           </div>
         </div>
       )}

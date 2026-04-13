@@ -323,6 +323,41 @@ export function useAgentPipeline() {
     });
   }, []);
 
+  const updateCourseContent = useCallback((section: "outline" | "script" | "assessment" | "package", value: string) => {
+    setOutputData((prev) => ({ ...prev, [section]: value }));
+
+    setRawOutputs((prev) => {
+      if (section === "script") {
+        return { ...prev, writer: value };
+      }
+      if (section === "assessment") {
+        return { ...prev, assessment: value };
+      }
+      if (section === "package") {
+        return { ...prev, assembly: value };
+      }
+      return { ...prev, architect: value };
+    });
+  }, []);
+
+  const loadPersistedState = useCallback((nextRaw: RawAgentOutputs, nextOutput: OutputData, nextLogs: string[] = []) => {
+    cancelledRef.current = false;
+    setIsRunning(false);
+    setAgentStatuses(initialStatuses());
+    setRawOutputs(nextRaw);
+    setOutputData(nextOutput);
+    setLogs(nextLogs);
+  }, []);
+
+  const clearPipelineState = useCallback(() => {
+    cancelledRef.current = false;
+    setIsRunning(false);
+    setAgentStatuses(initialStatuses());
+    setRawOutputs(initialRaw());
+    setOutputData(initialOutput());
+    setLogs([]);
+  }, []);
+
   const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams }) => {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
@@ -886,5 +921,17 @@ Rules you NEVER break:
     status: agentStatuses[a.id] || "idle",
   }));
 
-  return { agents, outputData, rawOutputs, logs, isRunning, runPipeline, stopPipeline, updateVisualTopicAsset };
+  return {
+    agents,
+    outputData,
+    rawOutputs,
+    logs,
+    isRunning,
+    runPipeline,
+    stopPipeline,
+    updateVisualTopicAsset,
+    updateCourseContent,
+    loadPersistedState,
+    clearPipelineState,
+  };
 }

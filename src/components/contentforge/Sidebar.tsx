@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+﻿import React, { useRef, useState } from "react";
 import { Zap, Upload, Square, FileText, X, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (isBinaryFile(file.name)) {
       // Show extracting state
       setIsExtracting(true);
-      setInputText(`📄 Extracting content from ${file.name}...`);
+      setInputText(`ðŸ“„ Extracting content from ${file.name}...`);
 
       try {
         const base64 = await readFileAsBase64(file);
@@ -108,15 +108,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (data?.error) throw new Error(data.error);
 
         if (data?.unsupported) {
-          setInputText(`📄 Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\n⚠ ${data.message || "Please paste the content directly."}`);
+          setInputText(`ðŸ“„ Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nâš  ${data.message || "Please paste the content directly."}`);
         } else if (data?.text && data.text.length > 0) {
           setInputText(data.text);
         } else {
-          setInputText(`📄 Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nCould not extract text. You can paste additional notes below.`);
+          setInputText(`ðŸ“„ Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nCould not extract text. You can paste additional notes below.`);
         }
       } catch (err) {
         console.error("Document extraction error:", err);
-        setInputText(`📄 Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\n⚠ Could not extract content automatically. Please paste the key topics and notes manually below.`);
+        setInputText(`ðŸ“„ Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nâš  Could not extract content automatically. Please paste the key topics and notes manually below.`);
       } finally {
         setIsExtracting(false);
       }
@@ -125,7 +125,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (text && text.length > 0) {
         setInputText(text);
       } else {
-        setInputText(`📄 Uploaded: ${file.name} — Could not extract text. Try pasting content directly.`);
+        setInputText(`ðŸ“„ Uploaded: ${file.name} â€” Could not extract text. Try pasting content directly.`);
       }
     }
 
@@ -174,18 +174,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {showTitleConfirm && (
           <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 animate-fade-in">
             <p className="text-[13px] font-semibold text-foreground mb-2">
-              📋 Is this the course you are creating?
+              ðŸ“‹ Is this the course you are creating?
             </p>
             <p className="text-[15px] font-bold text-primary mb-3">"{suggestedTitle}"</p>
             <div className="flex gap-2">
               <button
                 onClick={() => handleConfirmTitle(true)}
+                type="button"
                 className="flex-1 h-9 rounded-lg text-[13px] font-bold text-white flex items-center justify-center gap-1.5 bg-primary hover:brightness-110 transition-all"
               >
                 <Check className="w-3.5 h-3.5" /> Yes, use this title
               </button>
               <button
                 onClick={() => handleConfirmTitle(false)}
+                type="button"
                 className="flex-1 h-9 rounded-lg text-[13px] font-bold text-foreground flex items-center justify-center gap-1.5 border border-border hover:bg-secondary transition-all"
               >
                 <X className="w-3.5 h-3.5" /> No, I'll change it
@@ -243,6 +245,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isRunning ? (
           <button
             onClick={onStop}
+            type="button"
             className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 transition-all duration-200"
           >
             <Square className="w-4 h-4" />
@@ -251,14 +254,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
         ) : (
           <button
             onClick={onGenerate}
-            disabled={!courseTitle.trim() || isExtracting}
+            type="button"
+            disabled={!courseTitle.trim() || isExtracting || showTitleConfirm}
             className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-            style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}
+            style={{ background: '#2563EB' }}
           >
             {isExtracting ? (
               <>
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Extracting...
+              </>
+            ) : showTitleConfirm ? (
+              <>
+                <X className="w-4 h-4" />
+                Confirm Title Choice
               </>
             ) : (
               <>
@@ -272,3 +281,4 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </div>
   );
 };
+

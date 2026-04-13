@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from "react";
+﻿import React, { useState, useMemo, useEffect } from "react";
 import { X, Settings2, AlertTriangle, Info, Check } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage } from "@/lib/avatarTrainers";
@@ -18,6 +18,7 @@ export interface CourseParameters {
   glossaryEnabled: boolean;
   discussionEnabled: boolean;
   assessmentIntensity: "light" | "standard" | "deep";
+  flipStyle: "dramatic" | "subtle" | "bound";
   slideLayout: {
     maxLines: number;
     minFontSize: number;
@@ -85,6 +86,12 @@ const ASSESSMENT_INTENSITY_OPTIONS = [
   { value: "deep", label: "Deep", desc: "More checks" },
 ] as const;
 
+const FLIP_STYLE_OPTIONS = [
+  { value: "dramatic", label: "Physical Flip" },
+  { value: "subtle", label: "Subtle Flip" },
+  { value: "bound", label: "Bound Flipchart" },
+] as const;
+
 // Map duration to YouTube video count
 export const DURATION_VIDEO_COUNT: Record<string, number> = {
   "3min": 3,
@@ -119,7 +126,9 @@ const InfoHint: React.FC<{ text: string }> = ({ text }) => (
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   open, courseTitle, estimatedMinutes, onConfirm, onCancel,
 }) => {
-  const displayFont = '"Plus Jakarta Sans", "Manrope", sans-serif';
+  const headingFont = '"Poppins", sans-serif';
+  const bodyFont = '"Inter", sans-serif';
+  const buttonFont = '"Poppins", sans-serif';
   const [level, setLevel] = useState<CourseParameters["level"]>("intermediate");
   const [textLanguage, setTextLanguage] = useState("English");
   const [narratorLanguage, setNarratorLanguage] = useState("English");
@@ -134,6 +143,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [glossaryEnabled, setGlossaryEnabled] = useState(true);
   const [discussionEnabled, setDiscussionEnabled] = useState(true);
   const [assessmentIntensity, setAssessmentIntensity] = useState<CourseParameters["assessmentIntensity"]>("standard");
+  const [flipStyle, setFlipStyle] = useState<CourseParameters["flipStyle"]>("bound");
   const [maxLines, setMaxLines] = useState<CourseParameters["slideLayout"]["maxLines"]>(10);
   const [minFontSize, setMinFontSize] = useState<CourseParameters["slideLayout"]["minFontSize"]>(12.5);
   const [lineSpacing, setLineSpacing] = useState<CourseParameters["slideLayout"]["lineSpacing"]>(2);
@@ -169,6 +179,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
   if (!open) return null;
 
+  const surfaceCardClass = "rounded-[12px] border border-[#E5E7EB] bg-white p-6 shadow-[0_4px_12px_rgba(0,0,0,0.08)] transition-all duration-200 hover:shadow-[0_8px_20px_rgba(181,126,220,0.2)]";
+
   const handleConfirm = () => {
     if (mismatchInfo) {
       setMismatchType(mismatchInfo.type);
@@ -190,6 +202,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       glossaryEnabled,
       discussionEnabled,
       assessmentIntensity,
+      flipStyle,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -216,6 +229,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       glossaryEnabled,
       discussionEnabled,
       assessmentIntensity,
+      flipStyle,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -237,6 +251,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       glossaryEnabled,
       discussionEnabled,
       assessmentIntensity,
+      flipStyle,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -251,7 +266,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           <div className="absolute inset-0 bg-black/40" />
           <div
             className="relative w-[500px] max-w-[92vw] bg-card rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
-            style={{ fontFamily: displayFont }}
+            style={{ fontFamily: bodyFont }}
             onClick={(e) => e.stopPropagation()}
           >
             <div className="h-1.5 w-full bg-amber-500" />
@@ -271,24 +286,25 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 whereas you are asking for a{" "}
                 <span className="font-bold text-primary">{selectedMinutes} min</span> e-learning course.
                 {mismatchType === "more"
-                  ? " The selected duration is longer than what the content supports G�� the AI may need to pad with supplementary material."
-                  : " The selected duration is shorter G�� the AI will need to condense and prioritize key topics."}
+                  ? " The selected duration is longer than what the content supports - the AI may need to add supplementary material."
+                  : " The selected duration is shorter - the AI will need to condense and prioritize key topics."}
               </p>
               <p className="text-[14px] font-semibold text-foreground mb-5">What would you like to do?</p>
 
               <div className="space-y-3">
                 <button
                   onClick={handleProceedWithContent}
-                  className="w-full h-[52px] rounded-xl text-[14px] font-bold text-white transition-all flex items-center justify-center gap-2 shadow-lg hover:brightness-110"
-                  style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+                  className="w-full h-[52px] rounded-lg text-[14px] font-medium text-white transition-all duration-200 ease-in-out flex items-center justify-center gap-2 shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:brightness-110"
+                  style={{ background: "#2563EB", fontFamily: buttonFont }}
                 >
-                  =��� Proceed based on the content outline uploaded (~{estimatedMinutes} min)
+                  Use suggested duration based on content (~{estimatedMinutes} min)
                 </button>
                 <button
                   onClick={handleProceedWithSelected}
-                  className="w-full h-[52px] rounded-xl text-[14px] font-bold text-foreground border-2 border-border hover:bg-secondary/60 transition-all flex items-center justify-center gap-2"
+                  className="w-full h-[52px] rounded-lg text-[14px] font-medium border transition-all duration-200 ease-in-out flex items-center justify-center gap-2"
+                  style={{ fontFamily: buttonFont, color: "#2563EB", borderColor: "#2563EB", backgroundColor: "#FFFFFF" }}
                 >
-                  GŦn+� Go with the duration I have selected ({selectedMinutes} min)
+                  Keep my selected duration ({selectedMinutes} min)
                 </button>
               </div>
             </div>
@@ -298,33 +314,33 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
       <div
         className="relative w-[1080px] max-w-[96vw] h-[92vh] max-h-[92vh] rounded-[28px] shadow-2xl overflow-hidden animate-fade-in border border-white/30"
-        style={{ fontFamily: displayFont }}
+        style={{ fontFamily: bodyFont, backgroundColor: "#F9FAFB" }}
         onClick={(e) => e.stopPropagation()}
       >
         <TooltipProvider delayDuration={150}>
           <div className="grid h-full lg:grid-cols-[1.03fr_0.97fr]">
-            <div className="flex min-h-0 flex-col bg-[linear-gradient(180deg,#f7f9ff_0%,#f1f4fb_100%)]">
+            <div className="flex min-h-0 flex-col" style={{ backgroundColor: "#F9FAFB" }}>
               {/* Header */}
-              <div className="px-6 py-4 border-b border-[#d9dfef] flex items-center justify-between">
+              <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center justify-between bg-white">
                 <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center shadow-md" style={{ background: "linear-gradient(135deg, #0e8ca8, #1f5a89)" }}>
+                  <div className="w-11 h-11 rounded-full flex items-center justify-center shadow-md" style={{ background: "#2563EB" }}>
                     <Settings2 className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-[35px] leading-none font-[900] tracking-tight text-[#1d2f57]">Course Setup</h2>
-                    <p className="text-[12px] text-[#51648e] truncate max-w-[330px] mt-0.5">{courseTitle}</p>
+                    <h2 className="text-[35px] leading-none font-[700] tracking-tight text-[#2E2E2E]" style={{ fontFamily: headingFont }}>Course Setup</h2>
+                    <p className="text-[12px] text-[#6B7280] truncate max-w-[330px] mt-0.5">{courseTitle}</p>
                   </div>
                 </div>
-                <button onClick={onCancel} className="w-8 h-8 rounded-lg hover:bg-[#e8edf8] flex items-center justify-center transition-colors">
-                  <X className="w-4 h-4 text-[#6a7da5]" />
+                <button onClick={onCancel} className="w-8 h-8 rounded-full hover:bg-[#F3F4F6] flex items-center justify-center transition-colors duration-200 ease-in-out">
+                  <X className="w-4 h-4 text-[#6B7280]" />
                 </button>
               </div>
 
               {/* Body */}
               <div className="px-6 py-5 space-y-5 overflow-y-auto [scrollbar-gutter:stable] pr-4 flex-1">
           {/* Course Level */}
-          <div>
-            <label className="text-[13px] font-bold text-foreground mb-2 flex items-center gap-1.5">
+          <div className={surfaceCardClass}>
+            <label className="text-[13px] text-[#2E2E2E] mb-2 flex items-center gap-1.5" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
               Course Level
               <InfoHint text="Controls how basic or advanced the generated explanations should be." />
             </label>
@@ -333,27 +349,28 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 <button
                   key={l.value}
                   onClick={() => setLevel(l.value)}
-                  className={`p-3 rounded-xl border-2 text-left transition-all ${
+                  className={`p-3 rounded-[12px] border text-left transition-all duration-200 ease-in-out ${
                     level === l.value
-                      ? "border-primary bg-primary/5"
-                      : "border-border hover:border-primary/30"
+                      ? "text-white"
+                      : "border-[#E5E7EB] bg-white hover:border-[#6EC1E4]"
                   }`}
+                  style={level === l.value ? { background: "#2563EB", borderColor: "transparent" } : undefined}
                 >
-                  <p className={`text-[13px] font-bold ${level === l.value ? "text-primary" : "text-foreground"}`}>{l.label}</p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5 leading-tight">{l.desc}</p>
+                  <p className="text-[13px]" style={{ fontFamily: bodyFont, fontWeight: 600 }}>{l.label}</p>
+                  <p className={`text-[11px] mt-0.5 leading-tight ${level === l.value ? "text-white/90" : "text-[#6B7280]"}`}>{l.desc}</p>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
+          <div className={surfaceCardClass}>
             <div>
-              <label className="text-[13px] font-bold text-foreground mb-1.5 block">For Text on Screen</label>
-              <p className="text-[11px] font-medium text-foreground/70 mb-2">Choose the language used for slide content and written course material.</p>
+              <label className="text-[13px] text-[#2E2E2E] mb-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>For Text on Screen</label>
+              <p className="text-[11px] mb-2 text-[#6B7280]">Choose the language used for slide content and written course material.</p>
               <select
                 value={textLanguage}
                 onChange={(e) => setTextLanguage(e.target.value)}
-                className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                className="w-full h-10 border border-[#E5E7EB] rounded-[20px] px-4 text-[13px] bg-[#F3F4F6] text-[#2E2E2E] focus:outline-none focus:border-[#6EC1E4] transition-colors duration-200 ease-in-out appearance-none cursor-pointer"
               >
                 {LANGUAGES.map((l) => (
                   <option key={l.value} value={l.value}>{l.label}</option>
@@ -362,13 +379,13 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
 
             <div>
-              <label className="text-[13px] font-bold text-foreground mb-1.5 block">For Voice of Narrator</label>
-              <p className="text-[11px] font-medium text-foreground/70 mb-2">Choose the spoken language for narration, then select the narrator voice.</p>
+              <label className="text-[13px] text-[#2E2E2E] mb-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>For Voice of Narrator</label>
+              <p className="text-[11px] mb-2 text-[#6B7280]">Choose the spoken language for narration, then select the narrator voice.</p>
               <div className="space-y-3">
                 <select
                   value={narratorLanguage}
                   onChange={(e) => setNarratorLanguage(e.target.value)}
-                  className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                  className="w-full h-10 border border-[#E5E7EB] rounded-[20px] px-4 text-[13px] bg-[#F3F4F6] text-[#2E2E2E] focus:outline-none focus:border-[#6EC1E4] transition-colors duration-200 ease-in-out appearance-none cursor-pointer"
                 >
                   {LANGUAGES.map((l) => (
                     <option key={l.value} value={l.value}>{l.label}</option>
@@ -378,7 +395,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 <select
                   value={voiceAccent}
                   onChange={(e) => setVoiceAccent(e.target.value)}
-                  className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors appearance-none cursor-pointer"
+                  className="w-full h-10 border border-[#E5E7EB] rounded-[20px] px-4 text-[13px] bg-[#F3F4F6] text-[#2E2E2E] focus:outline-none focus:border-[#6EC1E4] transition-colors duration-200 ease-in-out appearance-none cursor-pointer"
                 >
                   {VOICE_ACCENTS.map((v) => (
                     <option key={v.value} value={v.value}>{v.label}</option>
@@ -393,7 +410,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                       {trainerAutoMode ? "Auto" : "Manual"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
                     {AVATAR_TRAINERS.map((trainer) => {
                       const selected = avatarTrainerId === trainer.id;
                       const trainerMedia = getTrainerMedia(trainer.id, avatarEnv);
@@ -405,23 +422,25 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                             setAvatarTrainerId(trainer.id);
                             setTrainerAutoMode(false);
                           }}
-                          className={`overflow-hidden rounded-xl border-2 bg-card text-left transition-all ${
-                            selected ? "border-primary shadow-[0_0_0_2px_rgba(14,140,168,0.15)]" : "border-border hover:border-primary/40"
+                          className={`overflow-hidden rounded-[12px] border bg-white text-left transition-all duration-200 ease-in-out ${
+                            selected ? "border-transparent shadow-[0_8px_20px_rgba(181,126,220,0.2)]" : "border-[#E5E7EB] hover:border-[#6EC1E4]"
                           }`}
+                          style={selected ? { boxShadow: "0 0 0 2px rgba(37,99,235,0.25), 0 8px 20px rgba(37,99,235,0.2)" } : undefined}
                           type="button"
                         >
-                          <div className="relative h-[78px] w-full overflow-hidden bg-[#dfe8f6]">
+                          <div className="relative flex h-[112px] items-center justify-center bg-[#F3F4F6]">
                             <img
                               src={trainerMedia.imageUrl}
                               alt={trainer.name}
-                              className={`h-full w-full object-cover transition-transform duration-300 ${selected ? "scale-[1.08]" : "scale-100"}`}
+                              className={`h-24 w-24 rounded-full border-2 border-[#E5E7EB] object-cover transition-transform duration-300 ${selected ? "scale-[1.05]" : "scale-100"}`}
                               onError={(event) => {
                                 event.currentTarget.src = "/placeholder.svg";
                               }}
                             />
                             {selected ? (
-                              <span className="absolute bottom-1.5 right-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0ea5c8] text-[12px] font-black text-white shadow">
-                                ✓
+                              <span className="absolute bottom-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-black text-white shadow"
+                                style={{ background: "#2563EB" }}>
+                                âœ“
                               </span>
                             ) : null}
                           </div>
@@ -444,9 +463,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           </div>
 
           {/* Duration */}
-          <div>
+          <div className={surfaceCardClass}>
             <div className="mb-2 flex items-center gap-1.5">
-              <label className="text-[13px] font-bold text-foreground">Target Duration</label>
+              <label className="text-[13px] text-[#2E2E2E]" style={{ fontFamily: bodyFont, fontWeight: 600 }}>Target Duration</label>
               <InfoHint text="Sets the overall learner seat-time target for the generated course." />
               {estimatedMinutes && estimatedMinutes > 0 && (
                 <span className="ml-1 text-[11px] font-normal text-muted-foreground">
@@ -459,11 +478,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 <button
                   key={d.value}
                   onClick={() => setDuration(d.value)}
-                  className={`h-9 px-4 rounded-full text-[13px] font-semibold border-2 transition-all ${
+                  className={`h-9 px-4 rounded-full text-[13px] border transition-all duration-200 ease-in-out ${
                     duration === d.value
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-foreground hover:border-primary/30"
+                      ? "text-white"
+                      : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#6EC1E4]"
                   }`}
+                  style={duration === d.value ? { background: "#2563EB", borderColor: "transparent", fontWeight: 600 } : { fontWeight: 600 }}
                 >
                   {d.label}
                 </button>
@@ -471,13 +491,13 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-3">
+          <div className={surfaceCardClass}>
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-[13px] font-bold text-foreground">Video Time Handling</p>
                 <InfoHint text="Choose whether video clips should consume course duration or be extra runtime." />
               </div>
-              <p className="text-[11px] font-medium text-foreground/70 mt-0.5">
+              <p className="text-[11px] text-[#6B7280] mt-0.5">
                 Decide whether inserted YouTube clips should count inside the selected course duration or be added on top of it.
               </p>
             </div>
@@ -485,10 +505,10 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             <div className="grid grid-cols-1 gap-2">
               <button
                 onClick={() => setVideoDurationHandling("within-course")}
-                className={`rounded-xl border-2 p-3 text-left transition-all ${
+                className={`rounded-[12px] border p-3 text-left transition-all duration-200 ease-in-out ${
                   videoDurationHandling === "within-course"
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:border-primary/30"
+                    ? "border-[#6EC1E4] bg-[#F0FBFF]"
+                    : "border-[#E5E7EB] hover:border-[#6EC1E4]"
                 }`}
                 type="button"
               >
@@ -502,10 +522,10 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
               <button
                 onClick={() => setVideoDurationHandling("additional-to-course")}
-                className={`rounded-xl border-2 p-3 text-left transition-all ${
+                className={`rounded-[12px] border p-3 text-left transition-all duration-200 ease-in-out ${
                   videoDurationHandling === "additional-to-course"
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:border-primary/30"
+                    ? "border-[#6EC1E4] bg-[#F0FBFF]"
+                    : "border-[#E5E7EB] hover:border-[#6EC1E4]"
                 }`}
                 type="button"
               >
@@ -519,7 +539,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
+          <div className={surfaceCardClass}>
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-[13px] font-bold text-foreground">Learner Tools</p>
@@ -629,7 +649,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
           </div>
 
-          <div className="rounded-xl border border-border bg-secondary/30 p-4 space-y-4">
+          <div className={surfaceCardClass}>
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-[13px] font-bold text-foreground">Slide Layout Rules</p>
@@ -647,11 +667,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   <button
                     key={value}
                     onClick={() => setMaxLines(value)}
-                    className={`h-9 px-4 rounded-full text-[13px] font-semibold border-2 transition-all ${
+                    className={`h-9 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
                       maxLines === value
-                        ? "border-primary bg-primary/10 text-primary"
-                        : "border-border text-foreground hover:border-primary/30"
+                          ? "text-white"
+                          : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#6EC1E4]"
                     }`}
+                      style={maxLines === value ? { background: "#2563EB", borderColor: "transparent" } : undefined}
                   >
                     {value} lines
                   </button>
@@ -668,7 +689,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   step={0.5}
                   value={minFontSize}
                   onChange={(e) => setMinFontSize(Math.max(12.5, Number(e.target.value) || 12.5))}
-                  className="w-full h-10 border-[1.5px] border-border rounded-xl px-3 text-[13px] bg-card text-foreground focus:outline-none focus:border-primary transition-colors"
+                  className="w-full h-10 border border-[#E5E7EB] rounded-[20px] px-4 text-[13px] bg-[#F3F4F6] text-[#2E2E2E] focus:outline-none focus:border-[#6EC1E4] transition-colors duration-200 ease-in-out"
                 />
               </div>
 
@@ -679,11 +700,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     <button
                       key={value}
                       onClick={() => setLineSpacing(value)}
-                      className={`h-10 px-3 rounded-xl text-[13px] font-semibold border-2 transition-all ${
+                      className={`h-10 px-3 rounded-[12px] text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
                         lineSpacing === value
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-foreground hover:border-primary/30"
+                          ? "text-white"
+                          : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#6EC1E4]"
                       }`}
+                      style={lineSpacing === value ? { background: "#2563EB", borderColor: "transparent" } : undefined}
                     >
                       {value}x
                     </button>
@@ -691,10 +713,34 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 </div>
               </div>
             </div>
+
+            <div>
+              <div className="flex items-center gap-1.5">
+                <label className="text-[12px] font-bold text-foreground">Flip Animation Style</label>
+                <InfoHint text="Controls flip-chart page transition style in the learner view. This is applied before generation." />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {FLIP_STYLE_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setFlipStyle(option.value)}
+                    className={`h-9 px-4 rounded-full text-[12px] font-semibold border transition-all duration-200 ease-in-out ${
+                      flipStyle === option.value
+                        ? "text-white"
+                        : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#6EC1E4]"
+                    }`}
+                    style={flipStyle === option.value ? { background: "#2563EB", borderColor: "transparent" } : undefined}
+                    type="button"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
 
           {/* Assessment Toggle */}
-          <div className="flex items-center justify-between bg-secondary/50 rounded-xl p-4">
+          <div className={surfaceCardClass + " flex items-center justify-between"}>
             <div>
               <div className="flex items-center gap-1.5">
                 <p className="text-[13px] font-bold text-foreground">Assessment</p>
@@ -722,85 +768,87 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
             <button
               onClick={() => setAssessmentRequired(!assessmentRequired)}
-              className={`w-12 h-7 rounded-full transition-all relative ${
-                assessmentRequired ? "bg-primary" : "bg-border"
+              className={`w-12 h-6 rounded-full transition-all duration-200 ease-in-out relative ${
+                assessmentRequired ? "bg-[#34D399]" : "bg-[#D1D5DB]"
               }`}
             >
-              <div className={`w-5 h-5 rounded-full bg-white shadow-sm absolute top-1 transition-all ${
-                assessmentRequired ? "left-6" : "left-1"
+              <div className={`w-5 h-5 rounded-full bg-white shadow-sm absolute top-0.5 transition-all duration-200 ease-in-out ${
+                assessmentRequired ? "left-[26px]" : "left-[2px]"
               }`} />
             </button>
           </div>
               </div>
 
               {/* Footer */}
-              <div className="px-6 py-4 border-t border-[#d9dfef] flex justify-between gap-3 bg-white/75">
+              <div className="px-6 py-4 border-t border-[#E5E7EB] flex justify-between gap-3 bg-white">
                 <button
                   onClick={onCancel}
-                  className="h-10 min-w-[120px] px-5 rounded-full text-[14px] font-[800] tracking-tight text-[#2a3f67] border border-[#cfd7ea] bg-[#f5f7fd] hover:bg-[#ecf0fa] transition-all"
+                  className="h-10 min-w-[120px] px-5 rounded-lg text-[14px] tracking-tight border transition-all duration-200 ease-in-out"
+                  style={{ fontFamily: buttonFont, fontWeight: 500, color: "#2563EB", borderColor: "#2563EB", backgroundColor: "#FFFFFF" }}
                 >
                   Back
                 </button>
                 <button
                   onClick={handleConfirm}
-                  className="h-10 px-6 rounded-full text-[14px] font-extrabold tracking-tight text-white shadow-lg hover:brightness-110 transition-all"
-                  style={{ background: "linear-gradient(135deg, #4f46e5, #6b4fd8)" }}
+                  className="h-10 px-6 rounded-lg text-[14px] tracking-tight text-white shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:brightness-110 transition-all duration-200 ease-in-out"
+                  style={{ fontFamily: buttonFont, fontWeight: 500, background: "#2563EB" }}
                 >
                   Launch Course
                 </button>
               </div>
             </div>
 
-            <aside className="hidden lg:flex min-h-0 flex-col justify-between p-7 text-white border-l border-white/20"
-              style={{ background: "radial-gradient(circle at 18% 18%, #6f76d9 0%, #483f9e 42%, #2e296c 100%)" }}>
+            <aside className="hidden lg:flex min-h-0 flex-col justify-between p-7 border-l border-[#E5E7EB]"
+              style={{ background: "#F8FAFC" }}>
               <div>
                 <div className="flex items-start justify-between">
-                  <h3 className="text-[34px] leading-none font-[900] tracking-tight">Course Summary</h3>
-                  <span className="text-white/80 text-[20px]">...</span>
+                  <h3 className="text-[34px] leading-none font-[700] tracking-tight text-[#2E2E2E]" style={{ fontFamily: headingFont }}>Course Summary</h3>
+                  <span className="text-[#6B7280] text-[20px]">...</span>
                 </div>
-                <div className="mt-4 h-px bg-white/25" />
+                <div className="mt-4 h-px bg-[#E5E7EB]" />
 
-                <div className="mt-5 rounded-2xl bg-white/95 text-[#1f2e55] p-5 shadow-[0_18px_32px_rgba(7,8,32,0.28)]">
-                  <p className="text-[26px] leading-none font-[900] mb-3">{selectedLevelLabel} Level</p>
+                <div className="mt-5 rounded-[12px] bg-white text-[#2E2E2E] p-5 shadow-[0_4px_12px_rgba(0,0,0,0.08)] border border-[#E5E7EB]">
+                  <p className="text-[26px] leading-none mb-3" style={{ fontFamily: headingFont, fontWeight: 700 }}>{selectedLevelLabel} Level</p>
                   <div className="space-y-2.5 text-[14px]">
-                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Text Language:</span> {textLanguage}</p>
-                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Narration Language:</span> {narratorLanguage}</p>
-                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Narrator Voice:</span> {selectedVoiceLabel}</p>
-                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Instructor:</span> {selectedTrainer.name}</p>
-                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#0e8ca8]" /> <span className="font-[800]">Duration:</span> {selectedDurationLabel}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Text Language:</span> {textLanguage}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Narration Language:</span> {narratorLanguage}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Narrator Voice:</span> {selectedVoiceLabel}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Instructor:</span> {selectedTrainer.name}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Duration:</span> {selectedDurationLabel}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Flip Style:</span> {FLIP_STYLE_OPTIONS.find((option) => option.value === flipStyle)?.label || "Bound Flipchart"}</p>
                   </div>
                 </div>
 
-                <div className="mt-4 overflow-hidden rounded-2xl border border-white/30 bg-white/10 backdrop-blur-sm">
-                  <div className="relative h-[280px] w-full overflow-hidden bg-[#1b2442]">
+                <div className="mt-4 overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
+                  <div className="relative h-[280px] w-full overflow-hidden bg-[#F3F4F6]">
                     <img
                       key={selectedTrainer.id}
                       src={selectedTrainerImage}
                       alt={`${selectedTrainer.name} preview`}
-                      className="h-full w-full object-contain transition-transform duration-300 hover:scale-[1.02]"
+                      className="h-full w-full object-contain drop-shadow-[0_10px_20px_rgba(0,0,0,0.18)] transition-all duration-300 hover:scale-[1.02]"
                       onError={(event) => {
                         event.currentTarget.src = "/placeholder.svg";
                       }}
                     />
-                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent px-4 pb-3 pt-10">
+                    <div className="absolute inset-x-0 bottom-0 bg-black/55 px-4 pb-3 pt-10">
                       <p className="text-[11px] uppercase tracking-[0.14em] text-white/80">Instructor Preview</p>
-                      <p className="text-[22px] font-[900] leading-none text-white mt-1">{selectedTrainer.name}</p>
+                      <p className="text-[22px] leading-none text-white mt-1" style={{ fontFamily: headingFont, fontWeight: 700 }}>{selectedTrainer.name}</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-6 rounded-2xl bg-white/12 border border-white/20 p-4 backdrop-blur-sm">
+              <div className="mt-6 rounded-[12px] bg-white border border-[#E5E7EB] p-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
                 <div className="flex items-center gap-3">
                   <img
                     src={selectedTrainerImage}
                     alt={selectedTrainer.name}
-                    className="h-16 w-16 rounded-xl object-cover border border-white/45"
+                    className="h-16 w-16 rounded-full object-cover border-2 border-[#E5E7EB]"
                   />
                   <div>
-                    <p className="text-[12px] uppercase tracking-[0.16em] text-white/70 font-[800]">Selected Instructor</p>
-                    <p className="text-[22px] leading-none font-[900] mt-1">{selectedTrainer.name}</p>
-                    <p className="text-[13px] text-white/75 mt-1">{learnerNotesEnabled ? "Notes enabled" : "Notes disabled"} - {assessmentRequired ? "Assessment enabled" : "Assessment off"}</p>
+                    <p className="text-[12px] uppercase tracking-[0.16em] text-[#6B7280]" style={{ fontWeight: 600 }}>Selected Instructor</p>
+                    <p className="text-[22px] leading-none mt-1 text-[#2E2E2E]" style={{ fontFamily: headingFont, fontWeight: 700 }}>{selectedTrainer.name}</p>
+                    <p className="text-[13px] text-[#6B7280] mt-1">{learnerNotesEnabled ? "Notes enabled" : "Notes disabled"} - {assessmentRequired ? "Assessment enabled" : "Assessment off"}</p>
                   </div>
                 </div>
               </div>
@@ -811,3 +859,4 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     </div>
   );
 };
+

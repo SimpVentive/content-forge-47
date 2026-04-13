@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { Eye, ThumbsUp, Play, X, Check, Trash2, Search, Clock, Plus, ChevronDown, ChevronUp, Film } from "lucide-react";
 
-/* ── helpers ── */
+/* â”€â”€ helpers â”€â”€ */
 function tryParseJSON(raw: string | undefined | null): any | null {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch {
@@ -71,7 +71,7 @@ interface VideosTabProps {
   onRemove: (videoId: string) => void;
 }
 
-/* ── Clip Preview Modal ── */
+/* â”€â”€ Clip Preview Modal â”€â”€ */
 const ClipModal = ({ video, startTime, endTime, onClose, onInsert, isInserted }: {
   video: any; startTime: string; endTime: string; onClose: () => void; onInsert: () => void; isInserted: boolean;
 }) => {
@@ -102,7 +102,7 @@ const ClipModal = ({ video, startTime, endTime, onClose, onInsert, isInserted }:
               <Clock className="w-3 h-3" /> Clip: {clipDur}
             </span>
             <span className="text-[12px] text-white/40">
-              {startTime || "0:00"} → {endTime || parseDuration(video.duration)}
+              {startTime || "0:00"} â†’ {endTime || parseDuration(video.duration)}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -110,7 +110,7 @@ const ClipModal = ({ video, startTime, endTime, onClose, onInsert, isInserted }:
               Close
             </button>
             {!isInserted && (
-              <button onClick={onInsert} className="h-9 px-5 rounded-lg text-white text-[13px] font-bold transition-all flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+              <button onClick={onInsert} className="h-9 px-5 rounded-lg text-white text-[13px] font-bold transition-all flex items-center gap-1.5" style={{ background: "#2563EB" }}>
                 <Plus className="w-3.5 h-3.5" /> Insert into Course
               </button>
             )}
@@ -121,7 +121,7 @@ const ClipModal = ({ video, startTime, endTime, onClose, onInsert, isInserted }:
   );
 };
 
-/* ── Compact Video Card ── */
+/* â”€â”€ Compact Video Card â”€â”€ */
 const VideoCard = ({ video, moduleTitle, isInserted, insertedInfo, onInsert, onRemove }: {
   video: any; moduleTitle: string; isInserted: boolean; insertedInfo?: InsertedVideo;
   onInsert: (startTime: string, endTime: string) => void; onRemove: () => void;
@@ -195,7 +195,7 @@ const VideoCard = ({ video, moduleTitle, isInserted, insertedInfo, onInsert, onR
                   className="w-full h-8 border border-border rounded-lg text-[12px] text-center bg-card focus:outline-none focus:border-primary"
                 />
               </div>
-              <span className="text-[11px] text-muted-foreground mt-4">→</span>
+              <span className="text-[11px] text-muted-foreground mt-4">â†’</span>
               <div className="flex-1">
                 <label className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">End</label>
                 <input
@@ -218,7 +218,7 @@ const VideoCard = ({ video, moduleTitle, isInserted, insertedInfo, onInsert, onR
                 <button
                   onClick={() => onInsert(startTime, endTime)}
                   className="flex-1 h-8 rounded-lg text-[11px] font-bold text-white transition-all flex items-center justify-center gap-1"
-                  style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+                  style={{ background: "#2563EB" }}
                 >
                   <Plus className="w-3 h-3" /> Insert into Course
                 </button>
@@ -231,7 +231,7 @@ const VideoCard = ({ video, moduleTitle, isInserted, insertedInfo, onInsert, onR
   );
 };
 
-/* ── Main Videos Tab ── */
+/* â”€â”€ Main Videos Tab â”€â”€ */
 export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onInsert, onRemove }) => {
   const data = tryParseJSON(raw);
   const [activeFilter, setActiveFilter] = useState("all");
@@ -252,7 +252,7 @@ export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onIns
   if (!data?.modules) {
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-[13px] text-amber-800">
-        ⚠ Add YOUTUBE_API_KEY to Lovable Secrets to enable video search
+        âš  Add YOUTUBE_API_KEY to Lovable Secrets to enable video search
       </div>
     );
   }
@@ -290,13 +290,13 @@ export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onIns
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-[20px] font-extrabold text-foreground">YouTube Resources</h3>
-          <p className="text-[12px] text-muted-foreground mt-0.5">{totalVideos} videos found · {insertedVideos.length} inserted</p>
+          <p className="text-[12px] text-muted-foreground mt-0.5">{totalVideos} videos found Â· {insertedVideos.length} inserted</p>
         </div>
       </div>
 
       {/* How to use hint */}
       <div className="bg-primary/5 border border-primary/15 rounded-xl p-3 text-[12px] text-foreground leading-relaxed">
-        <p className="font-bold text-primary mb-1">💡 How to insert videos into your course</p>
+        <p className="font-bold text-primary mb-1">ðŸ’¡ How to insert videos into your course</p>
         <ol className="list-decimal pl-4 space-y-0.5 text-muted-foreground">
           <li>Browse videos by module below</li>
           <li>Click <strong>"Set clip range & insert"</strong> to expand clip options</li>
@@ -354,7 +354,7 @@ export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onIns
                 <img src={v.thumbnail} alt="" className="w-12 h-8 rounded object-cover shrink-0" />
                 <div className="flex-1 min-w-0">
                   <p className="text-[11px] font-semibold text-foreground truncate">{v.title}</p>
-                  <p className="text-[10px] text-muted-foreground">{v.moduleTitle} · {v.startTime || "0:00"} → {v.endTime || parseDuration(v.duration)}</p>
+                  <p className="text-[10px] text-muted-foreground">{v.moduleTitle} Â· {v.startTime || "0:00"} â†’ {v.endTime || parseDuration(v.duration)}</p>
                 </div>
                 <button onClick={() => onRemove(v.videoId)} className="text-[11px] text-destructive font-semibold hover:underline shrink-0">Remove</button>
               </div>
@@ -392,3 +392,4 @@ export const VideosTab: React.FC<VideosTabProps> = ({ raw, insertedVideos, onIns
     </div>
   );
 };
+

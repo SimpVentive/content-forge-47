@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import { Download, Loader2, Image as ImageIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -163,7 +163,7 @@ export const InfographicPreview: React.FC<InfographicPreviewProps> = ({ archRaw,
 
       <div className="grid gap-4 xl:grid-cols-2">
         {infographics.map((inf, i) => (
-          <div key={i} className="overflow-hidden rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] shadow-[0_18px_42px_rgba(15,23,42,0.06)]">
+          <div key={i} className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_18px_42px_rgba(15,23,42,0.06)]">
             <div className="border-b border-slate-200 px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -175,9 +175,9 @@ export const InfographicPreview: React.FC<InfographicPreviewProps> = ({ archRaw,
                 </span>
               </div>
             </div>
-            <div className="relative bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.95),rgba(232,238,249,0.9))] p-4">
+            <div className="relative bg-slate-100 p-4">
               {inf.loading ? (
-                <div className="flex aspect-[3/2] w-full items-center justify-center rounded-[18px] border border-slate-200 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 animate-pulse">
+                <div className="flex aspect-[3/2] w-full items-center justify-center rounded-[18px] border border-slate-200 bg-primary/10 animate-pulse">
                   <Loader2 className="w-6 h-6 text-primary animate-spin" />
                 </div>
               ) : inf.svg ? (
@@ -211,3 +211,4 @@ export const InfographicPreview: React.FC<InfographicPreviewProps> = ({ archRaw,
     </div>
   );
 };
+

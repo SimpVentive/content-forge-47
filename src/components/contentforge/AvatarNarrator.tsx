@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -240,8 +240,10 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     setVideoPlaying(false);
   };
 
+  const captionText = speechText.trim().replace(/\s+/g, " ").slice(0, 80);
+
   return (
-    <section className="flex w-full max-w-2xl flex-col gap-4">
+    <section className="flex w-full flex-col gap-4">
       <style>
         {`@keyframes avatarNarratorPulse {
           from {
@@ -286,12 +288,12 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
         }`}
       </style>
       {avatarVideoUrl ? (
-        <div className="relative overflow-hidden rounded-[20px] border border-[#d8deea] bg-black shadow-[0_14px_30px_rgba(15,23,42,0.2)]" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+        <div className="relative overflow-hidden rounded-[22px] border border-[#d8deea] bg-black shadow-[0_14px_30px_rgba(15,23,42,0.2)]" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
           <video
             ref={avatarVideoRef}
             src={avatarVideoUrl}
             poster={avatarPosterUrl}
-            className="aspect-[3/4] w-full max-h-[320px] object-cover"
+            className="aspect-[9/13] w-full max-h-[560px] object-cover object-top"
             autoPlay
             playsInline
             muted={videoMuted}
@@ -321,34 +323,50 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
           >
             {videoMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
           </button>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/60 px-4 pb-4 pt-10">
+            <p className="text-[20px] font-[900] leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+              {captionText || `Explaining ${topic}`}
+            </p>
+          </div>
         </div>
       ) : (
-        <div className="flex items-center gap-4" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
-          <div
-            className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 shadow-sm text-lg font-semibold"
-            style={{ backgroundColor: AVATAR_BG, color: AVATAR_TEXT, animation: isStreaming ? undefined : AVATAR_IDLE_ANIMATION }}
-          >
+        <div className="w-full overflow-hidden rounded-[20px] border border-[#d8deea] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.12)]" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+          <div className="relative aspect-[3/4] w-full bg-[#eef2ff]">
             {hasAvatarImage ? (
               <img
                 src={avatarImageUrl || "/avatar-sarah.jpg"}
                 alt={trainerName}
-                className="h-full w-full scale-110 object-cover object-top"
-                style={{ animation: isStreaming ? AVATAR_PULSE_ANIMATION : undefined }}
+                className="h-full w-full object-cover object-top"
+                style={{ animation: isStreaming ? AVATAR_PULSE_ANIMATION : AVATAR_IDLE_ANIMATION }}
                 onError={() => setHasAvatarImage(false)}
               />
             ) : (
-              trainerInitials
+              <div className="flex h-full w-full items-center justify-center text-4xl font-bold" style={{ color: AVATAR_TEXT }}>
+                {trainerInitials}
+              </div>
             )}
+
+            <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/40 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
+              <span className={cn("inline-block h-2 w-2 rounded-full", isStreaming ? "bg-emerald-400" : "bg-slate-300")} />
+              {isStreaming ? "Speaking" : "Ready"}
+            </div>
+
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/60 px-4 pb-4 pt-10">
+              <p className="text-[20px] font-[900] leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
+                {captionText || `Explaining ${topic}`}
+              </p>
+            </div>
           </div>
-          <div className="min-w-0">
-            <p className="text-base font-semibold text-foreground">{trainerName}</p>
-            <p className="text-sm text-muted-foreground">Your learning guide</p>
+
+          <div className="px-4 py-3">
+            <p className="text-[16px] font-semibold text-foreground">{trainerName}</p>
+            <p className="text-[13px] text-muted-foreground">Your learning guide</p>
           </div>
         </div>
       )}
 
       <div
-        className="min-h-36 max-h-56 overflow-y-auto rounded-[24px] border px-5 py-4 text-sm leading-7 shadow-sm"
+        className="min-h-36 max-h-60 overflow-y-auto rounded-[24px] border px-5 py-4 text-[14px] leading-7 shadow-sm"
         style={{ backgroundColor: BUBBLE_BG, borderColor: BUBBLE_BORDER, color: BUBBLE_TEXT, animation: `avatarNarratorEnter 480ms cubic-bezier(0.22, 1, 0.36, 1) both, ${isStreaming ? "bubbleGlow 1.8s ease-in-out infinite" : "none"}` }}
       >
         <p className="whitespace-pre-wrap break-words">

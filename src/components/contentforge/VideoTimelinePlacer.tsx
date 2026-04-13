@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+﻿import React, { useState, useCallback } from "react";
 import { Film, AlertTriangle, Check, GripVertical, X, Clock, ChevronRight } from "lucide-react";
 
 interface ClipItem {
@@ -157,7 +157,7 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
           {unassigned.length > 0 && (
             <div>
               <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider mb-2">
-                Unassigned Clips — drag to a module below
+                Unassigned Clips â€” drag to a module below
               </p>
               <div className="flex gap-2 flex-wrap">
                 {unassigned.map(clip => {
@@ -222,7 +222,7 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
                     <div className="flex items-center justify-between px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center text-[13px] font-bold text-white"
-                          style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+                          style={{ background: "#2563EB" }}>
                           {mi + 1}
                         </div>
                         <div>
@@ -243,7 +243,7 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
                         {mod.sections.map((sec, si) => (
                           <React.Fragment key={si}>
                             <div className="h-7 px-3 rounded-lg bg-card border border-border text-[11px] font-semibold text-foreground flex items-center">
-                              {sec.length > 30 ? sec.slice(0, 30) + "…" : sec}
+                              {sec.length > 30 ? sec.slice(0, 30) + "â€¦" : sec}
                             </div>
                             {si < mod.sections.length - 1 && (
                               <ChevronRight className="w-3 h-3 text-muted-foreground shrink-0" />
@@ -265,7 +265,7 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
                               <div className="flex-1 min-w-0">
                                 <p className="text-[11px] font-bold text-foreground truncate">{clip.customName}</p>
                                 <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                  <Clock className="w-2.5 h-2.5" /> {formatSec(clipSec)} · {clip.channelTitle}
+                                  <Clock className="w-2.5 h-2.5" /> {formatSec(clipSec)} Â· {clip.channelTitle}
                                 </p>
                               </div>
                               <button
@@ -314,10 +314,10 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
                 : "bg-secondary text-muted-foreground"
             }`}>
               {videoDurationMode === "within-course" && totalVideoSec > courseSec
-                ? `⚠ ${formatSec(totalVideoSec - courseSec)} over limit`
+                ? `âš  ${formatSec(totalVideoSec - courseSec)} over limit`
                 : totalVideoSec > 0
                 ? videoDurationMode === "within-course"
-                  ? `✓ ${formatSec(Math.max(courseSec - totalVideoSec, 0))} remaining`
+                  ? `âœ“ ${formatSec(Math.max(courseSec - totalVideoSec, 0))} remaining`
                   : `+ ${formatSec(totalVideoSec)} additional video time`
                 : "No videos placed"}
             </div>
@@ -330,7 +330,7 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
             onClick={onBack}
             className="h-10 px-5 rounded-xl text-[13px] font-bold text-foreground border border-border hover:bg-secondary transition-all"
           >
-            ← Back to Browse
+            â† Back to Browse
           </button>
           <button
             onClick={() => {
@@ -340,12 +340,13 @@ export const VideoTimelinePlacer: React.FC<VideoTimelinePlacerProps> = ({
               onFinish();
             }}
             className="h-10 px-6 rounded-xl text-[13px] font-bold text-white transition-all flex items-center gap-2"
-            style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+            style={{ background: "#2563EB" }}
           >
-            <Check className="w-3.5 h-3.5" /> Done — Insert into Course
+            <Check className="w-3.5 h-3.5" /> Done â€” Insert into Course
           </button>
         </div>
       </div>
     </div>
   );
 };
+

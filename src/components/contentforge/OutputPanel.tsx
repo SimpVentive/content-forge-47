@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
 import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2 } from "lucide-react";
 import { exportScormPackage } from "@/lib/scormExport";
@@ -21,6 +21,7 @@ interface OutputPanelProps {
     lineSpacing: number;
   };
   onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
+  onUpdateCourseContent?: (section: "outline" | "script" | "assessment" | "package", value: string) => void;
 }
 
 const tabs = [
@@ -45,7 +46,7 @@ function tryParseJSON(raw: string): any | null {
   }
 }
 
-/* ─── Assessment Renderer ─── */
+/* â”€â”€â”€ Assessment Renderer â”€â”€â”€ */
 const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
   const data = tryParseJSON(raw);
   if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
@@ -105,7 +106,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
                   })}
                 </div>
                 {s.rationale && (
-                  <p className="text-[12px] text-muted-foreground mt-2 italic">💡 {s.rationale}</p>
+                  <p className="text-[12px] text-muted-foreground mt-2 italic">ðŸ’¡ {s.rationale}</p>
                 )}
               </div>
             ))}
@@ -133,7 +134,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
   );
 };
 
-/* ─── Package Renderer ─── */
+/* â”€â”€â”€ Package Renderer â”€â”€â”€ */
 const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, slideLayout, onUpdateVisualTopic }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
@@ -170,10 +171,10 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         <h3 className="text-[18px] font-extrabold text-foreground mb-4">{meta.title || "Course Package"}</h3>
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: "Modules", value: meta.total_modules || meta.modules || "—", icon: Layers },
-            { label: "Topics", value: meta.total_topics || meta.topics || "—", icon: BarChart3 },
-            { label: "Duration", value: meta.estimated_completion_time || meta.duration || "—", icon: Clock },
-            { label: "Difficulty", value: meta.difficulty_level || meta.difficulty || "—", icon: AlertTriangle },
+            { label: "Modules", value: meta.total_modules || meta.modules || "â€”", icon: Layers },
+            { label: "Topics", value: meta.total_topics || meta.topics || "â€”", icon: BarChart3 },
+            { label: "Duration", value: meta.estimated_completion_time || meta.duration || "â€”", icon: Clock },
+            { label: "Difficulty", value: meta.difficulty_level || meta.difficulty || "â€”", icon: AlertTriangle },
           ].map((stat) => (
             <div key={stat.label} className="bg-secondary/50 rounded-xl p-3 text-center">
               <stat.icon className="w-4 h-4 mx-auto text-primary mb-1" />
@@ -191,7 +192,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           <div className="bg-secondary/50 rounded-xl p-3 space-y-1">
             {data.scorm_manifest.assets.map((asset: string | { name?: string; type?: string }, i: number) => (
               <div key={i} className="flex items-center gap-2 text-[13px] text-foreground/80">
-                <span className="text-primary">📄</span>
+                <span className="text-primary">ðŸ“„</span>
                 {typeof asset === "string" ? asset : asset.name || JSON.stringify(asset)}
               </div>
             ))}
@@ -248,7 +249,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       )}
 
-      {/* 6. Action Buttons — Preview + Export */}
+      {/* 6. Action Buttons â€” Preview + Export */}
       <div className="flex gap-3">
         <button
           onClick={() => setShowLearnerPreview(true)}
@@ -279,14 +280,14 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           className="flex-1 h-12 rounded-xl text-[15px] font-bold text-primary-foreground flex items-center justify-center gap-2 bg-primary hover:brightness-110 transition-all disabled:opacity-60"
         >
           {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {exporting ? "Generating audio & exporting…" : "Export SCORM Package"}
+          {exporting ? "Generating audio & exportingâ€¦" : "Export SCORM Package"}
         </button>
       </div>
     </div>
   );
 };
 
-/* ─── Script Renderer (highlights narration cues + voice preview) ─── */
+/* â”€â”€â”€ Script Renderer (highlights narration cues + voice preview) â”€â”€â”€ */
 const ScriptView: React.FC<{ raw: string; voiceRaw: string }> = ({ raw, voiceRaw }) => {
   const parts = raw.split(/(\[(?:PAUSE[^]]*?|EMPHASIZE|SLOW DOWN|SPEED UP|WHISPER|EXCITED)\])/gi);
   return (
@@ -308,7 +309,7 @@ const ScriptView: React.FC<{ raw: string; voiceRaw: string }> = ({ raw, voiceRaw
   );
 };
 
-/* ─── Outline Renderer with Infographics ─── */
+/* â”€â”€â”€ Outline Renderer with Infographics â”€â”€â”€ */
 const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }> = ({ raw, archRaw, visualRaw }) => {
   // Split outline into sections
   const sections = raw.split(/\n---\n/);
@@ -323,7 +324,7 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
         <div key={i} className="text-[14px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{section.trim()}</div>
       ))}
 
-      {/* 2. Visual Assets — Infographic Gallery */}
+      {/* 2. Visual Assets â€” Infographic Gallery */}
       {archRaw && visualRaw && (
         <InfographicPreview archRaw={archRaw} visualRaw={visualRaw} />
       )}
@@ -354,12 +355,20 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
   );
 };
 
-export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, slideLayout, onUpdateVisualTopic }) => {
+export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, slideLayout, onUpdateVisualTopic, onUpdateCourseContent }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState("");
   const hasOutput = Object.values(rawOutputs).some(v => v);
   const content = (activeTab === "preview" || activeTab === "videos") ? null : outputData[activeTab as keyof OutputData];
+  const canEditTab = activeTab === "outline" || activeTab === "script" || activeTab === "assessment" || activeTab === "package";
+
+  React.useEffect(() => {
+    setIsEditing(false);
+    setEditValue(content || "");
+  }, [activeTab, content]);
 
   // Convert workflow clips to InsertedVideo format
   const allInsertedVideos: InsertedVideo[] = React.useMemo(() => {
@@ -458,6 +467,42 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       );
     }
 
+    if (isEditing && canEditTab) {
+      return (
+        <div className="space-y-3">
+          <textarea
+            value={editValue}
+            onChange={(event) => setEditValue(event.target.value)}
+            className="min-h-[360px] w-full rounded-xl border border-border bg-background px-4 py-3 text-[13px] leading-[1.7] text-foreground focus:border-primary focus:outline-none"
+          />
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                if (canEditTab && onUpdateCourseContent) {
+                  onUpdateCourseContent(activeTab as "outline" | "script" | "assessment" | "package", editValue);
+                }
+                setIsEditing(false);
+              }}
+              className="h-9 rounded-lg bg-primary px-4 text-[12px] font-bold text-primary-foreground"
+              type="button"
+            >
+              Save Changes
+            </button>
+            <button
+              onClick={() => {
+                setEditValue(content || "");
+                setIsEditing(false);
+              }}
+              className="h-9 rounded-lg border border-border px-4 text-[12px] font-bold text-foreground"
+              type="button"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     switch (activeTab) {
       case "assessment":
         return <AssessmentView raw={content} />;
@@ -494,20 +539,34 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       <div className="px-5 pt-6 pb-4">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4f46e5, #7c3aed)' }}>
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: '#2563EB' }}>
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <h2 className="text-[20px] font-extrabold text-foreground">Course Output</h2>
           </div>
-          {hasOutput && (
-            <button
-              onClick={() => setShowLearnerPreview(true)}
-              className="h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1.5 border-2 border-primary text-primary hover:bg-primary/5 transition-all"
-            >
-              <Play className="w-3 h-3" />
-              Preview
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {canEditTab && !!content && !isEditing && (
+              <button
+                onClick={() => {
+                  setEditValue(content || "");
+                  setIsEditing(true);
+                }}
+                className="h-8 px-3 rounded-lg text-[12px] font-bold border border-border text-foreground hover:bg-secondary transition-all"
+                type="button"
+              >
+                Edit
+              </button>
+            )}
+            {hasOutput && (
+              <button
+                onClick={() => setShowLearnerPreview(true)}
+                className="h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1.5 border-2 border-primary text-primary hover:bg-primary/5 transition-all"
+              >
+                <Play className="w-3 h-3" />
+                Preview
+              </button>
+            )}
+          </div>
         </div>
         <div className="flex gap-1.5 flex-wrap">
           {tabs.map((tab) => {
@@ -548,3 +607,4 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
     </div>
   );
 };
+

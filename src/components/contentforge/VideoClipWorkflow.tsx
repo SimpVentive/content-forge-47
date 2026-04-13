@@ -1,10 +1,10 @@
-import React, { useState, useRef } from "react";
+﻿import React, { useState, useRef } from "react";
 import { X, Play, Scissors, Film, Check, ChevronRight, Pencil, MapPin, Plus, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
 
-/* ── helpers ── */
+/* â”€â”€ helpers â”€â”€ */
 function parseDuration(iso: string): string {
   const m = iso?.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!m) return "0:00";
@@ -43,7 +43,7 @@ function tryParseJSON(raw: string | undefined | null): any | null {
   }
 }
 
-/* ── Types ── */
+/* â”€â”€ Types â”€â”€ */
 interface ClipItem {
   id: string;
   videoId: string;
@@ -71,20 +71,20 @@ interface VideoClipWorkflowProps {
   onSkip: () => void;
 }
 
-/* ═══════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    STEP 1: Ask if user wants videos
-   ═══════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ onYes, onNo }) => (
   <div className="fixed inset-0 z-[9999] flex items-center justify-center">
     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onNo} />
     <div className="relative bg-card rounded-2xl shadow-2xl w-[600px] max-w-[92vw] overflow-hidden">
-      {/* Gradient accent bar */}
-      <div className="h-1.5 w-full" style={{ background: "linear-gradient(90deg, #ef4444 0%, #4f46e5 50%, #7c3aed 100%)" }} />
+      {/* Accent bar */}
+      <div className="h-1.5 w-full" style={{ background: "#2563EB" }} />
 
       <div className="px-10 pt-10 pb-8">
         {/* Icon + Badge row */}
         <div className="flex items-center justify-center gap-4 mb-7">
-          <div className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center shadow-lg" style={{ background: "linear-gradient(135deg, #ef4444, #dc2626)" }}>
+          <div className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center shadow-lg" style={{ background: "#DC2626" }}>
             <Film className="w-9 h-9 text-white" />
           </div>
         </div>
@@ -100,9 +100,9 @@ const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ on
         {/* Feature highlights */}
         <div className="grid grid-cols-3 gap-3 mb-8">
           {[
-            { icon: "🎬", title: "Browse", desc: "Videos per module" },
-            { icon: "✂️", title: "Clip", desc: "Select time ranges" },
-            { icon: "📍", title: "Insert", desc: "Place in course" },
+            { icon: "ðŸŽ¬", title: "Browse", desc: "Videos per module" },
+            { icon: "âœ‚ï¸", title: "Clip", desc: "Select time ranges" },
+            { icon: "ðŸ“", title: "Insert", desc: "Place in course" },
           ].map((f) => (
             <div key={f.title} className="bg-secondary/60 rounded-xl p-3.5 text-center">
               <span className="text-[22px] block mb-1.5">{f.icon}</span>
@@ -123,7 +123,7 @@ const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ on
           <button
             onClick={onYes}
             className="flex-[1.5] h-[52px] rounded-xl text-[15px] font-bold text-white transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02]"
-            style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+            style={{ background: "#2563EB" }}
           >
             <Play className="w-4 h-4" /> Yes, Let's Browse Videos
           </button>
@@ -133,9 +133,9 @@ const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ on
   </div>
 );
 
-/* ═══════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    STEP 2: Select clip range after playing
-   ═══════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const ClipRangeDialog: React.FC<{
   video: any;
   onConfirm: (clipType: "all" | "range", start: string, end: string) => void;
@@ -158,7 +158,7 @@ const ClipRangeDialog: React.FC<{
         <div className="px-5 py-4 flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3 className="text-[16px] font-bold text-white truncate">{video.title}</h3>
-            <p className="text-[13px] text-white/50 mt-0.5">{video.channelTitle} · {totalDur}</p>
+            <p className="text-[13px] text-white/50 mt-0.5">{video.channelTitle} Â· {totalDur}</p>
           </div>
           <button onClick={onCancel} className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center shrink-0 ml-3">
             <X className="w-4 h-4 text-white/60" />
@@ -186,7 +186,7 @@ const ClipRangeDialog: React.FC<{
                   : "border-white/20 text-white/60 hover:border-white/40"
               }`}
             >
-              🎬 Use Entire Video
+              ðŸŽ¬ Use Entire Video
             </button>
             <button
               onClick={() => setClipType("range")}
@@ -196,7 +196,7 @@ const ClipRangeDialog: React.FC<{
                   : "border-white/20 text-white/60 hover:border-white/40"
               }`}
             >
-              ✂️ Custom Range
+              âœ‚ï¸ Custom Range
             </button>
           </div>
 
@@ -211,7 +211,7 @@ const ClipRangeDialog: React.FC<{
                   className="w-full h-10 border border-white/20 rounded-xl text-[14px] text-center bg-white/5 text-white focus:outline-none focus:border-primary"
                 />
               </div>
-              <span className="text-white/40 mt-5 text-[16px]">→</span>
+              <span className="text-white/40 mt-5 text-[16px]">â†’</span>
               <div className="flex-1">
                 <label className="text-[11px] font-semibold text-white/50 uppercase tracking-wide mb-1 block">To</label>
                 <input
@@ -227,7 +227,7 @@ const ClipRangeDialog: React.FC<{
           <button
             onClick={() => onConfirm(clipType, clipType === "all" ? "0:00" : startTime, clipType === "all" ? totalDur : endTime)}
             className="w-full h-12 rounded-xl text-[15px] font-bold text-white transition-all flex items-center justify-center gap-2"
-            style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+            style={{ background: "#2563EB" }}
           >
             <Check className="w-4 h-4" /> Confirm & Add Clip
           </button>
@@ -237,9 +237,9 @@ const ClipRangeDialog: React.FC<{
   );
 };
 
-/* ═══════════════════════════════════════
-   STEP 3: After adding — ask insert another?
-   ═══════════════════════════════════════ */
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+   STEP 3: After adding â€” ask insert another?
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const InsertAnotherDialog: React.FC<{ clipCount: number; onYes: () => void; onDone: () => void }> = ({ clipCount, onYes, onDone }) => (
   <div className="fixed inset-0 z-[9999] flex items-center justify-center">
     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
@@ -266,16 +266,16 @@ const InsertAnotherDialog: React.FC<{ clipCount: number; onYes: () => void; onDo
   </div>
 );
 
-/* ═══════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    STEP 3b: Place Now or Later?
-   ═══════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const PlaceNowOrLaterDialog: React.FC<{ clipCount: number; onNow: () => void; onLater: () => void }> = ({ clipCount, onNow, onLater }) => (
   <div className="fixed inset-0 z-[9999] flex items-center justify-center">
     <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
     <div className="relative bg-card rounded-2xl shadow-2xl w-[520px] max-w-[92vw] overflow-hidden" onClick={e => e.stopPropagation()}>
       <div className="px-8 pt-8 pb-6 text-center">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg"
-          style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+          style={{ background: "#2563EB" }}>
           <MapPin className="w-8 h-8 text-white" />
         </div>
         <h2 className="text-[22px] font-extrabold text-foreground mb-2">
@@ -291,7 +291,7 @@ const PlaceNowOrLaterDialog: React.FC<{ clipCount: number; onNow: () => void; on
           onClick={onNow}
           className="p-4 rounded-xl border-2 border-primary bg-primary/5 hover:bg-primary/10 transition-all text-left"
         >
-          <p className="text-[15px] font-bold text-primary mb-1">📍 Place Now</p>
+          <p className="text-[15px] font-bold text-primary mb-1">ðŸ“ Place Now</p>
           <p className="text-[12px] text-muted-foreground leading-snug">
             Drag & drop videos into specific modules on a timeline view right now.
           </p>
@@ -300,7 +300,7 @@ const PlaceNowOrLaterDialog: React.FC<{ clipCount: number; onNow: () => void; on
           onClick={onLater}
           className="p-4 rounded-xl border-2 border-border hover:border-primary/30 transition-all text-left"
         >
-          <p className="text-[15px] font-bold text-foreground mb-1">⏳ Place Later</p>
+          <p className="text-[15px] font-bold text-foreground mb-1">â³ Place Later</p>
           <p className="text-[12px] text-muted-foreground leading-snug">
             Skip for now. You can drag & drop videos while previewing the course as a learner.
           </p>
@@ -310,9 +310,9 @@ const PlaceNowOrLaterDialog: React.FC<{ clipCount: number; onNow: () => void; on
   </div>
 );
 
-/* ═══════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    STEP 4: Review, rename, preview, assign
-   ═══════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const ClipReviewPanel: React.FC<{
   clips: ClipItem[];
   modules: string[];
@@ -362,7 +362,7 @@ const ClipReviewPanel: React.FC<{
                   )}
                   <p className="text-[11px] text-muted-foreground mt-0.5">{clip.channelTitle}</p>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    Clip: {clip.clipType === "all" ? "Full video" : `${clip.startTime} → ${clip.endTime}`}
+                    Clip: {clip.clipType === "all" ? "Full video" : `${clip.startTime} â†’ ${clip.endTime}`}
                   </p>
                 </div>
                 <button onClick={() => onRemoveClip(clip.id)} className="text-[11px] text-destructive font-bold hover:underline shrink-0 self-start">
@@ -379,7 +379,7 @@ const ClipReviewPanel: React.FC<{
                   onChange={e => onUpdateClip(clip.id, { insertAfterModule: e.target.value })}
                   className="flex-1 h-8 border border-border rounded-lg text-[12px] bg-card text-foreground px-2 focus:outline-none focus:border-primary"
                 >
-                  <option value="">— Select module —</option>
+                  <option value="">â€” Select module â€”</option>
                   {modules.map((mod, i) => (
                     <option key={i} value={mod}>{mod}</option>
                   ))}
@@ -400,9 +400,9 @@ const ClipReviewPanel: React.FC<{
           <button
             onClick={onFinish}
             className="h-10 px-6 rounded-xl text-[13px] font-bold text-white transition-all flex items-center gap-2"
-            style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+            style={{ background: "#2563EB" }}
           >
-            <Check className="w-3.5 h-3.5" /> Done — Insert into Course
+            <Check className="w-3.5 h-3.5" /> Done â€” Insert into Course
           </button>
         </div>
       </div>
@@ -410,9 +410,9 @@ const ClipReviewPanel: React.FC<{
   );
 };
 
-/* ═══════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    STEP 5: Preview all clips player
-   ═══════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 const ClipPlayer: React.FC<{ clips: ClipItem[]; onClose: () => void }> = ({ clips, onClose }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const clip = clips[currentIdx];
@@ -444,24 +444,24 @@ const ClipPlayer: React.FC<{ clips: ClipItem[]; onClose: () => void }> = ({ clip
             disabled={currentIdx === 0}
             className="h-9 px-4 rounded-lg border border-white/20 text-white text-[13px] font-semibold disabled:opacity-30 hover:bg-white/5 transition-all"
           >
-            ← Previous
+            â† Previous
           </button>
           <p className="text-[12px] text-white/50">
-            {clip.insertAfterModule ? `→ ${clip.insertAfterModule}` : "No module assigned"}
+            {clip.insertAfterModule ? `â†’ ${clip.insertAfterModule}` : "No module assigned"}
           </p>
           {currentIdx < clips.length - 1 ? (
             <button
               onClick={() => setCurrentIdx(currentIdx + 1)}
               className="h-9 px-4 rounded-lg text-white text-[13px] font-bold transition-all flex items-center gap-1"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+              style={{ background: "#2563EB" }}
             >
-              Next →
+              Next â†’
             </button>
           ) : (
             <button
               onClick={onClose}
               className="h-9 px-4 rounded-lg text-white text-[13px] font-bold transition-all flex items-center gap-1"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+              style={{ background: "#2563EB" }}
             >
               <Check className="w-3.5 h-3.5" /> Done
             </button>
@@ -472,9 +472,9 @@ const ClipPlayer: React.FC<{ clips: ClipItem[]; onClose: () => void }> = ({ clip
   );
 };
 
-/* ═══════════════════════════════════════
+/* â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
    MAIN WORKFLOW ORCHESTRATOR
-   ═══════════════════════════════════════ */
+   â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• */
 export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw, modules, moduleSections, courseTitle, language, level, duration, videoDurationHandling = "within-course", onComplete, onSkip }) => {
   const [step, setStep] = useState<"ask" | "browse" | "clipRange" | "insertAnother" | "placeChoice" | "review" | "preview" | "done">("ask");
   const [clips, setClips] = useState<ClipItem[]>([]);
@@ -565,7 +565,7 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
     );
   }
 
-  // Step: REVIEW clips — Timeline Placer
+  // Step: REVIEW clips â€” Timeline Placer
   if (step === "review") {
     const timelineModules = moduleSections && moduleSections.length > 0
       ? moduleSections
@@ -632,7 +632,7 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
                 <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} /> Refresh
               </button>
               {clips.length > 0 && (
-                <button onClick={() => setStep("review")} className="h-9 px-4 rounded-lg text-[12px] font-bold text-white flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+                <button onClick={() => setStep("review")} className="h-9 px-4 rounded-lg text-[12px] font-bold text-white flex items-center gap-1.5" style={{ background: "#2563EB" }}>
                   Review {clips.length} Clip{clips.length > 1 ? "s" : ""} <ChevronRight className="w-3 h-3" />
                 </button>
               )}
@@ -706,7 +706,7 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
               Skip Videos
             </button>
             {clips.length > 0 && (
-              <button onClick={() => setStep("review")} className="h-9 px-5 rounded-lg text-[13px] font-bold text-white flex items-center gap-1.5" style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}>
+              <button onClick={() => setStep("review")} className="h-9 px-5 rounded-lg text-[13px] font-bold text-white flex items-center gap-1.5" style={{ background: "#2563EB" }}>
                 Review {clips.length} Clip{clips.length > 1 ? "s" : ""} <ChevronRight className="w-3 h-3" />
               </button>
             )}
@@ -718,3 +718,4 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
 
   return null;
 };
+

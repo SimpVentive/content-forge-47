@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+﻿import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
 
 interface SlidePreviewProps {
@@ -56,7 +56,7 @@ function buildSlides(archRaw: string, visualRaw: string, courseTitle: string): S
 const TitleSlide: React.FC<{ slide: SlideData }> = ({ slide }) => (
   <div
     className="w-full rounded-2xl flex flex-col items-center justify-center relative overflow-hidden"
-    style={{ height: 400, background: "linear-gradient(135deg, #4f46e5, #7c3aed)" }}
+    style={{ height: 400, background: "#2563EB" }}
   >
     <p className="text-[14px] text-white/60 font-semibold mb-2">Module {slide.moduleNum}</p>
     <h2 className="text-[32px] font-extrabold text-white text-center px-8 leading-tight">{slide.moduleTitle}</h2>
@@ -70,7 +70,7 @@ const ContentSlide: React.FC<{ slide: SlideData }> = ({ slide }) => (
     className="w-full rounded-2xl bg-white border border-border overflow-hidden flex flex-col"
     style={{ height: 400 }}
   >
-    <div className="h-2 w-full" style={{ background: "linear-gradient(90deg, #4f46e5, #7c3aed)" }} />
+    <div className="h-2 w-full" style={{ background: "#2563EB" }} />
     <div className="flex-1 flex p-6 gap-6">
       <div className="flex-[3] space-y-3">
         <h3 className="text-[20px] font-bold text-foreground">{slide.moduleTitle}</h3>
@@ -172,7 +172,7 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, 
             <div
               className="w-full h-full flex items-center justify-center text-[6px] font-bold"
               style={s.type === "title"
-                ? { background: "linear-gradient(135deg, #4f46e5, #7c3aed)", color: "white" }
+                ? { background: "#2563EB", color: "white" }
                 : { background: "white", color: "#0f172a" }
               }
             >
@@ -218,3 +218,4 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, 
     </div>
   );
 };
+

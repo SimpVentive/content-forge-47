@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle } from "lucide-react";
+﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle } from "lucide-react";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
@@ -7,7 +7,7 @@ import { FLIP_STYLES, HIGHLIGHT_PALETTES, PreviewActionBar, type FlipStyle, type
 import { AvatarNarrator } from "./AvatarNarrator";
 import { AVATAR_TRAINERS, getTrainerMedia } from "@/lib/avatarTrainers";
 
-/* ── helpers ── */
+/* â”€â”€ helpers â”€â”€ */
 function tryParseJSON(raw: string): any | null {
   try { return JSON.parse(raw); } catch {
     const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
@@ -16,7 +16,7 @@ function tryParseJSON(raw: string): any | null {
   }
 }
 
-/* ── types ── */
+/* â”€â”€ types â”€â”€ */
 interface Module {
   title: string;
   topics: string[];
@@ -57,11 +57,23 @@ function stripNarratorMarkdown(text: string): string {
     .trim();
 }
 
+function isPlaceholderToken(text: string): boolean {
+  const normalized = stripNarratorMarkdown(text).toLowerCase();
+  if (!normalized) return true;
+  if (/^[#*\-_.:;|/\\\[\](){}]+$/.test(normalized)) return true;
+  if (normalized === "n/a" || normalized === "na" || normalized === "null" || normalized === "undefined") return true;
+  return false;
+}
+
+function safeLearnerText(text: string, fallback = ""): string {
+  return isPlaceholderToken(text) ? fallback : stripNarratorMarkdown(text);
+}
+
 function getNarratorExcerpt(text: string, sentenceCount = 3): string {
   const normalized = stripNarratorMarkdown(text);
   if (!normalized) return "";
 
-  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`’”]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`â€™â€]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
   return sentences.slice(0, sentenceCount).join(" ");
 }
 
@@ -75,7 +87,7 @@ function buildFlipChartLines(
   const pushSentences = (text: string, tone: "lead" | "body" | "takeaway" | "challenge") => {
     if (!text || lines.length >= availableLines) return;
     const normalized = stripNarratorMarkdown(text);
-    const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`’”]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+    const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`â€™â€]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
 
     for (const sentence of sentences) {
       if (lines.length >= availableLines) break;
@@ -134,7 +146,7 @@ function splitParagraphIntoSentenceChunks(paragraph: string, targetWordsPerChunk
   const normalized = paragraph.trim();
   if (!normalized) return [];
 
-  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`’”]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`â€™â€]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
   const chunks: string[] = [];
   let currentChunk: string[] = [];
   let currentWordCount = 0;
@@ -250,11 +262,18 @@ function getTopicVisual(moduleVisual: any, topicTitle: string) {
   });
 }
 
-/* ── Parse writer content into structured parts ── */
+/* â”€â”€ Parse writer content into structured parts â”€â”€ */
 function parseContentParts(text: string) {
-  const lines = text.split("\n").filter(l => !l.match(/^#{1,3}\s/)); // remove heading lines
+  const lines = text
+    .split("\n")
+    .filter((line) => !line.match(/^#{1,3}\s/))
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !isPlaceholderToken(line));
   const joined = lines.join("\n").trim();
-  const paragraphs = joined.split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+  const paragraphs = joined
+    .split(/\n\n+/)
+    .map((paragraph) => safeLearnerText(paragraph))
+    .filter(Boolean);
 
   let hook = "";
   let body: string[] = [];
@@ -263,13 +282,14 @@ function parseContentParts(text: string) {
 
   paragraphs.forEach((p, i) => {
     if (i === 0) {
-      hook = p;
-    } else if (p.match(/^(Key Takeaway|Takeaway|Remember|💡)/i)) {
-      takeaway = p.replace(/^(Key Takeaway:|Takeaway:|Remember:|💡\s*)/i, "").trim();
+      hook = safeLearnerText(p);
+    } else if (p.match(/^(Key Takeaway|Takeaway|Remember|ðŸ’¡)/i)) {
+      takeaway = safeLearnerText(p.replace(/^(Key Takeaway:|Takeaway:|Remember:|ðŸ’¡\s*)/i, "").trim());
     } else if (p.match(/^(Challenge:|Next time|Try this:)/i) || (i === paragraphs.length - 1 && p.length < 120)) {
-      challenge = p.replace(/^(Challenge:\s*)/i, "").trim();
+      challenge = safeLearnerText(p.replace(/^(Challenge:\s*)/i, "").trim());
     } else {
-      body.push(p);
+      const cleaned = safeLearnerText(p);
+      if (cleaned) body.push(cleaned);
     }
   });
 
@@ -277,7 +297,7 @@ function parseContentParts(text: string) {
   if (!takeaway && body.length > 1) {
     const last = body[body.length - 1];
     if (last.length < 100) {
-      takeaway = last;
+      takeaway = safeLearnerText(last);
       body = body.slice(0, -1);
     }
   }
@@ -310,10 +330,10 @@ function getTopicLearningObjectives(moduleTopics: string[], topicTitle?: string)
 }
 
 function getQuickFact(parts: { hook: string; body: string[]; takeaway: string; challenge: string }): string {
-  if (parts.takeaway) return parts.takeaway;
-  const fallback = [parts.hook, ...parts.body].find(Boolean) || "Focus on the behavior shift that matters most in this lesson.";
+  if (parts.takeaway && !isPlaceholderToken(parts.takeaway)) return parts.takeaway;
+  const fallback = [parts.hook, ...parts.body].find((value) => value && !isPlaceholderToken(value)) || "Content not available for this section.";
   const sentence = stripNarratorMarkdown(fallback).match(/[^.!?]+[.!?]+|[^.!?]+$/)?.[0]?.trim();
-  return sentence || fallback;
+  return sentence && !isPlaceholderToken(sentence) ? sentence : fallback;
 }
 
 function getTargetCourseQuestionCount(durationMinutes: number, intensity: AssessmentIntensity): number {
@@ -395,7 +415,7 @@ function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[]
     .map(({ index }) => index);
 }
 
-/* ── build slides from agent outputs ── */
+/* â”€â”€ build slides from agent outputs â”€â”€ */
 function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
@@ -410,7 +430,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     modules = mods.map((m: any, mi: number) => ({
       title: m.module_title || m.title || m.name || `Module ${mi + 1}`,
       topics: (m.topics || m.sections || m.lessons || []).map((t: any, ti: number) =>
-        typeof t === "string" ? t : t.topic_name || t.topic_title || t.title || t.name || `Module ${mi + 1} — Part ${ti + 1}`
+        typeof t === "string" ? t : t.topic_name || t.topic_title || t.title || t.name || `Module ${mi + 1} â€” Part ${ti + 1}`
       ),
     }));
   }
@@ -453,7 +473,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     // 1. Title slide
     slides.push({ type: "title", moduleIndex: mi, moduleTitle: mod.title });
 
-    // 2. Content slides — one per topic
+    // 2. Content slides â€” one per topic
     mod.topics.forEach((topic, ti) => {
       // Try to match writer section by topic name
       let sectionText = writerSections[topic.toLowerCase()] || "";
@@ -559,7 +579,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   return { modules, slides };
 }
 
-/* ── Confetti animation ── */
+/* â”€â”€ Confetti animation â”€â”€ */
 const Confetti: React.FC = () => {
   const colors = ["#10b981", "#3b82f6", "#f59e0b", "#ec4899", "#8b5cf6", "#06b6d4"];
   return (
@@ -580,7 +600,7 @@ const Confetti: React.FC = () => {
   );
 };
 
-/* ── Waveform Bars ── */
+/* â”€â”€ Waveform Bars â”€â”€ */
 const WaveformBars: React.FC<{ playing: boolean }> = ({ playing }) => (
   <div className="flex items-end gap-[3px] h-5">
     {[0, 1, 2, 3].map(i => (
@@ -597,7 +617,7 @@ const WaveformBars: React.FC<{ playing: boolean }> = ({ playing }) => (
   </div>
 );
 
-/* ── Infographic Visual Aid (on-demand SVG generation) ── */
+/* â”€â”€ Infographic Visual Aid (on-demand SVG generation) â”€â”€ */
 function extractSVG(text: string): string {
   const svgMatch = text.match(/<svg[\s\S]*?<\/svg>/i);
   if (svgMatch) return svgMatch[0];
@@ -699,14 +719,14 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
   };
 
   return (
-    <div className="mb-6 overflow-hidden rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.88),rgba(30,41,59,0.82))] text-white shadow-[0_24px_54px_rgba(15,23,42,0.26)] anim-scale-in" style={{ animationDelay: "0.16s" }}>
+    <div className="mb-6 overflow-hidden rounded-[26px] border border-white/10 bg-slate-900 text-white shadow-[0_24px_54px_rgba(15,23,42,0.26)] anim-scale-in" style={{ animationDelay: "0.16s" }}>
       <button
         onClick={handleToggle}
         className="flex w-full items-start gap-4 px-5 py-4 text-left transition-colors hover:bg-white/5"
         type="button"
       >
         <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 text-[18px] text-white shadow-inner shadow-white/10">
-          📊
+          ðŸ“Š
         </div>
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex flex-wrap items-center gap-2">
@@ -769,7 +789,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
               <span className="ml-2 text-[13px] text-slate-300">Generating infographic...</span>
             </div>
           ) : svg ? (
-            <div className="rounded-[26px] border border-white/10 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(232,238,249,0.98))] p-4 text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+            <div className="rounded-[26px] border border-white/10 bg-slate-50 p-4 text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#4b6592]">{moduleTitle}</p>
@@ -802,7 +822,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
       {showZoomed && (
         <div className="fixed inset-0 z-[10002] flex items-center justify-center" onClick={() => setShowZoomed(false)}>
           <div className="absolute inset-0 bg-[#020617]/84 backdrop-blur-md" />
-          <div className="relative flex h-[min(92vh,980px)] w-[min(1380px,96vw)] flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(180deg,#e9eef7_0%,#dbe6f3_100%)] p-5 shadow-[0_36px_120px_rgba(2,6,23,0.58)]"
+          <div className="relative flex h-[min(92vh,980px)] w-[min(1380px,96vw)] flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[#e5edf7] p-5 shadow-[0_36px_120px_rgba(2,6,23,0.58)]"
             style={{ animation: "infographicZoomIn 240ms cubic-bezier(0.22, 1, 0.36, 1) both" }}
             onClick={(event) => event.stopPropagation()}>
             <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -846,7 +866,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-auto rounded-[28px] border border-[#c6d2e3] bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.94),rgba(239,244,250,0.98))] p-5">
+            <div className="min-h-0 flex-1 overflow-auto rounded-[28px] border border-[#c6d2e3] bg-[#f3f7fb] p-5">
               {svg ? (
                 <div className="mx-auto min-w-fit">
                   <div className="rounded-[26px] border border-[#d8deea] bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
@@ -883,6 +903,7 @@ interface LearnerPreviewProps {
   discussionEnabled?: boolean;
   assessmentIntensity?: AssessmentIntensity;
   avatarTrainerId?: string;
+  flipStylePreference?: FlipStyle;
   slideLayout?: {
     maxLines: number;
     minFontSize: number;
@@ -895,6 +916,7 @@ const PREVIEW_FLIP_STYLE_STORAGE_KEY = "contentforge.preview.flipStyle.default";
 const PREVIEW_NOTES_STORAGE_KEY_PREFIX = "contentforge.preview.notes";
 
 type SidebarPanel = "home" | "progress" | "notes" | "resources";
+type LearningToolPanel = "quiz" | "fact" | "takeaway" | "objectives" | null;
 
 function isFlipStyle(value: string | null): value is FlipStyle {
   return value === "dramatic" || value === "subtle" || value === "bound";
@@ -910,7 +932,7 @@ function getCourseNotesStorageKey(courseTitle: string): string {
   return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = false, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, slideLayout, onUpdateVisualTopic }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = false, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, onUpdateVisualTopic }) => {
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
   const avatarEnv = import.meta.env as Record<string, string | undefined>;
   const trainerMedia = getTrainerMedia(selectedTrainer.id, avatarEnv);
@@ -918,12 +940,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const avatarPosterUrl = trainerMedia.posterUrl;
   const avatarImageUrl = trainerMedia.imageUrl;
   const trainerName = selectedTrainer.name;
+  const trainerBadgeInitial = trainerName.charAt(0).toUpperCase();
   const hasAvatarVideoNarration = Boolean(avatarVideoUrl);
   const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
   const [showPlacer, setShowPlacer] = useState(false);
   const [highlightEnabled, setHighlightEnabled] = useState(true);
   const [highlightPalette, setHighlightPalette] = useState<HighlightPalette>("yellow");
   const [flipStyle, setFlipStyle] = useState<FlipStyle>("dramatic");
+  const [activeLearningTool, setActiveLearningTool] = useState<LearningToolPanel>(null);
   const [visualActionState, setVisualActionState] = useState<Record<string, { regenerating?: boolean; error?: string }>>({});
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>("home");
   const [learnerNotes, setLearnerNotes] = useState("");
@@ -942,6 +966,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   };
 
   useEffect(() => {
+    if (flipStylePreference && isFlipStyle(flipStylePreference)) {
+      setFlipStyle(flipStylePreference);
+      return;
+    }
+
     try {
       const savedCourseStyle = window.localStorage.getItem(flipStyleStorageKey);
       const savedDefaultStyle = window.localStorage.getItem(PREVIEW_FLIP_STYLE_STORAGE_KEY);
@@ -955,7 +984,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     } catch {
       // Ignore storage issues and keep the default flip style.
     }
-  }, [flipStyleStorageKey]);
+  }, [flipStylePreference, flipStyleStorageKey]);
 
   useEffect(() => {
     try {
@@ -1043,7 +1072,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [highlightWordIdx, setHighlightWordIdx] = useState(-1);
   const animFrameRef = useRef<number>(0);
 
-  // Narration text for current slide — with fallback to slide content
+  // Narration text for current slide â€” with fallback to slide content
   const getNarrationForSlide = useCallback((slideIdx: number) => {
     const s = slides[slideIdx];
     if (!s || s.type !== "content") return "";
@@ -1115,7 +1144,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     const totalWords = narrationWords.length;
     if (!totalSentences || !totalWords) return;
 
-    // Pre-compute cumulative word counts per sentence to map audio progress → sentence
+    // Pre-compute cumulative word counts per sentence to map audio progress â†’ sentence
     const sentenceWordCounts = narrationSentences.map(s => s.split(/\s+/).length);
     const cumulativeWords: number[] = [];
     sentenceWordCounts.reduce((acc, count, i) => {
@@ -1285,7 +1314,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         ? `Key takeaways and completion for ${currentModule?.title || "this module"}`
         : slide.type === "video"
           ? `${slide.video?.channelTitle || "Curated resource"} for this lesson`
-          : `Lesson ${(slide.topicIndex || 0) + 1}${slide.topicPartCount && slide.topicPartCount > 1 ? ` · Part ${(slide.topicPartIndex || 0) + 1} of ${slide.topicPartCount}` : ""}`;
+          : `Lesson ${(slide.topicIndex || 0) + 1}${slide.topicPartCount && slide.topicPartCount > 1 ? ` Â· Part ${(slide.topicPartIndex || 0) + 1} of ${slide.topicPartCount}` : ""}`;
   const layoutTrimNotice = slide.type === "content" && slide.wasTrimmedForLayout;
   const firstContentSlide = currentModuleSlides.find((moduleSlide) => moduleSlide.type === "content");
   const platformNavItems = [
@@ -1392,7 +1421,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     }
   }, [currentVisualKey, onUpdateVisualTopic, slide]);
 
-  /* ── COMPLETION SCREEN ── */
+  /* â”€â”€ COMPLETION SCREEN â”€â”€ */
   if (showCompletion) {
     return (
       <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: "#0f172a" }}>
@@ -1423,7 +1452,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     );
   }
 
-  /* ── SLIDE RENDERERS ── */
+  /* â”€â”€ SLIDE RENDERERS â”€â”€ */
   const renderSlide = () => {
     switch (slide.type) {
       case "title":
@@ -1433,7 +1462,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             <div className="flex items-end gap-4 anim-fade-in-down" style={{ animationDelay: "0s" }}>
               {/* Avatar */}
               <div className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center shadow-lg"
-                style={{ background: "linear-gradient(135deg, #6366f1, #a78bfa)" }}>
+                style={{ background: "#2563EB" }}>
                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
                   <circle cx="12" cy="7" r="4"/>
@@ -1443,7 +1472,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <div className="relative bg-white rounded-2xl rounded-bl-md px-5 py-3 shadow-md max-w-[400px]"
                 style={{ animation: "fadeInUp 0.5s ease both", animationDelay: "0.15s" }}>
                 <p className="text-[14px] font-semibold" style={{ color: "#1e293b" }}>
-                  Welcome to <span style={{ color: "#4f46e5" }}>Module {slide.moduleIndex + 1}</span>! 🎓
+                  Welcome to <span style={{ color: "#4f46e5" }}>Module {slide.moduleIndex + 1}</span>! ðŸŽ“
                 </p>
                 <p className="text-[12px] mt-0.5" style={{ color: "#64748b" }}>
                   Let's explore this topic together.
@@ -1455,7 +1484,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             </div>
 
             <div className="w-full max-w-[800px] rounded-2xl p-12 text-center anim-fade-in-down"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #7c3aed)", animationDelay: "0.1s" }}>
+              style={{ background: "#2563EB", animationDelay: "0.1s" }}>
               <p className="text-[13px] font-bold text-white/60 uppercase tracking-[3px] mb-4">
                 Module {String(slide.moduleIndex + 1).padStart(2, "0")}
               </p>
@@ -1471,7 +1500,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
       case "content": {
         const parts = parseContentParts(slide.content || "");
-        const moduleLabel = `MODULE ${slide.moduleIndex + 1} — ${slide.moduleTitle}`.toUpperCase();
+        const moduleLabel = `MODULE ${slide.moduleIndex + 1} â€” ${slide.moduleTitle}`.toUpperCase();
         const narratorSource = [parts.hook, ...parts.body].filter(Boolean).join(" ");
         const narratorExcerpt = getNarratorExcerpt(narratorSource || slide.content || "");
         const chartLines = buildFlipChartLines(parts, slideRules.maxLines);
@@ -1519,12 +1548,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         ) : null;
         const showHeroVisual = Boolean(visualMarkup) && slide.visualPlacement !== "side-panel";
         const showSideVisual = Boolean(visualMarkup) && slide.visualPlacement === "side-panel";
-        const contentTemplate = inferContentTemplate(slide, Boolean(visualMarkup));
+        const contentTemplate: ContentTemplate = "guided-notes";
         const lessonObjectives = getTopicLearningObjectives(currentModuleTopics, slide.topicTitle);
         const quickFact = getQuickFact(parts);
         const scenarioLead = parts.body[0] || parts.hook || narratorExcerpt;
         const scenarioSupport = parts.body[1] || parts.challenge || parts.takeaway || quickFact;
         const summaryBullets = Array.from(new Set(chartSentenceEntries.map((entry) => entry.text))).slice(0, 4);
+        const safeChartEntries = chartSentenceEntries.length > 0
+          ? chartSentenceEntries
+          : [{ text: "Content not available for this section.", tone: "body" as const, sentenceIndex: -1 }];
         const visualState = currentVisualKey ? visualActionState[currentVisualKey] : undefined;
         const visualControls = onUpdateVisualTopic && slide.topicTitle ? (
           <div className="flex items-center gap-2">
@@ -1549,8 +1581,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
         if (contentTemplate === "scenario") {
           return (
-            <div className="mx-auto max-w-[1180px]" key={currentSlide}>
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="mx-auto max-w-[1280px]" key={currentSlide}>
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_500px]">
                 <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)]">
                   <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -1561,9 +1593,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     {visualControls}
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-                    <div className="space-y-4">
-                      <div className="rounded-[24px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f7fbff_0%,#edf3f9_100%)] p-5">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
+                    <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+                      <div className="rounded-[24px] border border-[#d8e2ef] bg-[#f3f8fd] p-5">
                         <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Situation</p>
                         <p className="mt-3 text-[17px] leading-relaxed text-[#24486f]">{scenarioLead}</p>
                       </div>
@@ -1592,7 +1624,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       </div>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
                       <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-white shadow-sm">
                         <div className="border-b border-[#e2e8f0] px-4 py-3">
                           <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Scenario Visual</p>
@@ -1625,7 +1657,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         if (contentTemplate === "media-quiz") {
           return (
             <div className="mx-auto max-w-[1180px]" key={currentSlide}>
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
                 <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)]">
                   <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -1636,8 +1668,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     {visualControls}
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_290px]">
-                    <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-4">
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
+                    <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-[#f4f8fc] p-4">
                       <div className="mb-3 flex items-center justify-between gap-3">
                         <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Featured Media</p>
                         <span className="rounded-full bg-white px-3 py-1 text-[11px] font-[800] text-[#355fa8] shadow-sm">Interactive asset zone</span>
@@ -1653,8 +1685,26 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <div className="rounded-[22px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-4 shadow-sm">
+                    <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+                      <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.12)]">
+                        <div className="border-b border-[#e2e8f0] px-4 py-3">
+                          <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">{trainerName}'s Guide</p>
+                          <p className="mt-0.5 text-[12px] text-[#607896]">Presenter-led explanation and follow-up example</p>
+                        </div>
+                        <div className="p-4">
+                          <AvatarNarrator
+                            topic={slide.topicTitle || slide.moduleTitle}
+                            moduleContent={narratorExcerpt || `This section explains ${slide.topicTitle || slide.moduleTitle}.`}
+                            systemHint="Focus on the practical benefit to an office worker."
+                            trainerName={trainerName}
+                            avatarImageUrl={avatarImageUrl}
+                            avatarVideoUrl={avatarVideoUrl}
+                            avatarPosterUrl={avatarPosterUrl}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f4f8fc] p-4 shadow-sm">
                         <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
                         <div className="mt-3 space-y-3">
                           {lessonObjectives.map((objective, index) => (
@@ -1718,7 +1768,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-3">
-                  <div className="rounded-[22px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-4 shadow-sm">
+                  <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f4f8fc] p-4 shadow-sm">
                     <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">What Matters</p>
                     <p className="mt-3 text-[14px] leading-relaxed text-[#35506f]">{parts.takeaway || quickFact}</p>
                   </div>
@@ -1754,14 +1804,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
         if (contentTemplate === "dashboard") {
           return (
-            <div className="mx-auto max-w-[1180px]" key={currentSlide}>
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_290px]">
-                <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-5 shadow-[0_22px_54px_rgba(15,23,42,0.1)] md:p-6">
-                  <div className="mb-4 flex flex-wrap items-start justify-between gap-4">
+            <div className="mx-auto max-w-[1320px]" key={currentSlide}>
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
+                <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)] md:p-7">
+                  <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
                     <div>
                       <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">{moduleLabel}</p>
-                      <h2 className="mt-2 text-[34px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
-                      <p className="mt-1 text-[15px] text-[#5f7898]">{parts.hook || narratorExcerpt}</p>
+                      <h2 className="mt-2 text-[35px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
+                      <p className="mt-2 text-[15px] leading-relaxed text-[#5f7898]">{parts.hook || narratorExcerpt}</p>
                     </div>
                     {slide.topicPartCount && slide.topicPartCount > 1 ? (
                       <span className="inline-flex rounded-full bg-[#e8eef9] px-4 py-2 text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592]">
@@ -1770,9 +1820,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     ) : null}
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-                    <div className="space-y-4">
-                      <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f9fbfe_0%,#eef4fa_100%)] p-4">
+                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_390px]">
+                    <div className="space-y-5">
+                      <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-[#f5f8fc] p-5">
                         <div className="mb-3 flex items-center justify-between gap-3">
                           <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Lesson Canvas</p>
                           {visualControls}
@@ -1784,14 +1834,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                             </div>
                           </div>
                         ) : (
-                          <div className="rounded-[18px] border border-dashed border-[#bfd0e4] bg-white/70 p-6 text-[14px] text-[#607896]">
+                          <div className="rounded-[18px] border border-dashed border-[#bfd0e4] bg-white/70 p-7 text-[14px] leading-relaxed text-[#607896]">
                             {parts.body[0] || parts.hook || "This lesson opens with a guided explanation before moving into activities and knowledge checks."}
                           </div>
                         )}
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-2">
-                        <div className="rounded-[22px] border border-[#d8e2ef] bg-[#fbfdff] p-4 shadow-sm">
+                        <div className="rounded-[22px] border border-[#d8e2ef] bg-[#fbfdff] p-5 shadow-sm">
                           <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Core Explanation</p>
                           <div className="mt-3 space-y-2.5">
                             {chartSentenceEntries.slice(0, 4).map((line, index) => (
@@ -1803,7 +1853,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           </div>
                         </div>
 
-                        <div className="rounded-[22px] border border-[#d8e2ef] bg-[#fffaf3] p-4 shadow-sm">
+                        <div className="rounded-[22px] border border-[#d8e2ef] bg-[#fffaf3] p-5 shadow-sm">
                           <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Guided Coaching</p>
                           <p className="mt-3 text-[14px] leading-relaxed text-[#5f5a4a]">{parts.challenge || narratorExcerpt || "Think about how this would play out in your own workflow and where you would change your behavior."}</p>
                           <div className="mt-4 rounded-[18px] border border-[#f3d9a3] bg-white/80 p-3">
@@ -1815,7 +1865,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </div>
 
                     <div className="space-y-4">
-                      <div className="rounded-[22px] border border-[#d8e2ef] bg-[linear-gradient(180deg,#f8fbff_0%,#eef4fa_100%)] p-4 shadow-sm">
+                      <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f4f8fc] p-4 shadow-sm">
                         <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
                         <div className="mt-3 space-y-3">
                           {lessonObjectives.map((objective, index) => (
@@ -1855,27 +1905,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Did You Know?</p>
                         <p className="mt-3 text-[14px] leading-relaxed text-[#6f5b35]">{quickFact}</p>
                       </div>
-
-                      <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
-                        <div className="mb-3 flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#e8eef9] text-[14px] font-[900] text-[#1d4f93]">
-                            S
-                          </div>
-                          <div>
-                            <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">{trainerName}'s Guide</p>
-                            <p className="text-[12px] text-[#607896]">Quick explanation and follow-up example</p>
-                          </div>
-                        </div>
-                        <AvatarNarrator
-                          topic={slide.topicTitle || slide.moduleTitle}
-                          moduleContent={narratorExcerpt || `This section explains ${slide.topicTitle || slide.moduleTitle}.`}
-                          systemHint="Focus on the practical benefit to an office worker."
-                          trainerName={trainerName}
-                          avatarImageUrl={avatarImageUrl}
-                          avatarVideoUrl={avatarVideoUrl}
-                          avatarPosterUrl={avatarPosterUrl}
-                        />
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -1886,23 +1915,21 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
         return (
           <div className="mx-auto max-w-[1140px]" key={currentSlide}>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
               <div className="relative px-6 pt-8 pb-7 md:px-9 md:pt-10 md:pb-9"
                 style={{
-                  background: "linear-gradient(180deg, #eef2f7 0%, #dde3ec 100%)",
+                  background: "#E5EAF1",
                   borderRadius: "32px",
                   boxShadow: "0 24px 50px rgba(15,23,42,0.18)",
                 }}>
                 <div className="pointer-events-none absolute left-6 right-6 top-4 h-4 rounded-full md:left-9 md:right-9"
-                  style={{ background: "linear-gradient(180deg, #d8dee7 0%, #a8b2c2 45%, #eef2f7 100%)", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.85), 0 2px 6px rgba(15,23,42,0.18)" }}
+                  style={{ background: "#CAD3DF", boxShadow: "inset 0 -1px 0 rgba(255,255,255,0.85), 0 2px 6px rgba(15,23,42,0.18)" }}
                 />
                 <div className="pointer-events-none absolute left-[18%] top-[10px] h-10 w-4 -translate-x-1/2 rounded-full border-2 border-[#505867] bg-[#f8fafc] md:left-[22%]" />
                 <div className="pointer-events-none absolute right-[18%] top-[10px] h-10 w-4 translate-x-1/2 rounded-full border-2 border-[#505867] bg-[#f8fafc] md:right-[22%]" />
                 <div className="relative overflow-hidden rounded-[8px] border border-[#d8deea] bg-white px-6 py-6 md:px-8 md:py-7"
                   style={{ boxShadow: "0 16px 30px rgba(15,23,42,0.08)" }}>
-                  <div className="absolute inset-0 opacity-[0.22]"
-                    style={{ backgroundImage: "linear-gradient(180deg, transparent 0, transparent 35px, #dbe4f0 36px)", backgroundSize: "100% 36px" }}
-                  />
+                  <div className="absolute inset-0 opacity-[0.12] bg-[#dbe4f0]" />
                   <div className="relative z-10">
                     {showHeroVisual && (
                       <div className="mb-5 overflow-hidden rounded-[18px] border border-[#d8deea] bg-[#eef3f8] p-3"
@@ -1935,7 +1962,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </h2>
 
                     <div className="space-y-2.5">
-                      {chartSentenceEntries.map((line, index) => {
+                      {safeChartEntries.map((line, index) => {
                         const isActive = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 && line.sentenceIndex === highlightSentenceIdx;
 
                         return (
@@ -1979,11 +2006,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 </div>
               </div>
 
-              <div className="space-y-5">
+              <div className="space-y-5 lg:sticky lg:top-5 lg:self-start">
                 {showSideVisual && (
                   <div className="overflow-hidden rounded-[28px] border p-3 shadow-sm"
                     style={{
-                      background: "linear-gradient(180deg, rgba(255,255,255,0.98), rgba(241,245,249,0.98))",
+                      background: "rgba(255,255,255,0.98)",
                       borderColor: "rgba(148,163,184,0.22)",
                       boxShadow: "0 18px 40px rgba(15, 23, 42, 0.12)",
                     }}
@@ -2002,9 +2029,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   </div>
                 )}
                 <div
-                  className="rounded-[28px] border p-5 shadow-sm"
+                  className="rounded-[28px] border p-6 shadow-sm"
                   style={{
-                    background: "linear-gradient(180deg, rgba(79,70,229,0.1), rgba(124,58,237,0.04))",
+                    background: "rgba(37,99,235,0.08)",
                     borderColor: "rgba(99,102,241,0.22)",
                     boxShadow: "0 16px 36px rgba(79, 70, 229, 0.08)",
                     animation: "guidePanelIn 480ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both",
@@ -2015,7 +2042,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       className="flex h-9 w-9 items-center justify-center rounded-full text-[15px] font-bold"
                       style={{ background: "rgba(79,70,229,0.14)", color: "#4f46e5" }}
                     >
-                      S
+                            {trainerBadgeInitial}
                     </div>
                     <div>
                       <p className="text-[13px] font-bold uppercase tracking-[0.16em]" style={{ color: "#4f46e5" }}>
@@ -2036,6 +2063,89 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     avatarVideoUrl={avatarVideoUrl}
                     avatarPosterUrl={avatarPosterUrl}
                   />
+                </div>
+
+                <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-5 shadow-sm">
+                  <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Tools</p>
+                  <div className="mt-3 flex flex-wrap gap-2.5">
+                    {[
+                      { key: "quiz" as const, label: "Quiz" },
+                      { key: "fact" as const, label: "Did You Know" },
+                      { key: "takeaway" as const, label: "Key Takeaway" },
+                      { key: "objectives" as const, label: "Objectives" },
+                    ].map((tool) => (
+                      <button
+                        key={tool.key}
+                        onClick={() => setActiveLearningTool((prev) => (prev === tool.key ? null : tool.key))}
+                        className={`rounded-full border px-3.5 py-1.5 text-[12px] font-[800] transition-all ${
+                          activeLearningTool === tool.key
+                            ? "border-[#1d4f93] bg-[#eaf2ff] text-[#1d4f93]"
+                            : "border-[#d8e2ef] bg-white text-[#4b6592] hover:border-[#9fb6d8]"
+                        }`}
+                        type="button"
+                      >
+                        {tool.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {activeLearningTool === "objectives" ? (
+                    <div className="mt-3 rounded-xl border border-[#d8e2ef] bg-[#f8fbff] p-3.5">
+                      <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
+                      <div className="mt-2 space-y-2">
+                        {lessonObjectives.length > 0 ? lessonObjectives.map((objective, index) => (
+                          <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
+                            <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
+                            <span>{objective}</span>
+                          </div>
+                        )) : <p className="text-[13px] text-[#607896]">Content not available for this section.</p>}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {activeLearningTool === "takeaway" ? (
+                    <div className="mt-3 rounded-xl border border-[#f3d9a3] bg-[#fffaf3] p-3.5">
+                      <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Key Takeaway</p>
+                      <p className="mt-2 text-[13px] leading-relaxed text-[#6f5b35]">{safeLearnerText(parts.takeaway, "Content not available for this section.")}</p>
+                    </div>
+                  ) : null}
+
+                  {activeLearningTool === "fact" ? (
+                    <div className="mt-3 rounded-xl border border-[#f2d089] bg-[#fff5d6] p-3.5">
+                      <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Did You Know?</p>
+                      <p className="mt-2 text-[13px] leading-relaxed text-[#6f5b35]">{safeLearnerText(quickFact, "Content not available for this section.")}</p>
+                    </div>
+                  ) : null}
+
+                  {activeLearningTool === "quiz" ? (
+                    <div className="mt-3 rounded-xl border border-[#d8e2ef] bg-[#fbfdff] p-3.5">
+                      <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Interactive Quiz</p>
+                      {currentModuleAssessment ? (
+                        <>
+                          <p className="mt-2 text-[14px] font-[800] leading-snug text-[#123d78]">{currentModuleAssessment.question}</p>
+                          <div className="mt-2 space-y-1.5">
+                            {currentModuleAssessment.options.slice(0, 3).map((option, index) => (
+                              <div key={`${option}-${index}`} className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-[12px] text-[#35506f]">
+                                <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
+                                {option}
+                              </div>
+                            ))}
+                          </div>
+                          {currentModuleAssessmentSlide ? (
+                            <button
+                              onClick={() => navigateToSlide(currentModuleAssessmentSlide.idx)}
+                              className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-[#1d4f93] px-3 text-[12px] font-[800] text-white transition-all hover:bg-[#173f78]"
+                              type="button"
+                            >
+                              Open Quiz
+                            </button>
+                          ) : null}
+                        </>
+                      ) : (
+                        <p className="mt-2 text-[13px] text-[#607896]">Content not available for this section.</p>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
 
                 {slide.infographicSvg?.trim() && (
@@ -2066,7 +2176,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         return (
           <div className="max-w-[800px] mx-auto" key={currentSlide}>
             <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              <div className="h-[6px]" style={{ background: "linear-gradient(90deg, #f59e0b, #f97316)" }} />
+              <div className="h-[6px]" style={{ background: "#F59E0B" }} />
               <div className="p-8">
                 <p className="text-[13px] font-bold uppercase tracking-wider mb-4 anim-fade-in-down"
                   style={{ color: "#d97706" }}>
@@ -2114,7 +2224,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <div className="mt-4 space-y-3">
                     {q.rationale && (
                       <p className="text-[14px] bg-slate-50 rounded-xl p-4" style={{ color: "#64748b" }}>
-                        💡 {q.rationale}
+                        ðŸ’¡ {q.rationale}
                       </p>
                     )}
                     <button
@@ -2122,7 +2232,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       className="w-full h-12 rounded-xl text-[15px] font-bold text-white"
                       style={{ background: "#4f46e5" }}
                     >
-                      Next Slide →
+                      Next Slide â†’
                     </button>
                   </div>
                 )}
@@ -2137,7 +2247,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           <div className="flex items-center justify-center h-full relative" key={currentSlide}>
             <Confetti />
             <div className="w-full max-w-[800px] rounded-2xl p-12 text-center relative z-20 anim-fade-in-down"
-              style={{ background: "linear-gradient(135deg, #4f46e5, #10b981)" }}>
+              style={{ background: "#2563EB" }}>
               <p className="text-[13px] font-bold text-white/60 uppercase tracking-[3px] mb-4">Module Complete</p>
               <h1 className="text-[32px] font-[800] text-white leading-tight mb-6">{slide.moduleTitle}</h1>
               <div className="text-left space-y-3 max-w-[500px] mx-auto mb-8">
@@ -2154,7 +2264,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               {slide.moduleIndex < modules.length - 1 ? (
                 <button onClick={goNext}
                   className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all">
-                  Next Module →
+                  Next Module â†’
                 </button>
               ) : (
                 <button onClick={() => setShowCompletion(true)}
@@ -2183,7 +2293,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               </div>
               <div className="px-7 pt-3 pb-3">
                 <h2 className="text-[22px] font-bold text-white">{vid.title}</h2>
-                <p className="text-[13px] text-white/60 mt-1">{vid.channelTitle} · {durStr}</p>
+                <p className="text-[13px] text-white/60 mt-1">{vid.channelTitle} Â· {durStr}</p>
               </div>
               <div className="px-5 pb-4">
                 <iframe
@@ -2195,7 +2305,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 />
               </div>
               <div className="px-7 pb-5">
-                <p className="text-[11px] text-white/40">Source: YouTube — included for educational purposes</p>
+                <p className="text-[11px] text-white/40">Source: YouTube â€” included for educational purposes</p>
               </div>
             </div>
           </div>
@@ -2208,7 +2318,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5" style={{ background: "linear-gradient(180deg, #dfe8f2 0%, #cfdbe8 100%)" }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5" style={{ background: "#DCE6F1" }}>
       <style>
         {`@keyframes sheetFlipForward {
           0% {
@@ -2358,9 +2468,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         }`}
       </style>
       <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[30px] border border-[#c7d6ea] bg-[#edf3f9] shadow-[0_40px_120px_rgba(15,23,42,0.28)]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.86),rgba(237,243,249,0)_45%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-transparent" />
 
-        <aside className="relative hidden w-[260px] shrink-0 flex-col border-r border-[#335f99]/40 bg-[linear-gradient(180deg,#1d4f93_0%,#173f78_38%,#12345f_100%)] text-white md:flex">
+        <aside className="relative hidden w-[260px] shrink-0 flex-col border-r border-[#335f99]/40 bg-[#1d4f93] text-white md:flex">
           <div className="border-b border-white/10 px-5 py-5">
             <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-white/55">ContentForge LMS</p>
             <p className="mt-1 text-[18px] font-[900] tracking-tight">{courseTitle}</p>
@@ -2552,12 +2662,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         </aside>
 
         <div className="relative min-w-0 flex flex-1 flex-col overflow-hidden">
-          <div className="shrink-0 border-b border-[#31598d] bg-[linear-gradient(135deg,#1d4f93_0%,#2b5fa4_55%,#1a4a89_100%)] px-5 py-4 text-white md:px-7">
+          <div className="shrink-0 border-b border-[#31598d] bg-[#1f4f8a] px-5 py-4 text-white md:px-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[12px] font-semibold text-white/70">
                   <span>{currentModule?.title || courseTitle}</span>
-                  <span>›</span>
+                  <span>â€º</span>
                   <span className="truncate">{shellPageTitle}</span>
                 </div>
                 <p className="mt-2 text-[24px] font-[900] tracking-tight">{shellPageTitle}</p>
@@ -2620,14 +2730,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 <div className="rounded-2xl border border-[#d8e2ef] bg-[#fffaf0] px-4 py-3 shadow-sm">
                   <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Activities</p>
                   <p className="mt-2 text-[24px] font-[900] tracking-tight text-[#123d78]">{currentModuleVideoCount + (currentModuleAssessment ? 1 : 0)}</p>
-                  <p className="text-[12px] text-[#7c6a52]">{currentModuleAssessment ? "Quiz included" : "No quiz yet"}{currentModuleVideoCount ? ` · ${currentModuleVideoCount} video` : ""}</p>
+                  <p className="text-[12px] text-[#7c6a52]">{currentModuleAssessment ? "Quiz included" : "No quiz yet"}{currentModuleVideoCount ? ` Â· ${currentModuleVideoCount} video` : ""}</p>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-[linear-gradient(180deg,#f4f7fb_0%,#e9f0f7_100%)] px-5 py-6 md:px-8 md:py-8">
-            <div className="mx-auto mb-5 grid max-w-[1260px] gap-3 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="flex-1 overflow-y-auto bg-[#eef3f9] px-5 py-6 md:px-8 md:py-8">
+            <div className="mx-auto mb-5 grid max-w-[1260px] gap-3 lg:grid-cols-[minmax(0,1fr)_420px]">
               <div className="rounded-[26px] border border-[#d6e1ef] bg-white/88 px-5 py-4 shadow-sm backdrop-blur">
                 <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Lesson Context</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-[#48627f]">
@@ -2657,7 +2767,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 <div
                   className="pointer-events-none absolute inset-x-10 top-10 z-0 h-24 rounded-full blur-3xl"
                   style={{
-                    background: "radial-gradient(circle, rgba(148,163,184,0.42) 0%, rgba(15,23,42,0) 72%)",
+                    background: "rgba(148,163,184,0.24)",
                     animation: "flipchartStageGlow 520ms ease-out both",
                   }}
                 />
@@ -2719,7 +2829,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                 </button>
                 <span className="text-[11px] font-semibold text-[#5f7b9e]">
-                  {audioLoading ? "Loading..." : isPlaying ? "Playing narration" : "Play narration"} · {trainerName}
+                  {audioLoading ? "Loading..." : isPlaying ? "Playing narration" : "Play narration"} Â· {trainerName}
                 </span>
               </div>
             ) : null}
@@ -2747,7 +2857,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     />
                   ))}
                 </div>
-                <span className="text-[12px] font-semibold text-[#5f7b9e]">Slide {currentSlide + 1} of {totalSlides} · Score {score.correct}/{score.total || 0}</span>
+                <span className="text-[12px] font-semibold text-[#5f7b9e]">Slide {currentSlide + 1} of {totalSlides} Â· Score {score.correct}/{score.total || 0}</span>
               </div>
 
               <button
@@ -2809,3 +2919,4 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     </div>
   );
 };
+

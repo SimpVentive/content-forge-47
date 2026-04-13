@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Sparkles, BookOpen, Mic, Brain, Film, ShieldCheck, ArrowRight, HelpCircle } from "lucide-react";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
@@ -13,7 +13,7 @@ const loadedAtLabel = new Intl.DateTimeFormat("en-US", {
 }).format(new Date());
 
 const features = [
-  { icon: Brain, title: "AI-Powered Agents", desc: "10 specialized agents work together — research, writing, visuals, voice, assessment, and more." },
+  { icon: Brain, title: "AI-Powered Agents", desc: "10 specialized agents work together â€” research, writing, visuals, voice, assessment, and more." },
   { icon: BookOpen, title: "Structured Courses", desc: "Bloom's taxonomy-aligned modules with hooks, body content, and key takeaways." },
   { icon: Film, title: "YouTube Integration", desc: "Find, clip, and embed relevant videos directly into your course timeline." },
   { icon: Mic, title: "Narration & Voice", desc: "AI-generated narration scripts with text-to-speech and sentence highlighting." },
@@ -115,7 +115,7 @@ const Welcome = () => {
         <div
           className="fixed inset-0 z-40 flex items-center justify-center"
           style={{
-            background: "linear-gradient(180deg, #f8fafc 0%, #edf3fb 100%)",
+            background: "#F8FAFC",
             animation: introStage === "settling" ? "welcomeStageExit 700ms ease forwards" : undefined,
           }}
         >
@@ -145,7 +145,7 @@ const Welcome = () => {
                 className="text-[#b8860b]"
                 style={{
                   textShadow: "0 1px 3px rgba(184,134,11,0.3)",
-                  backgroundImage: "linear-gradient(90deg, #9f7002 0%, #d5a62d 35%, #f4d36d 50%, #c89105 68%, #9f7002 100%)",
+                  backgroundImage: "#B45309",
                   backgroundSize: "220% 100%",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",
@@ -183,14 +183,34 @@ const Welcome = () => {
           Latest load: {loadedAtLabel}
         </div>
       </div>
+      <div
+        className="fixed inset-x-0 bottom-0 z-[100] border-t-2 shadow-[0_-8px_22px_rgba(15,23,42,0.12)]"
+        style={{
+          background: "rgba(255, 255, 255, 0.98)",
+          borderColor: "#cbd5e1",
+          backdropFilter: "blur(8px)",
+        }}
+      >
+        <div className="mx-auto flex max-w-5xl flex-col items-center gap-2 px-4 py-3 sm:flex-row sm:justify-center sm:gap-5">
+          <img
+            src="/unitol-logo.svg"
+            alt="UniTol Training Solutions Pvt Ltd"
+            className="h-12 w-auto object-contain sm:h-14"
+            loading="lazy"
+          />
+          <p className="text-center text-[13px] font-bold sm:text-[15px]" style={{ color: "#1e3a5f" }}>
+            This is an offering from UniTol Training Solutions Pvt Ltd, India
+          </p>
+        </div>
+      </div>
       {/* Hero */}
       <div
-        className="relative overflow-hidden"
+        className="relative overflow-hidden pb-20"
         style={{ animation: isLeavingPage ? "welcomePageExit 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards" : undefined }}
       >
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/10" />
+        <div className="absolute inset-0 bg-slate-100/70" />
         <div className="absolute inset-x-0 top-0 h-[420px] opacity-90"
-          style={{ background: "radial-gradient(circle at 50% 18%, rgba(151,193,219,0.32) 0%, rgba(151,193,219,0.14) 32%, rgba(151,193,219,0) 70%)" }}
+          style={{ background: "rgba(151,193,219,0.16)" }}
         />
         <div
           className="relative max-w-5xl mx-auto px-6 pt-20 pb-20 text-center"
@@ -214,7 +234,7 @@ const Welcome = () => {
               className="text-[#b8860b]"
               style={{
                 textShadow: "0 1px 3px rgba(184,134,11,0.3)",
-                backgroundImage: "linear-gradient(90deg, #9f7002 0%, #d5a62d 36%, #f4d36d 50%, #c89105 68%, #9f7002 100%)",
+                backgroundImage: "#B45309",
                 backgroundSize: "220% 100%",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -226,7 +246,7 @@ const Welcome = () => {
           </h1>
           <p className="mx-auto mb-10 max-w-2xl text-[20px] font-medium leading-[1.75]"
             style={{ color: "#536a87" }}>
-            Transform your raw content into polished, LMS-ready eLearning courses in minutes — powered by a multi-agent AI pipeline.
+            Transform your raw content into polished, LMS-ready eLearning courses in minutes â€” powered by a multi-agent AI pipeline.
           </p>
           <div className="flex items-center justify-center gap-4">
             <button
@@ -298,13 +318,9 @@ const Welcome = () => {
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="border-t border-border py-8 text-center text-[14px] font-medium"
-        style={{ color: "#667b94" }}>
-        ContentForge — AI-Powered eLearning Course Generator
-      </footer>
     </div>
   );
 };
 
 export default Welcome;
+
