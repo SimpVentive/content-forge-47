@@ -233,6 +233,111 @@ function tryParseJson(raw: string): any | null {
   }
 }
 
+function toTitleCase(value: string): string {
+  return value
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function extractFallbackTopicCandidates(inputText: string): string[] {
+  const lines = inputText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/^[-*\d.)\s]+/, "").trim())
+    .filter((line) => line.length >= 12);
+
+  const sentenceCandidates = inputText
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.replace(/^[-*\d.)\s]+/, "").trim())
+    .filter((sentence) => sentence.length >= 18 && sentence.length <= 96);
+
+  const merged = [...lines, ...sentenceCandidates];
+  const seen = new Set<string>();
+  const normalized = merged
+    .map((value) => value.replace(/[:;]+$/g, "").replace(/\s+/g, " ").trim())
+    .filter((value) => {
+      const key = normalizeTextKey(value);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .map((value) => {
+      if (value.length <= 64) return toTitleCase(value);
+      const shortened = value.split(/[,:-]/)[0]?.trim() || value;
+      return toTitleCase(shortened.slice(0, 64).trim());
+    });
+
+  return normalized.slice(0, 12);
+}
+
+function buildArchitectFallback(
+  courseTitle: string,
+  inputText: string,
+  durationMinutes: number,
+  targetWords: number
+): string {
+  const topicCandidates = extractFallbackTopicCandidates(inputText);
+  const fallbackTopics = topicCandidates.length > 0
+    ? topicCandidates
+    : [
+        `Why ${courseTitle}`,
+        `Core Ideas In ${courseTitle}`,
+        `Applying ${courseTitle} At Work`,
+        `Common Pitfalls In ${courseTitle}`,
+        `Next Steps For ${courseTitle}`,
+      ];
+
+  const moduleCount = Math.max(1, Math.min(4, Math.ceil(fallbackTopics.length / 3)));
+  const topicsPerModule = Math.max(1, Math.ceil(fallbackTopics.length / moduleCount));
+  const estimatedMinutes = Math.max(1, Math.round((durationMinutes / moduleCount) * 10) / 10);
+  const moduleTitles = ["Foundations", "Core Practice", "Workplace Decisions", "Action Plan"];
+
+  const modules = Array.from({ length: moduleCount }, (_, moduleIndex) => {
+    const topics = fallbackTopics
+      .slice(moduleIndex * topicsPerModule, (moduleIndex + 1) * topicsPerModule)
+      .map((topicTitle, topicIndex) => ({
+        topic_title: topicTitle,
+        learning_objective: `Help the learner explain and apply ${topicTitle.toLowerCase()} in a practical work context.`,
+        blooms_level: topicIndex === 0 ? "Understand" : "Apply",
+        instructional_pattern: topicIndex % 2 === 0 ? "scenario walkthrough" : "concept explanation",
+        scenario_anchor: `A realistic workplace example involving ${topicTitle.toLowerCase()}.`,
+        misconception_to_correct: `Assuming ${topicTitle.toLowerCase()} is only theoretical or optional.`,
+        decision_skill: `Choose the strongest response when ${topicTitle.toLowerCase()} matters.`,
+        practice_activity: `Reflect on one real decision connected to ${topicTitle.toLowerCase()}.`,
+        interaction_type: topicIndex % 2 === 0 ? "decision prompt" : "guided reflection",
+        feedback_focus: `Reinforce practical use of ${topicTitle.toLowerCase()}.`,
+        screen_intent: "Teach the concept and connect it to real work.",
+        key_takeaway: `${topicTitle} should change what the learner does next.`,
+        evidence_or_example: `Use an example from the provided source material related to ${topicTitle.toLowerCase()}.`,
+      }));
+
+    return {
+      module_title: `${moduleTitles[moduleIndex] || `Module ${moduleIndex + 1}`} - ${courseTitle}`,
+      module_promise: `Give the learner a usable chapter on ${courseTitle.toLowerCase()}.`,
+      why_it_matters: `This module keeps the course moving toward practical application of ${courseTitle.toLowerCase()}.`,
+      estimated_minutes: estimatedMinutes,
+      module_assessment_strategy: "Short decision checks and applied reflection prompts.",
+      topics,
+    };
+  });
+
+  return JSON.stringify({
+    course_promise: `A practical course that helps learners act on ${courseTitle}.`,
+    audience: "Workplace learners who need concise, actionable guidance.",
+    outcome_statement: `By the end of the course, learners can explain and apply the key ideas in ${courseTitle}.`,
+    quality_targets: {
+      realism: "Use only examples grounded in the provided source material.",
+      instructional_variety: "Mix explanation, scenario, and reflection.",
+      interaction_density: "Include lightweight decision moments throughout.",
+      scenario_expectation: "Tie every module to at least one workplace situation.",
+    },
+    modules,
+    fallback_mode: true,
+    fallback_source_excerpt: inputText.trim().slice(0, Math.min(1800, targetWords)),
+  }, null, 2);
+}
+
 const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
@@ -254,7 +359,7 @@ async function callClaude(systemPrompt: string, userMessage: string): Promise<st
   return data.text;
 }
 
-async function callClaudeWithTimeout(systemPrompt: string, userMessage: string, timeoutMs = 120000): Promise<string> {
+async function callClaudeWithTimeout(systemPrompt: string, userMessage: string, timeoutMs = 90000): Promise<string> {
   let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
 
   try {
@@ -273,12 +378,12 @@ async function callClaudeWithTimeout(systemPrompt: string, userMessage: string, 
   }
 }
 
-async function callClaudeWithRetry(systemPrompt: string, userMessage: string, addLog: (msg: string) => void, agentName: string): Promise<string> {
+async function callClaudeWithRetry(systemPrompt: string, userMessage: string, addLog: (msg: string) => void, agentName: string, timeoutMs = 90000): Promise<string> {
   try {
-    return await callClaudeWithTimeout(systemPrompt, userMessage);
+    return await callClaudeWithTimeout(systemPrompt, userMessage, timeoutMs);
   } catch (err) {
-    addLog(`${agentName}: Error — retrying once...`);
-    return await callClaudeWithTimeout(systemPrompt, userMessage);
+    addLog(`${agentName}: Error — retrying once (${(err as Error).message})...`);
+    return await callClaudeWithTimeout(systemPrompt, userMessage, timeoutMs);
   }
 }
 
@@ -425,7 +530,7 @@ export function useAgentPipeline() {
           researchResult = await callClaudeWithRetry(
             `You are a Research Agent for premium corporate eLearning. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or drift into generic training filler. Extract the knowledge, tensions, examples, and practical behaviors that could support a sophisticated learner experience. Course level: ${params?.level || "intermediate"}. Language for on-screen text: ${textLanguage}. CRITICAL — Target duration is ${params?.duration || "15min"}. The finished learner experience must feel like approximately ${durationMinutes} minutes of content, which means around ${targetNarrationWords} words of narration/script across the course. Generate enough depth to support that runtime. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Return JSON with these keys: source_summary, key_themes, learner_problems, stakes_and_consequences, common_misconceptions, practical_behaviors, scenario_opportunities, evidence_and_examples, learning_objectives.`,
             `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content. Target duration: ${params?.duration || "15min"}. Approximate narration budget: ${targetNarrationWords} words. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Find material that can support realistic scenarios, decisions, contrasts between weak and strong practice, and memorable learner takeaways.`,
-            addLog, "Research Agent"
+            addLog, "Research Agent", 45000
           );
           setStatus("research", "complete");
           setRawOutputs((prev) => ({ ...prev, research: researchResult }));
@@ -459,12 +564,19 @@ export function useAgentPipeline() {
       if (toggles["architect"] !== false) {
         setStatus("architect", "running");
         addLog("Content Architect: Receiving research output...");
-        archResult = await callClaudeWithRetry(
-          `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. The sum of all module estimated_minutes must land within +/- ${durationToleranceMinutes} minutes of ${durationMinutes}. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. Return JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`,
-          `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nRecommended Structure: ${structureGuidance}\nSophistication Requirement: ${sophisticationGuidance}\nInstructional Pattern Guidance: ${instructionalPatternGuidance}\n\nBuild the course structure strictly from the above content, scaled to fit the target duration. Make modules feel like meaningful chapters with different jobs to do, and make topics feel teachable, scenario-ready, and presentation-worthy.`,
-          addLog, "Content Architect"
-        );
-        setStatus("architect", "complete");
+        try {
+          archResult = await callClaudeWithRetry(
+            `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. The sum of all module estimated_minutes must land within +/- ${durationToleranceMinutes} minutes of ${durationMinutes}. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. Return JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`,
+            `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nRecommended Structure: ${structureGuidance}\nSophistication Requirement: ${sophisticationGuidance}\nInstructional Pattern Guidance: ${instructionalPatternGuidance}\n\nBuild the course structure strictly from the above content, scaled to fit the target duration. Make modules feel like meaningful chapters with different jobs to do, and make topics feel teachable, scenario-ready, and presentation-worthy.`,
+            addLog, "Content Architect", 45000
+          );
+          setStatus("architect", "complete");
+        } catch (architectErr) {
+          archResult = buildArchitectFallback(courseTitle, inputText, durationMinutes, targetNarrationWords);
+          setStatus("architect", "error");
+          addLog(`Content Architect: Failed (${(architectErr as Error).message}). Continuing with deterministic fallback structure.`);
+        }
+
         setRawOutputs((prev) => ({ ...prev, architect: archResult }));
         setOutputData((prev) => ({
           ...prev,
