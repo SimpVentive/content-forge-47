@@ -1,22 +1,31 @@
-<svg width="260" height="190" viewBox="0 0 260 190" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="260" height="190" rx="18" fill="#F6F8FB"/>
-  <g opacity="0.55" stroke="#9DBED9" stroke-width="5" stroke-linecap="round">
-    <line x1="22" y1="60" x2="68" y2="60"/>
-    <line x1="12" y1="82" x2="58" y2="82"/>
-    <line x1="26" y1="104" x2="72" y2="104"/>
-    <line x1="16" y1="126" x2="62" y2="126"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="620" viewBox="0 0 1120 620" fill="none" role="img" aria-labelledby="title desc">
+  <title id="title">Hang on tight orchestration panel</title>
+  <desc id="desc">Running character and message while AI orchestrates the e-learning course.</desc>
+
+  <rect width="1120" height="620" fill="#ECEDEE"/>
+  <rect x="64" y="118" width="992" height="382" rx="20" fill="#ECEDEE" stroke="#223B76" stroke-width="10"/>
+
+  <g opacity="0.48" stroke="#95BCD2" stroke-width="5" stroke-linecap="round">
+    <line x1="154" y1="216" x2="210" y2="216"/>
+    <line x1="126" y1="248" x2="182" y2="248"/>
+    <line x1="148" y1="280" x2="204" y2="280"/>
+    <line x1="136" y1="312" x2="192" y2="312"/>
+    <line x1="162" y1="344" x2="218" y2="344"/>
   </g>
-  <ellipse cx="122" cy="163" rx="66" ry="9" fill="#D6DCE8"/>
-  <circle cx="148" cy="36" r="14" fill="#F2B37A"/>
-  <path d="M142 28C148 24 154 24 160 28" stroke="#2E364A" stroke-width="4" stroke-linecap="round"/>
-  <path d="M130 62C138 52 155 49 171 55L187 61L175 77L160 71L148 83L130 62Z" fill="#2D8CCF"/>
-  <path d="M156 77L177 91" stroke="#2E364A" stroke-width="7" stroke-linecap="round"/>
-  <path d="M136 69L112 88" stroke="#2E364A" stroke-width="7" stroke-linecap="round"/>
-  <path d="M112 88L86 104" stroke="#2E364A" stroke-width="7" stroke-linecap="round"/>
-  <path d="M86 104L68 139" stroke="#2E364A" stroke-width="7" stroke-linecap="round"/>
-  <path d="M160 86L138 118" stroke="#2E364A" stroke-width="7" stroke-linecap="round"/>
-  <path d="M138 118L112 147" stroke="#2E364A" stroke-width="7" stroke-linecap="round"/>
-  <path d="M68 139L92 145" stroke="#1E88D7" stroke-width="10" stroke-linecap="round"/>
-  <path d="M112 147L140 153" stroke="#1E88D7" stroke-width="10" stroke-linecap="round"/>
-  <path d="M128 66L158 66" stroke="#2E364A" stroke-width="6" stroke-linecap="round"/>
+
+  <ellipse cx="232" cy="424" rx="86" ry="10" fill="#CFD3D9"/>
+  <circle cx="250" cy="214" r="18" fill="#E8AE83"/>
+  <path d="M236 205C244 198 257 198 265 204" stroke="#533A33" stroke-width="5" stroke-linecap="round"/>
+  <path d="M224 248C236 234 264 228 290 237L317 245L300 272L274 264L254 283L224 248Z" fill="#2B97D8"/>
+  <path d="M268 263L307 286" stroke="#1F2A3A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M232 259L194 284" stroke="#1F2A3A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M194 284L161 346" stroke="#1F2A3A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M278 274L244 334" stroke="#1F2A3A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M244 334L208 386" stroke="#1F2A3A" stroke-width="10" stroke-linecap="round"/>
+  <path d="M161 346L187 354" stroke="#1E88D7" stroke-width="13" stroke-linecap="round"/>
+  <path d="M208 386L238 394" stroke="#1E88D7" stroke-width="13" stroke-linecap="round"/>
+
+  <text x="398" y="246" fill="#2A3551" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="68" font-weight="800" letter-spacing="-0.02em">Hang on tight !!</text>
+  <text x="420" y="318" fill="#2A3551" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="56" font-weight="500">AI is orchestrating your</text>
+  <text x="470" y="388" fill="#2A3551" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="56" font-weight="500">E-Learning course</text>
 </svg>

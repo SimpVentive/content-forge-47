@@ -29,6 +29,15 @@ function tryParseJSON(raw: string): any | null {
   }
 }
 
+function decodeBase64Audio(base64Audio: string): Blob {
+  const binary = atob(base64Audio);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: "audio/mpeg" });
+}
+
 export const VoicePreview: React.FC<VoicePreviewProps> = ({ voiceRaw }) => {
   const [selectedVoice, setSelectedVoice] = useState(VOICES[0]);
   const [audioUrls, setAudioUrls] = useState<Record<number, string>>({});
@@ -69,7 +78,20 @@ export const VoicePreview: React.FC<VoicePreviewProps> = ({ voiceRaw }) => {
         throw new Error(errData?.error || `TTS failed: ${response.status}`);
       }
 
-      const blob = await response.blob();
+      const contentType = response.headers.get("content-type") || "";
+      let blob: Blob;
+
+      if (contentType.includes("application/json")) {
+        const payload = await response.json();
+        const audioBase64: string | undefined = payload?.audioBase64 || payload?.audio_base64;
+        if (!audioBase64) {
+          throw new Error("TTS response did not include audio payload");
+        }
+        blob = decodeBase64Audio(audioBase64);
+      } else {
+        blob = await response.blob();
+      }
+
       const url = URL.createObjectURL(blob);
       setAudioUrls((prev) => ({ ...prev, [index]: url }));
       setGeneratedCount((c) => c + 1);

@@ -5,7 +5,7 @@ import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
 import { FLIP_STYLES, HIGHLIGHT_PALETTES, PreviewActionBar, type FlipStyle, type HighlightPalette } from "./PreviewActionBar";
 import { AvatarNarrator } from "./AvatarNarrator";
-import { AVATAR_TRAINERS, getTrainerMedia } from "@/lib/avatarTrainers";
+import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
 
 /* helpers */
 function tryParseJSON(raw: string): any | null {
@@ -75,6 +75,151 @@ function getNarratorExcerpt(text: string, sentenceCount = 3): string {
 
   const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
   return sentences.slice(0, sentenceCount).join(" ");
+}
+
+type ElevenLabsAlignment = {
+  characters?: string[];
+  chars?: string[];
+  character_start_times_seconds?: number[];
+  character_end_times_seconds?: number[];
+  char_start_times_ms?: number[];
+  char_durations_ms?: number[];
+};
+
+type VisemeCue = {
+  startMs: number;
+  endMs: number;
+  viseme: VisemeKey;
+};
+
+type ParsedTtsPayload = {
+  audioUrl: string;
+  visemeTimeline: VisemeCue[];
+};
+
+function decodeBase64Audio(base64Audio: string): Blob {
+  const binary = atob(base64Audio);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new Blob([bytes], { type: "audio/mpeg" });
+}
+
+function toMilliseconds(value: number, fromSeconds: boolean): number {
+  return fromSeconds ? value * 1000 : value;
+}
+
+function mapTokenToViseme(token: string): VisemeKey {
+  const normalized = token.toLowerCase();
+  if (!normalized || /\s/.test(normalized) || /[.,!?;:'"()\[\]{}\-]/.test(normalized)) return "rest";
+  if (["th"].includes(normalized)) return "th";
+  if (["ch", "sh", "zh"].includes(normalized)) return "ch";
+  if (["ph", "f", "v"].includes(normalized)) return "fv";
+  if (["b", "m", "p"].includes(normalized)) return "mbp";
+  if (normalized === "l") return "l";
+  if (normalized === "r") return "r";
+  if (["w", "q", "wh", "qu"].includes(normalized)) return "wq";
+  if (["a", "aa"].includes(normalized)) return "aa";
+  if (["e", "ee"].includes(normalized)) return "ee";
+  if (["i", "y", "ih"].includes(normalized)) return "ih";
+  if (["o", "oh"].includes(normalized)) return "oh";
+  if (["u", "ou", "oo"].includes(normalized)) return "ou";
+  if (/[ae]/.test(normalized)) return "aa";
+  if (/[iy]/.test(normalized)) return "ih";
+  if (/[ou]/.test(normalized)) return "oh";
+  if (/[fv]/.test(normalized)) return "fv";
+  if (/[bmp]/.test(normalized)) return "mbp";
+  if (/[rl]/.test(normalized)) return normalized.includes("l") ? "l" : "r";
+  if (/[wq]/.test(normalized)) return "wq";
+  return "rest";
+}
+
+function buildVisemeTimeline(alignment: ElevenLabsAlignment | null | undefined): VisemeCue[] {
+  if (!alignment) return [];
+
+  const chars = alignment.characters || alignment.chars || [];
+  if (!Array.isArray(chars) || chars.length === 0) return [];
+
+  const startsSeconds = alignment.character_start_times_seconds;
+  const startsMs = alignment.char_start_times_ms;
+  const hasSecondTimings = Array.isArray(startsSeconds) && startsSeconds.length === chars.length;
+  const starts = hasSecondTimings
+    ? startsSeconds
+    : Array.isArray(startsMs) && startsMs.length === chars.length
+      ? startsMs
+      : [];
+
+  if (starts.length !== chars.length) return [];
+
+  const durations = Array.isArray(alignment.char_durations_ms) && alignment.char_durations_ms.length === chars.length
+    ? alignment.char_durations_ms
+    : [];
+  const endsSeconds = Array.isArray(alignment.character_end_times_seconds) && alignment.character_end_times_seconds.length === chars.length
+    ? alignment.character_end_times_seconds
+    : [];
+
+  const digraphs = new Set(["th", "sh", "ch", "zh", "ph", "wh", "qu", "oo", "ee", "aa"]);
+  const timeline: VisemeCue[] = [];
+  let index = 0;
+
+  while (index < chars.length) {
+    const current = String(chars[index] || "");
+    const next = String(chars[index + 1] || "");
+    const pair = `${current}${next}`.toLowerCase();
+    const useDigraph = digraphs.has(pair);
+
+    const startMs = toMilliseconds(starts[index], hasSecondTimings);
+    let endMs = startMs + 70;
+
+    if (durations.length > 0) {
+      const durationMs = useDigraph
+        ? (durations[index] || 0) + (durations[index + 1] || 0)
+        : (durations[index] || 0);
+      endMs = startMs + Math.max(35, durationMs);
+    } else if (endsSeconds.length > 0) {
+      const end = useDigraph ? endsSeconds[index + 1] : endsSeconds[index];
+      endMs = Math.max(startMs + 30, toMilliseconds(end, true));
+    } else {
+      const nextStart = starts[Math.min(starts.length - 1, index + (useDigraph ? 2 : 1))];
+      if (Number.isFinite(nextStart)) {
+        endMs = Math.max(startMs + 30, toMilliseconds(nextStart, hasSecondTimings));
+      }
+    }
+
+    timeline.push({
+      startMs,
+      endMs,
+      viseme: mapTokenToViseme(useDigraph ? pair : current),
+    });
+
+    index += useDigraph ? 2 : 1;
+  }
+
+  return timeline;
+}
+
+async function parseTtsResponse(response: Response): Promise<ParsedTtsPayload> {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    const payload = await response.json();
+    const audioBase64: string | undefined = payload?.audioBase64 || payload?.audio_base64;
+    if (!audioBase64) {
+      throw new Error("TTS response did not include audio payload");
+    }
+
+    const blob = decodeBase64Audio(audioBase64);
+    return {
+      audioUrl: URL.createObjectURL(blob),
+      visemeTimeline: buildVisemeTimeline(payload?.alignment || payload?.normalizedAlignment || payload?.normalized_alignment),
+    };
+  }
+
+  const blob = await response.blob();
+  return {
+    audioUrl: URL.createObjectURL(blob),
+    visemeTimeline: [],
+  };
 }
 
 function buildFlipChartLines(
@@ -919,6 +1064,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
   const avatarEnv = import.meta.env as Record<string, string | undefined>;
   const trainerMedia = getTrainerMedia(selectedTrainer.id, avatarEnv);
+  const trainerVoiceId = getTrainerVoiceId(selectedTrainer.id);
   const avatarVideoUrl = trainerMedia.videoUrl;
   const avatarPosterUrl = trainerMedia.posterUrl;
   const avatarImageUrl = trainerMedia.imageUrl;
@@ -937,6 +1083,21 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   // Sync if parent changes
   useEffect(() => { setLocalVideos(insertedVideos); }, [insertedVideos]);
+
+  useEffect(() => {
+    Object.values(audioUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    audioUrlsRef.current = {};
+    visemeTimelinesRef.current = {};
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+
+    setIsPlaying(false);
+    stopLipSync();
+  }, [trainerVoiceId, stopLipSync]);
 
   const unassignedCount = localVideos.filter(v => !v.moduleTitle).length;
   const activeHighlightPalette = HIGHLIGHT_PALETTES[highlightPalette];
@@ -1024,14 +1185,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [voiceActivityLevel, setVoiceActivityLevel] = useState(0);
+  const [activeViseme, setActiveViseme] = useState<VisemeKey>("rest");
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlsRef = useRef<Record<number, string>>({});
+  const visemeTimelinesRef = useRef<Record<number, VisemeCue[]>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const lipSyncFrameRef = useRef<number>(0);
   const analyserDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
+  const visemeIndexRef = useRef(0);
 
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
@@ -1087,10 +1251,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
     analyserDataRef.current = null;
     setVoiceActivityLevel(0);
+    setActiveViseme("rest");
+    visemeIndexRef.current = 0;
   }, []);
 
-  const startLipSync = useCallback(async (audio: HTMLAudioElement) => {
+  const startLipSync = useCallback(async (audio: HTMLAudioElement, visemeTimeline: VisemeCue[] = []) => {
     stopLipSync();
+    visemeIndexRef.current = 0;
 
     try {
       const AudioContextCtor = window.AudioContext
@@ -1098,6 +1265,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
       if (!AudioContextCtor) {
         setVoiceActivityLevel(audio.paused ? 0 : 0.35);
+        setActiveViseme(audio.paused ? "rest" : "aa");
         return;
       }
 
@@ -1125,6 +1293,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       const tick = () => {
         if (audio.paused || audio.ended || !analyserRef.current || !analyserDataRef.current) {
           setVoiceActivityLevel(0);
+          setActiveViseme("rest");
           lipSyncFrameRef.current = 0;
           return;
         }
@@ -1141,12 +1310,33 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const normalized = Math.max(0, Math.min(1, (rms - 0.012) / 0.11));
         smoothedLevel = smoothedLevel * 0.62 + normalized * 0.38;
         setVoiceActivityLevel(smoothedLevel);
+
+        if (visemeTimeline.length > 0) {
+          const nowMs = audio.currentTime * 1000;
+          let timelineIndex = visemeIndexRef.current;
+
+          while (timelineIndex < visemeTimeline.length - 1 && nowMs >= visemeTimeline[timelineIndex].endMs) {
+            timelineIndex += 1;
+          }
+
+          while (timelineIndex > 0 && nowMs < visemeTimeline[timelineIndex].startMs) {
+            timelineIndex -= 1;
+          }
+
+          visemeIndexRef.current = timelineIndex;
+          const cue = visemeTimeline[timelineIndex];
+          setActiveViseme(nowMs >= cue.startMs && nowMs <= cue.endMs ? cue.viseme : "rest");
+        } else {
+          setActiveViseme(smoothedLevel > 0.18 ? "aa" : "rest");
+        }
+
         lipSyncFrameRef.current = requestAnimationFrame(tick);
       };
 
       lipSyncFrameRef.current = requestAnimationFrame(tick);
     } catch {
       setVoiceActivityLevel(audio.paused ? 0 : 0.35);
+      setActiveViseme(audio.paused ? "rest" : "aa");
     }
   }, [stopLipSync]);
 
@@ -1254,8 +1444,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     audioRef.current = audio;
     audio.onplay = () => {
       setIsPlaying(true);
+      visemeIndexRef.current = 0;
       startWordHighlight(audio);
-      void startLipSync(audio);
+      void startLipSync(audio, visemeTimelinesRef.current[currentSlide] || []);
     };
     audio.onended = () => {
       setIsPlaying(false);
@@ -1268,7 +1459,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
       stopLipSync();
     };
-  }, [muted, startLipSync, startWordHighlight, stopLipSync]);
+  }, [currentSlide, muted, startLipSync, startWordHighlight, stopLipSync]);
 
   // Fetch and play TTS on demand (user gesture)
   const playNarration = useCallback(async () => {
@@ -1297,7 +1488,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           },
           body: JSON.stringify({
             text: narrationText.slice(0, 2500),
-            voiceId: "EXAVITQu4vr4xnSDxMaL", // Sarah
+            voiceId: trainerVoiceId,
           }),
         }
       );
@@ -1306,9 +1497,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         console.error("TTS error:", response.status, errText);
         return;
       }
-      const blob = await response.blob();
-      if (blob.size < 100) { console.error("TTS returned empty audio"); return; }
-      const url = URL.createObjectURL(blob);
+      const { audioUrl, visemeTimeline } = await parseTtsResponse(response);
+      visemeTimelinesRef.current[currentSlide] = visemeTimeline;
+      const url = audioUrl;
       audioUrlsRef.current[currentSlide] = url;
       const audio = new Audio(url);
       wireAudio(audio);
@@ -1318,7 +1509,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     } finally {
       setAudioLoading(false);
     }
-  }, [currentSlide, getNarrationForSlide, wireAudio]);
+  }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio]);
 
   // Mute/unmute live
   useEffect(() => {
@@ -1743,9 +1934,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           avatarImageUrl={avatarImageUrl}
                           avatarVideoUrl={avatarVideoUrl}
                           avatarPosterUrl={avatarPosterUrl}
+                          trainerId={selectedTrainer.id}
                           isVoiceActive={isPlaying}
                           isVoiceLoading={audioLoading}
                           voiceActivityLevel={voiceActivityLevel}
+                          currentViseme={activeViseme}
                         />
                       </div>
                     </div>
@@ -1802,9 +1995,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                             avatarImageUrl={avatarImageUrl}
                             avatarVideoUrl={avatarVideoUrl}
                             avatarPosterUrl={avatarPosterUrl}
+                            trainerId={selectedTrainer.id}
                             isVoiceActive={isPlaying}
                             isVoiceLoading={audioLoading}
                             voiceActivityLevel={voiceActivityLevel}
+                            currentViseme={activeViseme}
                           />
                         </div>
                       </div>
@@ -2167,9 +2362,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     avatarImageUrl={avatarImageUrl}
                     avatarVideoUrl={avatarVideoUrl}
                     avatarPosterUrl={avatarPosterUrl}
+                    trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
                     voiceActivityLevel={voiceActivityLevel}
+                    currentViseme={activeViseme}
                   />
                 </div>
 

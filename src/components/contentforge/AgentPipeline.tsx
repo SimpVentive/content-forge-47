@@ -47,22 +47,12 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
       </div>
 
       {isRunning && (
-        <div
-          className="mb-6 flex items-center gap-5 rounded-[26px] border-[6px] px-6 py-5"
-          style={{
-            borderColor: "#2f4368",
-            background: "#f8fafc",
-            boxShadow: "0 16px 34px rgba(15, 23, 42, 0.14)",
-          }}
-        >
+        <div className="mb-6 overflow-hidden rounded-[20px] shadow-[0_14px_34px_rgba(15,23,42,0.14)]">
           <img
             src="/orchestration-waiting.svg"
-            alt="Running character"
-            className="h-[122px] w-[168px] shrink-0 object-contain"
+            alt="Hang on tight orchestration panel"
+            className="w-full object-contain"
           />
-          <p className="text-[44px] font-[900] leading-[1.05] tracking-[-0.02em] text-[#232d45]">
-            Hang on tight. AI is orchestrating your E-Learning course.
-          </p>
         </div>
       )}
 

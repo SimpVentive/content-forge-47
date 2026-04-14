@@ -342,7 +342,7 @@ function parseVoiceSections(voiceRaw: string): NarrationSection[] {
 }
 
 /* ── TTS Generation ── */
-async function generateTTSAudio(text: string, voiceId: string): Promise<ArrayBuffer> {
+async function generateTTSAudio(text: string, voiceId: string): Promise<string> {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
   const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
@@ -364,7 +364,19 @@ async function generateTTSAudio(text: string, voiceId: string): Promise<ArrayBuf
     throw new Error(errData?.error || `TTS failed: ${response.status}`);
   }
 
-  return response.arrayBuffer();
+  const contentType = response.headers.get("content-type") || "";
+
+  if (contentType.includes("application/json")) {
+    const payload = await response.json();
+    const audioBase64: string | undefined = payload?.audioBase64 || payload?.audio_base64;
+    if (!audioBase64) {
+      throw new Error("TTS response did not include audio payload");
+    }
+    return audioBase64;
+  }
+
+  const audioBuffer = await response.arrayBuffer();
+  return arrayBufferToBase64(audioBuffer);
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
@@ -1335,8 +1347,7 @@ export async function exportScormPackage(
 
       onProgress(`Generating audio for Module ${i + 1}/${modules.length}: ${modules[i].title}`);
       try {
-        const audioBuffer = await generateTTSAudio(section.narration_text, voiceId);
-        const base64 = arrayBufferToBase64(audioBuffer);
+        const base64 = await generateTTSAudio(section.narration_text, voiceId);
         audioBase64Map.set(i, base64);
       } catch (err) {
         console.warn(`TTS failed for module ${i + 1}:`, err);

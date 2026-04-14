@@ -2,6 +2,7 @@
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 
 interface AvatarNarratorProps {
   topic: string;
@@ -11,9 +12,11 @@ interface AvatarNarratorProps {
   avatarImageUrl?: string;
   avatarVideoUrl?: string;
   avatarPosterUrl?: string;
+  trainerId?: string;
   isVoiceActive?: boolean;
   isVoiceLoading?: boolean;
   voiceActivityLevel?: number;
+  currentViseme?: VisemeKey;
 }
 
 const CONCISE_RESPONSE_HINT = "Keep the response concise: maximum 90 words, 4 short paragraphs or fewer, and avoid repetition.";
@@ -36,7 +39,7 @@ function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: s
   return `Tap the explain icon and ${trainerName} will break down ${topic}. Quick preview: ${shortenedPreview}`;
 }
 
-export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl, isVoiceActive, isVoiceLoading, voiceActivityLevel = 0 }: AvatarNarratorProps) {
+export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl, trainerId = "priya", isVoiceActive, isVoiceLoading, voiceActivityLevel = 0, currentViseme = "rest" }: AvatarNarratorProps) {
   const [speechText, setSpeechText] = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasCompletedInitialResponse, setHasCompletedInitialResponse] = useState(false);
@@ -58,14 +61,16 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const pendingCompletionModeRef = useRef<RequestMode | null>(null);
   const mouthHoldTimeoutRef = useRef<number | null>(null);
   const [isMouthHold, setIsMouthHold] = useState(false);
+  const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
+  const visemeShape = lipSyncProfile.visemes[currentViseme] || lipSyncProfile.visemes.rest;
   const isTalking = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
   const normalizedVoiceLevel = Math.max(0, Math.min(1, voiceActivityLevel));
-  const mouthOpenLevel = isTalking
-    ? Math.max(isVoiceLoading ? 0.38 : 0.08, normalizedVoiceLevel)
-    : 0;
-  const mouthWidth = 34 + mouthOpenLevel * 16;
-  const mouthHeight = 4 + mouthOpenLevel * 22;
-  const mouthOpacity = isTalking ? 0.88 : 0.18;
+  const phonemeBoost = isTalking ? 0.85 + normalizedVoiceLevel * 0.3 : 0.72;
+  const mouthWidth = lipSyncProfile.baseWidth * visemeShape.width * phonemeBoost;
+  const mouthHeight = lipSyncProfile.baseHeight * visemeShape.height * (isTalking ? 1 : 0.45);
+  const mouthOpacity = isTalking
+    ? lipSyncProfile.openOpacity
+    : lipSyncProfile.closedOpacity;
 
   const clearMouthHoldTimeout = () => {
     if (mouthHoldTimeoutRef.current !== null) {
@@ -400,15 +405,16 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
             {hasAvatarImage && (
               <div className="pointer-events-none absolute left-1/2 top-[68%] h-[38px] w-[104px] -translate-x-1/2 -translate-y-1/2">
                 <div
-                  className="absolute left-1/2 top-1/2 rounded-[999px] border border-[#2d1714]/35"
+                  className="absolute left-1/2 top-1/2 border border-[#2d1714]/35"
                   style={{
                     width: `${mouthWidth}px`,
                     height: `${mouthHeight}px`,
                     opacity: mouthOpacity,
+                    borderRadius: `${visemeShape.roundness}px`,
                     background: "radial-gradient(circle at 50% 40%, rgba(42, 14, 18, 0.98) 0%, rgba(78, 23, 28, 0.9) 62%, rgba(42, 16, 18, 0.12) 100%)",
                     boxShadow: isTalking ? "0 2px 10px rgba(0,0,0,0.24)" : "none",
-                    transform: `translate(-50%, -50%) scaleY(${0.7 + mouthOpenLevel * 0.85})`,
-                    transition: "width 80ms linear, height 80ms linear, opacity 80ms linear, transform 80ms linear",
+                    transform: `translate(-50%, calc(-50% + ${visemeShape.lift * 10}px))`,
+                    transition: "width 45ms linear, height 45ms linear, opacity 45ms linear, transform 45ms linear, border-radius 45ms linear",
                   }}
                 />
                 <div
@@ -416,8 +422,8 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
                   style={{
                     width: `${mouthWidth + 10}px`,
                     background: "rgba(110, 54, 48, 0.46)",
-                    opacity: isTalking ? 0.18 : 0.36,
-                    transition: "width 80ms linear, opacity 80ms linear",
+                    opacity: isTalking ? 0.14 : 0.32,
+                    transition: "width 45ms linear, opacity 45ms linear",
                   }}
                 />
                 <div
@@ -425,9 +431,9 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
                   style={{
                     width: `${Math.max(14, mouthWidth - 10)}px`,
                     background: "rgba(244, 181, 194, 0.32)",
-                    opacity: isTalking ? 0.42 : 0,
+                    opacity: isTalking ? Math.min(0.48, 0.18 + normalizedVoiceLevel * 0.4) : 0,
                     filter: "blur(0.4px)",
-                    transition: "width 80ms linear, opacity 80ms linear",
+                    transition: "width 45ms linear, opacity 45ms linear",
                   }}
                 />
               </div>

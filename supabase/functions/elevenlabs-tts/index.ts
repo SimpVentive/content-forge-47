@@ -23,7 +23,7 @@ serve(async (req) => {
     }
 
     const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId || "21m00Tcm4TlvDq8ikWAM"}?output_format=mp3_44100_128`,
+      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId || "21m00Tcm4TlvDq8ikWAM"}/with-timestamps?output_format=mp3_44100_128`,
       {
         method: "POST",
         headers: {
@@ -52,12 +52,24 @@ serve(async (req) => {
       });
     }
 
-    const audioBuffer = await response.arrayBuffer();
+    const payload = await response.json();
 
-    return new Response(audioBuffer, {
+    if (!payload?.audio_base64) {
+      return new Response(JSON.stringify({ error: "ElevenLabs response missing audio payload" }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({
+      audioBase64: payload.audio_base64,
+      alignment: payload.alignment || null,
+      normalizedAlignment: payload.normalized_alignment || null,
+      voiceId: voiceId || "21m00Tcm4TlvDq8ikWAM",
+    }), {
       headers: {
         ...corsHeaders,
-        "Content-Type": "audio/mpeg",
+        "Content-Type": "application/json",
       },
     });
   } catch (error: unknown) {
