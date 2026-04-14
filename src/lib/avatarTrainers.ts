@@ -130,7 +130,7 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   priya: {
     baseWidth: 35,
     baseHeight: 22,
-    mouthTopPct: 68,
+    mouthTopPct: 28,
     mouthLeftPct: 50,
     visemeTweaks: {
       ee: { width: 1.25 },
@@ -140,7 +140,7 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   indira: {
     baseWidth: 34,
     baseHeight: 21,
-    mouthTopPct: 68,
+    mouthTopPct: 35,
     mouthLeftPct: 50,
     visemeTweaks: {
       ou: { width: 0.66, height: 0.94 },
@@ -150,7 +150,7 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   arjun: {
     baseWidth: 36,
     baseHeight: 23,
-    mouthTopPct: 68,
+    mouthTopPct: 36,
     mouthLeftPct: 50,
     visemeTweaks: {
       mbp: { height: 0.1 },
@@ -160,8 +160,8 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   neha: {
     baseWidth: 33,
     baseHeight: 21,
-    mouthTopPct: 68,
-    mouthLeftPct: 50,
+    mouthTopPct: 34,
+    mouthLeftPct: 49,
     visemeTweaks: {
       ih: { width: 1.06 },
       fv: { width: 1.2 },
@@ -170,7 +170,7 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   rohan: {
     baseWidth: 35,
     baseHeight: 22,
-    mouthTopPct: 68,
+    mouthTopPct: 62,
     mouthLeftPct: 50,
     visemeTweaks: {
       oh: { width: 0.78, height: 1.08 },
@@ -180,7 +180,7 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   daniel: {
     baseWidth: 36,
     baseHeight: 23,
-    mouthTopPct: 68,
+    mouthTopPct: 62,
     mouthLeftPct: 50,
     visemeTweaks: {
       aa: { width: 1.08, height: 1.06 },
@@ -190,7 +190,7 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   emma: {
     baseWidth: 34,
     baseHeight: 22,
-    mouthTopPct: 68,
+    mouthTopPct: 57,
     mouthLeftPct: 50,
     visemeTweaks: {
       ee: { width: 1.24 },
