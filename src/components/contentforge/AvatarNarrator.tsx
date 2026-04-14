@@ -2,7 +2,6 @@
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 
 interface AvatarNarratorProps {
   topic: string;
@@ -15,8 +14,6 @@ interface AvatarNarratorProps {
   trainerId?: string;
   isVoiceActive?: boolean;
   isVoiceLoading?: boolean;
-  voiceActivityLevel?: number;
-  currentViseme?: VisemeKey;
 }
 
 const CONCISE_RESPONSE_HINT = "Keep the response concise: maximum 90 words, 4 short paragraphs or fewer, and avoid repetition.";
@@ -39,7 +36,7 @@ function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: s
   return `Tap the explain icon and ${trainerName} will break down ${topic}. Quick preview: ${shortenedPreview}`;
 }
 
-export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl, trainerId = "priya", isVoiceActive, isVoiceLoading, voiceActivityLevel = 0, currentViseme = "rest" }: AvatarNarratorProps) {
+export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName = "Sarah", avatarImageUrl, avatarVideoUrl, avatarPosterUrl, trainerId = "priya", isVoiceActive, isVoiceLoading }: AvatarNarratorProps) {
   const [speechText, setSpeechText] = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
   const [isStreaming, setIsStreaming] = useState(false);
   const [hasCompletedInitialResponse, setHasCompletedInitialResponse] = useState(false);
@@ -61,46 +58,13 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const pendingCompletionModeRef = useRef<RequestMode | null>(null);
   const mouthHoldTimeoutRef = useRef<number | null>(null);
   const [isMouthHold, setIsMouthHold] = useState(false);
-  const streamVisemeIdxRef = useRef(0);
-  const streamVisemeIntervalRef = useRef<number | null>(null);
-  const [streamingViseme, setStreamingViseme] = useState<VisemeKey>("rest");
-  const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "aa", "ih", "r", "oh", "aa"];
-  const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
-  const effectiveViseme: VisemeKey = (isStreaming || isMouthHold) && currentViseme === "rest" ? streamingViseme : currentViseme;
-  const visemeShape = lipSyncProfile.visemes[effectiveViseme] || lipSyncProfile.visemes.rest;
   const isTalking = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
-  const normalizedVoiceLevel = Math.max(0, Math.min(1, voiceActivityLevel));
-  const phonemeBoost = isTalking ? 0.85 + normalizedVoiceLevel * 0.3 : 0.72;
-  const mouthWidth = lipSyncProfile.baseWidth * visemeShape.width * phonemeBoost;
-  const mouthHeight = lipSyncProfile.baseHeight * visemeShape.height * (isTalking ? 1 : 0.45);
-  const mouthOpacity = isTalking
-    ? lipSyncProfile.openOpacity
-    : lipSyncProfile.closedOpacity;
 
   const clearMouthHoldTimeout = () => {
     if (mouthHoldTimeoutRef.current !== null) {
       window.clearTimeout(mouthHoldTimeoutRef.current);
       mouthHoldTimeoutRef.current = null;
     }
-  };
-
-  const stopStreamVisemeInterval = () => {
-    if (streamVisemeIntervalRef.current !== null) {
-      window.clearInterval(streamVisemeIntervalRef.current);
-      streamVisemeIntervalRef.current = null;
-    }
-    streamVisemeIdxRef.current = 0;
-    setStreamingViseme("rest");
-  };
-
-  const startStreamVisemeInterval = () => {
-    stopStreamVisemeInterval();
-    streamVisemeIdxRef.current = 0;
-    streamVisemeIntervalRef.current = window.setInterval(() => {
-      const idx = streamVisemeIdxRef.current % STREAMING_VISEME_SEQUENCE.length;
-      setStreamingViseme(STREAMING_VISEME_SEQUENCE[idx]);
-      streamVisemeIdxRef.current += 1;
-    }, 110);
   };
 
   const stopFlushLoop = () => {
@@ -112,7 +76,6 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
 
   const finalizeStream = () => {
     stopFlushLoop();
-    stopStreamVisemeInterval();
     setIsStreaming(false);
     clearMouthHoldTimeout();
     mouthHoldTimeoutRef.current = window.setTimeout(() => {
@@ -151,7 +114,6 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     setSpeechText("");
     setIsStreaming(true);
     startFlushLoop();
-    startStreamVisemeInterval();
   };
 
   const handleFailure = (mode: RequestMode) => {
@@ -175,7 +137,6 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     pendingCompletionModeRef.current = null;
     clearMouthHoldTimeout();
     stopFlushLoop();
-    stopStreamVisemeInterval();
     setIsStreaming(false);
     setIsMouthHold(false);
   };
@@ -262,7 +223,6 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     pendingCompletionModeRef.current = null;
     clearMouthHoldTimeout();
     stopFlushLoop();
-    stopStreamVisemeInterval();
     setIsStreaming(false);
     setIsMouthHold(false);
   }, [topic, moduleContent, trainerName]);
@@ -272,7 +232,6 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
       abortControllerRef.current?.abort();
       stopFlushLoop();
       clearMouthHoldTimeout();
-      stopStreamVisemeInterval();
     };
   }, []);
 
@@ -319,47 +278,6 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
           100% {
             opacity: 1;
             transform: translateY(0) scale(1);
-          }
-        }
-
-        @keyframes avatarLipSync {
-          0% {
-            transform: translateY(0) scaleX(1) scaleY(0.75);
-            opacity: 0.45;
-          }
-
-          20% {
-            transform: translateY(1px) scaleX(1.04) scaleY(1.08);
-            opacity: 0.7;
-          }
-
-          45% {
-            transform: translateY(0) scaleX(0.92) scaleY(0.62);
-            opacity: 0.5;
-          }
-
-          70% {
-            transform: translateY(1px) scaleX(1.08) scaleY(1.22);
-            opacity: 0.78;
-          }
-
-          100% {
-            transform: translateY(0) scaleX(1) scaleY(0.7);
-            opacity: 0.42;
-          }
-        }
-
-        @keyframes avatarJawBob {
-          0%, 100% {
-            transform: translateY(0);
-          }
-
-          40% {
-            transform: translateY(1px);
-          }
-
-          75% {
-            transform: translateY(2px);
           }
         }
 
@@ -416,7 +334,14 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
           </div>
         </div>
       ) : (
-        <div className="w-full max-w-[360px] overflow-hidden rounded-[20px] border border-[#d8deea] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.12)]" style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both" }}>
+        <div
+          className="w-full max-w-[360px] overflow-hidden rounded-[20px] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.12)] transition-all duration-300"
+          style={{
+            border: isTalking ? "2.5px solid #4f8ef7" : "2.5px solid #d8deea",
+            boxShadow: isTalking ? "0 0 0 4px rgba(79,142,247,0.15), 0 12px 28px rgba(15,23,42,0.12)" : "0 12px 28px rgba(15,23,42,0.12)",
+            animation: "avatarNarratorEnter 420ms cubic-bezier(0.22, 1, 0.36, 1) both",
+          }}
+        >
           <div className="relative aspect-[3/4] w-full bg-[#eef2ff]">
             {hasAvatarImage ? (
               <img
@@ -428,46 +353,6 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
             ) : (
               <div className="flex h-full w-full items-center justify-center text-4xl font-bold" style={{ color: AVATAR_TEXT }}>
                 {trainerInitials}
-              </div>
-            )}
-
-            {hasAvatarImage && (
-              <div
-                className="pointer-events-none absolute h-[38px] w-[104px] -translate-x-1/2 -translate-y-1/2"
-                style={{ left: `${lipSyncProfile.mouthLeftPct}%`, top: `${lipSyncProfile.mouthTopPct}%` }}
-              >
-                <div
-                  className="absolute left-1/2 top-1/2 border border-[#2d1714]/35"
-                  style={{
-                    width: `${mouthWidth}px`,
-                    height: `${mouthHeight}px`,
-                    opacity: mouthOpacity,
-                    borderRadius: `${visemeShape.roundness}px`,
-                    background: "radial-gradient(circle at 50% 40%, rgba(42, 14, 18, 0.98) 0%, rgba(78, 23, 28, 0.9) 62%, rgba(42, 16, 18, 0.12) 100%)",
-                    boxShadow: isTalking ? "0 2px 10px rgba(0,0,0,0.24)" : "none",
-                    transform: `translate(-50%, calc(-50% + ${visemeShape.lift * 10}px))`,
-                    transition: "width 45ms linear, height 45ms linear, opacity 45ms linear, transform 45ms linear, border-radius 45ms linear",
-                  }}
-                />
-                <div
-                  className="absolute left-1/2 top-1/2 h-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full"
-                  style={{
-                    width: `${mouthWidth + 10}px`,
-                    background: "rgba(110, 54, 48, 0.46)",
-                    opacity: isTalking ? 0.14 : 0.32,
-                    transition: "width 45ms linear, opacity 45ms linear",
-                  }}
-                />
-                <div
-                  className="absolute left-1/2 top-[46%] h-[8px] -translate-x-1/2 -translate-y-1/2 rounded-full"
-                  style={{
-                    width: `${Math.max(14, mouthWidth - 10)}px`,
-                    background: "rgba(244, 181, 194, 0.32)",
-                    opacity: isTalking ? Math.min(0.48, 0.18 + normalizedVoiceLevel * 0.4) : 0,
-                    filter: "blur(0.4px)",
-                    transition: "width 45ms linear, opacity 45ms linear",
-                  }}
-                />
               </div>
             )}
 
