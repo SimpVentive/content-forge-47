@@ -61,8 +61,13 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
   const pendingCompletionModeRef = useRef<RequestMode | null>(null);
   const mouthHoldTimeoutRef = useRef<number | null>(null);
   const [isMouthHold, setIsMouthHold] = useState(false);
+  const streamVisemeIdxRef = useRef(0);
+  const streamVisemeIntervalRef = useRef<number | null>(null);
+  const [streamingViseme, setStreamingViseme] = useState<VisemeKey>("rest");
+  const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "aa", "ih", "r", "oh", "aa"];
   const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
-  const visemeShape = lipSyncProfile.visemes[currentViseme] || lipSyncProfile.visemes.rest;
+  const effectiveViseme: VisemeKey = (isStreaming || isMouthHold) && currentViseme === "rest" ? streamingViseme : currentViseme;
+  const visemeShape = lipSyncProfile.visemes[effectiveViseme] || lipSyncProfile.visemes.rest;
   const isTalking = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
   const normalizedVoiceLevel = Math.max(0, Math.min(1, voiceActivityLevel));
   const phonemeBoost = isTalking ? 0.85 + normalizedVoiceLevel * 0.3 : 0.72;
@@ -79,6 +84,25 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     }
   };
 
+  const stopStreamVisemeInterval = () => {
+    if (streamVisemeIntervalRef.current !== null) {
+      window.clearInterval(streamVisemeIntervalRef.current);
+      streamVisemeIntervalRef.current = null;
+    }
+    streamVisemeIdxRef.current = 0;
+    setStreamingViseme("rest");
+  };
+
+  const startStreamVisemeInterval = () => {
+    stopStreamVisemeInterval();
+    streamVisemeIdxRef.current = 0;
+    streamVisemeIntervalRef.current = window.setInterval(() => {
+      const idx = streamVisemeIdxRef.current % STREAMING_VISEME_SEQUENCE.length;
+      setStreamingViseme(STREAMING_VISEME_SEQUENCE[idx]);
+      streamVisemeIdxRef.current += 1;
+    }, 110);
+  };
+
   const stopFlushLoop = () => {
     if (flushIntervalRef.current !== null) {
       window.clearInterval(flushIntervalRef.current);
@@ -88,6 +112,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
 
   const finalizeStream = () => {
     stopFlushLoop();
+    stopStreamVisemeInterval();
     setIsStreaming(false);
     clearMouthHoldTimeout();
     mouthHoldTimeoutRef.current = window.setTimeout(() => {
@@ -126,6 +151,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     setSpeechText("");
     setIsStreaming(true);
     startFlushLoop();
+    startStreamVisemeInterval();
   };
 
   const handleFailure = (mode: RequestMode) => {
@@ -149,6 +175,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     pendingCompletionModeRef.current = null;
     clearMouthHoldTimeout();
     stopFlushLoop();
+    stopStreamVisemeInterval();
     setIsStreaming(false);
     setIsMouthHold(false);
   };
@@ -235,6 +262,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
     pendingCompletionModeRef.current = null;
     clearMouthHoldTimeout();
     stopFlushLoop();
+    stopStreamVisemeInterval();
     setIsStreaming(false);
     setIsMouthHold(false);
   }, [topic, moduleContent, trainerName]);
@@ -244,6 +272,7 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
       abortControllerRef.current?.abort();
       stopFlushLoop();
       clearMouthHoldTimeout();
+      stopStreamVisemeInterval();
     };
   }, []);
 

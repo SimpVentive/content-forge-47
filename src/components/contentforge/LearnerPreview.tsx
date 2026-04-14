@@ -1872,77 +1872,68 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         if (contentTemplate === "scenario") {
           return (
             <div className="mx-auto max-w-[1280px]" key={currentSlide}>
-              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_500px]">
-                <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)]">
-                  <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+
+                {/* LEFT: scenario content */}
+                <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-8 shadow-[0_22px_54px_rgba(15,23,42,0.1)] space-y-6">
+                  {/* Header */}
+                  <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                      <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Scenario Walkthrough</p>
-                      <h2 className="mt-2 text-[34px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
-                      <p className="mt-1 text-[15px] text-[#5f7898]">{parts.hook || "Work through the situation, spot the signal, and choose the better response."}</p>
+                      <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Scenario</p>
+                      <h2 className="mt-1 text-[32px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
                     </div>
                     {visualControls}
                   </div>
 
-                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
-                    <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-                      <div className="rounded-[24px] border border-[#d8e2ef] bg-[#f3f8fd] p-5">
-                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Situation</p>
-                        <p className="mt-3 text-[17px] leading-relaxed text-[#24486f]">{scenarioLead}</p>
-                      </div>
+                  {/* Situation */}
+                  <div className="rounded-[22px] bg-[#f3f8fd] border border-[#d8e2ef] p-6">
+                    <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592] mb-3">Situation</p>
+                    <p className="text-[18px] leading-relaxed text-[#1a3a5c] font-[500]">{scenarioLead}</p>
+                  </div>
 
-                      <div className="grid gap-4 md:grid-cols-2">
-                        <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
-                          <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">What to Notice</p>
-                          <div className="mt-3 space-y-2.5">
-                            {summaryBullets.slice(0, 3).map((bullet, index) => (
-                              <div key={`${bullet}-${index}`} className="flex items-start gap-2 text-[14px] text-[#24486f]">
-                                <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#2b5fa4]" />
-                                <span>{bullet}</span>
-                              </div>
-                            ))}
+                  {/* What to Notice + Better Move side by side */}
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="rounded-[20px] border border-[#d8e2ef] bg-white p-5 shadow-sm">
+                      <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592] mb-3">What to Notice</p>
+                      <div className="space-y-2.5">
+                        {summaryBullets.slice(0, 4).map((bullet, index) => (
+                          <div key={`${bullet}-${index}`} className="flex items-start gap-2.5 text-[14px] text-[#24486f]">
+                            <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#2b5fa4]" />
+                            <span>{bullet}</span>
                           </div>
-                        </div>
-                        <div className="rounded-[22px] border border-[#f3d9a3] bg-[#fffaf3] p-4 shadow-sm">
-                          <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Better Move</p>
-                          <p className="mt-3 text-[14px] leading-relaxed text-[#6f5b35]">{scenarioSupport}</p>
-                        </div>
-                      </div>
-
-                      <div className="rounded-[24px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
-                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Debrief</p>
-                        <p className="mt-3 text-[14px] leading-relaxed text-[#35506f]">{parts.takeaway || quickFact}</p>
+                        ))}
                       </div>
                     </div>
-
-                    <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-                      <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-white shadow-sm">
-                        <div className="border-b border-[#e2e8f0] px-4 py-3">
-                          <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Scenario Visual</p>
-                        </div>
-                        <div className="aspect-[4/3] w-full bg-[#eef3f8]">
-                          {visualMarkup ? visualMarkup : <div className="flex h-full items-center justify-center px-6 text-center text-[14px] text-[#607896]">Visual context will appear here when a scenario image is assigned.</div>}
-                        </div>
-                      </div>
-
-                      <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
-                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Coach Prompt</p>
-                        <AvatarNarrator
-                          topic={slide.topicTitle || slide.moduleTitle}
-                          moduleContent={narratorExcerpt || `This scenario explains ${slide.topicTitle || slide.moduleTitle}.`}
-                          systemHint="Coach the learner through the scenario and emphasize the stronger practical response."
-                          trainerName={trainerName}
-                          avatarImageUrl={avatarImageUrl}
-                          avatarVideoUrl={avatarVideoUrl}
-                          avatarPosterUrl={avatarPosterUrl}
-                          trainerId={selectedTrainer.id}
-                          isVoiceActive={isPlaying}
-                          isVoiceLoading={audioLoading}
-                          voiceActivityLevel={voiceActivityLevel}
-                          currentViseme={activeViseme}
-                        />
-                      </div>
+                    <div className="rounded-[20px] border border-[#f0d8a8] bg-[#fffbf0] p-5 shadow-sm">
+                      <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#9a6a1a] mb-3">Better Move</p>
+                      <p className="text-[15px] leading-relaxed text-[#6f5b35]">{scenarioSupport}</p>
                     </div>
                   </div>
+
+                  {/* Scenario visual - only show if there's actual content */}
+                  {visualMarkup ? (
+                    <div className="overflow-hidden rounded-[22px] border border-[#d8e2ef] bg-[#eef3f8]">
+                      <div className="aspect-video w-full">{visualMarkup}</div>
+                    </div>
+                  ) : null}
+                </div>
+
+                {/* RIGHT: avatar coach */}
+                <div className="xl:sticky xl:top-6 xl:self-start">
+                  <AvatarNarrator
+                    topic={slide.topicTitle || slide.moduleTitle}
+                    moduleContent={narratorExcerpt || `This scenario explains ${slide.topicTitle || slide.moduleTitle}.`}
+                    systemHint="Coach the learner through the scenario and emphasize the stronger practical response."
+                    trainerName={trainerName}
+                    avatarImageUrl={avatarImageUrl}
+                    avatarVideoUrl={avatarVideoUrl}
+                    avatarPosterUrl={avatarPosterUrl}
+                    trainerId={selectedTrainer.id}
+                    isVoiceActive={isPlaying}
+                    isVoiceLoading={audioLoading}
+                    voiceActivityLevel={voiceActivityLevel}
+                    currentViseme={activeViseme}
+                  />
                 </div>
               </div>
             </div>
