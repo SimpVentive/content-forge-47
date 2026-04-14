@@ -47,7 +47,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
       </div>
 
       {isRunning && (
-        <div className="mb-6 overflow-hidden rounded-[20px] shadow-[0_14px_34px_rgba(15,23,42,0.14)]">
+        <div className="sticky top-4 z-10 mb-6 overflow-hidden rounded-[20px] shadow-[0_14px_34px_rgba(15,23,42,0.14)]">
           <img
             src="/orchestration-waiting.png"
             alt="Hang on tight orchestration panel"

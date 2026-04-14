@@ -869,7 +869,7 @@ Rules you NEVER break:
         
         try {
         const { data, error } = await supabase.functions.invoke("youtube-search", {
-            body: { modules: moduleNames, courseTitle, language: params?.language, level: params?.level, duration: params?.duration },
+            body: { modules: moduleNames, courseTitle, language: params?.language, level: params?.level, duration: params?.duration, maxVideos: params?.maxYoutubeVideos ?? 20 },
           });
           
           if (error) throw new Error(error.message);

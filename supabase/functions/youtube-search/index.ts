@@ -12,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { modules, courseTitle, language, level, duration, refreshRound = 0, excludeVideoIds = [] } = await req.json();
+    const { modules, courseTitle, language, level, duration, refreshRound = 0, excludeVideoIds = [], maxVideos } = await req.json();
     const apiKey = Deno.env.get("Youtube_Learning");
 
     if (!apiKey) {
@@ -22,18 +22,25 @@ serve(async (req) => {
       );
     }
 
-    // Map duration to max results per module
+    // Use explicit maxVideos if provided, otherwise fall back to duration-based default
     const durationVideoMap: Record<string, number> = {
       "5min": 5, "10min": 8, "15min": 10, "20min": 15,
       "30min": 20, "45min": 30, "60min": 50,
     };
-    const maxPerModule = Math.min(durationVideoMap[duration] || 20, 50);
+    const maxPerModule = Math.min(typeof maxVideos === "number" ? maxVideos : (durationVideoMap[duration] || 20), 50);
+
+    // Rotate sort order and query variation per refresh round for genuinely new results
+    const sortOrders = ["relevance", "viewCount", "date", "rating", "relevance"];
+    const queryVariants = ["", "tutorial", "explained", "training", "course", "guide"];
+    const sortOrder = sortOrders[Number(refreshRound) % sortOrders.length];
+    const queryVariant = queryVariants[Number(refreshRound) % queryVariants.length];
+
     const excludedIds = new Set<string>(Array.isArray(excludeVideoIds) ? excludeVideoIds : []);
 
     const results: any[] = [];
 
     for (const mod of modules) {
-      const query = `${mod} ${courseTitle} ${language || ""} ${level || ""}`.trim();
+      const query = `${mod} ${courseTitle} ${language || ""} ${level || ""} ${queryVariant}`.trim();
       let pageToken = "";
       let searchData: any = { items: [] };
       const maxAttempts = Math.max(3, Number(refreshRound) + 2);
@@ -45,7 +52,7 @@ serve(async (req) => {
         searchUrl.searchParams.set("part", "snippet");
         searchUrl.searchParams.set("type", "video");
         searchUrl.searchParams.set("maxResults", String(maxPerModule));
-        searchUrl.searchParams.set("order", "relevance");
+        searchUrl.searchParams.set("order", sortOrder);
         searchUrl.searchParams.set("videoEmbeddable", "true");
         searchUrl.searchParams.set("safeSearch", "strict");
         if (pageToken) searchUrl.searchParams.set("pageToken", pageToken);

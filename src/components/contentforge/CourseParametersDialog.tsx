@@ -19,6 +19,7 @@ export interface CourseParameters {
   discussionEnabled: boolean;
   assessmentIntensity: "light" | "standard" | "deep";
   flipStyle: "dramatic" | "subtle" | "bound";
+  maxYoutubeVideos: number;
   slideLayout: {
     maxLines: number;
     minFontSize: number;
@@ -144,6 +145,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [discussionEnabled, setDiscussionEnabled] = useState(true);
   const [assessmentIntensity, setAssessmentIntensity] = useState<CourseParameters["assessmentIntensity"]>("standard");
   const [flipStyle, setFlipStyle] = useState<CourseParameters["flipStyle"]>("bound");
+  const [maxYoutubeVideos, setMaxYoutubeVideos] = useState(20);
   const [maxLines, setMaxLines] = useState<CourseParameters["slideLayout"]["maxLines"]>(10);
   const [minFontSize, setMinFontSize] = useState<CourseParameters["slideLayout"]["minFontSize"]>(12.5);
   const [lineSpacing, setLineSpacing] = useState<CourseParameters["slideLayout"]["lineSpacing"]>(2);
@@ -203,6 +205,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       discussionEnabled,
       assessmentIntensity,
       flipStyle,
+      maxYoutubeVideos,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -230,6 +233,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       discussionEnabled,
       assessmentIntensity,
       flipStyle,
+      maxYoutubeVideos,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -252,6 +256,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       discussionEnabled,
       assessmentIntensity,
       flipStyle,
+      maxYoutubeVideos,
       slideLayout: { maxLines, minFontSize, lineSpacing },
     });
   };
@@ -547,6 +552,28 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   Use this when videos are optional enrichment or should not reduce the base teaching time.
                 </p>
               </button>
+            </div>
+          </div>
+
+          <div className={surfaceCardClass}>
+            <div className="flex items-center gap-1.5 mb-2">
+              <p className="text-[13px] font-bold text-foreground">YouTube Video Count</p>
+              <InfoHint text="Maximum number of YouTube videos fetched per module during course generation." />
+            </div>
+            <p className="text-[11px] text-[#6B7280] mb-3">How many YouTube videos to surface per module (default 20). Increase for more variety, decrease to keep it focused.</p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setMaxYoutubeVideos(v => Math.max(5, v - 5))}
+                className="h-9 w-9 rounded-lg border border-[#E5E7EB] bg-white text-[18px] font-bold text-foreground hover:border-primary transition-colors"
+              >−</button>
+              <span className="w-12 text-center text-[20px] font-extrabold text-foreground">{maxYoutubeVideos}</span>
+              <button
+                type="button"
+                onClick={() => setMaxYoutubeVideos(v => Math.min(50, v + 5))}
+                className="h-9 w-9 rounded-lg border border-[#E5E7EB] bg-white text-[18px] font-bold text-foreground hover:border-primary transition-colors"
+              >+</button>
+              <span className="text-[11px] text-muted-foreground">videos per module (max 50)</span>
             </div>
           </div>
 
