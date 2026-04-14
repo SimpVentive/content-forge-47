@@ -193,7 +193,7 @@ const Welcome = () => {
       >
         <div className="mx-auto flex max-w-5xl flex-col items-center gap-2 px-4 py-3 sm:flex-row sm:justify-center sm:gap-5">
           <img
-            src="/unitol-logo.svg"
+            src="/unitol-logo.png"
             alt="UniTol Training Solutions Pvt Ltd"
             className="h-14 w-auto object-contain sm:h-16"
             loading="lazy"
