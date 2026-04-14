@@ -73,9 +73,11 @@ export function AvatarNarrator({
 
   const isTalking = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
 
-  // Jaw drop: lower jaw physically shifts down based on viseme opening height
-  const visemeShape = lipSyncProfile.visemes[effectiveViseme];
-  const jawDropPx   = Math.round(lipSyncProfile.baseHeight * visemeShape.height * (isTalking ? 0.32 : 0));
+  // Mouth opening: ellipse size driven by viseme height
+  const visemeShape  = lipSyncProfile.visemes[effectiveViseme];
+  const mouthOpenRy  = lipSyncProfile.baseHeight * visemeShape.height * (isTalking ? 0.55 : 0);
+  const mouthOpenRx  = (lipSyncProfile.baseWidth / 2) * visemeShape.width;
+  const mouthOpacity = isTalking ? Math.min(0.82, visemeShape.height * 0.78) : 0;
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
@@ -265,7 +267,6 @@ export function AvatarNarrator({
   };
 
   const captionText = speechText.trim().replace(/\s+/g, " ").slice(0, 80);
-  const splitPct    = lipSyncProfile.mouthTopPct; // % where upper/lower jaw split
 
   // ── render ────────────────────────────────────────────────────────────────
 
@@ -316,7 +317,7 @@ export function AvatarNarrator({
           </div>
         </div>
       ) : (
-        /* ── illustrated avatar with jaw-drop lip sync ───────────────────── */
+        /* ── illustrated avatar with multiply-blend mouth overlay ──────────── */
         <div
           className="w-full max-w-[360px] overflow-hidden rounded-[20px] bg-white transition-all duration-300"
           style={{
@@ -327,49 +328,32 @@ export function AvatarNarrator({
             animation: "avatarNarratorEnter 420ms cubic-bezier(0.22,1,0.36,1) both",
           }}
         >
-          {/* Face area — jaw-drop technique splits image at the lip line */}
-          <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#e8dfd4]">
+          <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#eef2ff]">
             {hasAvatarImage ? (
               <>
-                {/* Mouth interior — dark oval shown in the jaw gap */}
-                <div
-                  className="pointer-events-none absolute"
-                  style={{
-                    zIndex: 1,
-                    left: "28%", width: "44%",
-                    top: `${splitPct}%`,
-                    height: `${Math.max(jawDropPx + 2, 2)}px`,
-                    background: "radial-gradient(ellipse at 50% 30%, #3a0c0c 0%, #1a0606 100%)",
-                    borderRadius: "50%",
-                    transform: "translateY(-50%)",
-                    opacity: jawDropPx > 1 ? 1 : 0,
-                    transition: "opacity 60ms ease-out, height 60ms ease-out",
-                  }}
-                />
-
-                {/* Upper jaw — static, clipped below the lip line */}
                 <img
                   src={avatarImageUrl || "/trainers/priya.png"}
                   alt={trainerName}
-                  className="absolute inset-0 h-full w-full object-cover object-top"
-                  style={{
-                    zIndex: 2,
-                    clipPath: `inset(0 0 ${100 - splitPct}% 0)`,
-                  }}
+                  className="h-full w-full object-cover object-top"
                   onError={() => setHasAvatarImage(false)}
                 />
 
-                {/* Lower jaw — drops when speaking */}
-                <img
-                  src={avatarImageUrl || "/trainers/priya.png"}
-                  alt=""
-                  aria-hidden="true"
-                  className="absolute inset-0 h-full w-full object-cover object-top"
+                {/* Multiply-blend ellipse — darkens the mouth area when open.
+                    No skin-tone matching needed: multiply blends naturally
+                    with any illustrated skin tone. */}
+                <div
+                  className="pointer-events-none absolute"
                   style={{
-                    zIndex: 2,
-                    clipPath: `inset(${splitPct}% 0 0 0)`,
-                    transform: `translateY(${jawDropPx}px)`,
-                    transition: "transform 55ms ease-out",
+                    left: `${lipSyncProfile.mouthLeftPct}%`,
+                    top:  `${lipSyncProfile.mouthTopPct}%`,
+                    transform: "translate(-50%, -50%)",
+                    width:   `${mouthOpenRx * 2}px`,
+                    height:  `${Math.max(mouthOpenRy * 2, 1)}px`,
+                    background: "radial-gradient(ellipse, rgba(40,8,8,0.92) 0%, rgba(20,4,4,0.55) 60%, transparent 100%)",
+                    borderRadius: "50%",
+                    opacity: mouthOpacity,
+                    mixBlendMode: "multiply",
+                    transition: "width 55ms ease-out, height 55ms ease-out, opacity 55ms ease-out",
                   }}
                 />
               </>
