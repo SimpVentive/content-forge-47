@@ -80,9 +80,12 @@ const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ on
       <div className="h-1.5 w-full" style={{ background: "#2563EB" }} />
 
       <div className="px-10 pt-10 pb-8">
-        {/* Header illustration */}
+        {/* YouTube logo */}
         <div className="flex items-center justify-center mb-7">
-          <img src="/youtube-enhance-header.png" alt="Enhance with YouTube Videos" className="h-[90px] w-auto object-contain" />
+          <svg viewBox="0 0 90 64" width="90" height="64" aria-label="YouTube">
+            <rect width="90" height="64" rx="14" fill="#FF0000"/>
+            <polygon points="36,18 36,46 62,32" fill="white"/>
+          </svg>
         </div>
 
         <h2 className="text-[26px] font-[800] text-foreground text-center tracking-tight mb-3">
@@ -96,12 +99,36 @@ const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ on
         {/* Feature highlights */}
         <div className="grid grid-cols-3 gap-3 mb-8">
           {[
-            { icon: "B", title: "Browse", desc: "Videos per module" },
-            { icon: "C", title: "Clip", desc: "Select time ranges" },
-            { icon: "I", title: "Insert", desc: "Place in course" },
+            {
+              icon: (
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 7C3 5.9 3.9 5 5 5h14c1.1 0 2 .9 2 2v10c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V7z"/>
+                  <path d="M3 7l9 6 9-6"/>
+                </svg>
+              ),
+              title: "Browse", desc: "Videos per module"
+            },
+            {
+              icon: (
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+                  <path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12"/>
+                </svg>
+              ),
+              title: "Clip", desc: "Select time ranges"
+            },
+            {
+              icon: (
+                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/>
+                  <circle cx="12" cy="10" r="3"/>
+                </svg>
+              ),
+              title: "Insert", desc: "Place in course"
+            },
           ].map((f) => (
             <div key={f.title} className="bg-secondary/60 rounded-xl p-3.5 text-center">
-              <span className="text-[22px] block mb-1.5">{f.icon}</span>
+              <span className="flex justify-center mb-2 text-foreground/70">{f.icon}</span>
               <p className="text-[13px] font-bold text-foreground">{f.title}</p>
               <p className="text-[11px] text-muted-foreground">{f.desc}</p>
             </div>

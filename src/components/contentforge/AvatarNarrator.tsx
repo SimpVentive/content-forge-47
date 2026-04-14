@@ -2,102 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { getTrainerLipSyncProfile, type AvatarLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
-
-// ---------------------------------------------------------------------------
-// SVG parametric mouth — drawn on top of the illustrated avatar face
-// ---------------------------------------------------------------------------
-interface SvgMouthProps {
-  profile: AvatarLipSyncProfile;
-  viseme: VisemeKey;
-  isTalking: boolean;
-}
-
-function SvgMouth({ profile, viseme, isTalking }: SvgMouthProps) {
-  const shape   = profile.visemes[viseme];
-  const halfW   = (profile.baseWidth / 2) * shape.width;
-  const openH   = profile.baseHeight * shape.height * (isTalking ? 1 : 0.12);
-  const liftPx  = shape.lift * 10;
-  const isOpen  = openH > 2.5;
-
-  // patch large enough to cover the drawn mouth in the illustration
-  const patchRx = halfW + 7;
-  const patchRy = 9;
-
-  // Upper lip: Cupid's bow (M → left corner, C → left peak → dip → right peak → right corner)
-  const ulPath = [
-    `M${-halfW},${-liftPx}`,
-    `C${-halfW * 0.55},${-5 - liftPx}`,
-    `  ${-halfW * 0.12},${-4 - liftPx}`,
-    `  0,${-3 - liftPx}`,
-    `C${halfW * 0.12},${-4 - liftPx}`,
-    `  ${halfW * 0.55},${-5 - liftPx}`,
-    `  ${halfW},${-liftPx}`,
-  ].join(" ");
-
-  // Lower lip: single arc downward
-  const llPath = isOpen
-    ? `M${-halfW},${-liftPx} Q0,${openH + 5 - liftPx} ${halfW},${-liftPx}`
-    : `M${-halfW},${-liftPx} Q0,${5 - liftPx} ${halfW},${-liftPx}`;
-
-  const viewH  = Math.max(openH + patchRy + 10, patchRy * 2 + 4);
-  const vbMinY = -(patchRy + 5);
-
-  return (
-    <svg
-      width={patchRx * 2}
-      height={viewH}
-      viewBox={`${-patchRx} ${vbMinY} ${patchRx * 2} ${viewH}`}
-      overflow="visible"
-      style={{ pointerEvents: "none", display: "block" }}
-    >
-      {/* Skin patch — covers the existing illustrated closed mouth */}
-      <ellipse cx="0" cy="0" rx={patchRx} ry={patchRy} fill={profile.skinTone} />
-
-      {/* Dark interior — visible only when open */}
-      {isOpen && (
-        <ellipse
-          cx="0"
-          cy={openH / 2 - liftPx}
-          rx={halfW * 0.82}
-          ry={openH / 2 + 2}
-          fill="#1a0808"
-        />
-      )}
-
-      {/* Teeth strip — only for wide-open sounds (aa, oh) */}
-      {openH > 12 && (
-        <rect
-          x={-halfW * 0.68}
-          y={1 - liftPx}
-          width={halfW * 1.36}
-          height={Math.min(openH * 0.32, 6)}
-          rx="2"
-          fill="#f5f0ec"
-        />
-      )}
-
-      {/* Upper lip */}
-      <path
-        d={ulPath}
-        stroke={profile.lipColor}
-        strokeWidth="2"
-        fill={`${profile.lipColor}28`}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Lower lip */}
-      <path
-        d={llPath}
-        stroke={profile.lipColor}
-        strokeWidth="2.5"
-        fill={`${profile.lipColor}50`}
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
+import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 
 // ---------------------------------------------------------------------------
 // AvatarNarrator
@@ -126,9 +31,7 @@ type RequestMode = "initial" | "example";
 
 function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: string) {
   const preview = moduleContent.trim().replace(/\s+/g, " ");
-  if (!preview) {
-    return `Tap the explain icon and ${trainerName} will walk you through ${topic}.`;
-  }
+  if (!preview) return `Tap the explain icon and ${trainerName} will walk you through ${topic}.`;
   const short = preview.length > 180 ? `${preview.slice(0, 177).trimEnd()}...` : preview;
   return `Tap the explain icon and ${trainerName} will break down ${topic}. Quick preview: ${short}`;
 }
@@ -145,7 +48,7 @@ export function AvatarNarrator({
 }: AvatarNarratorProps) {
   const [speechText, setSpeechText]   = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
   const [isStreaming, setIsStreaming]  = useState(false);
-  const [hasCompletedInitialResponse, setHasCompletedInitialResponse] = useState(false);
+  const [hasSpoken, setHasSpoken] = useState(false);
   const [hasAvatarImage, setHasAvatarImage] = useState(true);
   const [videoMuted, setVideoMuted]   = useState(true);
   const [videoPlaying, setVideoPlaying] = useState(true);
@@ -164,14 +67,15 @@ export function AvatarNarrator({
 
   const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
 
-  // While streaming text we cycle through visemes so the mouth moves.
-  // When real ElevenLabs visemes arrive (currentViseme), they take precedence.
+  // Real ElevenLabs visemes take priority; fall back to cycling sequence while streaming
   const effectiveViseme: VisemeKey =
-    (isStreaming || isMouthHold) && currentViseme === "rest"
-      ? streamingViseme
-      : currentViseme;
+    (isStreaming || isMouthHold) && currentViseme === "rest" ? streamingViseme : currentViseme;
 
   const isTalking = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
+
+  // Jaw drop: lower jaw physically shifts down based on viseme opening height
+  const visemeShape = lipSyncProfile.visemes[effectiveViseme];
+  const jawDropPx   = Math.round(lipSyncProfile.baseHeight * visemeShape.height * (isTalking ? 0.32 : 0));
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
@@ -220,7 +124,7 @@ export function AvatarNarrator({
       setIsMouthHold(false);
       mouthHoldTimeoutRef.current = null;
     }, 1200);
-    if (pendingCompletionRef.current === "initial") setHasCompletedInitialResponse(true);
+    if (pendingCompletionRef.current === "initial") setHasSpoken(true);
     pendingCompletionRef.current = null;
   };
 
@@ -253,7 +157,7 @@ export function AvatarNarrator({
     setSpeechText(`Here is the key point: ${moduleContent}`);
     setIsStreaming(false);
     setIsMouthHold(false);
-    if (mode === "initial") setHasCompletedInitialResponse(true);
+    if (mode === "initial") setHasSpoken(true);
   };
 
   const stopStreaming = () => {
@@ -273,7 +177,6 @@ export function AvatarNarrator({
   const runNarration = async (mode: RequestMode) => {
     if (isStreaming) return;
     abortControllerRef.current?.abort();
-
     const controller = new AbortController();
     abortControllerRef.current = controller;
     currentRequestRef.current += 1;
@@ -291,19 +194,15 @@ export function AvatarNarrator({
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({
-            topic,
-            moduleContent,
+            topic, moduleContent,
             systemHint: mode === "initial" ? `${systemHint} ${CONCISE_RESPONSE_HINT}` : EXAMPLE_HINT,
           }),
           signal: controller.signal,
         }
       );
-
       if (!response.ok || !response.body) throw new Error(`Avatar narration failed: ${response.status}`);
-
       const reader  = response.body.getReader();
       const decoder = new TextDecoder();
-
       while (true) {
         const { done, value } = await reader.read();
         if (done) {
@@ -329,7 +228,8 @@ export function AvatarNarrator({
 
   useEffect(() => {
     setSpeechText(buildDefaultSpeech(topic, moduleContent, trainerName));
-    setHasCompletedInitialResponse(false);
+    setHasSpoken(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
     queuedCharactersRef.current = [];
@@ -360,11 +260,12 @@ export function AvatarNarrator({
   const toggleVideoPlayback = () => {
     const v = avatarVideoRef.current;
     if (!v) return;
-    if (v.paused) { v.play().then(() => setVideoPlaying(true)).catch(() => setVideoPlaying(false)); }
+    if (v.paused) v.play().then(() => setVideoPlaying(true)).catch(() => setVideoPlaying(false));
     else { v.pause(); setVideoPlaying(false); }
   };
 
   const captionText = speechText.trim().replace(/\s+/g, " ").slice(0, 80);
+  const splitPct    = lipSyncProfile.mouthTopPct; // % where upper/lower jaw split
 
   // ── render ────────────────────────────────────────────────────────────────
 
@@ -388,9 +289,7 @@ export function AvatarNarrator({
           style={{ animation: "avatarNarratorEnter 420ms cubic-bezier(0.22,1,0.36,1) both" }}
         >
           <video
-            ref={avatarVideoRef}
-            src={avatarVideoUrl}
-            poster={avatarPosterUrl}
+            ref={avatarVideoRef} src={avatarVideoUrl} poster={avatarPosterUrl}
             className="aspect-[9/12] w-full max-h-[420px] object-cover object-top"
             autoPlay playsInline muted={videoMuted} controls={false} preload="metadata"
             onPlay={() => setVideoPlaying(true)}
@@ -417,7 +316,7 @@ export function AvatarNarrator({
           </div>
         </div>
       ) : (
-        /* ── illustrated photo avatar with SVG lip sync ──────────────────── */
+        /* ── illustrated avatar with jaw-drop lip sync ───────────────────── */
         <div
           className="w-full max-w-[360px] overflow-hidden rounded-[20px] bg-white transition-all duration-300"
           style={{
@@ -428,47 +327,66 @@ export function AvatarNarrator({
             animation: "avatarNarratorEnter 420ms cubic-bezier(0.22,1,0.36,1) both",
           }}
         >
-          {/* Image + SVG mouth overlay */}
-          <div className="relative aspect-[3/4] w-full bg-[#eef2ff]">
+          {/* Face area — jaw-drop technique splits image at the lip line */}
+          <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#e8dfd4]">
             {hasAvatarImage ? (
-              <img
-                src={avatarImageUrl || "/trainers/priya.png"}
-                alt={trainerName}
-                className="h-full w-full object-cover object-top"
-                onError={() => setHasAvatarImage(false)}
-              />
+              <>
+                {/* Mouth interior — dark oval shown in the jaw gap */}
+                <div
+                  className="pointer-events-none absolute"
+                  style={{
+                    zIndex: 1,
+                    left: "28%", width: "44%",
+                    top: `${splitPct}%`,
+                    height: `${Math.max(jawDropPx + 2, 2)}px`,
+                    background: "radial-gradient(ellipse at 50% 30%, #3a0c0c 0%, #1a0606 100%)",
+                    borderRadius: "50%",
+                    transform: "translateY(-50%)",
+                    opacity: jawDropPx > 1 ? 1 : 0,
+                    transition: "opacity 60ms ease-out, height 60ms ease-out",
+                  }}
+                />
+
+                {/* Upper jaw — static, clipped below the lip line */}
+                <img
+                  src={avatarImageUrl || "/trainers/priya.png"}
+                  alt={trainerName}
+                  className="absolute inset-0 h-full w-full object-cover object-top"
+                  style={{
+                    zIndex: 2,
+                    clipPath: `inset(0 0 ${100 - splitPct}% 0)`,
+                  }}
+                  onError={() => setHasAvatarImage(false)}
+                />
+
+                {/* Lower jaw — drops when speaking */}
+                <img
+                  src={avatarImageUrl || "/trainers/priya.png"}
+                  alt=""
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full object-cover object-top"
+                  style={{
+                    zIndex: 2,
+                    clipPath: `inset(${splitPct}% 0 0 0)`,
+                    transform: `translateY(${jawDropPx}px)`,
+                    transition: "transform 55ms ease-out",
+                  }}
+                />
+              </>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-[#3C3489]">
                 {trainerInitials}
               </div>
             )}
 
-            {/* SVG mouth overlay — only on illustrated avatars */}
-            {hasAvatarImage && (
-              <div
-                className="pointer-events-none absolute"
-                style={{
-                  left: `${lipSyncProfile.mouthLeftPct}%`,
-                  top:  `${lipSyncProfile.mouthTopPct}%`,
-                  transform: "translate(-50%, -50%)",
-                }}
-              >
-                <SvgMouth
-                  profile={lipSyncProfile}
-                  viseme={effectiveViseme}
-                  isTalking={isTalking}
-                />
-              </div>
-            )}
-
             {/* Speaking badge */}
-            <div className="absolute left-3 top-3 inline-flex items-center gap-2 rounded-full bg-black/40 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
+            <div className="absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-full bg-black/40 px-2 py-1 text-[11px] font-semibold text-white backdrop-blur">
               <span className={cn("inline-block h-2 w-2 rounded-full", isTalking ? "bg-emerald-400" : "bg-slate-300")} />
               {isTalking ? "Speaking" : "Ready"}
             </div>
 
             {/* Caption bar */}
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/60 px-4 pb-4 pt-10">
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-black/60 px-4 pb-4 pt-10">
               <p className="text-[20px] font-[900] leading-tight text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]">
                 {captionText || `Explaining ${topic}`}
               </p>
@@ -484,24 +402,55 @@ export function AvatarNarrator({
 
       {/* Speech bubble */}
       <div
-        className="min-h-28 max-h-44 w-full max-w-[540px] overflow-y-auto rounded-[24px] border px-5 py-4 text-[14px] leading-7 shadow-sm"
+        className="w-full max-w-[540px] rounded-[24px] border shadow-sm overflow-hidden"
         style={{
-          backgroundColor: BUBBLE_BG,
-          borderColor: BUBBLE_BORDER,
-          color: BUBBLE_TEXT,
+          backgroundColor: BUBBLE_BG, borderColor: BUBBLE_BORDER,
           animation: `avatarNarratorEnter 480ms cubic-bezier(0.22,1,0.36,1) both, ${isStreaming ? "bubbleGlow 1.8s ease-in-out infinite" : "none"}`,
         }}
       >
-        <p className="whitespace-pre-wrap break-words">
-          {speechText}
-          {isStreaming && (
-            <span
-              aria-hidden="true"
-              className="ml-0.5 inline-block h-5 w-[2px] translate-y-1 animate-pulse rounded-full"
-              style={{ backgroundColor: BUBBLE_TEXT }}
-            />
+        <div className="max-h-44 overflow-y-auto px-5 pt-4 pb-3 text-[14px] leading-7" style={{ color: BUBBLE_TEXT }}>
+          <p className="whitespace-pre-wrap break-words">
+            {speechText}
+            {isStreaming && (
+              <span aria-hidden="true"
+                className="ml-0.5 inline-block h-5 w-[2px] translate-y-1 animate-pulse rounded-full"
+                style={{ backgroundColor: BUBBLE_TEXT }}
+              />
+            )}
+          </p>
+        </div>
+
+        {/* Trigger row */}
+        <div className="flex items-center justify-between border-t px-4 py-2" style={{ borderColor: BUBBLE_BORDER }}>
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={stopStreaming}
+              className="text-[12px] font-semibold text-red-400 hover:text-red-600 transition-colors"
+            >
+              Stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => runNarration("initial")}
+              className="text-[12px] font-semibold transition-colors"
+              style={{ color: BUBBLE_TEXT, opacity: 0.7 }}
+            >
+              {hasSpoken ? "Ask again" : "Ask trainer ›"}
+            </button>
           )}
-        </p>
+          {hasSpoken && !isStreaming && (
+            <button
+              type="button"
+              onClick={() => runNarration("example")}
+              className="text-[12px] font-semibold transition-colors"
+              style={{ color: BUBBLE_TEXT, opacity: 0.5 }}
+            >
+              Give example ›
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );
