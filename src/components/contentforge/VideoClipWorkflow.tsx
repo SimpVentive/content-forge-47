@@ -80,11 +80,9 @@ const AskInsertDialog: React.FC<{ onYes: () => void; onNo: () => void }> = ({ on
       <div className="h-1.5 w-full" style={{ background: "#2563EB" }} />
 
       <div className="px-10 pt-10 pb-8">
-        {/* Icon + Badge row */}
-        <div className="flex items-center justify-center gap-4 mb-7">
-          <div className="w-[72px] h-[72px] rounded-2xl flex items-center justify-center shadow-lg" style={{ background: "#DC2626" }}>
-            <Film className="w-9 h-9 text-white" />
-          </div>
+        {/* Header illustration */}
+        <div className="flex items-center justify-center mb-7">
+          <img src="/youtube-enhance-header.png" alt="Enhance with YouTube Videos" className="h-[90px] w-auto object-contain" />
         </div>
 
         <h2 className="text-[26px] font-[800] text-foreground text-center tracking-tight mb-3">
