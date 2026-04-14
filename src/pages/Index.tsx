@@ -440,6 +440,7 @@ const Index = () => {
             courseTitle={courseTitle}
             workflowClips={workflowClips}
             courseDuration={courseParams?.duration}
+            avatarTrainerId={courseParams?.avatarTrainerId}
             slideLayout={courseParams?.slideLayout}
             onUpdateVisualTopic={updateVisualTopicAsset}
             onUpdateCourseContent={updateCourseContent}

@@ -15,6 +15,7 @@ interface OutputPanelProps {
   courseTitle: string;
   workflowClips?: any[];
   courseDuration?: string;
+  avatarTrainerId?: string;
   slideLayout?: {
     maxLines: number;
     minFontSize: number;
@@ -135,7 +136,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 };
 
 /* Package Renderer */
-const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, slideLayout, onUpdateVisualTopic }) => {
+const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; avatarTrainerId?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, slideLayout, onUpdateVisualTopic }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
   const [checklist, setChecklist] = useState<boolean[]>(
@@ -156,6 +157,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           onClose={() => setShowLearnerPreview(false)}
           insertedVideos={insertedVideos}
           courseDuration={courseDuration}
+          avatarTrainerId={avatarTrainerId}
           slideLayout={slideLayout}
           onUpdateVisualTopic={onUpdateVisualTopic}
         />
@@ -355,7 +357,7 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
   );
 };
 
-export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, slideLayout, onUpdateVisualTopic, onUpdateCourseContent }) => {
+export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, slideLayout, onUpdateVisualTopic, onUpdateCourseContent }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
@@ -507,7 +509,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       case "assessment":
         return <AssessmentView raw={content} />;
       case "package":
-        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} insertedVideos={allInsertedVideos} courseDuration={courseDuration} slideLayout={slideLayout} onUpdateVisualTopic={onUpdateVisualTopic} />;
+        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} insertedVideos={allInsertedVideos} courseDuration={courseDuration} avatarTrainerId={avatarTrainerId} slideLayout={slideLayout} onUpdateVisualTopic={onUpdateVisualTopic} />;
       case "script":
         return <ScriptView raw={content} voiceRaw={rawOutputs.voice} />;
       case "outline":

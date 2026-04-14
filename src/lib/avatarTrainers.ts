@@ -130,7 +130,7 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   priya: {
     baseWidth: 35,
     baseHeight: 22,
-    mouthTopPct: 28,
+    mouthTopPct: 37,
     mouthLeftPct: 50,
     visemeTweaks: {
       ee: { width: 1.25 },
