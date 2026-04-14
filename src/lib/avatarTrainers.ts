@@ -70,6 +70,8 @@ export type AvatarLipSyncProfile = {
   baseHeight: number;
   closedOpacity: number;
   openOpacity: number;
+  mouthTopPct: number;   // vertical position of mouth centre as % of image height
+  mouthLeftPct: number;  // horizontal position of mouth centre as % of image width
   visemes: Record<VisemeKey, VisemeShape>;
 };
 
@@ -128,6 +130,8 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   priya: {
     baseWidth: 35,
     baseHeight: 22,
+    mouthTopPct: 68,
+    mouthLeftPct: 50,
     visemeTweaks: {
       ee: { width: 1.25 },
       aa: { height: 1.12 },
@@ -136,6 +140,8 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   indira: {
     baseWidth: 34,
     baseHeight: 21,
+    mouthTopPct: 68,
+    mouthLeftPct: 50,
     visemeTweaks: {
       ou: { width: 0.66, height: 0.94 },
       th: { width: 1.05 },
@@ -144,6 +150,8 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   arjun: {
     baseWidth: 36,
     baseHeight: 23,
+    mouthTopPct: 68,
+    mouthLeftPct: 50,
     visemeTweaks: {
       mbp: { height: 0.1 },
       r: { width: 0.84 },
@@ -152,6 +160,8 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   neha: {
     baseWidth: 33,
     baseHeight: 21,
+    mouthTopPct: 68,
+    mouthLeftPct: 50,
     visemeTweaks: {
       ih: { width: 1.06 },
       fv: { width: 1.2 },
@@ -160,6 +170,8 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   rohan: {
     baseWidth: 35,
     baseHeight: 22,
+    mouthTopPct: 68,
+    mouthLeftPct: 50,
     visemeTweaks: {
       oh: { width: 0.78, height: 1.08 },
       ch: { height: 0.72 },
@@ -168,6 +180,8 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   daniel: {
     baseWidth: 36,
     baseHeight: 23,
+    mouthTopPct: 68,
+    mouthLeftPct: 50,
     visemeTweaks: {
       aa: { width: 1.08, height: 1.06 },
       wq: { width: 0.7 },
@@ -176,6 +190,8 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
   emma: {
     baseWidth: 34,
     baseHeight: 22,
+    mouthTopPct: 68,
+    mouthLeftPct: 50,
     visemeTweaks: {
       ee: { width: 1.24 },
       l: { height: 0.58 },
@@ -198,6 +214,8 @@ function buildProfileForTrainer(trainerId: string): AvatarLipSyncProfile {
     baseHeight: preset.baseHeight ?? 22,
     closedOpacity: preset.closedOpacity ?? 0.2,
     openOpacity: preset.openOpacity ?? 0.9,
+    mouthTopPct: preset.mouthTopPct ?? 68,
+    mouthLeftPct: preset.mouthLeftPct ?? 50,
     visemes,
   };
 }

@@ -432,7 +432,10 @@ export function AvatarNarrator({ topic, moduleContent, systemHint, trainerName =
             )}
 
             {hasAvatarImage && (
-              <div className="pointer-events-none absolute left-1/2 top-[68%] h-[38px] w-[104px] -translate-x-1/2 -translate-y-1/2">
+              <div
+                className="pointer-events-none absolute h-[38px] w-[104px] -translate-x-1/2 -translate-y-1/2"
+                style={{ left: `${lipSyncProfile.mouthLeftPct}%`, top: `${lipSyncProfile.mouthTopPct}%` }}
+              >
                 <div
                   className="absolute left-1/2 top-1/2 border border-[#2d1714]/35"
                   style={{
