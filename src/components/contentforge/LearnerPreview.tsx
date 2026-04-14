@@ -1511,6 +1511,23 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     }
   }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio]);
 
+  // Auto-play narration when slide changes
+  useEffect(() => {
+    if (hasAvatarVideoNarration || muted) return;
+    const narration = getNarrationForSlide(currentSlide);
+    if (!narration) return;
+    // If audio already cached for this slide, play it
+    if (audioUrlsRef.current[currentSlide]) {
+      const audio = new Audio(audioUrlsRef.current[currentSlide]);
+      wireAudio(audio);
+      audio.play().catch(() => {});
+      return;
+    }
+    // Otherwise fetch and play
+    void playNarration();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSlide]);
+
   // Mute/unmute live
   useEffect(() => {
     if (audioRef.current) {
@@ -3124,20 +3141,19 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 <span className="text-[12px] font-semibold text-[#5f7b9e]">Slide {currentSlide + 1} of {totalSlides} - Score {score.correct}/{score.total || 0}</span>
               </div>
 
-              <div className="flex items-center gap-2 self-end lg:self-auto">
-                {/* Notes icon */}
+              <div className="flex items-center gap-2.5 self-end lg:self-auto">
+                {/* Notes */}
                 <button
                   onClick={() => setActiveSidebarPanel(activeSidebarPanel === "notes" ? "home" : "notes")}
-                  className={`inline-flex h-11 w-11 flex-col items-center justify-center rounded-xl border transition-all ${activeSidebarPanel === "notes" ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
+                  className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${activeSidebarPanel === "notes" ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
                   type="button"
                   aria-label="Notes"
-                  title="Notes"
                 >
-                  <NotebookPen className="h-4 w-4" />
-                  <span className="mt-0.5 text-[9px] font-semibold leading-none">Notes</span>
+                  <NotebookPen className="h-5 w-5" />
+                  <span>Notes</span>
                 </button>
 
-                {/* Quiz icon */}
+                {/* Quiz */}
                 <button
                   onClick={() => {
                     if (currentModuleAssessmentSlide) {
@@ -3146,16 +3162,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       setActiveLearningTool(activeLearningTool === "quiz" ? null : "quiz");
                     }
                   }}
-                  className={`inline-flex h-11 w-11 flex-col items-center justify-center rounded-xl border transition-all ${activeLearningTool === "quiz" || slide.type === "assessment" ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
+                  className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${activeLearningTool === "quiz" || slide.type === "assessment" ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
                   type="button"
                   aria-label="Quiz"
-                  title="Quiz"
                 >
-                  <HelpCircle className="h-4 w-4" />
-                  <span className="mt-0.5 text-[9px] font-semibold leading-none">Quiz</span>
+                  <HelpCircle className="h-5 w-5" />
+                  <span>Quiz</span>
                 </button>
 
-                {/* Explain (avatar narration) icon */}
+                {/* Explain */}
                 {currentNarration && !hasAvatarVideoNarration ? (
                   <button
                     onClick={() => {
@@ -3168,35 +3183,34 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         playNarration();
                       }
                     }}
-                    className={`inline-flex h-11 w-11 flex-col items-center justify-center rounded-xl border transition-all ${isPlaying ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
+                    className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${isPlaying ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
                     type="button"
-                    aria-label={audioLoading ? "Loading" : isPlaying ? "Pause Explain" : "Explain"}
-                    title={audioLoading ? "Loading" : isPlaying ? "Pause Explain" : "Explain"}
+                    aria-label={audioLoading ? "Loading…" : isPlaying ? "Pause" : "Explain"}
                   >
                     {audioLoading ? (
-                      <div className="h-4 w-4 rounded-full border-2 border-[#123d78]/30 border-t-[#123d78] animate-spin" />
-                    ) : isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    <span className="mt-0.5 text-[9px] font-semibold leading-none">{audioLoading ? "Loading" : "Explain"}</span>
+                      <div className="h-5 w-5 rounded-full border-2 border-[#123d78]/30 border-t-[#123d78] animate-spin" />
+                    ) : isPlaying ? <Pause className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                    <span>{audioLoading ? "Loading…" : isPlaying ? "Pause" : "Explain"}</span>
                   </button>
                 ) : null}
 
                 {/* Mute */}
                 <button
                   onClick={() => setMuted(!muted)}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#c9d8ea] bg-white text-[#123d78] transition-all hover:bg-[#f7fbff]"
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-xl border border-[#c9d8ea] bg-white text-[#123d78] transition-all hover:bg-[#f7fbff]"
                   type="button"
-                  aria-label={muted ? "Unmute narration" : "Mute narration"}
+                  aria-label={muted ? "Unmute" : "Mute"}
                 >
-                  {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+                  {muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
                 </button>
 
                 <button
                   onClick={goNext}
                   disabled={currentSlide === totalSlides - 1}
-                  className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1d4f93] px-5 text-[14px] font-semibold text-white transition-all hover:bg-[#173f78] disabled:opacity-40"
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#1d4f93] px-6 text-[14px] font-semibold text-white transition-all hover:bg-[#173f78] disabled:opacity-40"
                   type="button"
                 >
-                  Next <ChevronRight className="h-4 w-4" />
+                  Next <ChevronRight className="h-5 w-5" />
                 </button>
               </div>
             </div>
