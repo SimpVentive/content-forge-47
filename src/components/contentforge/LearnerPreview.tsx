@@ -1084,21 +1084,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   // Sync if parent changes
   useEffect(() => { setLocalVideos(insertedVideos); }, [insertedVideos]);
 
-  useEffect(() => {
-    Object.values(audioUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
-    audioUrlsRef.current = {};
-    visemeTimelinesRef.current = {};
-
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      audioRef.current = null;
-    }
-
-    setIsPlaying(false);
-    stopLipSync();
-  }, [trainerVoiceId, stopLipSync]);
-
   const unassignedCount = localVideos.filter(v => !v.moduleTitle).length;
   const activeHighlightPalette = HIGHLIGHT_PALETTES[highlightPalette];
   const flipStyleStorageKey = useMemo(() => getCourseFlipStyleStorageKey(courseTitle), [courseTitle]);
@@ -1254,6 +1239,21 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     setActiveViseme("rest");
     visemeIndexRef.current = 0;
   }, []);
+
+  useEffect(() => {
+    Object.values(audioUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+    audioUrlsRef.current = {};
+    visemeTimelinesRef.current = {};
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current = null;
+    }
+
+    setIsPlaying(false);
+    stopLipSync();
+  }, [trainerVoiceId, stopLipSync]);
 
   const startLipSync = useCallback(async (audio: HTMLAudioElement, visemeTimeline: VisemeCue[] = []) => {
     stopLipSync();
