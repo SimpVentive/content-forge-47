@@ -50,17 +50,79 @@ function getStructureGuidance(durationMinutes: number): string {
   return "7-8 modules with 24-30 topics total.";
 }
 
-function getSophisticationGuidance(durationMinutes: number): string {
-  if (durationMinutes <= 5) return "Even in a short course, include at least one tension point, one concrete workplace scenario, and one memorable decision or behavior shift.";
-  if (durationMinutes <= 15) return "Each module should have a clear promise, realistic scenario context, a practical framework, and at least one contrast between weak and strong practice.";
-  if (durationMinutes <= 30) return "Build a polished learning journey with escalating complexity, multiple scenario moments, strong transitions, and a balance of explanation, demonstration, and application.";
-  return "Treat the experience like premium corporate learning: layered module arcs, realistic decision points, recurring themes, practical frameworks, and varied instructional treatments that avoid repetition.";
+type LevelCalibration = {
+  label: string;
+  bloomsTarget: string;
+  vocabularyGuidance: string;
+  scenarioComplexity: string;
+  contentDepth: string;
+  assessmentStyle: string;
+  prerequisiteAssumption: string;
+};
+
+function getLevelCalibration(level?: string): LevelCalibration {
+  const l = (level || "intermediate").toLowerCase();
+
+  if (l === "basic" || l === "beginner" || l === "foundation") {
+    return {
+      label: "Basic",
+      bloomsTarget: "Remember and Understand (Bloom's levels 1–2). Use verbs like define, identify, describe, list, explain. Every concept is introduced from scratch — no assumed prior knowledge.",
+      vocabularyGuidance: "Plain, accessible language only. Define every piece of jargon or technical term the first time it appears. Use everyday analogies to make abstract ideas concrete. Avoid acronyms unless immediately defined.",
+      scenarioComplexity: "Simple, single-factor situations with clear right and wrong responses. No ambiguity. The learning challenge is recognition and recall, not judgment.",
+      contentDepth: "Prioritise breadth over depth. Cover essential concepts clearly without expert nuance or edge cases. The goal is confident awareness and foundational understanding.",
+      assessmentStyle: "Questions test recall and basic comprehension. Wrong options should be clearly incorrect — not subtle traps. Focus on 'what is', 'which of these', and 'true or false' style questions.",
+      prerequisiteAssumption: "Assume zero prior knowledge of this topic. Build from first principles. Explain why the topic matters before explaining what it is.",
+    };
+  }
+
+  if (l === "advanced" || l === "expert" || l === "mastery") {
+    return {
+      label: "Advanced",
+      bloomsTarget: "Evaluate and Create (Bloom's levels 5–6). Use verbs like evaluate, critique, justify, design, synthesise, recommend. Learners should be challenged to make high-stakes judgment calls and defend positions.",
+      vocabularyGuidance: "Expert-level terminology without definition. Assume domain fluency. Language should be strategic, precise, and peer-to-expert in tone — the kind used between senior practitioners. Challenge, provoke, and surface tensions in conventional thinking.",
+      scenarioComplexity: "Genuinely ambiguous situations with competing valid priorities and no obvious correct answer. Require weighing trade-offs, navigating systemic constraints, or handling political complexity. Surface edge cases and conditions under which standard advice breaks down.",
+      contentDepth: "Depth over breadth. Prioritise nuance, expert insight, and contrarian perspectives. Challenge assumptions. Surface the conditions under which common approaches fail. The goal is mastery and independent judgment.",
+      assessmentStyle: "Questions require analysis, synthesis, and judgment — not recall. Distractors should represent plausible expert mistakes or reasonable alternative framings. Use 'which is the BEST approach given…' and 'what is the PRIMARY risk of…' formats.",
+      prerequisiteAssumption: "Assume a solid working foundation. Skip definitions of standard domain terms. Build directly on established competence and push into nuanced territory.",
+    };
+  }
+
+  // Default: Intermediate
+  return {
+    label: "Intermediate",
+    bloomsTarget: "Apply and Analyse (Bloom's levels 3–4). Use verbs like apply, demonstrate, classify, compare, differentiate, explain in context. Learners should connect concepts to real situations.",
+    vocabularyGuidance: "Standard professional and domain terminology. Briefly explain specialist terms that may not be universally known, but do not over-define common vocabulary. Assume basic workplace literacy.",
+    scenarioComplexity: "Realistic workplace situations with competing priorities and some ambiguity. The challenge is applying the right principle in context, not just recalling it. Include moments where two reasonable people might disagree.",
+    contentDepth: "Balance concept explanation with practical application. Cover key nuances without going into edge-case complexity. The goal is confident, transferable competence.",
+    assessmentStyle: "Questions test application and analysis. Include nuanced distractors that represent common misconceptions or partially correct thinking. Mix 'how would you' and 'why does this happen' formats.",
+    prerequisiteAssumption: "Assume basic familiarity with the domain. Standard terms can be used without full definition, but reinforce foundational ideas as context, not instruction.",
+  };
 }
 
-function getInstructionalPatternGuidance(durationMinutes: number): string {
-  if (durationMinutes <= 10) return "Use a mix of scenario opener, concept explanation, and practical behavior shift. Avoid making every topic feel identical.";
-  if (durationMinutes <= 20) return "Vary topic treatments across scenario walkthroughs, myth-vs-reality reframes, process demos, good-vs-bad contrasts, and concise action checklists.";
-  return "Intentionally vary the instructional pattern across modules: case study, decision-point analysis, process walkthrough, manager coaching moment, customer scenario, misconception reset, and practical checklist.";
+function getSophisticationGuidance(durationMinutes: number, level?: string): string {
+  const cal = getLevelCalibration(level);
+  const durationBase = durationMinutes <= 5
+    ? "Even in a short course, include at least one tension point, one concrete workplace scenario, and one memorable decision or behavior shift."
+    : durationMinutes <= 15
+    ? "Each module should have a clear promise, realistic scenario context, a practical framework, and at least one contrast between weak and strong practice."
+    : durationMinutes <= 30
+    ? "Build a polished learning journey with escalating complexity, multiple scenario moments, strong transitions, and a balance of explanation, demonstration, and application."
+    : "Treat the experience like premium corporate learning: layered module arcs, realistic decision points, recurring themes, practical frameworks, and varied instructional treatments that avoid repetition.";
+  return `${durationBase} LEVEL (${cal.label}): ${cal.contentDepth} Bloom's target: ${cal.bloomsTarget} Prerequisite assumption: ${cal.prerequisiteAssumption}`;
+}
+
+function getInstructionalPatternGuidance(durationMinutes: number, level?: string): string {
+  const cal = getLevelCalibration(level);
+  const durationBase = durationMinutes <= 10
+    ? "Use a mix of scenario opener, concept explanation, and practical behavior shift. Avoid making every topic feel identical."
+    : durationMinutes <= 20
+    ? "Vary topic treatments across scenario walkthroughs, myth-vs-reality reframes, process demos, good-vs-bad contrasts, and concise action checklists."
+    : "Intentionally vary the instructional pattern across modules: case study, decision-point analysis, process walkthrough, manager coaching moment, customer scenario, misconception reset, and practical checklist.";
+  return `${durationBase} Scenario complexity for this level: ${cal.scenarioComplexity} Vocabulary guidance: ${cal.vocabularyGuidance}`;
+}
+
+function getAssessmentLevelGuidance(level?: string): string {
+  return getLevelCalibration(level).assessmentStyle;
 }
 
 function getAssessmentTargets(
@@ -482,7 +544,7 @@ export function useAgentPipeline() {
     setLogs([]);
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams }) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number }) => {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const durationMinutes = parseDurationMinutes(params?.duration);
@@ -490,8 +552,10 @@ export function useAgentPipeline() {
     const targetNarrationWords = Math.max(260, durationMinutes * 130);
     const durationToleranceMinutes = getDurationToleranceMinutes(durationMinutes);
     const structureGuidance = getStructureGuidance(durationMinutes);
-    const sophisticationGuidance = getSophisticationGuidance(durationMinutes);
-    const instructionalPatternGuidance = getInstructionalPatternGuidance(durationMinutes);
+    const sophisticationGuidance = getSophisticationGuidance(durationMinutes, params?.level);
+    const instructionalPatternGuidance = getInstructionalPatternGuidance(durationMinutes, params?.level);
+    const assessmentLevelGuidance = getAssessmentLevelGuidance(params?.level);
+    const levelCalibration = getLevelCalibration(params?.level);
 
     cancelledRef.current = false;
     setIsRunning(true);
@@ -623,6 +687,13 @@ CRITICAL: You are writing ONE MODULE of a ${params?.duration || "15min"} course.
       - Sophistication target: ${sophisticationGuidance}
       - Variation target: ${instructionalPatternGuidance}
 
+LEVEL CALIBRATION (${levelCalibration.label}) — apply these rules to every topic:
+- Bloom's target: ${levelCalibration.bloomsTarget}
+- Vocabulary: ${levelCalibration.vocabularyGuidance}
+- Scenario complexity: ${levelCalibration.scenarioComplexity}
+- Content depth: ${levelCalibration.contentDepth}
+- Prerequisite assumption: ${levelCalibration.prerequisiteAssumption}
+
 Rules you NEVER break:
 - Open every topic with a provocative hook — a shocking stat, a bold claim, a real-world scenario, or a question that makes the learner stop and think
 - Write in second person: 'You', 'Your team', 'You've probably seen this'
@@ -631,7 +702,7 @@ Rules you NEVER break:
 - Every section must have ONE memorable takeaway — something the learner will still remember next week
 - Use analogies. Make complex ideas click instantly.
 - End every topic with a challenge or reflection: 'Next time you X, try Y instead'
-- NO passive voice. NO jargon without explanation. NO bullet walls.
+- NO passive voice. NO bullet walls.
 - Do NOT make every topic feel structurally identical. Vary the treatment based on the instructional pattern and topic need.
 - Across a module, include a mix of these techniques when appropriate: scenario walkthrough, misconception reset, process breakdown, weak-vs-strong contrast, manager coaching moment, customer-facing example, concise checklist.
 - Use the architect blueprint explicitly. Every topic should visibly honour its learning_objective, misconception_to_correct, scenario_anchor, practice_activity, interaction_type, and feedback_focus when those fields are present.
@@ -954,7 +1025,7 @@ Rules you NEVER break:
 
         addLog(`Assessment Agent: Generating ${assessmentTargets.mcqCount} MCQs + ${assessmentTargets.scenarioCount} scenarios (${assessmentIntensity} intensity)...`);
         assessmentResult = await callClaudeWithRetry(
-          'You are an Assessment Design Agent. Given course script, architecture, and learning objectives, create a comprehensive assessment bank sized to the requested runtime and module complexity. Rules: (1) Question volume must scale with module/topic size; avoid token quizzes. (2) Spread MCQs across modules proportionally. (3) Include module_title and topic_title on every MCQ and scenario so the renderer can map items correctly. Generate: (1) requested number of multiple choice questions with 4 options each, correct answer marked, rationale, and common wrong-answer trap, (2) requested number of scenario-based questions with a situation description, 3 response options, best_response, and coaching rationale, (3) 1 reflection exercise with an open-ended prompt, and (4) embedded_interactions list in requested range aligned to specific topics. Tag each question with Bloom\'s taxonomy level. Return JSON: { mcq: [{ module_title, topic_title, question, options: [], correct_answer, rationale, wrong_answer_trap, blooms_level }], scenarios: [{ module_title, topic_title, situation, options: [], best_response, rationale, blooms_level }], reflection: { prompt, guidance }, embedded_interactions: [{ module_title, topic_title, interaction_type, prompt, expected_response, feedback_focus }], metadata: { target_mcq_count, target_scenario_count, module_count, topic_count, assessment_intensity } }',
+          `You are an Assessment Design Agent. Given course script, architecture, and learning objectives, create a comprehensive assessment bank sized to the requested runtime and module complexity. Rules: (1) Question volume must scale with module/topic size; avoid token quizzes. (2) Spread MCQs across modules proportionally. (3) Include module_title and topic_title on every MCQ and scenario so the renderer can map items correctly. LEVEL CALIBRATION (${levelCalibration.label}): ${assessmentLevelGuidance} Bloom's target for questions: ${levelCalibration.bloomsTarget} Generate: (1) requested number of multiple choice questions with 4 options each, correct answer marked, rationale, and common wrong-answer trap, (2) requested number of scenario-based questions with a situation description, 3 response options, best_response, and coaching rationale, (3) 1 reflection exercise with an open-ended prompt, and (4) embedded_interactions list in requested range aligned to specific topics. Tag each question with Bloom's taxonomy level. Return JSON: { mcq: [{ module_title, topic_title, question, options: [], correct_answer, rationale, wrong_answer_trap, blooms_level }], scenarios: [{ module_title, topic_title, situation, options: [], best_response, rationale, blooms_level }], reflection: { prompt, guidance }, embedded_interactions: [{ module_title, topic_title, interaction_type, prompt, expected_response, feedback_focus }], metadata: { target_mcq_count, target_scenario_count, module_count, topic_count, assessment_intensity } }`,
           `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nLearning Objectives:\n${researchResult}\n\nTarget Duration Minutes: ${durationMinutes}\nAssessment Intensity: ${assessmentIntensity}\nModule Count: ${moduleCount}\nTopic Count: ${topicCount}\nTarget MCQ Count: ${assessmentTargets.mcqCount}\nTarget Scenario Count: ${assessmentTargets.scenarioCount}\nTarget Embedded Interactions Range: ${assessmentTargets.interactionMin}-${assessmentTargets.interactionMax}`,
           addLog, "Assessment Agent"
         );
