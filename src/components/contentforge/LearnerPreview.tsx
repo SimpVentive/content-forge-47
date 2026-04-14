@@ -1060,7 +1060,7 @@ function getCourseNotesStorageKey(courseTitle: string): string {
   return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = false, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, onUpdateVisualTopic }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, onUpdateVisualTopic }) => {
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
   const avatarEnv = import.meta.env as Record<string, string | undefined>;
   const trainerMedia = getTrainerMedia(selectedTrainer.id, avatarEnv);
@@ -3133,7 +3133,38 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 <span className="text-[12px] font-semibold text-[#5f7b9e]">Slide {currentSlide + 1} of {totalSlides} - Score {score.correct}/{score.total || 0}</span>
               </div>
 
-              <div className="flex items-center gap-2.5 self-end lg:self-auto">
+              <div className="flex items-center gap-2 self-end lg:self-auto">
+                {/* Notes icon */}
+                <button
+                  onClick={() => setActiveSidebarPanel(activeSidebarPanel === "notes" ? "home" : "notes")}
+                  className={`inline-flex h-11 w-11 flex-col items-center justify-center rounded-xl border transition-all ${activeSidebarPanel === "notes" ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
+                  type="button"
+                  aria-label="Notes"
+                  title="Notes"
+                >
+                  <NotebookPen className="h-4 w-4" />
+                  <span className="mt-0.5 text-[9px] font-semibold leading-none">Notes</span>
+                </button>
+
+                {/* Quiz icon */}
+                <button
+                  onClick={() => {
+                    if (currentModuleAssessmentSlide) {
+                      navigateToSlide(currentModuleAssessmentSlide.idx);
+                    } else {
+                      setActiveLearningTool(activeLearningTool === "quiz" ? null : "quiz");
+                    }
+                  }}
+                  className={`inline-flex h-11 w-11 flex-col items-center justify-center rounded-xl border transition-all ${activeLearningTool === "quiz" || slide.type === "assessment" ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
+                  type="button"
+                  aria-label="Quiz"
+                  title="Quiz"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                  <span className="mt-0.5 text-[9px] font-semibold leading-none">Quiz</span>
+                </button>
+
+                {/* Explain (avatar narration) icon */}
                 {currentNarration && !hasAvatarVideoNarration ? (
                   <button
                     onClick={() => {
@@ -3146,16 +3177,19 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         playNarration();
                       }
                     }}
-                    className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-[#c9d8ea] bg-white px-4 text-[13px] font-semibold text-[#123d78] transition-all hover:bg-[#f7fbff]"
+                    className={`inline-flex h-11 w-11 flex-col items-center justify-center rounded-xl border transition-all ${isPlaying ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
                     type="button"
+                    aria-label={audioLoading ? "Loading" : isPlaying ? "Pause Explain" : "Explain"}
+                    title={audioLoading ? "Loading" : isPlaying ? "Pause Explain" : "Explain"}
                   >
                     {audioLoading ? (
                       <div className="h-4 w-4 rounded-full border-2 border-[#123d78]/30 border-t-[#123d78] animate-spin" />
                     ) : isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                    <span>{audioLoading ? "Loading" : isPlaying ? "Pause Explain" : "Explain"}</span>
+                    <span className="mt-0.5 text-[9px] font-semibold leading-none">{audioLoading ? "Loading" : "Explain"}</span>
                   </button>
                 ) : null}
 
+                {/* Mute */}
                 <button
                   onClick={() => setMuted(!muted)}
                   className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#c9d8ea] bg-white text-[#123d78] transition-all hover:bg-[#f7fbff]"
