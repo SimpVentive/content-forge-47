@@ -73,11 +73,15 @@ export function AvatarNarrator({
 
   const isTalking = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
 
-  // Mouth opening: ellipse size driven by viseme height
+  // Mouth: dark oval sized to the actual drawn mouth on these illustrations.
+  // Width  ≈ baseWidth  * shape.width  (full diameter, ~30–38 px at 360 wide)
+  // Height ≈ baseHeight * 0.62 * shape.height — capped so the tallest sound
+  //          (aa, height=1.1) gives ≈13 px which looks natural on a flat avatar.
+  // No blend mode — multiply was causing the blob to bleed far beyond its box.
   const visemeShape  = lipSyncProfile.visemes[effectiveViseme];
-  const mouthOpenRy  = lipSyncProfile.baseHeight * visemeShape.height * (isTalking ? 0.55 : 0);
-  const mouthOpenRx  = (lipSyncProfile.baseWidth / 2) * visemeShape.width;
-  const mouthOpacity = isTalking ? Math.min(0.82, visemeShape.height * 0.78) : 0;
+  const mouthW       = lipSyncProfile.baseWidth  * visemeShape.width * 0.92;
+  const mouthH       = lipSyncProfile.baseHeight * 0.62 * visemeShape.height * (isTalking ? 1 : 0);
+  const mouthAlpha   = isTalking ? Math.min(0.95, visemeShape.height * 0.88) : 0;
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
@@ -338,24 +342,34 @@ export function AvatarNarrator({
                   onError={() => setHasAvatarImage(false)}
                 />
 
-                {/* Multiply-blend ellipse — darkens the mouth area when open.
-                    No skin-tone matching needed: multiply blends naturally
-                    with any illustrated skin tone. */}
+                {/* Mouth opening — plain dark oval, no blend mode.
+                    Sized to the actual drawn mouth (~30–38 × 0–14 px). */}
                 <div
-                  className="pointer-events-none absolute"
+                  className="pointer-events-none absolute overflow-hidden"
                   style={{
-                    left: `${lipSyncProfile.mouthLeftPct}%`,
-                    top:  `${lipSyncProfile.mouthTopPct}%`,
+                    left:      `${lipSyncProfile.mouthLeftPct}%`,
+                    top:       `${lipSyncProfile.mouthTopPct}%`,
                     transform: "translate(-50%, -50%)",
-                    width:   `${mouthOpenRx * 2}px`,
-                    height:  `${Math.max(mouthOpenRy * 2, 1)}px`,
-                    background: "radial-gradient(ellipse, rgba(40,8,8,0.92) 0%, rgba(20,4,4,0.55) 60%, transparent 100%)",
+                    width:     `${mouthW}px`,
+                    height:    `${Math.max(mouthH, 0.5)}px`,
+                    background: "radial-gradient(ellipse at 50% 35%, #1e0505 0%, #2e0808 55%, transparent 85%)",
                     borderRadius: "50%",
-                    opacity: mouthOpacity,
-                    mixBlendMode: "multiply",
+                    opacity:   mouthAlpha,
                     transition: "width 55ms ease-out, height 55ms ease-out, opacity 55ms ease-out",
                   }}
-                />
+                >
+                  {/* Teeth strip for wide-open sounds (aa, oh) */}
+                  {mouthH > 7 && (
+                    <div style={{
+                      position: "absolute",
+                      left: "10%", right: "10%",
+                      top: "10%",
+                      height: `${Math.min(mouthH * 0.3, 4)}px`,
+                      background: "#f0e8dc",
+                      borderRadius: "1px",
+                    }} />
+                  )}
+                </div>
               </>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-[#3C3489]">
