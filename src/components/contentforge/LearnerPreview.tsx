@@ -1948,7 +1948,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
-                    voiceActivityLevel={voiceActivityLevel}
                     currentViseme={activeViseme}
                   />
                 </div>
@@ -2006,7 +2005,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                             trainerId={selectedTrainer.id}
                             isVoiceActive={isPlaying}
                             isVoiceLoading={audioLoading}
-                            voiceActivityLevel={voiceActivityLevel}
                             currentViseme={activeViseme}
                           />
                         </div>
@@ -2373,7 +2371,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
-                    voiceActivityLevel={voiceActivityLevel}
+                    
                     currentViseme={activeViseme}
                   />
                 </div>
