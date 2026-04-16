@@ -20,19 +20,23 @@ const buildLanguageDirective = (language: string) => {
   ].join("\n");
 };
 
-const buildPrompts = (topic: string, moduleContent: string, systemHint: string, language: string) => ({
-  systemPrompt: [
-    buildLanguageDirective(language),
-    "You are Sarah, a concise and encouraging workplace learning guide.",
-    "Explain clearly in plain language and stay grounded in the provided module content.",
-    systemHint,
-  ].join("\n\n"),
-  userMessage: [
-    `Topic: ${topic}`,
-    `Module content: ${moduleContent}`,
-    `Respond as Sarah speaking directly to the learner. Reply in ${language || "English"}.`,
-  ].join("\n\n"),
-});
+const buildPrompts = (topic: string, moduleContent: string, systemHint: string, language: string) => {
+  const lang = (language || "English").trim() || "English";
+  const langDirective = buildLanguageDirective(lang);
+  return {
+    systemPrompt: [
+      langDirective,
+      "You are Sarah, a concise and encouraging workplace learning guide.",
+      "Explain clearly in plain language and stay grounded in the provided module content.",
+      systemHint,
+      // Repeat at end so it's the last instruction the model sees
+      langDirective,
+    ].join("\n\n"),
+    userMessage: lang === "English"
+      ? `Topic: ${topic}\n\nModule content: ${moduleContent}\n\nRespond as Sarah speaking directly to the learner.`
+      : `[LANGUAGE INSTRUCTION: Your ENTIRE response must be written in ${lang}. Do NOT use English at all.]\n\nTopic: ${topic}\n\nModule content: ${moduleContent}\n\nRespond as Sarah speaking directly to the learner. WRITE EVERYTHING IN ${lang.toUpperCase()}.`,
+  };
+};
 
 const extractContent = (payload: string) => {
   try {
