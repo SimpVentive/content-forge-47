@@ -100,42 +100,42 @@ const TRAINER_LIP_SYNC_PRESETS: Record<string, Partial<AvatarLipSyncProfile> & {
 }> = {
   priya: {
     baseWidth: 34, baseHeight: 20,
-    mouthTopPct: 42, mouthLeftPct: 50,
+    mouthTopPct: 52, mouthLeftPct: 50,
     skinTone: "#C8865A", lipColor: "#9C5E38",
   },
   arjun: {
     baseWidth: 36, baseHeight: 22,
-    mouthTopPct: 42, mouthLeftPct: 50,
+    mouthTopPct: 52, mouthLeftPct: 50,
     skinTone: "#B07040", lipColor: "#8A4C28",
     visemeTweaks: { mbp: { height: 0.06 }, r: { width: 0.84 } },
   },
   soumya: {
     baseWidth: 34, baseHeight: 20,
-    mouthTopPct: 42, mouthLeftPct: 50,
+    mouthTopPct: 52, mouthLeftPct: 50,
     skinTone: "#C07850", lipColor: "#9A5034",
     visemeTweaks: { ee: { width: 1.24 } },
   },
   vedprakash: {
     baseWidth: 36, baseHeight: 21,
-    mouthTopPct: 42, mouthLeftPct: 50,
+    mouthTopPct: 52, mouthLeftPct: 50,
     skinTone: "#C08C60", lipColor: "#9C6840",
     visemeTweaks: { oh: { width: 0.78, height: 1.06 } },
   },
   atul: {
     baseWidth: 36, baseHeight: 22,
-    mouthTopPct: 42, mouthLeftPct: 50,
+    mouthTopPct: 52, mouthLeftPct: 50,
     skinTone: "#B88050", lipColor: "#966038",
     visemeTweaks: { aa: { width: 1.08, height: 1.06 } },
   },
   irina: {
     baseWidth: 33, baseHeight: 20,
-    mouthTopPct: 42, mouthLeftPct: 50,
+    mouthTopPct: 52, mouthLeftPct: 50,
     skinTone: "#F0C8A0", lipColor: "#C07860",
     visemeTweaks: { ee: { width: 1.26 }, l: { height: 0.58 } },
   },
   john: {
     baseWidth: 36, baseHeight: 22,
-    mouthTopPct: 42, mouthLeftPct: 50,
+    mouthTopPct: 52, mouthLeftPct: 50,
     skinTone: "#D4A870", lipColor: "#A87850",
     visemeTweaks: { wq: { width: 0.7 } },
   },
@@ -154,7 +154,7 @@ function buildProfileForTrainer(trainerId: string): AvatarLipSyncProfile {
   return {
     baseWidth:    preset.baseWidth    ?? 34,
     baseHeight:   preset.baseHeight   ?? 20,
-    mouthTopPct:  preset.mouthTopPct  ?? 62,
+    mouthTopPct:  preset.mouthTopPct  ?? 52,
     mouthLeftPct: preset.mouthLeftPct ?? 50,
     skinTone:     preset.skinTone     ?? "#C0886A",
     lipColor:     preset.lipColor     ?? "#9A6040",

@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 
 // ---------------------------------------------------------------------------
-// AvatarNarrator
+// Types
 // ---------------------------------------------------------------------------
 interface AvatarNarratorProps {
   topic: string;
@@ -19,16 +19,27 @@ interface AvatarNarratorProps {
   isVoiceActive?: boolean;
   isVoiceLoading?: boolean;
   currentViseme?: VisemeKey;
+  /** Language for the narrator's spoken reply (also used for the on-screen bubble). */
+  narratorLanguage?: string;
 }
 
+type RequestMode = "initial" | "example";
+type MouthState  = "rest" | "slight" | "open";
+
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 const CONCISE_RESPONSE_HINT = "Keep the response concise: maximum 90 words, 4 short paragraphs or fewer, and avoid repetition.";
-const EXAMPLE_HINT = `Give one vivid real-world workplace example in 2 sentences. ${CONCISE_RESPONSE_HINT}`;
+const EXAMPLE_HINT  = `Give one vivid real-world workplace example in 2 sentences. ${CONCISE_RESPONSE_HINT}`;
 const BUBBLE_BG     = "#EEEDFE";
 const BUBBLE_BORDER = "#AFA9EC";
 const BUBBLE_TEXT   = "#26215C";
 
-type RequestMode = "initial" | "example";
+const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "aa", "ih", "r", "oh", "aa"];
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: string) {
   const preview = moduleContent.trim().replace(/\s+/g, " ");
   if (!preview) return `Tap the explain icon and ${trainerName} will walk you through ${topic}.`;
@@ -36,8 +47,22 @@ function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: s
   return `Tap the explain icon and ${trainerName} will break down ${topic}. Quick preview: ${short}`;
 }
 
-const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "aa", "ih", "r", "oh", "aa"];
+/**
+ * Map a viseme key → one of three mouth states used to pick the sprite PNG.
+ *   rest   → mouth closed  (mbp bilabials, silence)
+ *   slight → lips parted   (fricatives, liquids, glides)
+ *   open   → jaw dropped   (vowels)
+ */
+function getVisemeMouthState(viseme: VisemeKey, isTalking: boolean): MouthState {
+  if (!isTalking) return "rest";
+  if (viseme === "mbp") return "rest";
+  if ((["fv", "th", "l", "r", "wq", "ih"] as VisemeKey[]).includes(viseme)) return "slight";
+  return "open"; // aa, ee, oh, ou, ch — and anything else while talking
+}
 
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
 export function AvatarNarrator({
   topic, moduleContent, systemHint,
   trainerName = "Sarah",
@@ -45,50 +70,102 @@ export function AvatarNarrator({
   trainerId = "priya",
   isVoiceActive, isVoiceLoading,
   currentViseme = "rest",
+  narratorLanguage = "English",
 }: AvatarNarratorProps) {
-  const [speechText, setSpeechText]   = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
-  const [isStreaming, setIsStreaming]  = useState(false);
-  const [hasSpoken, setHasSpoken] = useState(false);
-  const [hasAvatarImage, setHasAvatarImage] = useState(true);
-  const [videoMuted, setVideoMuted]   = useState(true);
-  const [videoPlaying, setVideoPlaying] = useState(true);
-  const [isMouthHold, setIsMouthHold] = useState(false);
+  const [speechText,    setSpeechText]    = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
+  const [isStreaming,   setIsStreaming]   = useState(false);
+  const [hasSpoken,     setHasSpoken]     = useState(false);
+  const [hasAvatarImage,setHasAvatarImage]= useState(true);
+  const [videoMuted,    setVideoMuted]    = useState(true);
+  const [videoPlaying,  setVideoPlaying]  = useState(true);
+  const [isMouthHold,   setIsMouthHold]   = useState(false);
   const [streamingViseme, setStreamingViseme] = useState<VisemeKey>("rest");
 
-  const avatarVideoRef        = useRef<HTMLVideoElement | null>(null);
-  const abortControllerRef    = useRef<AbortController | null>(null);
-  const flushIntervalRef      = useRef<number | null>(null);
-  const queuedCharactersRef   = useRef<string[]>([]);
-  const currentRequestRef     = useRef(0);
-  const pendingCompletionRef  = useRef<RequestMode | null>(null);
-  const mouthHoldTimeoutRef   = useRef<number | null>(null);
-  const streamVisemeIdxRef    = useRef(0);
+  // Sprite readiness: null = probing, true = PNG found, false = not found → CSS fallback
+  const [hasMouthSprite, setHasMouthSprite] = useState<boolean | null>(null);
+  const [hasBlinkSprite, setHasBlinkSprite] = useState<boolean | null>(null);
+  const [isBlinking,     setIsBlinking]     = useState(false);
+
+  const avatarVideoRef          = useRef<HTMLVideoElement | null>(null);
+  const abortControllerRef      = useRef<AbortController | null>(null);
+  const flushIntervalRef        = useRef<number | null>(null);
+  const queuedCharactersRef     = useRef<string[]>([]);
+  const currentRequestRef       = useRef(0);
+  const pendingCompletionRef    = useRef<RequestMode | null>(null);
+  const mouthHoldTimeoutRef     = useRef<number | null>(null);
+  const streamVisemeIdxRef      = useRef(0);
   const streamVisemeIntervalRef = useRef<number | null>(null);
+  const blinkTimeoutRef         = useRef<number | null>(null);
 
   const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
 
-  // Real ElevenLabs visemes take priority; fall back to cycling sequence while streaming
+  // Viseme resolution: ElevenLabs takes priority; cycling fallback while streaming
   const effectiveViseme: VisemeKey =
     (isStreaming || isMouthHold) && currentViseme === "rest" ? streamingViseme : currentViseme;
 
-  const isTalking = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
+  const isTalking  = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
+  const mouthState = getVisemeMouthState(effectiveViseme, isTalking);
 
-  // Mouth: dark oval sized to the actual drawn mouth on these illustrations.
-  // Width  ≈ baseWidth  * shape.width  (full diameter, ~30–38 px at 360 wide)
-  // Height ≈ baseHeight * 0.62 * shape.height — capped so the tallest sound
-  //          (aa, height=1.1) gives ≈13 px which looks natural on a flat avatar.
-  // No blend mode — multiply was causing the blob to bleed far beyond its box.
+  // SVG mouth geometry — drives both the sprite-fallback SVG and the mouthW for PNG sizing
   const visemeShape  = lipSyncProfile.visemes[effectiveViseme];
-  const mouthW       = lipSyncProfile.baseWidth  * visemeShape.width * 0.92;
-  const mouthH       = lipSyncProfile.baseHeight * 0.62 * visemeShape.height * (isTalking ? 1 : 0);
-  const mouthAlpha   = isTalking ? Math.min(0.95, visemeShape.height * 0.88) : 0;
+  const mouthW       = lipSyncProfile.baseWidth  * visemeShape.width * 0.90;
+  const mouthH       = lipSyncProfile.baseHeight * 0.55 * visemeShape.height * (isTalking ? 1 : 0);
+  const mouthAlpha   = isTalking ? Math.min(0.88, visemeShape.height * 0.80) : 0;
+
+  // SVG fallback sizing (viewBox is always 0 0 100 100; pixel height varies by state)
+  const svgIsOpen    = mouthState === "open";
+  const svgPxW       = mouthW + 6;                                  // +6 gives skin-patch breathing room
+  const svgPxH       = svgIsOpen ? Math.max(mouthH + 10, 14) : 15; // slight=15px, open scales with mouthH
+  const svgIntRy     = svgIsOpen ? 22 : 5;                          // interior oval vertical radius (vb units)
+  const svgLlY       = svgIsOpen ? 76 : 61;                         // lower-lip centre Y (vb units)
+  const svgShowTeeth = svgIsOpen && svgPxH > 12;                    // teeth strip for wide vowels only
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
     .map((p) => p[0]?.toUpperCase() || "").join("") || "AV";
 
-  // ── helpers ──────────────────────────────────────────────────────────────
+  // ── sprite probing ────────────────────────────────────────────────────────
+  // Probe once per trainer so we know whether PNG files exist.
+  // Uses Image() instead of fetch — silent failure with onError, no console 404.
+  useEffect(() => {
+    setHasMouthSprite(null);
+    const probe = new Image();
+    probe.onload  = () => setHasMouthSprite(true);
+    probe.onerror = () => setHasMouthSprite(false);
+    probe.src = `/trainers/${trainerId}-mouth-slight.png`;
+  }, [trainerId]);
 
+  useEffect(() => {
+    setHasBlinkSprite(null);
+    const probe = new Image();
+    probe.onload  = () => setHasBlinkSprite(true);
+    probe.onerror = () => setHasBlinkSprite(false);
+    probe.src = `/trainers/${trainerId}-blink.png`;
+  }, [trainerId]);
+
+  // ── random eye blink ──────────────────────────────────────────────────────
+  // Schedules itself recursively with a random 2–6 s interval.
+  // Blink lasts 140 ms. Works with a sprite PNG or is silently skipped
+  // if hasBlinkSprite === false.
+  const scheduleNextBlink = useCallback(() => {
+    const delay = Math.random() * 4000 + 2000;
+    blinkTimeoutRef.current = window.setTimeout(() => {
+      setIsBlinking(true);
+      window.setTimeout(() => {
+        setIsBlinking(false);
+        scheduleNextBlink();
+      }, 140);
+    }, delay);
+  }, []);
+
+  useEffect(() => {
+    scheduleNextBlink();
+    return () => {
+      if (blinkTimeoutRef.current !== null) window.clearTimeout(blinkTimeoutRef.current);
+    };
+  }, [scheduleNextBlink]);
+
+  // ── stream helpers ────────────────────────────────────────────────────────
   const clearMouthHold = () => {
     if (mouthHoldTimeoutRef.current !== null) {
       window.clearTimeout(mouthHoldTimeoutRef.current);
@@ -179,7 +256,6 @@ export function AvatarNarrator({
   };
 
   // ── narration fetch ───────────────────────────────────────────────────────
-
   const runNarration = async (mode: RequestMode) => {
     if (isStreaming) return;
     abortControllerRef.current?.abort();
@@ -202,6 +278,7 @@ export function AvatarNarrator({
           body: JSON.stringify({
             topic, moduleContent,
             systemHint: mode === "initial" ? `${systemHint} ${CONCISE_RESPONSE_HINT}` : EXAMPLE_HINT,
+            language: narratorLanguage,
           }),
           signal: controller.signal,
         }
@@ -231,7 +308,6 @@ export function AvatarNarrator({
   };
 
   // ── effects ───────────────────────────────────────────────────────────────
-
   useEffect(() => {
     setSpeechText(buildDefaultSpeech(topic, moduleContent, trainerName));
     setHasSpoken(false);
@@ -252,6 +328,7 @@ export function AvatarNarrator({
     stopFlushLoop();
     clearMouthHold();
     stopStreamViseme();
+    if (blinkTimeoutRef.current !== null) window.clearTimeout(blinkTimeoutRef.current);
   }, []);
 
   useEffect(() => { setHasAvatarImage(true); }, [avatarImageUrl, trainerName]);
@@ -272,8 +349,13 @@ export function AvatarNarrator({
 
   const captionText = speechText.trim().replace(/\s+/g, " ").slice(0, 80);
 
-  // ── render ────────────────────────────────────────────────────────────────
+  // Sprite URLs
+  const blinkSpriteUrl       = `/trainers/${trainerId}-blink.png`;
+  const mouthSlightSpriteUrl = `/trainers/${trainerId}-mouth-slight.png`;
+  const mouthOpenSpriteUrl   = `/trainers/${trainerId}-mouth-open.png`;
+  const activeMouthSpriteUrl = mouthState === "slight" ? mouthSlightSpriteUrl : mouthOpenSpriteUrl;
 
+  // ── render ────────────────────────────────────────────────────────────────
   return (
     <section className="flex w-full flex-col items-center gap-3">
       <style>{`
@@ -284,6 +366,12 @@ export function AvatarNarrator({
         @keyframes bubbleGlow {
           0%, 100% { box-shadow: 0 10px 24px rgba(60,52,137,0.08); }
           50%       { box-shadow: 0 14px 32px rgba(60,52,137,0.16); }
+        }
+        @keyframes headTilt {
+          0%,  100% { transform: rotate(0deg)     translateX(0px);   }
+          20%        { transform: rotate(0.8deg)   translateX(1px);   }
+          55%        { transform: rotate(-0.5deg)  translateX(-0.5px);}
+          80%        { transform: rotate(0.6deg)   translateX(0.8px); }
         }
       `}</style>
 
@@ -321,7 +409,7 @@ export function AvatarNarrator({
           </div>
         </div>
       ) : (
-        /* ── illustrated avatar with multiply-blend mouth overlay ──────────── */
+        /* ── illustrated avatar — layered sprite system ───────────────────── */
         <div
           className="w-full max-w-[360px] overflow-hidden rounded-[20px] bg-white transition-all duration-300"
           style={{
@@ -335,41 +423,123 @@ export function AvatarNarrator({
           <div className="relative aspect-[3/4] w-full overflow-hidden bg-[#eef2ff]">
             {hasAvatarImage ? (
               <>
+                {/*
+                  LAYER 0 — base head image
+                  Subtle 9 s head-tilt animation gives life without being distracting.
+                  transform-origin "50% 80%" pivots around the shoulders so the tilt
+                  feels like a natural head movement, not a full-body rock.
+                */}
                 <img
                   src={avatarImageUrl || "/trainers/priya.png"}
                   alt={trainerName}
-                  className="h-full w-full object-cover object-top"
+                  className="absolute inset-0 h-full w-full object-cover object-top"
+                  style={{
+                    animation: "headTilt 9s ease-in-out infinite",
+                    transformOrigin: "50% 80%",
+                  }}
                   onError={() => setHasAvatarImage(false)}
                 />
 
-                {/* Mouth opening — plain dark oval, no blend mode.
-                    Sized to the actual drawn mouth (~30–38 × 0–14 px). */}
-                <div
-                  className="pointer-events-none absolute overflow-hidden"
-                  style={{
-                    left:      `${lipSyncProfile.mouthLeftPct}%`,
-                    top:       `${lipSyncProfile.mouthTopPct}%`,
-                    transform: "translate(-50%, -50%)",
-                    width:     `${mouthW}px`,
-                    height:    `${Math.max(mouthH, 0.5)}px`,
-                    background: "radial-gradient(ellipse at 50% 35%, #1e0505 0%, #2e0808 55%, transparent 85%)",
-                    borderRadius: "50%",
-                    opacity:   mouthAlpha,
-                    transition: "width 55ms ease-out, height 55ms ease-out, opacity 55ms ease-out",
-                  }}
-                >
-                  {/* Teeth strip for wide-open sounds (aa, oh) */}
-                  {mouthH > 7 && (
-                    <div style={{
-                      position: "absolute",
-                      left: "10%", right: "10%",
-                      top: "10%",
-                      height: `${Math.min(mouthH * 0.3, 4)}px`,
-                      background: "#f0e8dc",
-                      borderRadius: "1px",
-                    }} />
-                  )}
-                </div>
+                {/*
+                  LAYER 1 — eyes-closed blink sprite  (optional)
+                  Drop  /public/trainers/{id}-blink.png  to enable.
+                  Full-size PNG — transparent everywhere except closed-eyes area.
+                  Fades in for 140 ms at random 2–6 s intervals.
+                */}
+                {hasBlinkSprite !== false && (
+                  <img
+                    src={blinkSpriteUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
+                    style={{
+                      opacity: isBlinking ? 1 : 0,
+                      transition: "opacity 60ms ease-in-out",
+                    }}
+                    onError={() => setHasBlinkSprite(false)}
+                  />
+                )}
+
+                {/*
+                  LAYER 2a — mouth sprites  (optional, preferred)
+                  Drop  /public/trainers/{id}-mouth-slight.png
+                  and   /public/trainers/{id}-mouth-open.png  to enable.
+                  Full-size PNGs — transparent everywhere except the mouth area.
+                  Three states driven by viseme groups:
+                    rest   → no sprite shown (drawn closed mouth visible in layer 0)
+                    slight → fricatives / liquids  → {id}-mouth-slight.png
+                    open   → vowels                → {id}-mouth-open.png
+                */}
+                {hasMouthSprite === true && mouthState !== "rest" && (
+                  <img
+                    src={activeMouthSpriteUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
+                    style={{ transition: "opacity 55ms ease-out" }}
+                  />
+                )}
+
+                {/*
+                  LAYER 2b — SVG cartoon mouth fallback (active until sprite PNGs added)
+
+                  ViewBox is always 0 0 100 100. Pixel dimensions vary by mouth state.
+                  transform "translate(-50%, -46%)" centres the skin-patch ellipse
+                  (whose cy=46 in vb units) exactly on mouthTopPct — so it reliably
+                  covers the drawn closed-mouth line in the illustration.
+
+                  Layers inside the SVG (painter's order):
+                    1. Skin patch  — erases the drawn closed-mouth line
+                    2. Dark interior — the mouth void (tiny slit or open oval)
+                    3. Teeth strip  — off-white, visible only on wide vowels (aa, ee, oh)
+                    4. Upper lip   — Cupid's-bow path, styled with lipColor
+                    5. Lower lip   — fuller arc, slightly translucent lipColor
+                */}
+                {hasMouthSprite !== true && mouthState !== "rest" && (
+                  <svg
+                    aria-hidden="true"
+                    width={svgPxW}
+                    height={svgPxH}
+                    viewBox="0 0 100 100"
+                    overflow="visible"
+                    style={{
+                      position:   "absolute",
+                      left:       `${lipSyncProfile.mouthLeftPct}%`,
+                      top:        `${lipSyncProfile.mouthTopPct}%`,
+                      transform:  "translate(-50%, -46%)",
+                      opacity:    mouthAlpha,
+                      pointerEvents: "none",
+                      transition: "width 55ms ease-out, height 55ms ease-out, opacity 55ms ease-out",
+                    }}
+                  >
+                    {/* 1 — skin patch: erases drawn closed-mouth line */}
+                    <ellipse cx="50" cy="46" rx="58" ry="56"
+                      fill={lipSyncProfile.skinTone} opacity="0.92" />
+
+                    {/* 2 — dark interior: tiny slit (slight) or jaw-drop oval (open) */}
+                    <ellipse cx="50" cy="52" rx="38" ry={svgIntRy}
+                      fill="#150202" />
+
+                    {/* 3 — teeth: off-white strip just below upper lip */}
+                    {svgShowTeeth && (
+                      <rect x="15" y="28" width="70" height="12"
+                        rx="3" fill="#f5ede8" />
+                    )}
+
+                    {/* 4 — upper lip: Cupid's bow (M-shape) */}
+                    <path
+                      d="M 5,28 C 20,8 40,18 50,22 C 60,18 80,8 95,28 C 78,38 22,38 5,28 Z"
+                      fill={lipSyncProfile.lipColor}
+                    />
+
+                    {/* 5 — lower lip: full arc, drops with jaw */}
+                    <path
+                      d={`M 8,${svgLlY} Q 50,${svgLlY - 12} 92,${svgLlY} Q 50,${svgLlY + 15} 8,${svgLlY} Z`}
+                      fill={lipSyncProfile.lipColor}
+                      opacity="0.88"
+                    />
+                  </svg>
+                )}
               </>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-[#3C3489]">
@@ -421,30 +591,21 @@ export function AvatarNarrator({
         {/* Trigger row */}
         <div className="flex items-center justify-between border-t px-4 py-2" style={{ borderColor: BUBBLE_BORDER }}>
           {isStreaming ? (
-            <button
-              type="button"
-              onClick={stopStreaming}
-              className="text-[12px] font-semibold text-red-400 hover:text-red-600 transition-colors"
-            >
+            <button type="button" onClick={stopStreaming}
+              className="text-[12px] font-semibold text-red-400 hover:text-red-600 transition-colors">
               Stop
             </button>
           ) : (
-            <button
-              type="button"
-              onClick={() => runNarration("initial")}
+            <button type="button" onClick={() => runNarration("initial")}
               className="text-[12px] font-semibold transition-colors"
-              style={{ color: BUBBLE_TEXT, opacity: 0.7 }}
-            >
+              style={{ color: BUBBLE_TEXT, opacity: 0.7 }}>
               {hasSpoken ? "Ask again" : "Ask trainer ›"}
             </button>
           )}
           {hasSpoken && !isStreaming && (
-            <button
-              type="button"
-              onClick={() => runNarration("example")}
+            <button type="button" onClick={() => runNarration("example")}
               className="text-[12px] font-semibold transition-colors"
-              style={{ color: BUBBLE_TEXT, opacity: 0.5 }}
-            >
+              style={{ color: BUBBLE_TEXT, opacity: 0.5 }}>
               Give example ›
             </button>
           )}

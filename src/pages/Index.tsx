@@ -336,6 +336,8 @@ const Index = () => {
             avatarTrainerId={courseParams?.avatarTrainerId}
             flipStylePreference={courseParams?.flipStyle}
             slideLayout={courseParams?.slideLayout}
+            textLanguage={courseParams?.textLanguage || courseParams?.language}
+            narratorLanguage={courseParams?.narratorLanguage}
             onUpdateVisualTopic={updateVisualTopicAsset}
           />
         </Suspense>

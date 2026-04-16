@@ -8,16 +8,29 @@ const corsHeaders = {
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
-const buildPrompts = (topic: string, moduleContent: string, systemHint: string) => ({
+const buildLanguageDirective = (language: string) => {
+  const lang = (language || "English").trim() || "English";
+  if (lang === "English") {
+    return "OUTPUT LANGUAGE: English.";
+  }
+  return [
+    `=== ABSOLUTE OUTPUT LANGUAGE RULE ===`,
+    `Reply ONLY in ${lang}. Do not write any English. Every sentence, example, and takeaway must be in ${lang}. This rule overrides every other instruction below.`,
+    `=== END LANGUAGE RULE ===`,
+  ].join("\n");
+};
+
+const buildPrompts = (topic: string, moduleContent: string, systemHint: string, language: string) => ({
   systemPrompt: [
+    buildLanguageDirective(language),
     "You are Sarah, a concise and encouraging workplace learning guide.",
     "Explain clearly in plain language and stay grounded in the provided module content.",
     systemHint,
-  ].join(" "),
+  ].join("\n\n"),
   userMessage: [
     `Topic: ${topic}`,
     `Module content: ${moduleContent}`,
-    "Respond as Sarah speaking directly to the learner.",
+    `Respond as Sarah speaking directly to the learner. Reply in ${language || "English"}.`,
   ].join("\n\n"),
 });
 
@@ -36,7 +49,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, moduleContent, systemHint } = await req.json();
+    const { topic, moduleContent, systemHint, language } = await req.json();
 
     if (!topic || !moduleContent || !systemHint) {
       return new Response(JSON.stringify({ error: "topic, moduleContent, and systemHint are required" }), {
@@ -50,7 +63,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not set");
     }
 
-    const { systemPrompt, userMessage } = buildPrompts(topic, moduleContent, systemHint);
+    const { systemPrompt, userMessage } = buildPrompts(topic, moduleContent, systemHint, language || "English");
 
     const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",

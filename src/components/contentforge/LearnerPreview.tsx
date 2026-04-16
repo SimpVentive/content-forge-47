@@ -1037,6 +1037,10 @@ interface LearnerPreviewProps {
     minFontSize: number;
     lineSpacing: number;
   };
+  /** On-screen / body text language selected in the course parameters dialog. */
+  textLanguage?: string;
+  /** Narration/voice language selected in the course parameters dialog. */
+  narratorLanguage?: string;
   onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
 }
 
@@ -1060,7 +1064,9 @@ function getCourseNotesStorageKey(courseTitle: string): string {
   return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, onUpdateVisualTopic }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic }) => {
+  // Prefer the explicit narrator language; fall back to text language; final fallback English.
+  const effectiveNarratorLanguage = narratorLanguage || textLanguage || "English";
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
   const avatarEnv = import.meta.env as Record<string, string | undefined>;
   const trainerMedia = getTrainerMedia(selectedTrainer.id, avatarEnv);
@@ -1949,6 +1955,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
                     currentViseme={activeViseme}
+                    narratorLanguage={effectiveNarratorLanguage}
                   />
                 </div>
               </div>
@@ -2006,6 +2013,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                             isVoiceActive={isPlaying}
                             isVoiceLoading={audioLoading}
                             currentViseme={activeViseme}
+                            narratorLanguage={effectiveNarratorLanguage}
                           />
                         </div>
                       </div>
@@ -2373,6 +2381,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     isVoiceLoading={audioLoading}
                     
                     currentViseme={activeViseme}
+                    narratorLanguage={effectiveNarratorLanguage}
                   />
                 </div>
 
