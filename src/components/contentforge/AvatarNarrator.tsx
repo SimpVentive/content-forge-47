@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
+import type { VisemeKey } from "@/lib/avatarTrainers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,28 +97,12 @@ export function AvatarNarrator({
   const streamVisemeIntervalRef = useRef<number | null>(null);
   const blinkTimeoutRef         = useRef<number | null>(null);
 
-  const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
-
   // Viseme resolution: ElevenLabs takes priority; cycling fallback while streaming
   const effectiveViseme: VisemeKey =
     (isStreaming || isMouthHold) && currentViseme === "rest" ? streamingViseme : currentViseme;
 
   const isTalking  = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
   const mouthState = getVisemeMouthState(effectiveViseme, isTalking);
-
-  // SVG mouth geometry — drives both the sprite-fallback SVG and the mouthW for PNG sizing
-  const visemeShape  = lipSyncProfile.visemes[effectiveViseme];
-  const mouthW       = lipSyncProfile.baseWidth  * visemeShape.width * 0.90;
-  const mouthH       = lipSyncProfile.baseHeight * 0.55 * visemeShape.height * (isTalking ? 1 : 0);
-  const mouthAlpha   = isTalking ? Math.min(0.88, visemeShape.height * 0.80) : 0;
-
-  // SVG fallback sizing (viewBox is always 0 0 100 100; pixel height varies by state)
-  const svgIsOpen    = mouthState === "open";
-  const svgPxW       = mouthW + 6;                                  // +6 gives skin-patch breathing room
-  const svgPxH       = svgIsOpen ? Math.max(mouthH + 10, 14) : 15; // slight=15px, open scales with mouthH
-  const svgIntRy     = svgIsOpen ? 22 : 5;                          // interior oval vertical radius (vb units)
-  const svgLlY       = svgIsOpen ? 76 : 61;                         // lower-lip centre Y (vb units)
-  const svgShowTeeth = svgIsOpen && svgPxH > 12;                    // teeth strip for wide vowels only
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
@@ -478,67 +462,6 @@ export function AvatarNarrator({
                     className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
                     style={{ transition: "opacity 55ms ease-out" }}
                   />
-                )}
-
-                {/*
-                  LAYER 2b — SVG cartoon mouth fallback (active until sprite PNGs added)
-
-                  ViewBox is always 0 0 100 100. Pixel dimensions vary by mouth state.
-                  transform "translate(-50%, -46%)" centres the skin-patch ellipse
-                  (whose cy=46 in vb units) exactly on mouthTopPct — so it reliably
-                  covers the drawn closed-mouth line in the illustration.
-
-                  Layers inside the SVG (painter's order):
-                    1. Skin patch  — erases the drawn closed-mouth line
-                    2. Dark interior — the mouth void (tiny slit or open oval)
-                    3. Teeth strip  — off-white, visible only on wide vowels (aa, ee, oh)
-                    4. Upper lip   — Cupid's-bow path, styled with lipColor
-                    5. Lower lip   — fuller arc, slightly translucent lipColor
-                */}
-                {hasMouthSprite !== true && mouthState !== "rest" && (
-                  <svg
-                    aria-hidden="true"
-                    width={svgPxW}
-                    height={svgPxH}
-                    viewBox="0 0 100 100"
-                    overflow="visible"
-                    style={{
-                      position:   "absolute",
-                      left:       `${lipSyncProfile.mouthLeftPct}%`,
-                      top:        `${lipSyncProfile.mouthTopPct}%`,
-                      transform:  "translate(-50%, -46%)",
-                      opacity:    mouthAlpha,
-                      pointerEvents: "none",
-                      transition: "width 55ms ease-out, height 55ms ease-out, opacity 55ms ease-out",
-                    }}
-                  >
-                    {/* 1 — skin patch: erases drawn closed-mouth line */}
-                    <ellipse cx="50" cy="46" rx="58" ry="56"
-                      fill={lipSyncProfile.skinTone} opacity="0.92" />
-
-                    {/* 2 — dark interior: tiny slit (slight) or jaw-drop oval (open) */}
-                    <ellipse cx="50" cy="52" rx="38" ry={svgIntRy}
-                      fill="#150202" />
-
-                    {/* 3 — teeth: off-white strip just below upper lip */}
-                    {svgShowTeeth && (
-                      <rect x="15" y="28" width="70" height="12"
-                        rx="3" fill="#f5ede8" />
-                    )}
-
-                    {/* 4 — upper lip: Cupid's bow (M-shape) */}
-                    <path
-                      d="M 5,28 C 20,8 40,18 50,22 C 60,18 80,8 95,28 C 78,38 22,38 5,28 Z"
-                      fill={lipSyncProfile.lipColor}
-                    />
-
-                    {/* 5 — lower lip: full arc, drops with jaw */}
-                    <path
-                      d={`M 8,${svgLlY} Q 50,${svgLlY - 12} 92,${svgLlY} Q 50,${svgLlY + 15} 8,${svgLlY} Z`}
-                      fill={lipSyncProfile.lipColor}
-                      opacity="0.88"
-                    />
-                  </svg>
                 )}
               </>
             ) : (
