@@ -421,6 +421,36 @@ function buildLanguageDirective(textLanguage: string, narratorLanguage: string):
   ].join("\n");
 }
 
+// Tail reminder appended to the END of every agent system prompt.
+// Models often relapse mid-generation (start in Hindi, drift to English); repeating
+// the directive as the last thing the model sees dramatically improves compliance.
+function buildLanguageDirectiveTail(textLanguage: string, narratorLanguage: string): string {
+  const nonEnglish = textLanguage !== "English" || narratorLanguage !== "English";
+  if (!nonEnglish) return "";
+  const sameLang = textLanguage === narratorLanguage;
+  return [
+    "",
+    "=== FINAL LANGUAGE REMINDER — THIS IS THE LAST INSTRUCTION, IT OVERRIDES EVERYTHING ABOVE ===",
+    sameLang
+      ? `Your ENTIRE response must be in ${textLanguage}. Do NOT output any English. Every string value in your JSON (titles, module names, topic names, body text, takeaways, questions, options, feedback, rationale) MUST be in ${textLanguage}. JSON structural keys stay in English; every VALUE a learner will read is in ${textLanguage}.`
+      : `On-screen/slide text stays in ${textLanguage}. Narration/script stays in ${narratorLanguage}. Do NOT output any English. Every human-readable string value MUST be in the target language (JSON structural keys stay English).`,
+    "=== END FINAL LANGUAGE REMINDER ===",
+  ].join("\n");
+}
+
+// Prefix prepended to every agent user message for non-English runs.
+// Same sandwich technique as claude-avatar edge function — the LLM sees the language
+// rule at start of system, end of system, AND start of user message.
+function buildUserLanguageReminder(textLanguage: string, narratorLanguage: string): string {
+  const nonEnglish = textLanguage !== "English" || narratorLanguage !== "English";
+  if (!nonEnglish) return "";
+  const sameLang = textLanguage === narratorLanguage;
+  const langPhrase = sameLang
+    ? textLanguage.toUpperCase()
+    : `${textLanguage.toUpperCase()} for on-screen text and ${narratorLanguage.toUpperCase()} for narration`;
+  return `[LANGUAGE INSTRUCTION: Your ENTIRE response must be written in ${langPhrase}. Do NOT use English. WRITE EVERY STRING VALUE IN ${sameLang ? textLanguage.toUpperCase() : "THE TARGET LANGUAGE"}.]\n\n`;
+}
+
 const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
@@ -569,6 +599,28 @@ export function useAgentPipeline() {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const languageDirective = buildLanguageDirective(textLanguage, narratorLanguage);
+    const languageDirectiveTail = buildLanguageDirectiveTail(textLanguage, narratorLanguage);
+    const userLanguageReminder = buildUserLanguageReminder(textLanguage, narratorLanguage);
+
+    // Wrapper that sandwiches language instructions around every agent call.
+    // Head directive is already baked into each systemPrompt template (${languageDirective});
+    // this wrapper appends the tail reminder and prepends the user-message reminder
+    // so the model sees the language rule at start of system, end of system, and start of user msg.
+    const runAgentWithLanguage = async (
+      systemPrompt: string,
+      userMessage: string,
+      logCb: (msg: string) => void,
+      agentName: string,
+      timeoutMs = 90000,
+    ): Promise<string> => {
+      const wrappedSystem = languageDirectiveTail
+        ? `${systemPrompt}\n${languageDirectiveTail}`
+        : systemPrompt;
+      const wrappedUser = userLanguageReminder
+        ? `${userLanguageReminder}${userMessage}`
+        : userMessage;
+      return callClaudeWithRetry(wrappedSystem, wrappedUser, logCb, agentName, timeoutMs);
+    };
     const durationMinutes = parseDurationMinutes(params?.duration);
     const assessmentIntensity: AssessmentIntensity = params?.assessmentIntensity || "standard";
     const targetNarrationWords = Math.max(260, durationMinutes * 130);
@@ -613,7 +665,7 @@ export function useAgentPipeline() {
         setStatus("research", "running");
         addLog("Research Agent: Starting web + document analysis...");
         try {
-          researchResult = await callClaudeWithRetry(
+          researchResult = await runAgentWithLanguage(
             `${languageDirective}You are a Research Agent for premium corporate eLearning. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or drift into generic training filler. Extract the knowledge, tensions, examples, and practical behaviors that could support a sophisticated learner experience. Course level: ${params?.level || "intermediate"}. LANGUAGE REQUIREMENT: Write ALL text values in your JSON output (source_summary, key_themes, learner_problems, practical_behaviors, learning_objectives, and every other text field) in ${textLanguage}. Do NOT use English if ${textLanguage} is not English. CRITICAL — Target duration is ${params?.duration || "15min"}. The finished learner experience must feel like approximately ${durationMinutes} minutes of content, which means around ${targetNarrationWords} words of narration/script across the course. Generate enough depth to support that runtime. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Return JSON with these keys: source_summary, key_themes, learner_problems, stakes_and_consequences, common_misconceptions, practical_behaviors, scenario_opportunities, evidence_and_examples, learning_objectives.`,
             `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content. Target duration: ${params?.duration || "15min"}. Approximate narration budget: ${targetNarrationWords} words. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Find material that can support realistic scenarios, decisions, contrasts between weak and strong practice, and memorable learner takeaways.`,
             addLog, "Research Agent", 45000
@@ -651,7 +703,7 @@ export function useAgentPipeline() {
         setStatus("architect", "running");
         addLog("Content Architect: Receiving research output...");
         try {
-          archResult = await callClaudeWithRetry(
+          archResult = await runAgentWithLanguage(
             `${languageDirective}You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. LANGUAGE REQUIREMENT: Write ALL module_title, topic_title, module_promise, why_it_matters, outcome_statement, course_promise, and every other text field in ${textLanguage}. Do NOT use English if ${textLanguage} is not English. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. The sum of all module estimated_minutes must land within +/- ${durationToleranceMinutes} minutes of ${durationMinutes}. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. Return JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`,
             `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nRecommended Structure: ${structureGuidance}\nSophistication Requirement: ${sophisticationGuidance}\nInstructional Pattern Guidance: ${instructionalPatternGuidance}\n\nBuild the course structure strictly from the above content, scaled to fit the target duration. Make modules feel like meaningful chapters with different jobs to do, and make topics feel teachable, scenario-ready, and presentation-worthy.`,
             addLog, "Content Architect", 45000
@@ -745,7 +797,7 @@ Rules you NEVER break:
         if (parsedModules.length === 0) {
           // Fallback: single call if we can't parse modules
           addLog("Writer Agent: Drafting all content...");
-          writerResult = await callClaudeWithRetry(
+          writerResult = await runAgentWithLanguage(
             writerSystemPrompt,
             `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nPlanned Topic Count: ${totalTopics}\n\nDuration Plan:\n${summarizeDurationPlan(durationPlan)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"} and reach approximately ${targetNarrationWords} words in total.`,
             addLog, "Writer Agent"
@@ -771,7 +823,7 @@ Rules you NEVER break:
 
             addLog(`Writer Agent: Drafting Module ${mi + 1}/${parsedModules.length} — ${modTitle}...`);
 
-            const moduleContent = await callClaudeWithRetry(
+            const moduleContent = await runAgentWithLanguage(
               writerSystemPrompt,
               `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nModule Runtime Target: ${moduleDurationPlan?.targetMinutes ?? "auto"} minutes\nModule Word Budget: ${moduleDurationPlan?.targetWords ?? "auto"} words\nModule Topic Word Range: ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange}\nTopics:\n${topics}\n\nStructured Topic Blueprint JSON:\n${topicBlueprint}\n\nDuration Plan JSON:\n${JSON.stringify(moduleDurationPlan || null, null, 2)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging content for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange} words minimum so the final course genuinely feels like ${params?.duration || "15min"}. Make this module feel like a coherent chapter with a distinct purpose, not a pile of disconnected notes. Use the topic's objective, scenario_anchor, misconception_to_correct, practice_activity, interaction_type, feedback_focus, and evidence_or_example when present. Stay close to the module word budget rather than writing evenly by instinct.`,
               addLog, "Writer Agent"
@@ -799,7 +851,7 @@ Rules you NEVER break:
       if (toggles["quality"] !== false) {
         setStatus("quality", "running");
         addLog("Quality Reviewer: Scoring instructional quality and revising weak sections...");
-        qualityResult = await callClaudeWithRetry(
+        qualityResult = await runAgentWithLanguage(
           `${languageDirective}You are a Quality Reviewer for premium corporate eLearning. Review the architect plan and draft script with a ruthless instructional-design lens. Score the draft on instructional clarity, realism, interaction quality, learner engagement, assessment readiness, and duration alignment. Then rewrite any weak content so the output feels sharper, more teachable, more scenario-based, and less generic while still landing near the requested runtime. LANGUAGE REQUIREMENT: The entire revised_script must be written in ${textLanguage}. Narration text must be in ${narratorLanguage}. Do not revert content to English if ${textLanguage} is not English. Return JSON in this exact shape: { instructional_score, realism_score, interaction_score, engagement_score, assessment_readiness_score, duration_alignment_score, strengths: [], issues: [], revision_summary: [], revised_script }. The revised_script must preserve the same module and topic headings while improving the content beneath them.`,
           `Course Title: ${courseTitle}\n\nArchitect Plan:\n${archResult}\n\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nDraft Script:\n${writerResult}\n\nCurrent Draft Word Count: ${countWords(writerResult)}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\n\nResearch Context:\n${researchResult}\n\nReview the draft against the architect schema. If a topic feels generic, lacks a decision point, ignores a misconception, misses a practical scenario, or materially under-runs or over-runs its word budget, fix it in revised_script.`,
           addLog, "Quality Reviewer"
@@ -827,7 +879,7 @@ Rules you NEVER break:
       if (toggles["visual"] !== false) {
         setStatus("visual", "running");
         addLog("Visual Design Agent: Generating layout specs for modules...");
-        visualResult = await callClaudeWithRetry(
+        visualResult = await runAgentWithLanguage(
           `${languageDirective}You are a Visual Design Agent for premium corporate eLearning. Given a course outline and script, produce a visual design plan that feels intentional, modern, and presentation-grade. For each module, specify: (1) recommended slide layout type, (2) key infographic or diagram description, (3) color palette suggestion, (4) iconography style, and (5) topic-level realism plan. The realism plan must use ONLY AI-generated original visuals, never stock photography or copyrighted images. Do NOT assign imagery to every topic. Select only the slides that truly benefit from realism, usually about 20-35% of topics, prioritising scenarios, workplace conversations, customer interactions, environmental context, and moments where the learner benefits from seeing a situation. Also ensure the infographic_description is ambitious enough to produce a sophisticated visual, not a simple poster. Return JSON: { modules: [{ module_title, slide_layout, infographic_description, color_palette, icon_style, composition_notes, topic_visuals: [{ topic_title, screen_template, image_needed, image_style, image_prompt, placement, alt_text, interaction_emphasis }] }] }. Valid screen_template values: dashboard, guided-notes, scenario, media-quiz, summary-panel. Use dashboard for module openers, visual-first lessons, and lessons that should feel like an LMS page with cards. Use guided-notes for more linear explanation screens. Use scenario for decision-oriented workplace moments. Use media-quiz for lessons that should combine a hero asset with an embedded knowledge check feel. Use summary-panel for wrap-up or consolidation screens. Valid placements: hero, side-panel, inline-card. Valid image_style values: realistic-office, realistic-customer, realistic-teamwork, realistic-device-demo. ${buildSlideLayoutInstruction(params?.slideLayout)}`,
           `Course Outline:\n${archResult}\n\nScript:\n${writerResult}\n\n${buildSlideLayoutInstruction(params?.slideLayout)}\n\nDesign goal: avoid generic e-learning blandness. Make each module feel like it has a visual thesis, a deliberate information hierarchy, and at least one premium infographic concept that could stand on its own in an executive presentation. Explicitly assign a screen_template for each topic so the renderer does not have to guess, and vary those templates across the course instead of defaulting everything to the same structure.`,
           addLog, "Visual Design Agent"
@@ -933,7 +985,7 @@ Rules you NEVER break:
       if (toggles["animation"] !== false) {
         setStatus("animation", "running");
         addLog("Animation Agent: Writing interaction notes...");
-        animResult = await callClaudeWithRetry(
+        animResult = await runAgentWithLanguage(
           `${languageDirective}You are an Animation Agent for eLearning. Given a course architecture, script, and visual design plan, write animation and interaction notes for each module. For each topic or section specify: (1) animation type (entrance, transition, emphasis), (2) timing in seconds, (3) interaction type (click, hover, drag, quiz trigger, scenario decision, reveal), (4) branching or feedback logic, and (5) the learner action the interaction is reinforcing. Keep it practical for tools like Articulate Storyline or Adobe Captivate. Return as a structured list grouped by module.`,
           `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nVisual Design Plan:\n${visualResult}`,
           addLog, "Animation Agent"
@@ -1002,7 +1054,7 @@ Rules you NEVER break:
       if (toggles["compliance"] !== false) {
         setStatus("compliance", "running");
         addLog("Compliance Agent: Auditing content for accessibility and policy...");
-        complianceResult = await callClaudeWithRetry(
+        complianceResult = await runAgentWithLanguage(
           `${languageDirective}You are a Compliance Agent for eLearning content. Review the course script and outline for the following: (1) Reading level — is it appropriate for the target audience? (2) Inclusive language — flag any non-inclusive terms. (3) Accessibility — does content support screen readers, captions, alt-text needs? (4) Policy alignment — does it reference relevant standards (OSHA, WCAG 2.1, etc.)? (5) Overall compliance score out of 10. Return as JSON: { reading_level, inclusive_language_issues: [], accessibility_notes: [], policy_alignment: [], compliance_score, recommendations: [] }`,
           `Script:\n${writerResult}`,
           addLog, "Compliance Agent"
@@ -1052,7 +1104,7 @@ Rules you NEVER break:
         const assessmentTargets = getAssessmentTargets(durationMinutes, assessmentIntensity, moduleCount, topicCount);
 
         addLog(`Assessment Agent: Generating ${assessmentTargets.mcqCount} MCQs + ${assessmentTargets.scenarioCount} scenarios (${assessmentIntensity} intensity)...`);
-        assessmentResult = await callClaudeWithRetry(
+        assessmentResult = await runAgentWithLanguage(
           `${languageDirective}You are an Assessment Design Agent. Given course script, architecture, and learning objectives, create a comprehensive assessment bank sized to the requested runtime and module complexity. LANGUAGE REQUIREMENT: Write ALL question text, options, rationale, situation descriptions, prompts, and every text field in ${textLanguage}. Do not use English if ${textLanguage} is not English. Rules: (1) Question volume must scale with module/topic size; avoid token quizzes. (2) Spread MCQs across modules proportionally. (3) Include module_title and topic_title on every MCQ and scenario so the renderer can map items correctly. LEVEL CALIBRATION (${levelCalibration.label}): ${assessmentLevelGuidance} Bloom's target for questions: ${levelCalibration.bloomsTarget} Generate: (1) requested number of multiple choice questions with 4 options each, correct answer marked, rationale, and common wrong-answer trap, (2) requested number of scenario-based questions with a situation description, 3 response options, best_response, and coaching rationale, (3) 1 reflection exercise with an open-ended prompt, and (4) embedded_interactions list in requested range aligned to specific topics. Tag each question with Bloom's taxonomy level. Return JSON: { mcq: [{ module_title, topic_title, question, options: [], correct_answer, rationale, wrong_answer_trap, blooms_level }], scenarios: [{ module_title, topic_title, situation, options: [], best_response, rationale, blooms_level }], reflection: { prompt, guidance }, embedded_interactions: [{ module_title, topic_title, interaction_type, prompt, expected_response, feedback_focus }], metadata: { target_mcq_count, target_scenario_count, module_count, topic_count, assessment_intensity } }`,
           `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nLearning Objectives:\n${researchResult}\n\nTarget Duration Minutes: ${durationMinutes}\nAssessment Intensity: ${assessmentIntensity}\nModule Count: ${moduleCount}\nTopic Count: ${topicCount}\nTarget MCQ Count: ${assessmentTargets.mcqCount}\nTarget Scenario Count: ${assessmentTargets.scenarioCount}\nTarget Embedded Interactions Range: ${assessmentTargets.interactionMin}-${assessmentTargets.interactionMax}`,
           addLog, "Assessment Agent"
@@ -1070,7 +1122,7 @@ Rules you NEVER break:
       if (toggles["voice"] !== false) {
         setStatus("voice", "running");
         addLog("Voice Agent: Reformatting script for narration...");
-        voiceResult = await callClaudeWithRetry(
+        voiceResult = await runAgentWithLanguage(
           `${languageDirective}You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at ${NARRATION_WORDS_PER_MINUTE} words per minute. Preserve section structure, and keep the overall read-time within +/- ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target unless the script makes that impossible. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }`,
           `Script:\n${writerResult}\n\nOn-screen text language: ${textLanguage}\nNarrator language: ${narratorLanguage}\nTarget Duration Minutes: ${durationMinutes}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}`,
           addLog, "Voice Agent"
@@ -1082,7 +1134,7 @@ Rules you NEVER break:
           const adjustmentDirection = estimatedDuration < durationMinutes ? "expand" : "compress";
           addLog(`Voice Agent: Runtime drift detected (${estimatedDuration} min vs ${durationMinutes} min target). Calibrating script...`);
 
-          const calibrationResult = await callClaudeWithRetry(
+          const calibrationResult = await runAgentWithLanguage(
             `${languageDirective}You are a runtime calibration specialist for eLearning scripts. Your job is to ${adjustmentDirection} the script so the narrated runtime lands within +/- ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target at ${NARRATION_WORDS_PER_MINUTE} words per minute. Preserve the same module and topic headings. Keep the writing high quality, practical, and scenario-based. If expanding, add depth, examples, learner decisions, and coaching language. If compressing, remove repetition and tighten prose without losing key teaching points. Return JSON: { calibrated_script, estimated_duration_minutes, calibration_actions: [] }`,
             `Course Title: ${courseTitle}\nTarget Duration: ${durationMinutes} minutes\nAllowed Drift: +/- ${durationToleranceMinutes} minutes\nTarget Narration Words: ${targetNarrationWords}\nCurrent Estimated Duration: ${estimatedDuration} minutes\nCurrent Script Word Count: ${countWords(writerResult)}\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nCurrent Script:\n${writerResult}`,
             addLog,
@@ -1095,7 +1147,7 @@ Rules you NEVER break:
             setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
             setOutputData((prev) => ({ ...prev, script: writerResult }));
 
-            voiceResult = await callClaudeWithRetry(
+            voiceResult = await runAgentWithLanguage(
               `${languageDirective}You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at ${NARRATION_WORDS_PER_MINUTE} words per minute. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }`,
               `Script:\n${writerResult}\n\nOn-screen text language: ${textLanguage}\nNarrator language: ${narratorLanguage}\nTarget Duration Minutes: ${durationMinutes}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes`,
               addLog,
@@ -1134,7 +1186,7 @@ Rules you NEVER break:
         setStatus("assembly", "running");
         addLog("Final Assembly: Packaging all outputs...");
         const assemblyInput = `Course Title: ${courseTitle}\n\nOutline:\n${archResult}\n\nScript:\n${writerResult}\n\nVisual Plan:\n${visualResult}\n\nAssessment:\n${assessmentResult}\n\nQuality Review:\n${qualityResult}\n\nNarration:\n${voiceResult}\n\nCompliance:\n${complianceResult}`;
-        const assemblyResult = await callClaudeWithRetry(
+        const assemblyResult = await runAgentWithLanguage(
           'You are a Final Assembly Agent for eLearning. Given the full course output (outline, script, assessment, narration, visual plan, quality review), produce a final course package summary. Include: (1) Course metadata — title, total modules, total topics, estimated completion time, difficulty level, (2) SCORM manifest summary — list of all assets needed (slides, audio files, images, assessments), (3) LMS deployment checklist — 10-item checklist of steps to publish to an LMS, (4) Quality assurance summary — confirm all agents completed, include key quality scores, and list any remaining gaps. Return as JSON: { metadata: {}, scorm_manifest: { assets: [] }, deployment_checklist: [], qa_summary: { agents_completed: [], quality_scores: {}, gaps: [] } }',
           assemblyInput,
           addLog, "Final Assembly"

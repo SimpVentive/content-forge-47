@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Narrator Animator</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: system-ui, sans-serif; background: #f4f4f4; display: flex; flex-direction: column; align-items: center; padding: 24px; gap: 16px; }
+h1 { font-size: 16px; font-weight: 600; color: #222; }
+.char-tabs { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 700px; }
+.tab { padding: 7px 16px; border-radius: 20px; border: 1.5px solid #ccc; background: #fff; cursor: pointer; font-size: 13px; font-weight: 500; color: #444; transition: all 0.15s; }
+.tab:hover { border-color: #888; }
+.tab.active { background: #1a1a2e; color: #fff; border-color: #1a1a2e; }
+.name-badge { font-size: 13px; font-weight: 600; color: #333; letter-spacing: 0.04em; text-transform: uppercase; }
+.stage { position: relative; width: 320px; height: 480px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.12); background: #eee; }
+.stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.eye-overlay { position: absolute; pointer-events: none; transform: translate(-50%, -50%); border-radius: 50%; overflow: hidden; }
+.eye-lid { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%; background: rgba(20,10,5,0.82); transform: scaleY(0); transform-origin: center center; transition: transform 0.07s ease-in; }
+.mouth-overlay { position: absolute; pointer-events: none; transform: translate(-50%, -50%); overflow: hidden; border-radius: 50% 50% 60% 60%; }
+.mouth-inner { width: 100%; height: 100%; background: rgba(20,3,3,0.75); transform: scaleY(0); transform-origin: center center; transition: transform 0.06s ease-out; border-radius: 50% 50% 60% 60%; }
+.audio-row { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+audio { width: 280px; }
+.audio-label { font-size: 12px; color: #888; }
+.status { font-size: 12px; color: #888; }
+</style>
+</head>
+<body>
+<h1>Narrator Animator</h1>
+<div class="char-tabs" id="charTabs"></div>
+<div class="name-badge" id="nameBadge">&mdash;</div>
+<div class="stage">
+  <img id="charImg" src="" alt="narrator" />
+  <div class="eye-overlay" id="eyeL"><div class="eye-lid" id="lidL"></div></div>
+  <div class="eye-overlay" id="eyeR"><div class="eye-lid" id="lidR"></div></div>
+  <div class="mouth-overlay" id="mouthOv"><div class="mouth-inner" id="mouthIn"></div></div>
+</div>
+<div class="audio-row">
+  <div class="audio-label">Load audio to drive lip sync</div>
+  <audio id="audioEl" controls></audio>
+</div>
+<div class="status" id="statusEl">Select a character</div>
+
+<script>
+fetch('./narrator_config.json')
+  .then(r => r.json())
+  .then(config => init(config))
+  .catch(err => { document.getElementById('statusEl').textContent = 'Error loading narrator_config.json: ' + err; });
+
+const STAGE_W = 320, STAGE_H = 480;
+const EYE_W = 28;
+const EYE_H = 10;
+const MTH_W = 26;
+const MTH_H = 12;
+
+let blinkTimer, mouthTimer;
+let isAudioPlaying = false;
+
+const charImg   = document.getElementById('charImg');
+const eyeL      = document.getElementById('eyeL');
+const eyeR      = document.getElementById('eyeR');
+const lidL      = document.getElementById('lidL');
+const lidR      = document.getElementById('lidR');
+const mouthOv   = document.getElementById('mouthOv');
+const mouthIn   = document.getElementById('mouthIn');
+const audioEl   = document.getElementById('audioEl');
+const statusEl  = document.getElementById('statusEl');
+const nameBadge = document.getElementById('nameBadge');
+const tabsEl    = document.getElementById('charTabs');
+
+function init(config) {
+  const chars = Object.values(config);
+  chars.forEach((c, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'tab' + (i === 0 ? ' active' : '');
+    btn.textContent = c.name;
+    btn.onclick = () => loadChar(chars, i);
+    tabsEl.appendChild(btn);
+  });
+  loadChar(chars, 0);
+}
+
+function positionOverlays(c) {
+  const elx = (c.eyeLeft.pctX  / 100) * STAGE_W;
+  const ely = (c.eyeLeft.pctY  / 100) * STAGE_H;
+  const erx = (c.eyeRight.pctX / 100) * STAGE_W;
+  const ery = (c.eyeRight.pctY / 100) * STAGE_H;
+  const mx  = (c.mouth.pctX    / 100) * STAGE_W;
+  const my  = (c.mouth.pctY    / 100) * STAGE_H;
+  eyeL.style.left = elx+'px'; eyeL.style.top = ely+'px';
+  eyeL.style.width = EYE_W+'px'; eyeL.style.height = EYE_H+'px';
+  eyeR.style.left = erx+'px'; eyeR.style.top = ery+'px';
+  eyeR.style.width = EYE_W+'px'; eyeR.style.height = EYE_H+'px';
+  mouthOv.style.left = mx+'px'; mouthOv.style.top = my+'px';
+  mouthOv.style.width = MTH_W+'px'; mouthOv.style.height = MTH_H+'px';
+}
+
+function loadChar(chars, i) {
+  const c = chars[i];
+  charImg.src = c.image;
+  nameBadge.textContent = c.name;
+  document.querySelectorAll('.tab').forEach((t,j) => t.classList.toggle('active', j===i));
+  positionOverlays(c);
+  stopAll();
+  startAnimations();
+}
+
+function stopAll() {
+  clearTimeout(blinkTimer);
+  clearInterval(mouthTimer);
+  lidL.style.transform = 'scaleY(0)';
+  lidR.style.transform = 'scaleY(0)';
+  mouthIn.style.transform = 'scaleY(0)';
+}
+
+function scheduleBlink() {
+  const delay = 1500 + Math.random() * 2000;
+  blinkTimer = setTimeout(() => {
+    doBlink(() => {
+      if (Math.random() < 0.2) {
+        setTimeout(() => doBlink(scheduleBlink), 220);
+      } else {
+        scheduleBlink();
+      }
+    });
+  }, delay);
+}
+
+function doBlink(cb) {
+  lidL.style.transform = 'scaleY(1)';
+  lidR.style.transform = 'scaleY(1)';
+  setTimeout(() => {
+    lidL.style.transform = 'scaleY(0)';
+    lidR.style.transform = 'scaleY(0)';
+    if (cb) setTimeout(cb, 80);
+  }, 110);
+}
+
+const lipPattern = [0,0.2,0.6,0.4,0.1,0.8,0.5,0.15,0.7,0.35,
+                    0.05,0,0,0.3,0.75,0.5,0.25,0.9,0.4,0.1,
+                    0.6,0.2,0.85,0.45,0.05,0,0.3,0.65,0.4,0.1];
+let lipIdx = 0;
+
+function startLipLoop() {
+  clearInterval(mouthTimer);
+  mouthTimer = setInterval(() => {
+    const val = isAudioPlaying
+      ? (Math.random() * 0.9 + 0.05).toFixed(2)
+      : lipPattern[lipIdx++ % lipPattern.length].toFixed(2);
+    mouthIn.style.transform = `scaleY(${val})`;
+  }, 100);
+}
+
+function startAnimations() {
+  scheduleBlink();
+  startLipLoop();
+  statusEl.textContent = 'talking — load audio for live lip sync';
+}
+
+audioEl.addEventListener('play',  () => { isAudioPlaying = true;  statusEl.textContent = 'audio playing — lip sync live'; });
+audioEl.addEventListener('pause', () => { isAudioPlaying = false; statusEl.textContent = 'paused'; });
+audioEl.addEventListener('ended', () => { isAudioPlaying = false; mouthIn.style.transform = 'scaleY(0)'; statusEl.textContent = 'audio ended'; });
+</script>
+</body>
+</html>

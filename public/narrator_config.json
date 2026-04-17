@@ -1,0 +1,51 @@
+{
+  "priya": {
+    "name": "Priya",
+    "image": "./trainers/priya.png",
+    "eyeLeft": { "pctX": 56.25, "pctY": 29.10 },
+    "eyeRight": { "pctX": 43.95, "pctY": 29.10 },
+    "mouth": { "pctX": 49.80, "pctY": 36.20 }
+  },
+  "arjun": {
+    "name": "Arjun",
+    "image": "./trainers/arjun.png",
+    "eyeLeft": { "pctX": 55.47, "pctY": 27.60 },
+    "eyeRight": { "pctX": 43.36, "pctY": 27.80 },
+    "mouth": { "pctX": 49.02, "pctY": 34.90 }
+  },
+  "soumya": {
+    "name": "Soumya",
+    "image": "./trainers/soumya.png",
+    "eyeLeft": { "pctX": 55.27, "pctY": 28.00 },
+    "eyeRight": { "pctX": 43.55, "pctY": 28.20 },
+    "mouth": { "pctX": 49.22, "pctY": 35.00 }
+  },
+  "ved_prakash": {
+    "name": "Ved Prakash",
+    "image": "./trainers/vedprakash.png",
+    "eyeLeft": { "pctX": 54.69, "pctY": 27.00 },
+    "eyeRight": { "pctX": 43.16, "pctY": 27.00 },
+    "mouth": { "pctX": 48.83, "pctY": 34.00 }
+  },
+  "atul": {
+    "name": "Atul",
+    "image": "./trainers/atul.png",
+    "eyeLeft": { "pctX": 55.08, "pctY": 27.10 },
+    "eyeRight": { "pctX": 42.97, "pctY": 27.10 },
+    "mouth": { "pctX": 48.63, "pctY": 34.30 }
+  },
+  "irina": {
+    "name": "Irina",
+    "image": "./trainers/irina.png",
+    "eyeLeft": { "pctX": 55.47, "pctY": 28.00 },
+    "eyeRight": { "pctX": 43.55, "pctY": 28.00 },
+    "mouth": { "pctX": 49.41, "pctY": 35.20 }
+  },
+  "john": {
+    "name": "John",
+    "image": "./trainers/john.png",
+    "eyeLeft": { "pctX": 54.30, "pctY": 27.20 },
+    "eyeRight": { "pctX": 42.97, "pctY": 27.20 },
+    "mouth": { "pctX": 48.44, "pctY": 34.20 }
+  }
+}
