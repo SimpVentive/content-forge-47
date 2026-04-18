@@ -1048,6 +1048,7 @@ const PREVIEW_FLIP_STYLE_STORAGE_KEY = "contentforge.preview.flipStyle.default";
 const PREVIEW_NOTES_STORAGE_KEY_PREFIX = "contentforge.preview.notes";
 
 type SidebarPanel = "home" | "progress" | "notes" | "resources";
+type UtilityPanel = "discussion" | "glossary" | "settings" | null;
 type LearningToolPanel = "quiz" | "fact" | "takeaway" | "objectives" | null;
 
 function isFlipStyle(value: string | null): value is FlipStyle {
@@ -1085,6 +1086,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [activeLearningTool, setActiveLearningTool] = useState<LearningToolPanel>(null);
   const [visualActionState, setVisualActionState] = useState<Record<string, { regenerating?: boolean; error?: string }>>({});
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>("home");
+  const [activeUtilityPanel, setActiveUtilityPanel] = useState<UtilityPanel>(null);
   const [learnerNotes, setLearnerNotes] = useState("");
 
   // Sync if parent changes
@@ -1167,7 +1169,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     [rawOutputs, localVideos, courseDuration, slideRules.maxLines, assessmentIntensity]
   );
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [visited, setVisited] = useState<Set<number>>(new Set([0]));
+  const [visited, setVisited] = useState<Set<number>>(new Set());
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [startTime] = useState(Date.now());
@@ -1637,9 +1639,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     ...(resourcesPanelEnabled ? [{ id: "resources" as const, label: "Resources", icon: FolderOpen }] : []),
   ];
   const utilityActions = [
-    ...(discussionEnabled ? [{ label: "Discussion", icon: MessageSquareText }] : []),
-    ...(glossaryEnabled ? [{ label: "Glossary", icon: BookOpenText }] : []),
-    { label: "Settings", icon: Settings2 },
+    ...(discussionEnabled ? [{ label: "Discussion", icon: MessageSquareText, panel: "discussion" as const }] : []),
+    ...(glossaryEnabled ? [{ label: "Glossary", icon: BookOpenText, panel: "glossary" as const }] : []),
+    { label: "Settings", icon: Settings2, panel: "settings" as const },
   ];
 
   const formatElapsed = () => {
@@ -1824,7 +1826,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const clampSingleLine = {
           display: "-webkit-box",
           WebkitBoxOrient: "vertical",
-          WebkitLineClamp: 1,
+          WebkitLineClamp: 3,
           overflow: "hidden",
         } as React.CSSProperties;
 
@@ -3003,11 +3005,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <div className="flex flex-wrap items-center gap-2">
                 {utilityActions.map((action) => {
                   const Icon = action.icon;
+                  const isActive = activeUtilityPanel === action.panel;
                   return (
                     <button
                       key={action.label}
                       type="button"
-                      className="inline-flex h-10 items-center gap-2 rounded-full border border-white/14 bg-white/8 px-4 text-[12px] font-[800] text-white/90 transition-all hover:bg-white/14"
+                      onClick={() => setActiveUtilityPanel(isActive ? null : action.panel)}
+                      className={`inline-flex h-10 items-center gap-2 rounded-full border px-4 text-[12px] font-[800] transition-all ${isActive ? "border-white/40 bg-white/22 text-white" : "border-white/14 bg-white/8 text-white/90 hover:bg-white/14"}`}
                     >
                       <Icon className="h-3.5 w-3.5" />
                       {action.label}
@@ -3016,11 +3020,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 })}
                 <div className="ml-1 flex items-center gap-3 rounded-full bg-white px-2 py-1 pr-3 text-[#143a6f] shadow-sm">
                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e7eef8] text-[12px] font-[900]">
-                    AL
+                    {trainerBadgeInitial}
                   </div>
                   <div>
-                    <p className="text-[12px] font-[900] leading-none">Alex</p>
-                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5d769a]">Learner</p>
+                    <p className="text-[12px] font-[900] leading-none">{trainerName}</p>
+                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5d769a]">Instructor</p>
                   </div>
                 </div>
                 <button
@@ -3033,6 +3037,28 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               </div>
             </div>
           </div>
+
+          {activeUtilityPanel && (
+            <div className="shrink-0 border-b border-[#d7e1ee] bg-[#f0f5fc] px-6 py-4">
+              <div className="mx-auto flex max-w-[900px] items-start gap-4">
+                <div className="flex-1">
+                  <p className="text-[13px] font-[900] uppercase tracking-[0.12em] text-[#3a5a8a]">
+                    {activeUtilityPanel === "discussion" ? "Discussion" : activeUtilityPanel === "glossary" ? "Glossary" : "Settings"}
+                  </p>
+                  <p className="mt-2 text-[13px] leading-relaxed text-[#4a6585]">
+                    {activeUtilityPanel === "discussion"
+                      ? "Discussion threads will be available when the course is published to your LMS. Learners can post questions, reply to peers, and interact with facilitators here."
+                      : activeUtilityPanel === "glossary"
+                        ? "The glossary will be auto-generated from key terms in the course content once published. Learners can search and browse definitions inline."
+                        : "Playback settings such as narration speed, closed captions, font size adjustments, and accessibility preferences will be available in the published course."}
+                  </p>
+                </div>
+                <button type="button" onClick={() => setActiveUtilityPanel(null)} className="mt-1 rounded-full p-1 text-[#5f7b9e] hover:bg-white/60 hover:text-[#123d78]">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
 
           <div className="shrink-0 border-b border-[#d7e1ee] bg-white/80 px-4 py-3 backdrop-blur md:px-6">
             <div className="grid gap-3">
