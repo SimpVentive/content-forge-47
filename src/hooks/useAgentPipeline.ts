@@ -789,6 +789,12 @@ Rules you NEVER break:
 - Make the learner do mental work. Include at least one decision prompt, judgment call, or “what would you do?” moment in each topic, written naturally inside the prose.
 - Format each topic using markdown prose with this backbone: Hook → Core explanation → Concrete example or scenario → Key Takeaway: → Challenge:. Keep headings limited to the topic title only.
 - Use markdown ## headers for each topic title, matching the exact topic names provided.
+
+OUTPUT FORMAT — ABSOLUTE:
+- Output ONLY markdown prose. NEVER output JSON, code blocks, key/value pairs, or any structured data.
+- Do NOT echo the blueprint. Do NOT wrap output in \`\`\`json or any code fence.
+- Do NOT output keys like "course_title", "module_title", "topics", "on_screen_text", "topic_name". The blueprint is INPUT only — your output is human-readable narration.
+- The very first character of your response must be "#" (a markdown heading), never "{" or "[" or "\`".
 - You MUST use content from the source material provided. Do NOT invent unrelated examples.
 - You MUST respect the supplied runtime plan. Hit the requested word budgets closely so the narration lands within ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target.
 
