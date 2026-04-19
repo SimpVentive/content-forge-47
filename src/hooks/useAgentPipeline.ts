@@ -1130,11 +1130,17 @@ Rules you NEVER break:
 
         const parsedVoice = tryParseJson(voiceResult);
         const estimatedDuration = safeNumber(parsedVoice?.estimated_duration_minutes);
-        if (estimatedDuration !== null && Math.abs(estimatedDuration - durationMinutes) > durationToleranceMinutes) {
-          const adjustmentDirection = estimatedDuration < durationMinutes ? "expand" : "compress";
-          addLog(`Voice Agent: Runtime drift detected (${estimatedDuration} min vs ${durationMinutes} min target). Calibrating script...`);
+        // Only calibrate when drift is severe (>2x tolerance) to avoid stalling the pipeline
+        // on long, expensive recursive rewrites. Minor drift is acceptable.
+        const severeDrift = estimatedDuration !== null &&
+          Math.abs(estimatedDuration - durationMinutes) > durationToleranceMinutes * 2;
+        if (severeDrift) {
+          const adjustmentDirection = estimatedDuration! < durationMinutes ? "expand" : "compress";
+          addLog(`Voice Agent: Severe runtime drift (${estimatedDuration} min vs ${durationMinutes} min target). Calibrating script...`);
 
-          const calibrationResult = await runAgentWithLanguage(
+          let calibrationResult = "";
+          try {
+            calibrationResult = await runAgentWithLanguage(
             `${languageDirective}You are a runtime calibration specialist for eLearning scripts. Your job is to ${adjustmentDirection} the script so the narrated runtime lands within +/- ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target at ${NARRATION_WORDS_PER_MINUTE} words per minute. Preserve the same module and topic headings. Keep the writing high quality, practical, and scenario-based. If expanding, add depth, examples, learner decisions, and coaching language. If compressing, remove repetition and tighten prose without losing key teaching points. Return JSON: { calibrated_script, estimated_duration_minutes, calibration_actions: [] }`,
             `Course Title: ${courseTitle}\nTarget Duration: ${durationMinutes} minutes\nAllowed Drift: +/- ${durationToleranceMinutes} minutes\nTarget Narration Words: ${targetNarrationWords}\nCurrent Estimated Duration: ${estimatedDuration} minutes\nCurrent Script Word Count: ${countWords(writerResult)}\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nCurrent Script:\n${writerResult}`,
             addLog,
