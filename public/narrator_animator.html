@@ -15,9 +15,9 @@ h1 { font-size: 16px; font-weight: 600; color: #222; }
 .stage { position: relative; width: 320px; height: 480px; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.12); background: #eee; }
 .stage img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .eye-overlay { position: absolute; pointer-events: none; transform: translate(-50%, -50%); border-radius: 50%; overflow: hidden; }
-.eye-lid { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%; background: rgba(20,10,5,0.82); transform: scaleY(0); transform-origin: center center; transition: transform 0.07s ease-in; }
+.eye-lid { position: absolute; left: 0; top: 0; width: 100%; height: 100%; border-radius: 50%; background: rgba(20,10,5,0.82); transform: scaleY(0); transform-origin: top center; transition: transform 0.07s ease-in; }
 .mouth-overlay { position: absolute; pointer-events: none; transform: translate(-50%, -50%); overflow: hidden; border-radius: 50% 50% 60% 60%; }
-.mouth-inner { width: 100%; height: 100%; background: rgba(20,3,3,0.75); transform: scaleY(0); transform-origin: center center; transition: transform 0.06s ease-out; border-radius: 50% 50% 60% 60%; }
+.mouth-inner { width: 100%; height: 100%; background: rgba(20,3,3,0.75); transform: scaleY(0); transform-origin: top center; transition: transform 0.06s ease-out; border-radius: 50% 50% 60% 60%; }
 .audio-row { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 audio { width: 280px; }
 .audio-label { font-size: 12px; color: #888; }
@@ -47,10 +47,13 @@ fetch('./narrator_config.json')
   .catch(err => { document.getElementById('statusEl').textContent = 'Error loading narrator_config.json: ' + err; });
 
 const STAGE_W = 320, STAGE_H = 480;
-const EYE_W = 28;
-const EYE_H = 10;
-const MTH_W = 26;
-const MTH_H = 12;
+const ORIG_W  = 1024, ORIG_H  = 1536;
+const SX = STAGE_W / ORIG_W;
+const SY = STAGE_H / ORIG_H;
+const EYE_W = 90 * SX;
+const EYE_H = 32 * SY;
+const MTH_W = 82 * SX;
+const MTH_H = 26 * SY;
 
 let blinkTimer, mouthTimer;
 let isAudioPlaying = false;

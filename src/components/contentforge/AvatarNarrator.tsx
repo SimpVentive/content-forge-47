@@ -37,17 +37,30 @@ const BUBBLE_TEXT   = "#26215C";
 
 const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "aa", "ih", "r", "oh", "aa"];
 
-// CSS-overlay facial coordinates (percentage of image) used when sprite PNGs are unavailable.
+// CSS-overlay facial coordinates — exact pctX/pctY from narrator_config.json
+// These are percentages of the original 1024×1536 image.
 const FACE_COORDS: Record<string, { eyeLeft: { x: number; y: number }; eyeRight: { x: number; y: number }; mouth: { x: number; y: number } }> = {
-  priya:      { eyeLeft: { x: 56.25, y: 29.10 }, eyeRight: { x: 43.95, y: 29.10 }, mouth: { x: 49.80, y: 36.20 } },
-  arjun:      { eyeLeft: { x: 55.47, y: 27.60 }, eyeRight: { x: 43.36, y: 27.80 }, mouth: { x: 49.02, y: 34.90 } },
-  soumya:     { eyeLeft: { x: 55.27, y: 28.00 }, eyeRight: { x: 43.55, y: 28.20 }, mouth: { x: 49.22, y: 35.00 } },
-  vedprakash: { eyeLeft: { x: 54.69, y: 27.00 }, eyeRight: { x: 43.16, y: 27.00 }, mouth: { x: 48.83, y: 34.00 } },
-  atul:       { eyeLeft: { x: 55.08, y: 27.10 }, eyeRight: { x: 42.97, y: 27.10 }, mouth: { x: 48.63, y: 34.30 } },
-  irina:      { eyeLeft: { x: 55.47, y: 28.00 }, eyeRight: { x: 43.55, y: 28.00 }, mouth: { x: 49.41, y: 35.20 } },
-  john:       { eyeLeft: { x: 54.30, y: 27.20 }, eyeRight: { x: 42.97, y: 27.20 }, mouth: { x: 48.44, y: 34.20 } },
+  priya:      { eyeLeft: { x: 56.64, y: 27.99 }, eyeRight: { x: 43.65, y: 27.99 }, mouth: { x: 49.32, y: 35.81 } },
+  arjun:      { eyeLeft: { x: 54.98, y: 26.43 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 47.66, y: 34.64 } },
+  soumya:     { eyeLeft: { x: 55.66, y: 26.69 }, eyeRight: { x: 42.97, y: 26.89 }, mouth: { x: 48.63, y: 34.44 } },
+  vedprakash: { eyeLeft: { x: 54.30, y: 25.59 }, eyeRight: { x: 42.68, y: 25.59 }, mouth: { x: 48.34, y: 33.33 } },
+  atul:       { eyeLeft: { x: 53.71, y: 25.98 }, eyeRight: { x: 41.99, y: 25.98 }, mouth: { x: 47.36, y: 34.24 } },
+  irina:      { eyeLeft: { x: 55.37, y: 26.69 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 48.63, y: 34.64 } },
+  john:       { eyeLeft: { x: 53.32, y: 25.98 }, eyeRight: { x: 42.29, y: 25.98 }, mouth: { x: 46.97, y: 33.79 } },
 };
-const DEFAULT_FACE = { eyeLeft: { x: 55, y: 28 }, eyeRight: { x: 43, y: 28 }, mouth: { x: 49, y: 35 } };
+const DEFAULT_FACE = { eyeLeft: { x: 55, y: 27 }, eyeRight: { x: 43, y: 27 }, mouth: { x: 48.5, y: 34.5 } };
+
+// Stage & scaling — matches narrator_animator.html logic
+const STAGE_W = 360, STAGE_H = 480;
+const ORIG_W  = 1024, ORIG_H  = 1536;
+const SCALE_X = STAGE_W / ORIG_W;                 // 0.3516
+const DISPLAYED_H = ORIG_H * SCALE_X;             // 540px
+const Y_CORRECT = DISPLAYED_H / STAGE_H;          // 1.125
+
+const EYE_W = 90 * SCALE_X;   // ~31.6px
+const EYE_H = 32 * SCALE_X;   // ~11.3px
+const MTH_W = 82 * SCALE_X;   // ~28.8px
+const MTH_H = 26 * SCALE_X;   // ~9.1px
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -513,32 +526,35 @@ export function AvatarNarrator({
                 */}
                 {hasBlinkSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
-                  const yScale = 1.125;
+                  const elx = (face.eyeLeft.x  / 100) * STAGE_W;
+                  const ely = (face.eyeLeft.y  / 100) * STAGE_H * Y_CORRECT;
+                  const erx = (face.eyeRight.x / 100) * STAGE_W;
+                  const ery = (face.eyeRight.y / 100) * STAGE_H * Y_CORRECT;
                   return (
                     <>
                       <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: `${face.eyeLeft.x}%`, top: `${face.eyeLeft.y * yScale}%`,
-                        width: 28, height: 10, borderRadius: "50%", overflow: "hidden",
+                        left: elx, top: ely,
+                        width: EYE_W, height: EYE_H, borderRadius: "50%", overflow: "hidden",
                         transform: "translate(-50%, -50%)",
                       }}>
                         <div style={{
                           width: "100%", height: "100%", borderRadius: "50%",
                           background: "rgba(20,10,5,0.82)",
                           transform: isBlinking ? "scaleY(1)" : "scaleY(0)",
-                          transformOrigin: "center center",
+                          transformOrigin: "top center",
                           transition: "transform 70ms ease-in",
                         }} />
                       </div>
                       <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: `${face.eyeRight.x}%`, top: `${face.eyeRight.y * yScale}%`,
-                        width: 28, height: 10, borderRadius: "50%", overflow: "hidden",
+                        left: erx, top: ery,
+                        width: EYE_W, height: EYE_H, borderRadius: "50%", overflow: "hidden",
                         transform: "translate(-50%, -50%)",
                       }}>
                         <div style={{
                           width: "100%", height: "100%", borderRadius: "50%",
                           background: "rgba(20,10,5,0.82)",
                           transform: isBlinking ? "scaleY(1)" : "scaleY(0)",
-                          transformOrigin: "center center",
+                          transformOrigin: "top center",
                           transition: "transform 70ms ease-in",
                         }} />
                       </div>
@@ -549,11 +565,12 @@ export function AvatarNarrator({
                 {/* LAYER 2b — CSS mouth overlay fallback (when no sprite PNG) */}
                 {hasMouthSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
-                  const yScale = 1.125;
+                  const mx = (face.mouth.x / 100) * STAGE_W;
+                  const my = (face.mouth.y / 100) * STAGE_H * Y_CORRECT;
                   return (
                     <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                      left: `${face.mouth.x}%`, top: `${face.mouth.y * yScale}%`,
-                      width: 38, height: 18,
+                      left: mx, top: my,
+                      width: MTH_W, height: MTH_H,
                       borderRadius: "50% 50% 60% 60%", overflow: "hidden",
                       transform: "translate(-50%, -50%)",
                     }}>
@@ -562,7 +579,7 @@ export function AvatarNarrator({
                         background: "rgba(20,3,3,0.75)",
                         borderRadius: "50% 50% 60% 60%",
                         transform: `scaleY(${cssLipValue})`,
-                        transformOrigin: "center center",
+                        transformOrigin: "top center",
                         transition: "transform 60ms ease-out",
                       }} />
                     </div>
