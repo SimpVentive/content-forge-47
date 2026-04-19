@@ -97,6 +97,9 @@ export function AvatarNarrator({
   const [hasMouthSprite, setHasMouthSprite] = useState<boolean | null>(null);
   const [hasBlinkSprite, setHasBlinkSprite] = useState<boolean | null>(null);
   const [isBlinking,     setIsBlinking]     = useState(false);
+  // CSS fallback lip-sync animation cycle (0–1 scale)
+  const [cssLipValue,    setCssLipValue]    = useState(0);
+  const cssLipIntervalRef = useRef<number | null>(null);
 
   const avatarVideoRef          = useRef<HTMLVideoElement | null>(null);
   const abortControllerRef      = useRef<AbortController | null>(null);
@@ -160,6 +163,39 @@ export function AvatarNarrator({
       if (blinkTimeoutRef.current !== null) window.clearTimeout(blinkTimeoutRef.current);
     };
   }, [scheduleNextBlink]);
+
+  // ── CSS fallback lip-sync loop ────────────────────────────────────────────
+  // When sprite PNGs are missing and the avatar is talking, cycle through
+  // a naturalistic lip pattern so the mouth visibly moves.
+  const CSS_LIP_PATTERN = [0,0.2,0.6,0.4,0.1,0.8,0.5,0.15,0.7,0.35,
+                           0.05,0,0,0.3,0.75,0.5,0.25,0.9,0.4,0.1,
+                           0.6,0.2,0.85,0.45,0.05,0,0.3,0.65,0.4,0.1];
+  const cssLipIdxRef = useRef(0);
+
+  useEffect(() => {
+    if (hasMouthSprite !== false) return;  // only for CSS fallback
+    if (!isTalking) {
+      // stop loop, close mouth
+      if (cssLipIntervalRef.current !== null) {
+        window.clearInterval(cssLipIntervalRef.current);
+        cssLipIntervalRef.current = null;
+      }
+      setCssLipValue(0);
+      return;
+    }
+    // start cycling
+    cssLipIntervalRef.current = window.setInterval(() => {
+      const val = CSS_LIP_PATTERN[cssLipIdxRef.current % CSS_LIP_PATTERN.length];
+      cssLipIdxRef.current += 1;
+      setCssLipValue(val);
+    }, 100);
+    return () => {
+      if (cssLipIntervalRef.current !== null) {
+        window.clearInterval(cssLipIntervalRef.current);
+        cssLipIntervalRef.current = null;
+      }
+    };
+  }, [isTalking, hasMouthSprite]);
 
   // ── stream helpers ────────────────────────────────────────────────────────
   const clearMouthHold = () => {
@@ -523,7 +559,6 @@ export function AvatarNarrator({
                 {hasMouthSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
                   const yScale = 1.125;
-                  const mouthScale = mouthState === "open" ? 0.85 : mouthState === "slight" ? 0.4 : 0;
                   return (
                     <div aria-hidden="true" className="pointer-events-none absolute" style={{
                       left: `${face.mouth.x}%`, top: `${face.mouth.y * yScale}%`,
@@ -535,7 +570,7 @@ export function AvatarNarrator({
                         width: "100%", height: "100%",
                         background: "rgba(20,3,3,0.75)",
                         borderRadius: "50% 50% 60% 60%",
-                        transform: `scaleY(${mouthScale})`,
+                        transform: `scaleY(${cssLipValue})`,
                         transformOrigin: "center center",
                         transition: "transform 60ms ease-out",
                       }} />
