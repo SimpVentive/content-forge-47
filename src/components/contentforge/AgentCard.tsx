@@ -51,7 +51,8 @@ export const AgentCard: React.FC<AgentCardProps> = ({ agent, isLast, enabled, on
   return (
     <div className="relative">
       <div
-        className={`bg-card rounded-xl shadow-card hover:shadow-card-hover hover:-translate-y-px transition-all duration-200 flex items-center gap-4 px-5 py-4 ${!enabled ? "opacity-50" : ""}`}
+        className={`bg-card rounded-xl shadow-card hover:shadow-card-hover hover:-translate-y-1 active:translate-y-0 transition-all duration-200 flex items-center gap-4 px-5 py-4 ${!enabled ? "opacity-50" : ""}`}
+        style={{ border: "1px solid rgba(0,0,0,0.06)" }}
       >
         {/* Toggle */}
         <button
@@ -60,16 +61,20 @@ export const AgentCard: React.FC<AgentCardProps> = ({ agent, isLast, enabled, on
           style={{
             backgroundColor: enabled ? "hsl(192, 91%, 36%)" : "#e2e8f0",
             borderColor: enabled ? "hsl(192, 91%, 30%)" : "#cbd5e1",
+            boxShadow: enabled
+              ? "inset 0 2px 4px rgba(0,0,0,0.15), 0 1px 0 rgba(255,255,255,0.3)"
+              : "inset 0 2px 4px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,0.5)",
           }}
           type="button"
           role="switch"
           aria-checked={enabled}
         >
           <span
-            className="absolute top-[2px] w-[22px] h-[22px] rounded-full shadow-lg transition-all duration-200"
+            className="absolute top-[2px] w-[22px] h-[22px] rounded-full transition-all duration-200"
             style={{
               left: enabled ? "26px" : "2px",
               backgroundColor: enabled ? "#ffffff" : "#94a3b8",
+              boxShadow: "0 2px 4px rgba(0,0,0,0.2), 0 1px 0 rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.8)",
             }}
           />
           <span className="absolute inset-0 flex items-center text-[9px] font-bold text-white pointer-events-none">
@@ -80,7 +85,10 @@ export const AgentCard: React.FC<AgentCardProps> = ({ agent, isLast, enabled, on
         {/* Circle icon */}
         <div
           className="w-10 h-10 rounded-full flex items-center justify-center shrink-0"
-          style={{ backgroundColor: enabled ? color : '#94a3b8' }}
+          style={{
+            backgroundColor: enabled ? color : '#94a3b8',
+            boxShadow: `0 3px 0 rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.25)`,
+          }}
         >
           <span className="text-white text-[17px] font-bold">{initial}</span>
         </div>
@@ -94,7 +102,11 @@ export const AgentCard: React.FC<AgentCardProps> = ({ agent, isLast, enabled, on
         {/* Status badge */}
         <span
           className="text-[13px] font-semibold px-3 py-1 rounded-full shrink-0 flex items-center gap-1.5"
-          style={{ backgroundColor: status.bg, color: status.text }}
+          style={{
+            backgroundColor: status.bg,
+            color: status.text,
+            boxShadow: "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.5)",
+          }}
         >
           {agent.status === "running" && (
             <span className="w-2 h-2 rounded-full bg-white animate-pulse-dot" />

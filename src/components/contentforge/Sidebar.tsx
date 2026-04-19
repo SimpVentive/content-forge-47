@@ -165,7 +165,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <input
             value={courseTitle}
             onChange={(e) => setCourseTitle(e.target.value)}
-            className="w-full h-11 border-[1.5px] border-border rounded-xl px-3.5 text-[14px] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors duration-200"
+            className="w-full h-11 border-[1.5px] border-border rounded-xl px-3.5 text-[14px] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-all duration-200"
+            style={{ boxShadow: "inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.7)" }}
             placeholder="Enter course title..."
           />
         </div>
@@ -181,14 +182,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 onClick={() => handleConfirmTitle(true)}
                 type="button"
-                className="flex-1 h-9 rounded-lg text-[13px] font-bold text-white flex items-center justify-center gap-1.5 bg-primary hover:brightness-110 transition-all"
+                className="flex-1 h-9 rounded-lg text-[13px] font-bold text-white flex items-center justify-center gap-1.5 bg-primary hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0.5 transition-all"
+                style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.2)" }}
               >
                 <Check className="w-3.5 h-3.5" /> Yes, use this title
               </button>
               <button
                 onClick={() => handleConfirmTitle(false)}
                 type="button"
-                className="flex-1 h-9 rounded-lg text-[13px] font-bold text-foreground flex items-center justify-center gap-1.5 border border-border hover:bg-secondary transition-all"
+                className="flex-1 h-9 rounded-lg text-[13px] font-bold text-foreground flex items-center justify-center gap-1.5 border border-border hover:bg-secondary hover:-translate-y-0.5 active:translate-y-0.5 transition-all"
+                style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5)" }}
               >
                 <X className="w-3.5 h-3.5" /> No, I'll change it
               </button>
@@ -212,7 +215,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={() => fileInputRef.current?.click()}
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="border-2 border-dashed border-primary/25 rounded-xl p-4 text-center cursor-pointer hover:bg-primary/[0.04] hover:border-primary transition-all duration-200 mb-3"
+            className="border-2 border-dashed border-primary/25 rounded-xl p-4 text-center cursor-pointer hover:bg-primary/[0.04] hover:border-primary hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 mb-3"
+            style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.04), 0 4px 10px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.6)" }}
           >
             <Upload className="w-7 h-7 mx-auto mb-2 text-primary" />
             <p className="text-[13px] font-semibold text-foreground">Drop PPT, PDF or DOCX</p>
@@ -237,7 +241,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
             value={inputText}
             onChange={(e) => setInputText(e.target.value)}
             rows={8}
-            className="w-full border-[1.5px] border-border rounded-xl px-3.5 py-3 text-[13px] leading-[1.6] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none transition-colors duration-200"
+            className="w-full border-[1.5px] border-border rounded-xl px-3.5 py-3 text-[13px] leading-[1.6] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none transition-all duration-200"
+            style={{ boxShadow: "inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.7)" }}
             placeholder="Paste subject matter notes..."
           />
         </div>
@@ -246,7 +251,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onStop}
             type="button"
-            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 transition-all duration-200"
+            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 hover:-translate-y-0.5 active:translate-y-0.5 transition-all duration-200"
+            style={{ boxShadow: "0 3px 0 rgba(0,0,0,0.15), 0 6px 12px rgba(220,38,38,0.25), inset 0 1px 0 rgba(255,255,255,0.2)" }}
           >
             <Square className="w-4 h-4" />
             Stop Generating
@@ -256,7 +262,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onClick={onGenerate}
             type="button"
             disabled={!courseTitle.trim() || isExtracting || showTitleConfirm}
-            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] hover:-translate-y-0.5 active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             style={{ background: '#2563EB' }}
           >
             {isExtracting ? (

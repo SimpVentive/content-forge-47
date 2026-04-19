@@ -586,7 +586,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                     setActiveTab(tab.key);
                   }
                 }}
-                className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-200 ${
+                className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0.5 ${
                   disabled
                     ? "bg-secondary/50 text-muted-foreground/40 cursor-not-allowed"
                     : isPreview
@@ -595,6 +595,13 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                         ? "bg-primary text-primary-foreground"
                         : "bg-secondary text-muted-foreground hover:bg-border"
                 }`}
+                style={{
+                  boxShadow: disabled
+                    ? "none"
+                    : activeTab === tab.key
+                      ? "0 3px 0 rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)"
+                      : "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5)",
+                }}
               >
                 <tab.icon className="w-3 h-3" />
                 {tab.label}
