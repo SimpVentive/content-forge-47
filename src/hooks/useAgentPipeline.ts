@@ -457,6 +457,50 @@ const initialStatuses = (): Record<string, AgentStatus> =>
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
 const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", quality: "", voice: "", assembly: "" });
 
+/**
+ * Strip JSON / code-fence leakage from Writer output.
+ * If the model returned a JSON blueprint instead of prose, convert it to readable markdown.
+ */
+function sanitizeWriterOutput(raw: string): string {
+  if (!raw) return raw;
+  let text = raw.trim();
+  text = text.replace(/^```(?:json|markdown|md)?\s*/i, "").replace(/```\s*$/i, "").trim();
+
+  const looksLikeJson = (text.startsWith("{") || text.startsWith("[")) &&
+    /["']?(course_title|module_title|topic_name|topics|on_screen_text|modules)["']?\s*:/i.test(text);
+  if (!looksLikeJson) return text;
+
+  try {
+    const parsed = JSON.parse(text);
+    const lines: string[] = [];
+    const renderTopic = (t: any) => {
+      const name = t.topic_name || t.topic_title || t.title || t.name || "Topic";
+      lines.push(`## ${name}`);
+      const body = t.on_screen_text || t.content || t.body || t.narration || t.script || "";
+      if (body) lines.push(String(body).replace(/^#+\s*/gm, "").trim());
+      lines.push("");
+    };
+    const renderModule = (m: any) => {
+      const title = m.module_title || m.title || m.name;
+      if (title) lines.push(`# ${title}\n`);
+      const topics = m.topics || m.sections || m.lessons || [];
+      if (Array.isArray(topics)) topics.forEach(renderTopic);
+    };
+    if (Array.isArray(parsed)) {
+      parsed.forEach((item) => (item.topics ? renderModule(item) : renderTopic(item)));
+    } else if (parsed.modules && Array.isArray(parsed.modules)) {
+      parsed.modules.forEach(renderModule);
+    } else if (parsed.topics) {
+      renderModule(parsed);
+    } else {
+      renderTopic(parsed);
+    }
+    return lines.join("\n").trim() || text;
+  } catch {
+    return text;
+  }
+}
+
 const timestamp = () => {
   const d = new Date();
   return `[${d.toLocaleTimeString("en-US", { hour12: false })}]`;
