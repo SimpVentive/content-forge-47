@@ -37,6 +37,18 @@ const BUBBLE_TEXT   = "#26215C";
 
 const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "aa", "ih", "r", "oh", "aa"];
 
+// CSS-overlay facial coordinates (percentage of image) used when sprite PNGs are unavailable.
+const FACE_COORDS: Record<string, { eyeLeft: { x: number; y: number }; eyeRight: { x: number; y: number }; mouth: { x: number; y: number } }> = {
+  priya:      { eyeLeft: { x: 56.25, y: 29.10 }, eyeRight: { x: 43.95, y: 29.10 }, mouth: { x: 49.80, y: 36.20 } },
+  arjun:      { eyeLeft: { x: 55.47, y: 27.60 }, eyeRight: { x: 43.36, y: 27.80 }, mouth: { x: 49.02, y: 34.90 } },
+  soumya:     { eyeLeft: { x: 55.27, y: 28.00 }, eyeRight: { x: 43.55, y: 28.20 }, mouth: { x: 49.22, y: 35.00 } },
+  vedprakash: { eyeLeft: { x: 54.69, y: 27.00 }, eyeRight: { x: 43.16, y: 27.00 }, mouth: { x: 48.83, y: 34.00 } },
+  atul:       { eyeLeft: { x: 55.08, y: 27.10 }, eyeRight: { x: 42.97, y: 27.10 }, mouth: { x: 48.63, y: 34.30 } },
+  irina:      { eyeLeft: { x: 55.47, y: 28.00 }, eyeRight: { x: 43.55, y: 28.00 }, mouth: { x: 49.41, y: 35.20 } },
+  john:       { eyeLeft: { x: 54.30, y: 27.20 }, eyeRight: { x: 42.97, y: 27.20 }, mouth: { x: 48.44, y: 34.20 } },
+};
+const DEFAULT_FACE = { eyeLeft: { x: 55, y: 28 }, eyeRight: { x: 43, y: 28 }, mouth: { x: 49, y: 35 } };
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -463,6 +475,64 @@ export function AvatarNarrator({
                     style={{ transition: "opacity 55ms ease-out" }}
                   />
                 )}
+
+                {/* LAYER 1b — CSS blink overlay fallback (when no sprite PNG) */}
+                {hasBlinkSprite === false && (() => {
+                  const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
+                  return (
+                    <>
+                      <div aria-hidden="true" className="pointer-events-none absolute" style={{
+                        left: `${face.eyeLeft.x}%`, top: `${face.eyeLeft.y}%`,
+                        width: 28, height: 10, borderRadius: "50%", overflow: "hidden",
+                        transform: "translate(-50%, -50%)",
+                      }}>
+                        <div style={{
+                          width: "100%", height: "100%", borderRadius: "50%",
+                          background: "rgba(20,10,5,0.82)",
+                          transform: isBlinking ? "scaleY(1)" : "scaleY(0)",
+                          transformOrigin: "center center",
+                          transition: "transform 70ms ease-in",
+                        }} />
+                      </div>
+                      <div aria-hidden="true" className="pointer-events-none absolute" style={{
+                        left: `${face.eyeRight.x}%`, top: `${face.eyeRight.y}%`,
+                        width: 28, height: 10, borderRadius: "50%", overflow: "hidden",
+                        transform: "translate(-50%, -50%)",
+                      }}>
+                        <div style={{
+                          width: "100%", height: "100%", borderRadius: "50%",
+                          background: "rgba(20,10,5,0.82)",
+                          transform: isBlinking ? "scaleY(1)" : "scaleY(0)",
+                          transformOrigin: "center center",
+                          transition: "transform 70ms ease-in",
+                        }} />
+                      </div>
+                    </>
+                  );
+                })()}
+
+                {/* LAYER 2b — CSS mouth overlay fallback (when no sprite PNG) */}
+                {hasMouthSprite === false && (() => {
+                  const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
+                  const mouthScale = mouthState === "open" ? 0.85 : mouthState === "slight" ? 0.4 : 0;
+                  return (
+                    <div aria-hidden="true" className="pointer-events-none absolute" style={{
+                      left: `${face.mouth.x}%`, top: `${face.mouth.y}%`,
+                      width: 26, height: 12,
+                      borderRadius: "50% 50% 60% 60%", overflow: "hidden",
+                      transform: "translate(-50%, -50%)",
+                    }}>
+                      <div style={{
+                        width: "100%", height: "100%",
+                        background: "rgba(20,3,3,0.75)",
+                        borderRadius: "50% 50% 60% 60%",
+                        transform: `scaleY(${mouthScale})`,
+                        transformOrigin: "center center",
+                        transition: "transform 60ms ease-out",
+                      }} />
+                    </div>
+                  );
+                })()}
               </>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-[#3C3489]">
