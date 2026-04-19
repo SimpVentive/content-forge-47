@@ -477,12 +477,20 @@ export function AvatarNarrator({
                 )}
 
                 {/* LAYER 1b — CSS blink overlay fallback (when no sprite PNG) */}
+                {/*
+                  Y-correction: container is aspect-[3/4] (0.75) but images are
+                  1024×1536 (0.667). With object-cover object-top the image is
+                  scaled to match container width; its rendered height exceeds
+                  the container, and the bottom is cropped.
+                  Scale factor = (1536/1024) / (4/3) = 1.125
+                */}
                 {hasBlinkSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
+                  const yScale = 1.125;
                   return (
                     <>
                       <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: `${face.eyeLeft.x}%`, top: `${face.eyeLeft.y}%`,
+                        left: `${face.eyeLeft.x}%`, top: `${face.eyeLeft.y * yScale}%`,
                         width: 28, height: 10, borderRadius: "50%", overflow: "hidden",
                         transform: "translate(-50%, -50%)",
                       }}>
@@ -495,7 +503,7 @@ export function AvatarNarrator({
                         }} />
                       </div>
                       <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: `${face.eyeRight.x}%`, top: `${face.eyeRight.y}%`,
+                        left: `${face.eyeRight.x}%`, top: `${face.eyeRight.y * yScale}%`,
                         width: 28, height: 10, borderRadius: "50%", overflow: "hidden",
                         transform: "translate(-50%, -50%)",
                       }}>
@@ -514,10 +522,11 @@ export function AvatarNarrator({
                 {/* LAYER 2b — CSS mouth overlay fallback (when no sprite PNG) */}
                 {hasMouthSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
+                  const yScale = 1.125;
                   const mouthScale = mouthState === "open" ? 0.85 : mouthState === "slight" ? 0.4 : 0;
                   return (
                     <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                      left: `${face.mouth.x}%`, top: `${face.mouth.y}%`,
+                      left: `${face.mouth.x}%`, top: `${face.mouth.y * yScale}%`,
                       width: 26, height: 12,
                       borderRadius: "50% 50% 60% 60%", overflow: "hidden",
                       transform: "translate(-50%, -50%)",
