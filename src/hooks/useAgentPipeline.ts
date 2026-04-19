@@ -457,6 +457,50 @@ const initialStatuses = (): Record<string, AgentStatus> =>
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
 const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", quality: "", voice: "", assembly: "" });
 
+/**
+ * Strip JSON / code-fence leakage from Writer output.
+ * If the model returned a JSON blueprint instead of prose, convert it to readable markdown.
+ */
+function sanitizeWriterOutput(raw: string): string {
+  if (!raw) return raw;
+  let text = raw.trim();
+  text = text.replace(/^```(?:json|markdown|md)?\s*/i, "").replace(/```\s*$/i, "").trim();
+
+  const looksLikeJson = (text.startsWith("{") || text.startsWith("[")) &&
+    /["']?(course_title|module_title|topic_name|topics|on_screen_text|modules)["']?\s*:/i.test(text);
+  if (!looksLikeJson) return text;
+
+  try {
+    const parsed = JSON.parse(text);
+    const lines: string[] = [];
+    const renderTopic = (t: any) => {
+      const name = t.topic_name || t.topic_title || t.title || t.name || "Topic";
+      lines.push(`## ${name}`);
+      const body = t.on_screen_text || t.content || t.body || t.narration || t.script || "";
+      if (body) lines.push(String(body).replace(/^#+\s*/gm, "").trim());
+      lines.push("");
+    };
+    const renderModule = (m: any) => {
+      const title = m.module_title || m.title || m.name;
+      if (title) lines.push(`# ${title}\n`);
+      const topics = m.topics || m.sections || m.lessons || [];
+      if (Array.isArray(topics)) topics.forEach(renderTopic);
+    };
+    if (Array.isArray(parsed)) {
+      parsed.forEach((item) => (item.topics ? renderModule(item) : renderTopic(item)));
+    } else if (parsed.modules && Array.isArray(parsed.modules)) {
+      parsed.modules.forEach(renderModule);
+    } else if (parsed.topics) {
+      renderModule(parsed);
+    } else {
+      renderTopic(parsed);
+    }
+    return lines.join("\n").trim() || text;
+  } catch {
+    return text;
+  }
+}
+
 const timestamp = () => {
   const d = new Date();
   return `[${d.toLocaleTimeString("en-US", { hour12: false })}]`;
@@ -789,6 +833,12 @@ Rules you NEVER break:
 - Make the learner do mental work. Include at least one decision prompt, judgment call, or “what would you do?” moment in each topic, written naturally inside the prose.
 - Format each topic using markdown prose with this backbone: Hook → Core explanation → Concrete example or scenario → Key Takeaway: → Challenge:. Keep headings limited to the topic title only.
 - Use markdown ## headers for each topic title, matching the exact topic names provided.
+
+OUTPUT FORMAT — ABSOLUTE:
+- Output ONLY markdown prose. NEVER output JSON, code blocks, key/value pairs, or any structured data.
+- Do NOT echo the blueprint. Do NOT wrap output in \`\`\`json or any code fence.
+- Do NOT output keys like "course_title", "module_title", "topics", "on_screen_text", "topic_name". The blueprint is INPUT only — your output is human-readable narration.
+- The very first character of your response must be "#" (a markdown heading), never "{" or "[" or "\`".
 - You MUST use content from the source material provided. Do NOT invent unrelated examples.
 - You MUST respect the supplied runtime plan. Hit the requested word budgets closely so the narration lands within ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target.
 
@@ -823,11 +873,12 @@ Rules you NEVER break:
 
             addLog(`Writer Agent: Drafting Module ${mi + 1}/${parsedModules.length} — ${modTitle}...`);
 
-            const moduleContent = await runAgentWithLanguage(
+            const moduleContentRaw = await runAgentWithLanguage(
               writerSystemPrompt,
-              `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nModule Runtime Target: ${moduleDurationPlan?.targetMinutes ?? "auto"} minutes\nModule Word Budget: ${moduleDurationPlan?.targetWords ?? "auto"} words\nModule Topic Word Range: ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange}\nTopics:\n${topics}\n\nStructured Topic Blueprint JSON:\n${topicBlueprint}\n\nDuration Plan JSON:\n${JSON.stringify(moduleDurationPlan || null, null, 2)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging content for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange} words minimum so the final course genuinely feels like ${params?.duration || "15min"}. Make this module feel like a coherent chapter with a distinct purpose, not a pile of disconnected notes. Use the topic's objective, scenario_anchor, misconception_to_correct, practice_activity, interaction_type, feedback_focus, and evidence_or_example when present. Stay close to the module word budget rather than writing evenly by instinct.`,
+              `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nModule Runtime Target: ${moduleDurationPlan?.targetMinutes ?? "auto"} minutes\nModule Word Budget: ${moduleDurationPlan?.targetWords ?? "auto"} words\nModule Topic Word Range: ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange}\nTopics:\n${topics}\n\nStructured Topic Blueprint JSON (FOR YOUR REFERENCE ONLY — DO NOT ECHO):\n${topicBlueprint}\n\nDuration Plan JSON (FOR YOUR REFERENCE ONLY — DO NOT ECHO):\n${JSON.stringify(moduleDurationPlan || null, null, 2)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging MARKDOWN PROSE for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange} words minimum. NEVER output JSON or code blocks — output flowing prose only. Your first character must be "#".`,
               addLog, "Writer Agent"
             );
+            const moduleContent = sanitizeWriterOutput(moduleContentRaw);
             moduleResults.push(`# ${modTitle}\n\n${moduleContent}`);
             
             // Update output progressively
