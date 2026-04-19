@@ -2640,9 +2640,79 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5" style={{ background: "#DCE6F1" }}>
+    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5 learner-preview-3d" style={{ background: "#DCE6F1" }}>
       <style>
-        {`@keyframes sheetFlipForward {
+        {`/* ── 3D lift for buttons ─────────────────────────────────────── */
+        .learner-preview-3d button {
+          box-shadow:
+            0 2px 0 rgba(0,0,0,0.10),
+            0 4px 8px rgba(0,0,0,0.06),
+            inset 0 1px 0 rgba(255,255,255,0.18);
+          transition: box-shadow 0.15s ease, transform 0.15s ease, background 0.15s ease;
+        }
+        .learner-preview-3d button:hover {
+          transform: translateY(-1px);
+          box-shadow:
+            0 4px 2px rgba(0,0,0,0.08),
+            0 8px 16px rgba(0,0,0,0.10),
+            inset 0 1px 0 rgba(255,255,255,0.22);
+        }
+        .learner-preview-3d button:active {
+          transform: translateY(1px);
+          box-shadow:
+            0 1px 0 rgba(0,0,0,0.12),
+            0 2px 4px rgba(0,0,0,0.06),
+            inset 0 2px 4px rgba(0,0,0,0.08);
+        }
+        /* Slide dots — keep them flat, they're too small for 3D */
+        .learner-preview-3d .slide-dot-nav button {
+          box-shadow: none !important;
+          transform: none !important;
+        }
+
+        /* ── 3D lift for cards & panels ─────────────────────────────── */
+        .learner-preview-3d [class*="rounded-2xl"][class*="border"],
+        .learner-preview-3d [class*="rounded-[2"][class*="border"],
+        .learner-preview-3d [class*="rounded-[3"][class*="border"],
+        .learner-preview-3d [class*="rounded-xl"][class*="shadow"] {
+          box-shadow:
+            0 3px 0 rgba(0,0,0,0.06),
+            0 6px 14px rgba(0,0,0,0.07),
+            inset 0 1px 0 rgba(255,255,255,0.55);
+          transition: box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .learner-preview-3d [class*="rounded-2xl"][class*="border"]:hover,
+        .learner-preview-3d [class*="rounded-[2"][class*="border"]:hover,
+        .learner-preview-3d [class*="rounded-[3"][class*="border"]:hover {
+          box-shadow:
+            0 5px 2px rgba(0,0,0,0.05),
+            0 10px 22px rgba(0,0,0,0.09),
+            inset 0 1px 0 rgba(255,255,255,0.60);
+        }
+
+        /* ── sidebar cards (dark bg — needs lighter inset) ──────── */
+        .learner-preview-3d aside [class*="rounded-2xl"] {
+          box-shadow:
+            0 3px 0 rgba(0,0,0,0.18),
+            0 6px 14px rgba(0,0,0,0.15),
+            inset 0 1px 0 rgba(255,255,255,0.10);
+        }
+
+        /* ── bottom toolbar buttons — stronger 3D ───────────────── */
+        .learner-preview-3d .bottom-toolbar button {
+          box-shadow:
+            0 3px 0 rgba(0,0,0,0.12),
+            0 6px 12px rgba(0,0,0,0.08),
+            inset 0 1px 0 rgba(255,255,255,0.25);
+        }
+        .learner-preview-3d .bottom-toolbar button:active {
+          transform: translateY(2px);
+          box-shadow:
+            0 1px 0 rgba(0,0,0,0.15),
+            inset 0 2px 6px rgba(0,0,0,0.10);
+        }
+
+        @keyframes sheetFlipForward {
           0% {
             opacity: 0.8;
             transform: perspective(2200px) rotateX(22deg) translateY(10px) scaleY(0.992);
@@ -3149,7 +3219,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             </div>
           </div>
 
-          <div className="shrink-0 border-t border-[#d7e1ee] bg-white/90 px-5 py-4 backdrop-blur md:px-7">
+          <div className="bottom-toolbar shrink-0 border-t border-[#d7e1ee] bg-white/90 px-5 py-4 backdrop-blur md:px-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <button
                 onClick={goPrev}
@@ -3161,7 +3231,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               </button>
 
               <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-1.5">
+                <div className="slide-dot-nav flex items-center gap-1.5">
                   {currentModuleSlides.map((s) => (
                     <button
                       key={s.idx}
