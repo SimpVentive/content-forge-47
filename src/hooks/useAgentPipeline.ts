@@ -1141,29 +1141,32 @@ Rules you NEVER break:
           let calibrationResult = "";
           try {
             calibrationResult = await runAgentWithLanguage(
-            `${languageDirective}You are a runtime calibration specialist for eLearning scripts. Your job is to ${adjustmentDirection} the script so the narrated runtime lands within +/- ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target at ${NARRATION_WORDS_PER_MINUTE} words per minute. Preserve the same module and topic headings. Keep the writing high quality, practical, and scenario-based. If expanding, add depth, examples, learner decisions, and coaching language. If compressing, remove repetition and tighten prose without losing key teaching points. Return JSON: { calibrated_script, estimated_duration_minutes, calibration_actions: [] }`,
-            `Course Title: ${courseTitle}\nTarget Duration: ${durationMinutes} minutes\nAllowed Drift: +/- ${durationToleranceMinutes} minutes\nTarget Narration Words: ${targetNarrationWords}\nCurrent Estimated Duration: ${estimatedDuration} minutes\nCurrent Script Word Count: ${countWords(writerResult)}\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nCurrent Script:\n${writerResult}`,
-            addLog,
-            "Voice Agent"
-          );
-
-          const parsedCalibration = tryParseJson(calibrationResult);
-          if (parsedCalibration?.calibrated_script && typeof parsedCalibration.calibrated_script === "string") {
-            writerResult = parsedCalibration.calibrated_script;
-            setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
-            setOutputData((prev) => ({ ...prev, script: writerResult }));
-
-            voiceResult = await runAgentWithLanguage(
-              `${languageDirective}You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at ${NARRATION_WORDS_PER_MINUTE} words per minute. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }`,
-              `Script:\n${writerResult}\n\nOn-screen text language: ${textLanguage}\nNarrator language: ${narratorLanguage}\nTarget Duration Minutes: ${durationMinutes}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes`,
+              `${languageDirective}You are a runtime calibration specialist for eLearning scripts. Your job is to ${adjustmentDirection} the script so the narrated runtime lands within +/- ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target at ${NARRATION_WORDS_PER_MINUTE} words per minute. Preserve the same module and topic headings. Keep the writing high quality, practical, and scenario-based. If expanding, add depth, examples, learner decisions, and coaching language. If compressing, remove repetition and tighten prose without losing key teaching points. Return JSON: { calibrated_script, estimated_duration_minutes, calibration_actions: [] }`,
+              `Course Title: ${courseTitle}\nTarget Duration: ${durationMinutes} minutes\nAllowed Drift: +/- ${durationToleranceMinutes} minutes\nTarget Narration Words: ${targetNarrationWords}\nCurrent Estimated Duration: ${estimatedDuration} minutes\nCurrent Script Word Count: ${countWords(writerResult)}\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nCurrent Script:\n${writerResult}`,
               addLog,
               "Voice Agent"
             );
 
-            qualityResult = qualityResult
-              ? `${qualityResult}\n\nDuration Calibration\n${calibrationResult}`
-              : calibrationResult;
-            setRawOutputs((prev) => ({ ...prev, writer: writerResult, quality: qualityResult }));
+            const parsedCalibration = tryParseJson(calibrationResult);
+            if (parsedCalibration?.calibrated_script && typeof parsedCalibration.calibrated_script === "string") {
+              writerResult = parsedCalibration.calibrated_script;
+              setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
+              setOutputData((prev) => ({ ...prev, script: writerResult }));
+
+              voiceResult = await runAgentWithLanguage(
+                `${languageDirective}You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at ${NARRATION_WORDS_PER_MINUTE} words per minute. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }`,
+                `Script:\n${writerResult}\n\nOn-screen text language: ${textLanguage}\nNarrator language: ${narratorLanguage}\nTarget Duration Minutes: ${durationMinutes}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes`,
+                addLog,
+                "Voice Agent"
+              );
+
+              qualityResult = qualityResult
+                ? `${qualityResult}\n\nDuration Calibration\n${calibrationResult}`
+                : calibrationResult;
+              setRawOutputs((prev) => ({ ...prev, writer: writerResult, quality: qualityResult }));
+            }
+          } catch (calErr) {
+            addLog(`Voice Agent: Calibration skipped (${(calErr as Error).message}). Using original narration.`);
           }
         }
 
