@@ -165,8 +165,8 @@ export function AvatarNarrator({
   }, [scheduleNextBlink]);
 
   // ── CSS fallback lip-sync loop ────────────────────────────────────────────
-  // When sprite PNGs are missing and the avatar is talking, cycle through
-  // a naturalistic lip pattern so the mouth visibly moves.
+  // Always runs when sprite PNGs are missing. Uses a naturalistic pattern
+  // so the avatar always looks alive — identical to narrator_animator.html.
   const CSS_LIP_PATTERN = [0,0.2,0.6,0.4,0.1,0.8,0.5,0.15,0.7,0.35,
                            0.05,0,0,0.3,0.75,0.5,0.25,0.9,0.4,0.1,
                            0.6,0.2,0.85,0.45,0.05,0,0.3,0.65,0.4,0.1];
@@ -174,16 +174,7 @@ export function AvatarNarrator({
 
   useEffect(() => {
     if (hasMouthSprite !== false) return;  // only for CSS fallback
-    if (!isTalking) {
-      // stop loop, close mouth
-      if (cssLipIntervalRef.current !== null) {
-        window.clearInterval(cssLipIntervalRef.current);
-        cssLipIntervalRef.current = null;
-      }
-      setCssLipValue(0);
-      return;
-    }
-    // start cycling
+    // Always run the lip loop — avatar should always look alive
     cssLipIntervalRef.current = window.setInterval(() => {
       const val = CSS_LIP_PATTERN[cssLipIdxRef.current % CSS_LIP_PATTERN.length];
       cssLipIdxRef.current += 1;
@@ -195,7 +186,7 @@ export function AvatarNarrator({
         cssLipIntervalRef.current = null;
       }
     };
-  }, [isTalking, hasMouthSprite]);
+  }, [hasMouthSprite]);
 
   // ── stream helpers ────────────────────────────────────────────────────────
   const clearMouthHold = () => {
@@ -562,7 +553,7 @@ export function AvatarNarrator({
                   return (
                     <div aria-hidden="true" className="pointer-events-none absolute" style={{
                       left: `${face.mouth.x}%`, top: `${face.mouth.y * yScale}%`,
-                      width: 26, height: 12,
+                      width: 38, height: 18,
                       borderRadius: "50% 50% 60% 60%", overflow: "hidden",
                       transform: "translate(-50%, -50%)",
                     }}>
