@@ -242,7 +242,7 @@ const Welcome = () => {
               className="text-[#b8860b]"
               style={{
                 textShadow: "0 1px 3px rgba(184,134,11,0.3)",
-                backgroundImage: "#B45309",
+                backgroundImage: "linear-gradient(135deg, #b8860b 0%, #daa520 40%, #ffd700 60%, #b8860b 100%)",
                 backgroundSize: "220% 100%",
                 WebkitBackgroundClip: "text",
                 WebkitTextFillColor: "transparent",
