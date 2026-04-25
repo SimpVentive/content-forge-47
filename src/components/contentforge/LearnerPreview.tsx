@@ -1572,11 +1572,19 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     return () => window.removeEventListener("keydown", handler);
   }, [currentSlide]);
 
+  const isAssessmentLocked = useCallback((idx: number) => {
+    const s = slides[idx];
+    if (!s || s.type !== "assessment") return false;
+    const ans = assessmentAnswers[idx];
+    return !ans?.submitted;
+  }, [slides, assessmentAnswers]);
+
   const goNext = useCallback(() => {
+    if (isAssessmentLocked(currentSlide)) return;
     if (currentSlide < totalSlides - 1) {
       navigateToSlide(currentSlide + 1);
     }
-  }, [currentSlide, totalSlides, navigateToSlide]);
+  }, [currentSlide, totalSlides, navigateToSlide, isAssessmentLocked]);
 
   const goPrev = useCallback(() => {
     if (currentSlide > 0) {
