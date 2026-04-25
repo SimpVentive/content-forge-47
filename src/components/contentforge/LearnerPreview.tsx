@@ -697,11 +697,13 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       });
     }
 
-    // 3b. Insert video slides for this module (fuzzy match module titles)
-    const modVideos = insertedVideos.filter(v => 
-      v.moduleTitle === mod.title || 
-      normalizeModuleKey(v.moduleTitle) === normalizeModuleKey(mod.title)
-    );
+    // 3b. Insert video slides for this module (fuzzy match module titles).
+    // Videos with no assigned module are placed in the first module so they still appear.
+    const modVideos = insertedVideos.filter(v => {
+      const assigned = (v.moduleTitle || "").trim();
+      if (!assigned) return mi === 0;
+      return assigned === mod.title || normalizeModuleKey(assigned) === normalizeModuleKey(mod.title);
+    });
     modVideos.forEach(vid => {
       slides.push({
         type: "video",
