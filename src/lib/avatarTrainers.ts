@@ -73,7 +73,7 @@ const TRAINER_VOICE_IDS: Record<string, string> = {
   arjun:      "TX3LPaxmHKxFdv7VOQHJ",
   soumya:     "EXAVITQu4vr4xnSDxMaL",
   vedprakash: "onwK4e9ZLuTAKqWW03F9",
-  atul:       "MF3mGyEYCl7XYWbV9V6O",
+  atul:       "pNInz6obpgDQGcFmaJgB",
   irina:      "21m00Tcm4TlvDq8ikWAM",
   john:       "onwK4e9ZLuTAKqWW03F9",
 };

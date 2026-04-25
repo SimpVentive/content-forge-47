@@ -20,21 +20,22 @@ const buildLanguageDirective = (language: string) => {
   ].join("\n");
 };
 
-const buildPrompts = (topic: string, moduleContent: string, systemHint: string, language: string) => {
+const buildPrompts = (topic: string, moduleContent: string, systemHint: string, language: string, trainerName: string) => {
   const lang = (language || "English").trim() || "English";
   const langDirective = buildLanguageDirective(lang);
+  const name = (trainerName || "the trainer").trim() || "the trainer";
   return {
     systemPrompt: [
       langDirective,
-      "You are Sarah, a concise and encouraging workplace learning guide.",
+      `You are ${name}, a concise and encouraging workplace learning guide.`,
       "Explain clearly in plain language and stay grounded in the provided module content.",
       systemHint,
       // Repeat at end so it's the last instruction the model sees
       langDirective,
     ].join("\n\n"),
     userMessage: lang === "English"
-      ? `Topic: ${topic}\n\nModule content: ${moduleContent}\n\nRespond as Sarah speaking directly to the learner.`
-      : `[LANGUAGE INSTRUCTION: Your ENTIRE response must be written in ${lang}. Do NOT use English at all.]\n\nTopic: ${topic}\n\nModule content: ${moduleContent}\n\nRespond as Sarah speaking directly to the learner. WRITE EVERYTHING IN ${lang.toUpperCase()}.`,
+      ? `Topic: ${topic}\n\nModule content: ${moduleContent}\n\nRespond as ${name} speaking directly to the learner.`
+      : `[LANGUAGE INSTRUCTION: Your ENTIRE response must be written in ${lang}. Do NOT use English at all.]\n\nTopic: ${topic}\n\nModule content: ${moduleContent}\n\nRespond as ${name} speaking directly to the learner. WRITE EVERYTHING IN ${lang.toUpperCase()}.`,
   };
 };
 
@@ -53,7 +54,7 @@ serve(async (req) => {
   }
 
   try {
-    const { topic, moduleContent, systemHint, language } = await req.json();
+    const { topic, moduleContent, systemHint, language, trainerName } = await req.json();
 
     if (!topic || !moduleContent || !systemHint) {
       return new Response(JSON.stringify({ error: "topic, moduleContent, and systemHint are required" }), {
@@ -67,7 +68,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not set");
     }
 
-    const { systemPrompt, userMessage } = buildPrompts(topic, moduleContent, systemHint, language || "English");
+    const { systemPrompt, userMessage } = buildPrompts(topic, moduleContent, systemHint, language || "English", trainerName || "the trainer");
 
     const upstream = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
