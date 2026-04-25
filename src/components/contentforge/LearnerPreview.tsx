@@ -3317,8 +3317,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
                 <button
                   onClick={goNext}
-                  disabled={currentSlide === totalSlides - 1}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#1d4f93] px-6 text-[14px] font-semibold text-white transition-all hover:bg-[#173f78] disabled:opacity-40"
+                  disabled={currentSlide === totalSlides - 1 || isAssessmentLocked(currentSlide)}
+                  title={isAssessmentLocked(currentSlide) ? "Answer the question to continue" : undefined}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#1d4f93] px-6 text-[14px] font-semibold text-white transition-all hover:bg-[#173f78] disabled:opacity-40 disabled:cursor-not-allowed"
                   type="button"
                 >
                   Next <ChevronRight className="h-5 w-5" />
