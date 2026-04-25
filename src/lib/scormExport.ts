@@ -194,29 +194,34 @@ function normalizeSvgMarkup(svg: string): string {
 
 function extractTakeaway(markdown: string): { cleanedMarkdown: string; takeaway: string } {
   const normalized = markdown.replace(/\r\n/g, "\n");
-  const marker = /Key Takeaway:\s*([^\n]+)/i;
-  const match = normalized.match(marker);
 
-  if (!match) {
-    return {
-      cleanedMarkdown: normalized.trim(),
-      takeaway: "",
-    };
+  // Pattern 1: explicit "Key Takeaway:" / "Takeaway:" / "Remember:" / "Tip:" prefix on a line
+  const explicitMarker = /(?:^|\n)\s*(?:Key Takeaway|Takeaway|Remember|Tip)\s*:\s*([^\n]+)/i;
+  const explicitMatch = normalized.match(explicitMarker);
+  if (explicitMatch) {
+    const takeaway = stripMarkdown(explicitMatch[1]).trim();
+    const cleanedMarkdown = normalized
+      .replace(explicitMarker, "")
+      .replace(/\n{3,}/g, "\n\n")
+      .split("\n")
+      .map((line) => line.trimEnd())
+      .join("\n")
+      .trim();
+    return { cleanedMarkdown, takeaway };
   }
 
-  const takeaway = stripMarkdown(match[1]).trim();
-  const cleanedMarkdown = normalized
-    .replace(marker, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .split("\n")
-    .map((line) => line.trimEnd())
-    .join("\n")
-    .trim();
+  // Pattern 2: short final paragraph treated as takeaway (matches LearnerPreview parseContentParts)
+  const paragraphs = normalized.trim().split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
+  if (paragraphs.length > 1) {
+    const last = paragraphs[paragraphs.length - 1];
+    const lastPlain = stripMarkdown(last).trim();
+    if (lastPlain.length > 0 && lastPlain.length < 120) {
+      const cleanedMarkdown = paragraphs.slice(0, -1).join("\n\n").trim();
+      return { cleanedMarkdown, takeaway: lastPlain };
+    }
+  }
 
-  return {
-    cleanedMarkdown,
-    takeaway,
-  };
+  return { cleanedMarkdown: normalized.trim(), takeaway: "" };
 }
 
 function parseModules(archRaw: string): Module[] {
