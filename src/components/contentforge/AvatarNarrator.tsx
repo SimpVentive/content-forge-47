@@ -315,6 +315,7 @@ export function AvatarNarrator({
             topic, moduleContent,
             systemHint: mode === "initial" ? `${systemHint} ${CONCISE_RESPONSE_HINT}` : EXAMPLE_HINT,
             language: narratorLanguage,
+            trainerName,
           }),
           signal: controller.signal,
         }

@@ -261,7 +261,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onGenerate}
             type="button"
-            disabled={!courseTitle.trim() || isExtracting || showTitleConfirm}
+            disabled={!courseTitle.trim() || !inputText.trim() || isExtracting || showTitleConfirm}
             className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] hover:-translate-y-0.5 active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             style={{ background: '#2563EB' }}
           >

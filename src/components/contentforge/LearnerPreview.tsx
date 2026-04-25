@@ -697,11 +697,13 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       });
     }
 
-    // 3b. Insert video slides for this module (fuzzy match module titles)
-    const modVideos = insertedVideos.filter(v => 
-      v.moduleTitle === mod.title || 
-      normalizeModuleKey(v.moduleTitle) === normalizeModuleKey(mod.title)
-    );
+    // 3b. Insert video slides for this module (fuzzy match module titles).
+    // Videos with no assigned module are placed in the first module so they still appear.
+    const modVideos = insertedVideos.filter(v => {
+      const assigned = (v.moduleTitle || "").trim();
+      if (!assigned) return mi === 0;
+      return assigned === mod.title || normalizeModuleKey(assigned) === normalizeModuleKey(mod.title);
+    });
     modVideos.forEach(vid => {
       slides.push({
         type: "video",
@@ -1261,7 +1263,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
     setIsPlaying(false);
     stopLipSync();
-  }, [trainerVoiceId, stopLipSync]);
+  }, [trainerVoiceId, rawOutputs.writer, rawOutputs.voice, stopLipSync]);
 
   const startLipSync = useCallback(async (audio: HTMLAudioElement, visemeTimeline: VisemeCue[] = []) => {
     stopLipSync();
@@ -1572,11 +1574,19 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     return () => window.removeEventListener("keydown", handler);
   }, [currentSlide]);
 
+  const isAssessmentLocked = useCallback((idx: number) => {
+    const s = slides[idx];
+    if (!s || s.type !== "assessment") return false;
+    const ans = assessmentAnswers[idx];
+    return !ans?.submitted;
+  }, [slides, assessmentAnswers]);
+
   const goNext = useCallback(() => {
+    if (isAssessmentLocked(currentSlide)) return;
     if (currentSlide < totalSlides - 1) {
       navigateToSlide(currentSlide + 1);
     }
-  }, [currentSlide, totalSlides, navigateToSlide]);
+  }, [currentSlide, totalSlides, navigateToSlide, isAssessmentLocked]);
 
   const goPrev = useCallback(() => {
     if (currentSlide > 0) {
@@ -3278,13 +3288,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <button
                     onClick={() => {
                       if (audioLoading) return;
+                      const cachedUrl = audioUrlsRef.current[currentSlide];
                       if (audioRef.current && isPlaying) {
                         audioRef.current.pause();
-                      } else if (audioRef.current && !isPlaying) {
-                        audioRef.current.play().catch(() => {});
-                      } else {
-                        playNarration();
+                        return;
                       }
+                      // If we already have a cached URL for this slide, (re)create the element and play it.
+                      if (cachedUrl) {
+                        const audio = new Audio(cachedUrl);
+                        wireAudio(audio);
+                        audio.play().catch(() => {
+                          // Autoplay/playback blocked — try a fresh fetch as fallback
+                          void playNarration();
+                        });
+                        return;
+                      }
+                      void playNarration();
                     }}
                     className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${isPlaying ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
                     type="button"
@@ -3309,8 +3328,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
                 <button
                   onClick={goNext}
-                  disabled={currentSlide === totalSlides - 1}
-                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#1d4f93] px-6 text-[14px] font-semibold text-white transition-all hover:bg-[#173f78] disabled:opacity-40"
+                  disabled={currentSlide === totalSlides - 1 || isAssessmentLocked(currentSlide)}
+                  title={isAssessmentLocked(currentSlide) ? "Answer the question to continue" : undefined}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#1d4f93] px-6 text-[14px] font-semibold text-white transition-all hover:bg-[#173f78] disabled:opacity-40 disabled:cursor-not-allowed"
                   type="button"
                 >
                   Next <ChevronRight className="h-5 w-5" />
