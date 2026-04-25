@@ -3286,13 +3286,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <button
                     onClick={() => {
                       if (audioLoading) return;
+                      const cachedUrl = audioUrlsRef.current[currentSlide];
                       if (audioRef.current && isPlaying) {
                         audioRef.current.pause();
-                      } else if (audioRef.current && !isPlaying) {
-                        audioRef.current.play().catch(() => {});
-                      } else {
-                        playNarration();
+                        return;
                       }
+                      // If we already have a cached URL for this slide, (re)create the element and play it.
+                      if (cachedUrl) {
+                        const audio = new Audio(cachedUrl);
+                        wireAudio(audio);
+                        audio.play().catch(() => {
+                          // Autoplay/playback blocked — try a fresh fetch as fallback
+                          void playNarration();
+                        });
+                        return;
+                      }
+                      void playNarration();
                     }}
                     className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${isPlaying ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
                     type="button"
