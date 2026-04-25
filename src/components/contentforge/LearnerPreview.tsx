@@ -1263,7 +1263,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
     setIsPlaying(false);
     stopLipSync();
-  }, [trainerVoiceId, stopLipSync]);
+  }, [trainerVoiceId, rawOutputs.writer, rawOutputs.voice, stopLipSync]);
 
   const startLipSync = useCallback(async (audio: HTMLAudioElement, visemeTimeline: VisemeCue[] = []) => {
     stopLipSync();
