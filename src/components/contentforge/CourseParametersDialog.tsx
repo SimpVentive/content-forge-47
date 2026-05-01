@@ -31,6 +31,8 @@ interface CourseParametersDialogProps {
   open: boolean;
   courseTitle: string;
   estimatedMinutes?: number | null;
+  /** Whether the YouTube agent is enabled in the orchestrator. Hides YouTube-only setup sections when false. */
+  youtubeAgentEnabled?: boolean;
   onConfirm: (params: CourseParameters) => void;
   onCancel: () => void;
 }
@@ -125,7 +127,7 @@ const InfoHint: React.FC<{ text: string }> = ({ text }) => (
 );
 
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
-  open, courseTitle, estimatedMinutes, onConfirm, onCancel,
+  open, courseTitle, estimatedMinutes, youtubeAgentEnabled = true, onConfirm, onCancel,
 }) => {
   const headingFont = '"Poppins", sans-serif';
   const bodyFont = '"Inter", sans-serif';
@@ -507,6 +509,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
           </div>
 
+          {youtubeAgentEnabled && (
           <div className={surfaceCardClass}>
             <div>
               <div className="flex items-center gap-1.5">
@@ -554,7 +557,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </button>
             </div>
           </div>
+          )}
 
+          {youtubeAgentEnabled && (
           <div className={surfaceCardClass}>
             <div className="flex items-center gap-1.5 mb-2">
               <p className="text-[13px] font-bold text-foreground">YouTube Video Count</p>
@@ -576,6 +581,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               <span className="text-[11px] text-muted-foreground">videos per module (max 50)</span>
             </div>
           </div>
+          )}
 
           <div className={surfaceCardClass}>
             <div>

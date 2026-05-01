@@ -187,7 +187,12 @@ export function AvatarNarrator({
 
   useEffect(() => {
     if (hasMouthSprite !== false) return;  // only for CSS fallback
-    // Always run the lip loop — avatar should always look alive
+    if (!isTalking) {
+      // Paused / idle → freeze lips closed, don't churn the interval
+      cssLipIdxRef.current = 0;
+      setCssLipValue(0);
+      return;
+    }
     cssLipIntervalRef.current = window.setInterval(() => {
       const val = CSS_LIP_PATTERN[cssLipIdxRef.current % CSS_LIP_PATTERN.length];
       cssLipIdxRef.current += 1;
@@ -199,7 +204,7 @@ export function AvatarNarrator({
         cssLipIntervalRef.current = null;
       }
     };
-  }, [hasMouthSprite]);
+  }, [hasMouthSprite, isTalking]);
 
   // ── stream helpers ────────────────────────────────────────────────────────
   const clearMouthHold = () => {
@@ -471,7 +476,7 @@ export function AvatarNarrator({
                   alt={trainerName}
                   className="absolute inset-0 h-full w-full object-cover object-top"
                   style={{
-                    animation: "headTilt 9s ease-in-out infinite",
+                    animation: isTalking ? "headTilt 9s ease-in-out infinite" : "none",
                     transformOrigin: "50% 80%",
                   }}
                   onError={() => setHasAvatarImage(false)}

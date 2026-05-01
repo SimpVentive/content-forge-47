@@ -29,6 +29,11 @@ function escapeJsString(s: unknown): string {
   return JSON.stringify(typeof s === "string" ? s : JSON.stringify(s) || "");
 }
 
+// Strip a leading option-letter prefix so the renderer's own "A. " label doesn't double up.
+function stripOptionPrefix(opt: string): string {
+  return String(opt ?? "").replace(/^\s*\(?[A-Da-d]\)?\s*[\.\):\-]\s*/, "");
+}
+
 interface Module { title: string; topics: string[]; }
 
 interface ModuleSection {
@@ -322,14 +327,49 @@ function parseScript(writerRaw: string, modules: Module[], visualRaw?: string): 
   return typedMap;
 }
 
+// The MCQ correct_answer can come in as a number (0-3), a letter ("A"/"B"/...),
+// or the full option text. Resolve to a 0-based index against the options array;
+// fall back to 0 only when nothing else matches.
+function resolveCorrectIndex(correctAnswer: unknown, options: string[]): number {
+  if (typeof correctAnswer === "number" && correctAnswer >= 0 && correctAnswer < options.length) {
+    return correctAnswer;
+  }
+  if (typeof correctAnswer === "string") {
+    const trimmed = correctAnswer.trim();
+    // Single letter "A"/"B"/"C"/"D" (optionally with parens/period)
+    const letterMatch = trimmed.match(/^\(?([A-Da-d])\)?[.\):\s]?$/);
+    if (letterMatch) {
+      const idx = letterMatch[1].toUpperCase().charCodeAt(0) - 65;
+      if (idx >= 0 && idx < options.length) return idx;
+    }
+    // Strip a leading "A) " / "A. " / "(A) " prefix that authors sometimes put on the answer
+    const cleanedAnswer = trimmed.replace(/^\s*\(?[A-Da-d]\)?\s*[\.\):\-]\s*/, "").toLowerCase();
+    const exactIdx = options.findIndex((opt) => {
+      const cleanedOpt = String(opt).trim().replace(/^\s*\(?[A-Da-d]\)?\s*[\.\):\-]\s*/, "").toLowerCase();
+      return cleanedOpt === cleanedAnswer || cleanedOpt === trimmed.toLowerCase();
+    });
+    if (exactIdx >= 0) return exactIdx;
+    // Last-ditch substring match (handles "the system unit" vs "The System Unit (CPU)")
+    const containsIdx = options.findIndex((opt) => {
+      const cleanedOpt = String(opt).trim().toLowerCase();
+      return cleanedOpt.includes(cleanedAnswer) || cleanedAnswer.includes(cleanedOpt);
+    });
+    if (containsIdx >= 0) return containsIdx;
+  }
+  return 0;
+}
+
 function parseAssessment(assessRaw: string): { question: string; options: string[]; correct: number }[] {
   const data = tryParseJSON(assessRaw);
   if (data?.mcq) {
-    return data.mcq.map((q: any) => ({
-      question: q.question || q.stem || "",
-      options: q.options || q.choices || [],
-      correct: typeof q.correct_answer === "number" ? q.correct_answer : 0,
-    }));
+    return data.mcq.map((q: any) => {
+      const options = q.options || q.choices || [];
+      return {
+        question: q.question || q.stem || "",
+        options,
+        correct: resolveCorrectIndex(q.correct_answer, options),
+      };
+    });
   }
   return [];
 }
@@ -488,6 +528,13 @@ function scormSetComplete() {
     api.LMSCommit("");
   }
 }
+function scormSetStatus(status) {
+  var api = getAPI();
+  if (api) {
+    api.LMSSetValue("cmi.core.lesson_status", status);
+    api.LMSCommit("");
+  }
+}
 function scormSetScore(score) {
   var api = getAPI();
   if (api) {
@@ -499,6 +546,9 @@ function scormSetScore(score) {
 }
 `;
 
+// Pass mark for SCORM assessment (percent). Could be made configurable later.
+const PASS_MARK_PERCENT = 70;
+
 /* ── Module HTML page builder ── */
 function buildModuleHtml(
   courseTitle: string,
@@ -507,14 +557,14 @@ function buildModuleHtml(
   totalModules: number,
   sections: ModuleSection[],
   quizzes: { question: string; options: string[]; correct: number }[],
-  audioBase64: string | null,
+  audioSrc: string | null,
   narrationText: string
 ): string {
   // Split narration into sentences for highlighting
   const sentences = narrationText
     ? narrationText.match(/[^.!?]+[.!?]+[\s]*/g) || [narrationText]
     : [];
-  const hasSentences = sentences.length > 0 && audioBase64;
+  const hasSentences = sentences.length > 0 && !!audioSrc;
 
   const moduleTopics = sections.map((section) => ({
     heading: section.heading,
@@ -662,7 +712,7 @@ function buildModuleHtml(
       </section>`;
   };
 
-  const sectionsHtml = sections.map((section, sectionIndex) => section.screenTemplate === "dashboard" ? renderDashboardSection(section, sectionIndex) : section.screenTemplate === "scenario" ? renderScenarioSection(section, sectionIndex) : section.screenTemplate === "media-quiz" ? renderMediaQuizSection(section, sectionIndex) : section.screenTemplate === "summary-panel" ? renderSummaryPanelSection(section, sectionIndex) : `
+  const renderSection = (section: ModuleSection, sectionIndex: number): string => section.screenTemplate === "dashboard" ? renderDashboardSection(section, sectionIndex) : section.screenTemplate === "scenario" ? renderScenarioSection(section, sectionIndex) : section.screenTemplate === "media-quiz" ? renderMediaQuizSection(section, sectionIndex) : section.screenTemplate === "summary-panel" ? renderSummaryPanelSection(section, sectionIndex) : `
       <section class="lesson-section" id="section-${sectionIndex + 1}">
         <div
           class="avatar-narrator"
@@ -715,9 +765,17 @@ function buildModuleHtml(
           <div class="key-takeaway-label">Key takeaway</div>
           <p>${renderInlineMarkdown(section.keyTakeaway)}</p>
         </aside>` : ""}
-      </section>`).join("\n");
+      </section>`;
 
-  const audioHtml = audioBase64 ? `
+  // Wrap each section as its own screen for slide-by-slide navigation. Audio
+  // and quiz become trailing screens so the learner can step through them.
+  // Initial active screen is set by JS on load (so it works whether or not
+  // audio/quiz exist).
+  const sectionScreensHtml = sections.map((section, sectionIndex) =>
+    `<div class="scorm-screen" data-screen-index="${sectionIndex}">${renderSection(section, sectionIndex)}</div>`
+  ).join("\n");
+
+  const audioHtml = audioSrc ? `
       <div class="audio-section">
         <div class="audio-header">
           <h2>🎧 Listen to Narration</h2>
@@ -736,7 +794,7 @@ function buildModuleHtml(
           </div>
         </div>
         <audio controls class="audio-player" id="moduleAudio" preload="auto">
-          <source src="data:audio/mpeg;base64,${audioBase64}" type="audio/mpeg"/>
+          <source src="${escapeAttribute(audioSrc)}" type="audio/mpeg"/>
           Your browser does not support the audio element.
         </audio>
         <p class="audio-hint">Click play — text highlights sentence by sentence as you listen</p>
@@ -751,7 +809,7 @@ function buildModuleHtml(
           ${q.options.map((opt, oi) => `
           <label class="quiz-opt" data-option-index="${oi}">
             <input type="radio" name="q${qi}" value="${oi}" onchange="checkAnswer(${qi},${oi},${q.correct})"/>
-            <span>${escapeHtml(typeof opt === "string" ? opt : String(opt))}</span>
+            <span>${escapeHtml(stripOptionPrefix(typeof opt === "string" ? opt : String(opt)))}</span>
           </label>`).join("")}
           <p class="quiz-fb" id="fb${qi}"></p>
         </div>`).join("")}
@@ -869,6 +927,15 @@ function buildModuleHtml(
     .progress-fill { height: 100%; background: var(--progress-fill, #fbbf24); transition: width 0.3s; }
     .container { max-width: 780px; margin: 0 auto; padding: 32px 24px; }
     .lesson-section { margin-bottom: 32px; padding: 24px; border-radius: 24px; background: var(--card); border: 1px solid var(--border); box-shadow: 0 12px 30px var(--shadow-elevated, rgba(79, 70, 229, 0.06)); }
+    /* Slide-by-slide screens (each lesson section + audio + quiz = one screen) */
+    .scorm-screen { display: none; }
+    .scorm-screen.active { display: block; animation: scormScreenIn 280ms ease-out; }
+    @keyframes scormScreenIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    .screen-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; padding: 16px 20px; border-radius: 18px; background: var(--card); border: 1px solid var(--border); }
+    .screen-nav button { font-family: inherit; font-size: 14px; font-weight: 700; padding: 10px 18px; border-radius: 12px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; transition: all 0.15s ease; }
+    .screen-nav button:hover:not(:disabled) { background: var(--quiz-hover); border-color: var(--primary); }
+    .screen-nav button:disabled { opacity: 0.45; cursor: not-allowed; }
+    .screen-nav .screen-counter { font-size: 13px; color: var(--muted); font-weight: 600; }
     .lesson-template-dashboard { padding: 26px; background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.98)); }
     .dashboard-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr) 260px; align-items: start; }
     .dashboard-main-card, .dashboard-info-card { border-radius: 20px; border: 1px solid var(--border); background: rgba(255,255,255,0.92); box-shadow: 0 12px 28px var(--shadow-elevated, rgba(79, 70, 229, 0.06)); }
@@ -996,9 +1063,14 @@ function buildModuleHtml(
     <div class="progress-bar"><div class="progress-fill" style="width:${Math.round(((moduleIndex + 1) / totalModules) * 100)}%"></div></div>
   </div>
   <div class="container">
-    ${audioHtml}
-    ${sectionsHtml}
-    ${quizHtml}
+    ${audioHtml ? `<div class="scorm-screen audio-screen">${audioHtml}</div>` : ""}
+    ${sectionScreensHtml}
+    ${quizHtml ? `<div class="scorm-screen quiz-screen">${quizHtml}</div>` : ""}
+    <div class="screen-nav">
+      <button type="button" id="scormPrevBtn" onclick="prevScreen()">&larr; Previous</button>
+      <span class="screen-counter" id="scormScreenCounter"></span>
+      <button type="button" id="scormNextBtn" onclick="nextScreen()">Next &rarr;</button>
+    </div>
     <div class="nav">
       ${navPrev}
       ${navNext}
@@ -1046,10 +1118,72 @@ function buildModuleHtml(
       }
     }
 
+    /* ── slide-by-slide screen navigation ────────────────────────────── */
+    function getScreens() {
+      return document.querySelectorAll('.scorm-screen');
+    }
+    var currentScreenIndex = 0;
+    function showScreen(idx) {
+      var screens = getScreens();
+      if (!screens.length) return;
+      if (idx < 0) idx = 0;
+      if (idx > screens.length - 1) idx = screens.length - 1;
+      for (var i = 0; i < screens.length; i++) {
+        screens[i].classList.toggle('active', i === idx);
+      }
+      currentScreenIndex = idx;
+      var counter = document.getElementById('scormScreenCounter');
+      if (counter) counter.textContent = 'Screen ' + (idx + 1) + ' of ' + screens.length;
+      var prev = document.getElementById('scormPrevBtn');
+      var next = document.getElementById('scormNextBtn');
+      if (prev) prev.disabled = idx === 0;
+      if (next) next.disabled = idx === screens.length - 1;
+      // Pause audio when leaving the audio screen
+      var audio = document.getElementById('moduleAudio');
+      if (audio) {
+        var audioScreen = document.querySelector('.audio-screen');
+        if (audioScreen && !audioScreen.classList.contains('active') && !audio.paused) {
+          audio.pause();
+        }
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+    function nextScreen() { showScreen(currentScreenIndex + 1); }
+    function prevScreen() { showScreen(currentScreenIndex - 1); }
+    document.addEventListener('DOMContentLoaded', function() { showScreen(0); });
+
     function completeCourse() {
-      scormSetComplete();
+      var passMark = ${PASS_MARK_PERCENT};
+      var btn = document.querySelector('.complete-btn');
+      if (total > 0 && answered < total) {
+        alert('Please answer all ' + total + ' questions before completing the course.');
+        return;
+      }
+      var pct = total > 0 ? Math.round((score / total) * 100) : 100;
+      var passed = total === 0 || pct >= passMark;
+      if (total > 0) scormSetScore(pct);
+      scormSetStatus(passed ? 'passed' : 'failed');
       scormFinish();
-      alert('Congratulations! You have completed the course.');
+      if (passed) {
+        alert('Congratulations! You passed with ' + pct + '% (' + score + '/' + total + ').');
+      } else {
+        alert('You scored ' + pct + '% (' + score + '/' + total + '). A score of ' + passMark + '% is required to pass — review the lessons and try the quiz again.');
+        // Reset quiz so the learner can retry
+        var items = document.querySelectorAll('.quiz-item');
+        for (var i = 0; i < items.length; i++) {
+          items[i].removeAttribute('data-answered');
+          var inputs = items[i].querySelectorAll('input[type="radio"]');
+          for (var j = 0; j < inputs.length; j++) inputs[j].checked = false;
+          var labels = items[i].querySelectorAll('.quiz-opt');
+          for (var k = 0; k < labels.length; k++) {
+            labels[k].classList.remove('correct');
+            labels[k].classList.remove('incorrect');
+          }
+          var fb = items[i].querySelector('.quiz-fb');
+          if (fb) { fb.textContent = ''; fb.className = 'quiz-fb'; }
+        }
+        score = 0; answered = 0;
+      }
     }
 
     function clearHighlights() {
@@ -1368,6 +1502,24 @@ export async function exportScormPackage(
   zip.file("adlcp_rootv1p2.xsd", ADLCP_XSD);
   zip.file("imsmd_rootv1p2p1.xsd", IMSMD_XSD);
 
+  // Decode each module's base64 audio into an mp3 binary inside the zip and
+  // reference it from the HTML via a relative URL. This avoids gigantic data:
+  // URIs that some SCORM players choke on (the original cause of "no audio
+  // when opening the export").
+  const audioSrcMap = new Map<number, string>();
+  audioBase64Map.forEach((base64, idx) => {
+    try {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let b = 0; b < binary.length; b++) bytes[b] = binary.charCodeAt(b);
+      const filePath = `audio/module_${idx + 1}.mp3`;
+      zip.file(filePath, bytes);
+      audioSrcMap.set(idx, filePath);
+    } catch (err) {
+      console.warn(`Audio decode failed for module ${idx + 1}:`, err);
+    }
+  });
+
   // Add module HTML pages
   modules.forEach((mod, i) => {
     const sections = scriptMap.get(mod.title) || [{
@@ -1379,9 +1531,9 @@ export async function exportScormPackage(
     }];
     const startQ = i * quizzesPerModule;
     const modQuizzes = allQuizzes.slice(startQ, startQ + quizzesPerModule);
-    const audioBase64 = audioBase64Map.get(i) || null;
+    const audioSrc = audioSrcMap.get(i) || null;
     const narrationText = voiceSections[i]?.narration_text || "";
-    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioBase64, narrationText);
+    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioSrc, narrationText);
     zip.file(`module_${i + 1}.html`, html);
   });
 

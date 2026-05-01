@@ -15,11 +15,6 @@ export const OrchestratorLog: React.FC<OrchestratorLogProps> = ({ logs }) => {
     }
   }, [logs]);
 
-  // Auto-expand when logs start coming in
-  useEffect(() => {
-    if (logs.length > 0) setIsOpen(true);
-  }, [logs.length]);
-
   return (
     <div>
       <button

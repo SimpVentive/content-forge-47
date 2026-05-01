@@ -353,6 +353,7 @@ const Index = () => {
             open={showParamsDialog}
             courseTitle={courseTitle}
             estimatedMinutes={estimateMinutesFromText(inputText)}
+            youtubeAgentEnabled={agentToggles.youtube}
             onConfirm={handleParamsConfirm}
             onCancel={() => setShowParamsDialog(false)}
           />
@@ -447,7 +448,16 @@ const Index = () => {
             workflowClips={workflowClips}
             courseDuration={courseParams?.duration}
             avatarTrainerId={courseParams?.avatarTrainerId}
+            isRunning={isRunning}
             slideLayout={courseParams?.slideLayout}
+            learnerNotesEnabled={courseParams?.learnerNotesEnabled}
+            resourcesPanelEnabled={courseParams?.resourcesPanelEnabled}
+            glossaryEnabled={courseParams?.glossaryEnabled}
+            discussionEnabled={courseParams?.discussionEnabled}
+            assessmentIntensity={courseParams?.assessmentIntensity}
+            flipStylePreference={courseParams?.flipStyle}
+            textLanguage={courseParams?.textLanguage || courseParams?.language}
+            narratorLanguage={courseParams?.narratorLanguage}
             onUpdateVisualTopic={updateVisualTopicAsset}
             onUpdateCourseContent={updateCourseContent}
           />

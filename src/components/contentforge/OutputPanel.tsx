@@ -16,11 +16,20 @@ interface OutputPanelProps {
   workflowClips?: any[];
   courseDuration?: string;
   avatarTrainerId?: string;
+  isRunning?: boolean;
   slideLayout?: {
     maxLines: number;
     minFontSize: number;
     lineSpacing: number;
   };
+  learnerNotesEnabled?: boolean;
+  resourcesPanelEnabled?: boolean;
+  glossaryEnabled?: boolean;
+  discussionEnabled?: boolean;
+  assessmentIntensity?: "light" | "standard" | "deep";
+  flipStylePreference?: "dramatic" | "subtle" | "bound";
+  textLanguage?: string;
+  narratorLanguage?: string;
   onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
   onUpdateCourseContent?: (section: "outline" | "script" | "assessment" | "package", value: string) => void;
 }
@@ -136,7 +145,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 };
 
 /* Package Renderer */
-const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; avatarTrainerId?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, slideLayout, onUpdateVisualTopic }) => {
+const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; avatarTrainerId?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; learnerNotesEnabled?: boolean; resourcesPanelEnabled?: boolean; glossaryEnabled?: boolean; discussionEnabled?: boolean; assessmentIntensity?: "light" | "standard" | "deep"; flipStylePreference?: "dramatic" | "subtle" | "bound"; textLanguage?: string; narratorLanguage?: string; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
   const [checklist, setChecklist] = useState<boolean[]>(
@@ -159,6 +168,14 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           courseDuration={courseDuration}
           avatarTrainerId={avatarTrainerId}
           slideLayout={slideLayout}
+          learnerNotesEnabled={learnerNotesEnabled}
+          resourcesPanelEnabled={resourcesPanelEnabled}
+          glossaryEnabled={glossaryEnabled}
+          discussionEnabled={discussionEnabled}
+          assessmentIntensity={assessmentIntensity}
+          flipStylePreference={flipStylePreference}
+          textLanguage={textLanguage}
+          narratorLanguage={narratorLanguage}
           onUpdateVisualTopic={onUpdateVisualTopic}
         />
       )}
@@ -357,12 +374,17 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
   );
 };
 
-export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, slideLayout, onUpdateVisualTopic, onUpdateCourseContent }) => {
+export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic, onUpdateCourseContent }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
+  const [showScriptConfirm, setShowScriptConfirm] = useState(false);
+  const [showScriptDialog, setShowScriptDialog] = useState(false);
+  const [scriptDialogEditing, setScriptDialogEditing] = useState(false);
+  const [scriptDialogDraft, setScriptDialogDraft] = useState("");
+  const prevIsRunningRef = React.useRef<boolean>(Boolean(isRunning));
   const hasOutput = Object.values(rawOutputs).some(v => v);
   const content = (activeTab === "preview" || activeTab === "videos") ? null : outputData[activeTab as keyof OutputData];
   const canEditTab = activeTab === "outline" || activeTab === "script" || activeTab === "assessment" || activeTab === "package";
@@ -371,6 +393,14 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
     setIsEditing(false);
     setEditValue(content || "");
   }, [activeTab, content]);
+
+  React.useEffect(() => {
+    const wasRunning = prevIsRunningRef.current;
+    prevIsRunningRef.current = Boolean(isRunning);
+    if (wasRunning && !isRunning && (outputData.script || "").trim().length > 0) {
+      setShowScriptConfirm(true);
+    }
+  }, [isRunning, outputData.script]);
 
   // Convert workflow clips to InsertedVideo format
   const allInsertedVideos: InsertedVideo[] = React.useMemo(() => {
@@ -509,7 +539,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       case "assessment":
         return <AssessmentView raw={content} />;
       case "package":
-        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} insertedVideos={allInsertedVideos} courseDuration={courseDuration} avatarTrainerId={avatarTrainerId} slideLayout={slideLayout} onUpdateVisualTopic={onUpdateVisualTopic} />;
+        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} insertedVideos={allInsertedVideos} courseDuration={courseDuration} avatarTrainerId={avatarTrainerId} slideLayout={slideLayout} learnerNotesEnabled={learnerNotesEnabled} resourcesPanelEnabled={resourcesPanelEnabled} glossaryEnabled={glossaryEnabled} discussionEnabled={discussionEnabled} assessmentIntensity={assessmentIntensity} flipStylePreference={flipStylePreference} textLanguage={textLanguage} narratorLanguage={narratorLanguage} onUpdateVisualTopic={onUpdateVisualTopic} />;
       case "script":
         return <ScriptView raw={content} voiceRaw={rawOutputs.voice} />;
       case "outline":
@@ -521,6 +551,28 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           </div>
         );
     }
+  };
+
+  const scriptContent = outputData.script || "";
+
+  const openScriptDialog = () => {
+    setScriptDialogDraft(scriptContent);
+    setScriptDialogEditing(false);
+    setShowScriptDialog(true);
+  };
+
+  const handleScriptDialogSave = () => {
+    if (onUpdateCourseContent) {
+      onUpdateCourseContent("script", scriptDialogDraft);
+    }
+    setScriptDialogEditing(false);
+    setShowScriptDialog(false);
+    toast.success("Script saved");
+  };
+
+  const handleScriptDialogCancelEdit = () => {
+    setScriptDialogDraft(scriptContent);
+    setScriptDialogEditing(false);
   };
 
   return (
@@ -535,8 +587,141 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           courseDuration={courseDuration}
           avatarTrainerId={avatarTrainerId}
           slideLayout={slideLayout}
+          learnerNotesEnabled={learnerNotesEnabled}
+          resourcesPanelEnabled={resourcesPanelEnabled}
+          glossaryEnabled={glossaryEnabled}
+          discussionEnabled={discussionEnabled}
+          assessmentIntensity={assessmentIntensity}
+          flipStylePreference={flipStylePreference}
+          textLanguage={textLanguage}
+          narratorLanguage={narratorLanguage}
           onUpdateVisualTopic={onUpdateVisualTopic}
         />
+      )}
+
+      {showScriptConfirm && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowScriptConfirm(false)} />
+          <div className="relative w-[440px] max-w-[92vw] rounded-2xl bg-card shadow-2xl overflow-hidden animate-fade-in">
+            <div className="h-1.5 w-full bg-primary" />
+            <div className="px-7 pt-6 pb-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-[17px] font-extrabold text-foreground leading-tight">View and Edit the Script</h3>
+              </div>
+              <p className="text-[13px] text-muted-foreground leading-relaxed mb-5">
+                The script has been generated. Would you like to review it now? You can make edits before it's used in the course.
+              </p>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowScriptConfirm(false)}
+                  className="h-10 px-4 rounded-lg text-[13px] font-bold border border-border text-foreground hover:bg-secondary transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowScriptConfirm(false);
+                    openScriptDialog();
+                  }}
+                  className="h-10 px-5 rounded-lg text-[13px] font-bold bg-primary text-primary-foreground hover:brightness-110 transition-all"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showScriptDialog && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            onClick={() => !scriptDialogEditing && setShowScriptDialog(false)}
+          />
+          <div className="relative w-[860px] max-w-[94vw] h-[82vh] rounded-2xl bg-card shadow-2xl overflow-hidden animate-fade-in flex flex-col">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-card">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-[18px] font-extrabold text-foreground leading-tight">Course Script</h3>
+                  <p className="text-[12px] text-muted-foreground mt-0.5">
+                    {scriptDialogEditing ? "Editing — make your changes and click Save" : "Review the script below. Click Edit to make changes."}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (scriptDialogEditing) return;
+                  setShowScriptDialog(false);
+                }}
+                disabled={scriptDialogEditing}
+                className="w-8 h-8 rounded-full hover:bg-secondary flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                aria-label="Close"
+              >
+                <span className="text-[18px] leading-none text-muted-foreground">×</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-6 py-5">
+              {scriptDialogEditing ? (
+                <textarea
+                  value={scriptDialogDraft}
+                  onChange={(event) => setScriptDialogDraft(event.target.value)}
+                  className="w-full h-full min-h-[55vh] resize-none rounded-xl border border-border bg-background px-4 py-3 text-[13px] leading-[1.7] text-foreground focus:border-primary focus:outline-none font-mono"
+                />
+              ) : (
+                <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{scriptDialogDraft}</pre>
+              )}
+            </div>
+
+            <div className="px-6 py-4 border-t border-border flex justify-end gap-2 bg-card">
+              {scriptDialogEditing ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleScriptDialogCancelEdit}
+                    className="h-10 px-4 rounded-lg text-[13px] font-bold border border-border text-foreground hover:bg-secondary transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleScriptDialogSave}
+                    className="h-10 px-5 rounded-lg text-[13px] font-bold bg-primary text-primary-foreground hover:brightness-110 transition-all"
+                  >
+                    Save
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setShowScriptDialog(false)}
+                    className="h-10 px-4 rounded-lg text-[13px] font-bold border border-border text-foreground hover:bg-secondary transition-colors"
+                  >
+                    Close
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScriptDialogEditing(true)}
+                    className="h-10 px-5 rounded-lg text-[13px] font-bold bg-primary text-primary-foreground hover:brightness-110 transition-all"
+                  >
+                    Edit
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       <div className="px-5 pt-6 pb-4">
@@ -560,15 +745,6 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                 Edit
               </button>
             )}
-            {hasOutput && (
-              <button
-                onClick={() => setShowLearnerPreview(true)}
-                className="h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1.5 border-2 border-primary text-primary hover:bg-primary/5 transition-all"
-              >
-                <Play className="w-3 h-3" />
-                Preview
-              </button>
-            )}
           </div>
         </div>
         <div className="flex gap-1.5 flex-wrap">
@@ -590,7 +766,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                   disabled
                     ? "bg-secondary/50 text-muted-foreground/40 cursor-not-allowed"
                     : isPreview
-                      ? "bg-accent text-primary hover:bg-primary/10 border border-primary/30"
+                      ? "bg-white text-primary border-2 border-primary hover:bg-primary/5"
                       : activeTab === tab.key
                         ? "bg-primary text-primary-foreground"
                         : "bg-secondary text-muted-foreground hover:bg-border"

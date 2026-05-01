@@ -6,6 +6,7 @@ import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
 import { FLIP_STYLES, HIGHLIGHT_PALETTES, PreviewActionBar, type FlipStyle, type HighlightPalette } from "./PreviewActionBar";
 import { AvatarNarrator } from "./AvatarNarrator";
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
+import { toast } from "sonner";
 
 /* helpers */
 function tryParseJSON(raw: string): any | null {
@@ -46,8 +47,27 @@ function getInfographicDescription(visualModule: any, module: Module): string {
   return candidate?.trim() || buildFallbackInfographicText(module);
 }
 
-function stripNarratorMarkdown(text: string): string {
+// Stage directions / production markers the writer/architect agent embeds inline
+// (e.g. "(Visual: An empty desk...)", "Narration:", "*(Interaction: drag-and-drop)*",
+// "Topic 1:" prefixes). These are authoring scaffolding, not learner-facing prose —
+// strip them from any text that flows into Situation / What to Notice / Better Move
+// / Key Takeaway / Did You Know / avatar narration.
+function stripStageDirections(text: string): string {
   return text
+    // parenthetical visual/audio/stage cues: (Visual: ...), (Audio: ...), (SFX: ...), (On screen: ...)
+    .replace(/\(\s*(?:Visual|Image|Audio|SFX|On[- ]?screen|Caption|B-?roll|Cut to|On screen text)\s*:[^)]*\)/gi, "")
+    // bracketed interaction markers: *(Interaction: drag-and-drop)*, [Interaction: ...]
+    // Tolerant of malformed markers (missing closing bracket) — terminate at the
+    // first sentence break or line end if no closing bracket is found.
+    .replace(/[\*_]?\s*[\(\[]\s*Interaction\s*:[^)\]\.\n]*(?:[\)\]]|(?=[\.\n])|$)\s*[\*_]?/gi, "")
+    // standalone "Narration:" / "Visual:" / "Audio:" speaker prefixes when they start a clause
+    .replace(/(^|[\.\!\?\s])(?:Narration|Visual|Audio|Caption|On[- ]?screen)\s*:\s*/gi, "$1")
+    // "Topic 1:", "Topic 12:" leading scaffolding
+    .replace(/^\s*Topic\s+\d+\s*:\s*/i, "");
+}
+
+function stripNarratorMarkdown(text: string): string {
+  return stripStageDirections(text)
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/\*\*(.*?)\*\*/g, "$1")
     .replace(/\*(.*?)\*/g, "$1")
@@ -63,6 +83,12 @@ function isPlaceholderToken(text: string): boolean {
   if (/^[#*\-_.:;|/\\\[\](){}]+$/.test(normalized)) return true;
   if (normalized === "n/a" || normalized === "na" || normalized === "null" || normalized === "undefined") return true;
   return false;
+}
+
+// Strip a leading option-letter prefix like "A)", "A.", "(A)", "A -" so the
+// renderer's own "A. " label doesn't double up.
+function stripOptionPrefix(opt: string): string {
+  return String(opt ?? "").replace(/^\s*\(?[A-Da-d]\)?\s*[\.\):\-]\s*/, "");
 }
 
 function safeLearnerText(text: string, fallback = ""): string {
@@ -344,6 +370,14 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxL
       : [];
   }
 
+  // Cap chunks-per-topic by duration so a 3-min course doesn't blow up to 12+ slides.
+  const maxChunksPerTopic = durationMinutes <= 3 ? 1
+    : durationMinutes <= 5 ? 2
+    : durationMinutes <= 10 ? 3
+    : durationMinutes <= 20 ? 4
+    : durationMinutes <= 45 ? 5
+    : 6;
+
   const targetWordsByDuration = durationMinutes <= 5 ? 70 : durationMinutes <= 10 ? 85 : durationMinutes <= 20 ? 100 : 115;
   const approxWordsPerLine = 9;
   const lineBudgetWordLimit = Math.max(36, maxLines * approxWordsPerLine);
@@ -388,6 +422,20 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxL
   });
 
   flushChunk();
+
+  // Enforce per-topic chunk cap: if we exceeded the cap, merge the trailing
+  // chunks into the last allowed slide (truncated to fit) rather than spawning
+  // extra slides that overshoot the course's target duration.
+  if (chunks.length > maxChunksPerTopic) {
+    const kept = chunks.slice(0, maxChunksPerTopic - 1);
+    const overflow = chunks.slice(maxChunksPerTopic - 1).map((c) => c.text).join(" ");
+    kept.push({
+      text: truncateToWordLimit(overflow, lineBudgetWordLimit),
+      wasTrimmed: true,
+    });
+    return kept;
+  }
+
   if (chunks.length > 0) return chunks;
 
   const fallback = text.trim();
@@ -447,6 +495,14 @@ function parseContentParts(text: string) {
     }
   }
 
+  // Final fallback: derive a one-sentence takeaway from any available prose so the
+  // Key Takeaway panel doesn't render the "Content not available" filler.
+  if (!takeaway) {
+    const source = [...body, hook].find((value) => value && !isPlaceholderToken(value));
+    const lastSentence = source ? source.match(/[^.!?]+[.!?]+/g)?.slice(-1)[0]?.trim() : "";
+    if (lastSentence && !isPlaceholderToken(lastSentence)) takeaway = safeLearnerText(lastSentence);
+  }
+
   return { hook, body, takeaway, challenge };
 }
 
@@ -476,9 +532,10 @@ function getTopicLearningObjectives(moduleTopics: string[], topicTitle?: string)
 
 function getQuickFact(parts: { hook: string; body: string[]; takeaway: string; challenge: string }): string {
   if (parts.takeaway && !isPlaceholderToken(parts.takeaway)) return parts.takeaway;
-  const fallback = [parts.hook, ...parts.body].find((value) => value && !isPlaceholderToken(value)) || "Content not available for this section.";
-  const sentence = stripNarratorMarkdown(fallback).match(/[^.!?]+[.!?]+|[^.!?]+$/)?.[0]?.trim();
-  return sentence && !isPlaceholderToken(sentence) ? sentence : fallback;
+  const source = [parts.challenge, parts.hook, ...parts.body].find((value) => value && !isPlaceholderToken(value));
+  if (!source) return "";
+  const sentence = stripNarratorMarkdown(source).match(/[^.!?]+[.!?]+|[^.!?]+$/)?.[0]?.trim();
+  return sentence && !isPlaceholderToken(sentence) ? sentence : "";
 }
 
 function getTargetCourseQuestionCount(durationMinutes: number, intensity: AssessmentIntensity): number {
@@ -1194,6 +1251,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
+  // courseDuration may arrive as "3min", "15min", "3 min", or "3" — normalize once.
+  const courseDurationMinutes = (() => {
+    const raw = String(courseDuration ?? "15");
+    const match: RegExpMatchArray | null = raw.match(/\d+/);
+    return match ? `${match[0]} min` : `${raw} min`;
+  })();
   const progress = ((currentSlide + 1) / totalSlides) * 100;
   const slideAnimationName = slideMotion
     ? flipStyle === "subtle"
@@ -1671,9 +1734,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     if (!ans || ans.submitted) return;
     const q = slides[slideIdx].question;
     if (!q) return;
-    const correct = q.options[ans.selected] === q.correct_answer ||
+    const optClean = stripOptionPrefix(q.options[ans.selected] || "");
+    const correctClean = stripOptionPrefix(q.correct_answer || "");
+    const correct = optClean === correctClean ||
+      q.options[ans.selected] === q.correct_answer ||
       String.fromCharCode(65 + ans.selected) === q.correct_answer ||
-      q.correct_answer?.includes(q.options[ans.selected]);
+      q.correct_answer?.includes(optClean);
     setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true } }));
     setScore(prev => ({ correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1 }));
   };
@@ -1690,10 +1756,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   }, [navigateToSlide]);
 
   const handleApproveVisual = useCallback(() => {
-    if (!onUpdateVisualTopic || slide.type !== "content" || !slide.topicTitle) return;
+    if (!onUpdateVisualTopic || slide.type !== "content" || !slide.topicTitle) {
+      toast.error("Cannot approve: visual editor isn't available in this preview.");
+      return;
+    }
+    const willApprove = !slide.visualApproved;
     onUpdateVisualTopic(slide.moduleTitle, slide.topicTitle, {
-      image_approved: !slide.visualApproved,
+      image_approved: willApprove,
     });
+    toast.success(willApprove ? "Visual approved" : "Approval removed");
   }, [onUpdateVisualTopic, slide]);
 
   const handleRegenerateVisual = useCallback(async () => {
@@ -1735,14 +1806,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           error: "",
         },
       }));
+      toast.success("Visual regenerated");
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Image regeneration failed";
       setVisualActionState((prev) => ({
         ...prev,
         [currentVisualKey]: {
           regenerating: false,
-          error: error instanceof Error ? error.message : "Image regeneration failed",
+          error: message,
         },
       }));
+      toast.error(`Regeneration failed: ${message}`);
     }
   }, [currentVisualKey, onUpdateVisualTopic, slide]);
 
@@ -1817,7 +1891,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <p className="text-[15px] text-white/60 mb-8">{courseTitle}</p>
               <span className="inline-flex items-center gap-2 bg-white/20 text-white text-[13px] font-semibold px-4 py-2 rounded-full">
                 <Clock className="w-4 h-4" />
-                ~{courseDuration || "15"} min
+                ~{courseDurationMinutes}
               </span>
             </div>
           </div>
@@ -1879,9 +1953,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const scenarioLead = parts.body[0] || parts.hook || narratorExcerpt;
         const scenarioSupport = parts.body[1] || parts.challenge || parts.takeaway || quickFact;
         const summaryBullets = Array.from(new Set(chartSentenceEntries.map((entry) => entry.text))).slice(0, 4);
+        const fallbackChartText = safeLearnerText(parts.hook)
+          || safeLearnerText(narratorExcerpt)
+          || (slide.topicTitle ? `This section covers ${slide.topicTitle}.` : "");
         const safeChartEntries = chartSentenceEntries.length > 0
           ? chartSentenceEntries
-          : [{ text: "Content not available for this section.", tone: "body" as const, sentenceIndex: -1 }];
+          : fallbackChartText
+            ? [{ text: fallbackChartText, tone: "body" as const, sentenceIndex: -1 }]
+            : [];
         const visualState = currentVisualKey ? visualActionState[currentVisualKey] : undefined;
         const visualControls = onUpdateVisualTopic && slide.topicTitle ? (
           <div className="flex items-center gap-2">
@@ -2030,17 +2109,19 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         </div>
                       </div>
 
-                      <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f4f8fc] p-4 shadow-sm">
-                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
-                        <div className="mt-3 space-y-3">
-                          {lessonObjectives.map((objective, index) => (
-                            <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
-                              <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
-                              <span>{objective}</span>
-                            </div>
-                          ))}
+                      {(slide.topicPartIndex || 0) === 0 && lessonObjectives.length > 0 && (
+                        <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f4f8fc] p-4 shadow-sm">
+                          <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
+                          <div className="mt-3 space-y-3">
+                            {lessonObjectives.map((objective, index) => (
+                              <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
+                                <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
+                                <span>{objective}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
                         <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Quick Check</p>
@@ -2049,7 +2130,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           {(currentModuleAssessment?.options || lessonObjectives).slice(0, 3).map((option, index) => (
                             <div key={`${option}-${index}`} className="rounded-xl border border-[#e2e8f0] bg-[#fbfdff] px-3 py-2 text-[13px] text-[#35506f]">
                               <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
-                              {option}
+                              {stripOptionPrefix(option)}
                             </div>
                           ))}
                         </div>
@@ -2191,17 +2272,19 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </div>
 
                     <div className="space-y-4">
-                      <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f4f8fc] p-4 shadow-sm">
-                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
-                        <div className="mt-3 space-y-3">
-                          {lessonObjectives.map((objective, index) => (
-                            <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
-                              <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
-                              <span>{objective}</span>
-                            </div>
-                          ))}
+                      {(slide.topicPartIndex || 0) === 0 && lessonObjectives.length > 0 && (
+                        <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f4f8fc] p-4 shadow-sm">
+                          <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
+                          <div className="mt-3 space-y-3">
+                            {lessonObjectives.map((objective, index) => (
+                              <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
+                                <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
+                                <span>{objective}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                      </div>
+                      )}
 
                       {currentModuleAssessment ? (
                         <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
@@ -2211,7 +2294,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                             {currentModuleAssessment.options.slice(0, 3).map((option, index) => (
                               <div key={`${option}-${index}`} className="rounded-xl border border-[#e2e8f0] bg-[#fbfdff] px-3 py-2 text-[13px] text-[#35506f]">
                                 <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
-                                {option}
+                                {stripOptionPrefix(option)}
                               </div>
                             ))}
                           </div>
@@ -2401,11 +2484,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Tools</p>
                   <div className="mt-3 flex flex-wrap gap-2.5">
                     {[
-                      { key: "quiz" as const, label: "Quiz" },
-                      { key: "fact" as const, label: "Did You Know" },
-                      { key: "takeaway" as const, label: "Key Takeaway" },
-                      { key: "objectives" as const, label: "Objectives" },
-                    ].map((tool) => (
+                      { key: "quiz" as const, label: "Quiz", available: !!currentModuleAssessment },
+                      { key: "fact" as const, label: "Did You Know", available: !!safeLearnerText(quickFact).trim() },
+                      { key: "takeaway" as const, label: "Key Takeaway", available: !!safeLearnerText(parts.takeaway).trim() },
+                      { key: "objectives" as const, label: "Objectives", available: lessonObjectives.length > 0 },
+                    ].filter((tool) => tool.available).map((tool) => (
                       <button
                         key={tool.key}
                         onClick={() => setActiveLearningTool((prev) => (prev === tool.key ? null : tool.key))}
@@ -2422,60 +2505,56 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   </div>
 
                   {activeLearningTool === "objectives" ? (
-                    <div className="mt-3 rounded-xl border border-[#d8e2ef] bg-[#f8fbff] p-3.5">
-                      <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
-                      <div className="mt-2 space-y-2">
-                        {lessonObjectives.length > 0 ? lessonObjectives.map((objective, index) => (
-                          <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
-                            <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
-                            <span>{objective}</span>
-                          </div>
-                        )) : <p className="text-[13px] text-[#607896]">Content not available for this section.</p>}
+                    lessonObjectives.length > 0 ? (
+                      <div className="mt-3 rounded-xl border border-[#d8e2ef] bg-[#f8fbff] p-3.5">
+                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
+                        <div className="mt-2 space-y-2">
+                          {lessonObjectives.map((objective, index) => (
+                            <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
+                              <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
+                              <span>{objective}</span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    ) : null
                   ) : null}
 
-                  {activeLearningTool === "takeaway" ? (
+                  {activeLearningTool === "takeaway" && safeLearnerText(parts.takeaway).trim() ? (
                     <div className="mt-3 rounded-xl border border-[#f3d9a3] bg-[#fffaf3] p-3.5">
                       <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Key Takeaway</p>
-                      <p className="mt-2 text-[13px] leading-relaxed text-[#6f5b35]">{safeLearnerText(parts.takeaway, "Content not available for this section.")}</p>
+                      <p className="mt-2 text-[13px] leading-relaxed text-[#6f5b35]">{safeLearnerText(parts.takeaway)}</p>
                     </div>
                   ) : null}
 
-                  {activeLearningTool === "fact" ? (
+                  {activeLearningTool === "fact" && safeLearnerText(quickFact).trim() ? (
                     <div className="mt-3 rounded-xl border border-[#f2d089] bg-[#fff5d6] p-3.5">
                       <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Did You Know?</p>
-                      <p className="mt-2 text-[13px] leading-relaxed text-[#6f5b35]">{safeLearnerText(quickFact, "Content not available for this section.")}</p>
+                      <p className="mt-2 text-[13px] leading-relaxed text-[#6f5b35]">{safeLearnerText(quickFact)}</p>
                     </div>
                   ) : null}
 
-                  {activeLearningTool === "quiz" ? (
+                  {activeLearningTool === "quiz" && currentModuleAssessment ? (
                     <div className="mt-3 rounded-xl border border-[#d8e2ef] bg-[#fbfdff] p-3.5">
                       <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Interactive Quiz</p>
-                      {currentModuleAssessment ? (
-                        <>
-                          <p className="mt-2 text-[14px] font-[800] leading-snug text-[#123d78]">{currentModuleAssessment.question}</p>
-                          <div className="mt-2 space-y-1.5">
-                            {currentModuleAssessment.options.slice(0, 3).map((option, index) => (
-                              <div key={`${option}-${index}`} className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-[12px] text-[#35506f]">
-                                <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
-                                {option}
-                              </div>
-                            ))}
+                      <p className="mt-2 text-[14px] font-[800] leading-snug text-[#123d78]">{currentModuleAssessment.question}</p>
+                      <div className="mt-2 space-y-1.5">
+                        {currentModuleAssessment.options.slice(0, 3).map((option, index) => (
+                          <div key={`${option}-${index}`} className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-[12px] text-[#35506f]">
+                            <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
+                            {stripOptionPrefix(option)}
                           </div>
-                          {currentModuleAssessmentSlide ? (
-                            <button
-                              onClick={() => navigateToSlide(currentModuleAssessmentSlide.idx)}
-                              className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-[#1d4f93] px-3 text-[12px] font-[800] text-white transition-all hover:bg-[#173f78]"
-                              type="button"
-                            >
-                              Open Quiz
-                            </button>
-                          ) : null}
-                        </>
-                      ) : (
-                        <p className="mt-2 text-[13px] text-[#607896]">Content not available for this section.</p>
-                      )}
+                        ))}
+                      </div>
+                      {currentModuleAssessmentSlide ? (
+                        <button
+                          onClick={() => navigateToSlide(currentModuleAssessmentSlide.idx)}
+                          className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-[#1d4f93] px-3 text-[12px] font-[800] text-white transition-all hover:bg-[#173f78]"
+                          type="button"
+                        >
+                          Open Quiz
+                        </button>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>
@@ -2521,10 +2600,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 <div className="space-y-3">
                   {q.options.map((opt: string, oi: number) => {
                     let style = "border-[#e2e8f0] bg-white hover:bg-[#f0f2f7]";
+                    const optClean = stripOptionPrefix(opt);
+                    const correctClean = stripOptionPrefix(q.correct_answer || "");
                     if (ans?.submitted) {
-                      const isCorrect = opt === q.correct_answer ||
+                      const isCorrect = optClean === correctClean ||
+                        opt === q.correct_answer ||
                         String.fromCharCode(65 + oi) === q.correct_answer ||
-                        q.correct_answer?.includes(opt);
+                        q.correct_answer?.includes(optClean);
                       if (isCorrect) style = "border-emerald-400 bg-emerald-50 text-emerald-800";
                       else if (oi === ans.selected) style = "border-red-400 bg-red-50 text-red-800";
                     } else if (ans?.selected === oi) {
@@ -2538,7 +2620,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         style={{ animationDelay: `${0.2 + oi * 0.08}s` }}
                       >
                         <span className="font-semibold mr-2">{String.fromCharCode(65 + oi)}.</span>
-                        {opt}
+                        {stripOptionPrefix(opt)}
                       </button>
                     );
                   })}
@@ -3068,11 +3150,21 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 text-[12px] font-semibold text-white/70">
-                  <span>{currentModule?.title || courseTitle}</span>
-                  <span>&gt;</span>
-                  <span className="truncate">{shellPageTitle}</span>
+                  <span className="truncate font-[900] text-white">{courseTitle}</span>
+                  {currentModule?.title && currentModule.title !== courseTitle ? (
+                    <>
+                      <span>&gt;</span>
+                      <span className="truncate">{currentModule.title}</span>
+                    </>
+                  ) : null}
+                  {shellPageTitle && shellPageTitle !== currentModule?.title ? (
+                    <>
+                      <span>&gt;</span>
+                      <span className="truncate">{shellPageTitle}</span>
+                    </>
+                  ) : null}
                 </div>
-                <p className="mt-2 text-[24px] font-[900] tracking-tight">{shellPageTitle}</p>
+                <p className="mt-2 text-[24px] font-[900] tracking-tight">{currentModule?.title || shellPageTitle}</p>
                 <p className="mt-1 max-w-[760px] text-[13px] text-white/72">{shellPageSubtitle}</p>
                 {layoutTrimNotice ? (
                   <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#facc15]/55 bg-[#fff7cc] px-3 py-1 text-[11px] font-[900] uppercase tracking-[0.08em] text-[#8a5a00]">
@@ -3169,7 +3261,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-[#48627f]">
                   <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Module {slide.moduleIndex + 1}</span>
                   <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Screen {currentSlide + 1} of {totalSlides}</span>
-                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Estimated {courseDuration || "15min"}</span>
+                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Estimated {courseDurationMinutes}</span>
                 </div>
               </div>
               <div className="rounded-[26px] border border-[#d6e1ef] bg-white/88 px-5 py-4 shadow-sm backdrop-blur">
