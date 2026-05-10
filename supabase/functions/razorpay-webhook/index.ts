@@ -11,7 +11,7 @@
 //   - order.paid        → same as payment.captured
 
 import { handlePreflight } from "../_shared/cors.ts";
-import { ok, badRequest, unauthorized, serverError } from "../_shared/responses.ts";
+import { ok, badRequest, unauthorized, serverError, methodNotAllowed } from "../_shared/responses.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { hmacSha256Hex, timingSafeEqual } from "../_shared/hmac.ts";
 
@@ -20,7 +20,7 @@ const WEBHOOK_SECRET = Deno.env.get("RAZORPAY_WEBHOOK_SECRET");
 Deno.serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
-  if (req.method !== "POST") return badRequest("Method not allowed");
+  if (req.method !== "POST") return methodNotAllowed("POST");
   if (!WEBHOOK_SECRET) return serverError("Webhook secret not configured");
 
   const sig = req.headers.get("x-razorpay-signature");

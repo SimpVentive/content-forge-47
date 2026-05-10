@@ -9,7 +9,7 @@
 // If `id` is present this is an update; otherwise an insert.
 
 import { handlePreflight } from "../_shared/cors.ts";
-import { ok, badRequest, unauthorized, forbidden, serverError } from "../_shared/responses.ts";
+import { ok, badRequest, unauthorized, forbidden, serverError, methodNotAllowed } from "../_shared/responses.ts";
 import { requireAdmin, AuthError } from "../_shared/auth.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { encryptSecret } from "../_shared/encryption.ts";
@@ -25,7 +25,7 @@ type Body = {
 Deno.serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
-  if (req.method !== "POST" && req.method !== "PUT") return badRequest("Method not allowed");
+  if (req.method !== "POST" && req.method !== "PUT") return methodNotAllowed("POST, PUT");
 
   let ctx;
   try {
@@ -42,30 +42,36 @@ Deno.serve(async (req) => {
     return badRequest("Invalid JSON body");
   }
   if (!body.provider_name?.trim()) return badRequest("provider_name required");
-  if (!body.api_key?.trim()) return badRequest("api_key required");
 
-  let encrypted: string;
-  try {
-    encrypted = await encryptSecret(body.api_key);
-  } catch (e) {
-    return serverError("Encryption failed", e instanceof Error ? e.message : String(e));
+  // Insert path requires an api_key. Update path may omit it to keep the
+  // existing encrypted value (e.g. admin toggles is_active or edits notes).
+  const isUpdate = !!body.id;
+  if (!isUpdate && !body.api_key?.trim()) return badRequest("api_key required for new providers");
+
+  let encrypted: string | null = null;
+  if (body.api_key?.trim()) {
+    try {
+      encrypted = await encryptSecret(body.api_key);
+    } catch (e) {
+      return serverError("Encryption failed", e instanceof Error ? e.message : String(e));
+    }
   }
 
   const admin = adminClient();
-  const row = {
+  const baseRow: Record<string, unknown> = {
     provider_name: body.provider_name.trim(),
-    api_key_encrypted: encrypted,
     is_active: body.is_active ?? true,
     config_json: body.config_json ?? null,
     updated_by: ctx.user.id,
     updated_at: new Date().toISOString(),
   };
+  if (encrypted !== null) baseRow.api_key_encrypted = encrypted;
 
-  if (body.id) {
+  if (isUpdate) {
     const { data, error } = await admin
       .from("provider_configs")
-      .update(row)
-      .eq("id", body.id)
+      .update(baseRow)
+      .eq("id", body.id!)
       .select("id, provider_name, is_active, config_json, updated_at")
       .maybeSingle();
     if (error) return serverError("Update failed", error);
@@ -73,9 +79,10 @@ Deno.serve(async (req) => {
     return ok(data);
   }
 
+  // Insert: encrypted is guaranteed non-null by the validation above.
   const { data, error } = await admin
     .from("provider_configs")
-    .insert(row)
+    .insert({ ...baseRow, api_key_encrypted: encrypted! })
     .select("id, provider_name, is_active, config_json, updated_at")
     .single();
   if (error) return serverError("Insert failed", error);

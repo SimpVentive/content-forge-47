@@ -10,7 +10,7 @@
 //   expected = HMAC-SHA256(`${order_id}|${payment_id}`, KEY_SECRET) hex
 
 import { handlePreflight } from "../_shared/cors.ts";
-import { ok, badRequest, unauthorized, forbidden, serverError } from "../_shared/responses.ts";
+import { ok, badRequest, unauthorized, forbidden, serverError, methodNotAllowed } from "../_shared/responses.ts";
 import { getAuthedUser, AuthError } from "../_shared/auth.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { hmacSha256Hex, timingSafeEqual } from "../_shared/hmac.ts";
@@ -26,7 +26,7 @@ type Body = {
 Deno.serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
-  if (req.method !== "POST") return badRequest("Method not allowed");
+  if (req.method !== "POST") return methodNotAllowed("POST");
   if (!RAZORPAY_KEY_SECRET) return serverError("Razorpay not configured");
 
   let ctx;

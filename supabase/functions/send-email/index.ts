@@ -9,7 +9,7 @@
 // from-address (e.g. "ContentForge <hello@contentforge.app>").
 
 import { handlePreflight } from "../_shared/cors.ts";
-import { ok, badRequest, unauthorized, forbidden, serverError } from "../_shared/responses.ts";
+import { ok, badRequest, unauthorized, forbidden, serverError, methodNotAllowed } from "../_shared/responses.ts";
 import { getAuthedUser, AuthError } from "../_shared/auth.ts";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
@@ -68,7 +68,7 @@ Amount: ₹${params.amount_inr ? Number(params.amount_inr).toLocaleString("en-IN
 Deno.serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
-  if (req.method !== "POST") return badRequest("Method not allowed");
+  if (req.method !== "POST") return methodNotAllowed("POST");
   if (!RESEND_API_KEY) return serverError("RESEND_API_KEY not configured");
 
   // Allow either an admin JWT or the service-role key (for inter-function calls).

@@ -10,7 +10,7 @@
 // generation pipeline can surface a clean error to the user.
 
 import { handlePreflight } from "../_shared/cors.ts";
-import { ok, badRequest, unauthorized, forbidden, serverError } from "../_shared/responses.ts";
+import { ok, badRequest, unauthorized, forbidden, serverError, methodNotAllowed } from "../_shared/responses.ts";
 import { getAuthedUser, AuthError } from "../_shared/auth.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -20,7 +20,7 @@ type Body = { amount?: number; reason?: string };
 Deno.serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
-  if (req.method !== "POST") return badRequest("Method not allowed");
+  if (req.method !== "POST") return methodNotAllowed("POST");
 
   let ctx;
   try {

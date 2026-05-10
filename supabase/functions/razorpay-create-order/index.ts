@@ -7,7 +7,7 @@
 // frontend Razorpay JS SDK needs to open the checkout.
 
 import { handlePreflight } from "../_shared/cors.ts";
-import { ok, badRequest, serverError, unauthorized, forbidden } from "../_shared/responses.ts";
+import { ok, badRequest, serverError, unauthorized, forbidden, methodNotAllowed } from "../_shared/responses.ts";
 import { getAuthedUser, AuthError } from "../_shared/auth.ts";
 import { adminClient } from "../_shared/supabase.ts";
 
@@ -23,7 +23,7 @@ type Body = {
 Deno.serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
-  if (req.method !== "POST") return badRequest("Method not allowed");
+  if (req.method !== "POST") return methodNotAllowed("POST");
 
   if (!RAZORPAY_KEY_ID || !RAZORPAY_KEY_SECRET) {
     return serverError("Razorpay not configured");

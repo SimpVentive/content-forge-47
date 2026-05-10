@@ -12,7 +12,7 @@
 // switch below to add more.
 
 import { handlePreflight } from "../_shared/cors.ts";
-import { ok, badRequest, unauthorized, forbidden, notFound, serverError } from "../_shared/responses.ts";
+import { ok, badRequest, unauthorized, forbidden, notFound, serverError, methodNotAllowed } from "../_shared/responses.ts";
 import { requireAdmin, AuthError } from "../_shared/auth.ts";
 import { adminClient } from "../_shared/supabase.ts";
 import { decryptSecret } from "../_shared/encryption.ts";
@@ -73,7 +73,7 @@ const probe = async (providerName: string, key: string): Promise<ProbeResult> =>
 Deno.serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
-  if (req.method !== "POST") return badRequest("Method not allowed");
+  if (req.method !== "POST") return methodNotAllowed("POST");
 
   try {
     await requireAdmin(req);

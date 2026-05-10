@@ -23,5 +23,11 @@ export const notFound = (message = "Not found") =>
 export const conflict = (message: string) =>
   json({ ok: false, error: { code: "conflict", message } }, 409);
 
+export const methodNotAllowed = (allowed: string) =>
+  new Response(
+    JSON.stringify({ ok: false, error: { code: "method_not_allowed", message: `Method not allowed (expected ${allowed})` } }),
+    { status: 405, headers: { ...corsHeaders, "content-type": "application/json", allow: allowed } },
+  );
+
 export const serverError = (message: string, details?: unknown) =>
   json({ ok: false, error: { code: "server_error", message, details } }, 500);

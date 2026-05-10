@@ -8,7 +8,7 @@
 // Returns 404 if the PDF hasn't been generated yet (path is null).
 
 import { handlePreflight } from "../_shared/cors.ts";
-import { ok, badRequest, unauthorized, forbidden, notFound, serverError } from "../_shared/responses.ts";
+import { ok, badRequest, unauthorized, forbidden, notFound, serverError, methodNotAllowed } from "../_shared/responses.ts";
 import { getAuthedUser, AuthError } from "../_shared/auth.ts";
 import { adminClient } from "../_shared/supabase.ts";
 
@@ -18,7 +18,7 @@ const SIGNED_URL_TTL_SECONDS = 60 * 5; // 5 minutes
 Deno.serve(async (req) => {
   const pre = handlePreflight(req);
   if (pre) return pre;
-  if (req.method !== "GET") return badRequest("Method not allowed");
+  if (req.method !== "GET") return methodNotAllowed("GET");
 
   let ctx;
   try {
