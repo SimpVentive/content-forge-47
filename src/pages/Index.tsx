@@ -43,7 +43,7 @@ const VideoClipWorkflow = lazy(() =>
 );
 
 const Index = () => {
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, isAdmin } = useAuth();
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
   const [inputText, setInputText] = useState(SAMPLE_NOTES);
   const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(
@@ -198,6 +198,14 @@ const Index = () => {
     }
 
     const estimated = estimateMinutesFromText(inputText);
+
+    // Admins bypass credit checks and deductions (for internal testing).
+    if (isAdmin) {
+      runPipeline(courseTitle, inputText, agentToggles, params);
+      toast.success("Admin run — credits not deducted");
+      return;
+    }
+
     const availableCredits = (profile?.credits_total ?? 0) - (profile?.credits_used ?? 0);
 
     if (estimated > availableCredits) {
