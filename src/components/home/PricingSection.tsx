@@ -1,5 +1,9 @@
-import { Check, Shield, FileText } from "lucide-react";
+import { Check, Shield, FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/edgeFunctions";
 
 type Pack = { id: string; credits: number; price: number; perCredit: number; tag: string | null };
 
@@ -11,10 +15,56 @@ const PACKS: Pack[] = [
 ];
 
 export const PricingSection = () => {
-  const handleBuy = (pack: Pack) => {
-    toast("Coming soon", {
-      description: `${pack.credits} credits for ₹${pack.price.toLocaleString("en-IN")} — payments will be live shortly.`,
-    });
+  const { isAuthenticated, refreshProfile } = useAuth();
+  const navigate = useNavigate();
+  const [processingPack, setProcessingPack] = useState<string | null>(null);
+
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    document.body.appendChild(script);
+    return () => document.body.removeChild(script);
+  }, []);
+
+  const handleBuy = async (pack: Pack) => {
+    if (!isAuthenticated) {
+      navigate("/signup");
+      return;
+    }
+
+    setProcessingPack(pack.id);
+    try {
+      const orderRes = await createRazorpayOrder(pack.credits, pack.price, `order-${Date.now()}`);
+
+      const rzp = (window as any).Razorpay;
+      if (!rzp) {
+        throw new Error("Razorpay not loaded");
+      }
+
+      new rzp({
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        order_id: orderRes.order_id,
+        handler: async (response: any) => {
+          try {
+            await verifyRazorpayPayment(
+              response.razorpay_order_id,
+              response.razorpay_payment_id,
+              response.razorpay_signature
+            );
+            await refreshProfile();
+            toast.success(`${pack.credits} credits added! Check your account.`);
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Payment verification failed");
+          }
+        },
+        prefill: { contact: "" },
+      }).open();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to initiate payment");
+    } finally {
+      setProcessingPack(null);
+    }
   };
 
   return (
@@ -60,12 +110,20 @@ export const PricingSection = () => {
 
                 <button
                   data-testid={`buy-now-${pack.credits}`}
-                  onClick={() => handleBuy(pack)}
-                  className={`mt-auto w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors ${
-                    isHighlight ? "bg-indigo-600 text-white hover:bg-indigo-700" : "bg-slate-900 text-white hover:bg-slate-800"
+                  onClick={() => void handleBuy(pack)}
+                  disabled={processingPack !== null}
+                  className={`mt-auto w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${
+                    isHighlight ? "bg-indigo-600 text-white hover:bg-indigo-700 disabled:hover:bg-indigo-600" : "bg-slate-900 text-white hover:bg-slate-800 disabled:hover:bg-slate-900"
                   }`}
                 >
-                  Buy now
+                  {processingPack === pack.id ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Buy now"
+                  )}
                 </button>
               </div>
             );

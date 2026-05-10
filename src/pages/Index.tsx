@@ -20,6 +20,9 @@ import {
   type CourseDraft,
 } from "@/lib/courseDrafts";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal";
+import { spendCredits } from "@/lib/edgeFunctions";
 
 const LearnerPreview = lazy(() =>
   import("@/components/contentforge/LearnerPreview").then((module) => ({
@@ -40,6 +43,7 @@ const VideoClipWorkflow = lazy(() =>
 );
 
 const Index = () => {
+  const { profile, refreshProfile } = useAuth();
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
   const [inputText, setInputText] = useState(SAMPLE_NOTES);
   const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(
@@ -54,6 +58,8 @@ const Index = () => {
   const [showDraftsPanel, setShowDraftsPanel] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<CourseDraft[]>([]);
+  const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
+  const [requiredCredits, setRequiredCredits] = useState(0);
   const prevIsRunning = useRef(false);
 
   const {
@@ -182,7 +188,7 @@ const Index = () => {
     toast.success("Started a new course");
   };
 
-  const handleParamsConfirm = (params: CourseParameters) => {
+  const handleParamsConfirm = async (params: CourseParameters) => {
     setCourseParams(params);
     setShowParamsDialog(false);
     if (!params.assessmentRequired) {
@@ -190,7 +196,24 @@ const Index = () => {
     } else {
       setAgentToggles((prev) => ({ ...prev, assessment: true }));
     }
-    runPipeline(courseTitle, inputText, agentToggles, params);
+
+    const estimated = estimateMinutesFromText(inputText);
+    const availableCredits = (profile?.credits_total ?? 0) - (profile?.credits_used ?? 0);
+
+    if (estimated > availableCredits) {
+      setRequiredCredits(estimated);
+      setShowInsufficientCredits(true);
+      return;
+    }
+
+    try {
+      await spendCredits(estimated, "course_generation");
+      await refreshProfile();
+      runPipeline(courseTitle, inputText, agentToggles, params);
+      toast.success(`${estimated} credits deducted`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to deduct credits");
+    }
   };
 
   const hasRun = logs.length > 0;
@@ -210,6 +233,11 @@ const Index = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
+      <InsufficientCreditsModal
+        open={showInsufficientCredits}
+        requiredCredits={requiredCredits}
+        onClose={() => setShowInsufficientCredits(false)}
+      />
       <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6 relative">
         <div className="flex items-center gap-2.5">
           <div className="flex items-center justify-center">
@@ -237,6 +265,10 @@ const Index = () => {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 text-sm font-medium text-slate-700">
+            <Clock3 className="w-4 h-4" />
+            <span>{(profile?.credits_total ?? 0) - (profile?.credits_used ?? 0)} credits</span>
+          </div>
           {hasOutput && (
             <button
               onClick={() => setShowLearnerPreview(true)}
