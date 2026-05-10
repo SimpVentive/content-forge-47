@@ -15,6 +15,7 @@ const Help = lazy(() => import("./pages/Help"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
 const Signup = lazy(() => import("./pages/Signup"));
+const TypeSelector = lazy(() => import("./components/TypeSelector").then(m => ({ default: m.TypeSelector })));
 const AdminShell = lazy(() => import("./components/admin/AdminShell"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminUsers = lazy(() => import("./pages/admin/Users"));
@@ -39,6 +40,7 @@ const App = () => (
               <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
               <Route path="/help" element={<PublicRoute><Help /></PublicRoute>} />
               <Route path="/welcome" element={<Welcome />} />
+              <Route path="/new-course" element={<ProtectedRoute><TypeSelector /></ProtectedRoute>} />
               <Route path="/studio" element={<Index />} />
               <Route path="/forge" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/admin" element={<AdminRoute><AdminShell /></AdminRoute>}>

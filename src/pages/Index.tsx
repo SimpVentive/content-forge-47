@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import type { CourseParameters } from "@/components/contentforge/CourseParametersDialog";
 import { estimateMinutesFromText } from "@/components/contentforge/Sidebar";
 import { Sidebar } from "@/components/contentforge/Sidebar";
@@ -44,6 +45,10 @@ const VideoClipWorkflow = lazy(() =>
 
 const Index = () => {
   const { profile, refreshProfile } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const learningType = (location.state as any)?.learningType || "static";
+
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
   const [inputText, setInputText] = useState(SAMPLE_NOTES);
   const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(
@@ -179,6 +184,10 @@ const Index = () => {
   };
 
   const handleNewCourse = () => {
+    navigate("/new-course");
+  };
+
+  const handleNewCourseHere = () => {
     setCurrentDraftId(null);
     setCourseTitle("");
     setInputText("");
@@ -265,6 +274,11 @@ const Index = () => {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 text-sm font-medium text-blue-700 border border-blue-200">
+            <span className="capitalize text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-200">
+              {learningType === "video" ? "🎥 Video" : "📊 Static"}
+            </span>
+          </div>
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 text-sm font-medium text-slate-700">
             <Clock3 className="w-4 h-4" />
             <span>{(profile?.credits_total ?? 0) - (profile?.credits_used ?? 0)} credits</span>
