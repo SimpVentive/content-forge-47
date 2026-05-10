@@ -14,6 +14,7 @@ const Index = lazy(() => import("./pages/Index"));
 const Help = lazy(() => import("./pages/Help"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Signup = lazy(() => import("./pages/Signup"));
 const TypeSelector = lazy(() => import("./components/TypeSelector").then(m => ({ default: m.TypeSelector })));
 const AdminShell = lazy(() => import("./components/admin/AdminShell"));
@@ -37,11 +38,12 @@ const App = () => (
             <Routes>
               <Route path="/" element={<PublicRoute><HomePage /></PublicRoute>} />
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
               <Route path="/help" element={<PublicRoute><Help /></PublicRoute>} />
               <Route path="/welcome" element={<Welcome />} />
               <Route path="/new-course" element={<ProtectedRoute><TypeSelector /></ProtectedRoute>} />
-              <Route path="/studio" element={<Index />} />
+              <Route path="/studio" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/forge" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/admin" element={<AdminRoute><AdminShell /></AdminRoute>}>
                 <Route index element={<AdminDashboard />} />

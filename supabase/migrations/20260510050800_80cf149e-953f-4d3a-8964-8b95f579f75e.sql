@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_single_admin_idx ON public.profiles ((role)) WHERE role = 'admin';
