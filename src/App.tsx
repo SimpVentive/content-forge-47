@@ -14,6 +14,7 @@ const Index = lazy(() => import("./pages/Index"));
 const Help = lazy(() => import("./pages/Help"));
 const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
+const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Signup = lazy(() => import("./pages/Signup"));
 const AdminShell = lazy(() => import("./components/admin/AdminShell"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -36,6 +37,7 @@ const App = () => (
             <Routes>
               <Route path="/" element={<PublicRoute><HomePage /></PublicRoute>} />
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+              <Route path="/admin/login" element={<AdminLogin />} />
               <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
               <Route path="/help" element={<PublicRoute><Help /></PublicRoute>} />
               <Route path="/welcome" element={<Welcome />} />
