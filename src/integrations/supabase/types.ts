@@ -14,160 +14,163 @@ export type Database = {
   }
   public: {
     Tables: {
-      profiles: {
-        Row: {
-          id: string
-          email: string
-          full_name: string | null
-          phone: string | null
-          account_type: "individual" | "organization"
-          organization_name: string | null
-          role: "user" | "admin"
-          credits_total: number
-          credits_used: number
-          plan: string
-          status: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id: string
-          email: string
-          full_name?: string | null
-          phone?: string | null
-          account_type?: "individual" | "organization"
-          organization_name?: string | null
-          role?: "user" | "admin"
-          credits_total?: number
-          credits_used?: number
-          plan?: string
-          status?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          email?: string
-          full_name?: string | null
-          phone?: string | null
-          account_type?: "individual" | "organization"
-          organization_name?: string | null
-          role?: "user" | "admin"
-          credits_total?: number
-          credits_used?: number
-          plan?: string
-          status?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       billing_transactions: {
         Row: {
+          amount_inr: number
+          created_at: string
+          credits_purchased: number
           id: string
-          user_id: string
           razorpay_order_id: string | null
           razorpay_payment_id: string | null
-          amount_inr: number
-          credits_purchased: number
-          status: "created" | "paid" | "failed"
-          created_at: string
+          status: string
+          user_id: string
         }
         Insert: {
+          amount_inr: number
+          created_at?: string
+          credits_purchased: number
           id?: string
-          user_id: string
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
-          amount_inr: number
-          credits_purchased: number
-          status?: "created" | "paid" | "failed"
-          created_at?: string
+          status?: string
+          user_id: string
         }
         Update: {
+          amount_inr?: number
+          created_at?: string
+          credits_purchased?: number
           id?: string
-          user_id?: string
           razorpay_order_id?: string | null
           razorpay_payment_id?: string | null
-          amount_inr?: number
-          credits_purchased?: number
-          status?: "created" | "paid" | "failed"
-          created_at?: string
+          status?: string
+          user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "billing_transactions_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          }
-        ]
-      }
-      provider_configs: {
-        Row: {
-          id: string
-          provider_name: string
-          api_key_encrypted: string
-          is_active: boolean
-          config_json: Json | null
-          updated_by: string | null
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          provider_name: string
-          api_key_encrypted: string
-          is_active?: boolean
-          config_json?: Json | null
-          updated_by?: string | null
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          provider_name?: string
-          api_key_encrypted?: string
-          is_active?: boolean
-          config_json?: Json | null
-          updated_by?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "provider_configs_updated_by_fkey"
-            columns: ["updated_by"]
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          }
+          },
         ]
       }
       conversations: {
         Row: {
-          id: string
-          user_id: string
-          subject: string
-          status: "open" | "resolved"
           created_at: string
+          id: string
+          status: string
+          subject: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          user_id: string
-          subject: string
-          status?: "open" | "resolved"
           created_at?: string
+          id?: string
+          status?: string
+          subject: string
+          user_id: string
         }
         Update: {
-          id?: string
-          user_id?: string
-          subject?: string
-          status?: "open" | "resolved"
           created_at?: string
+          id?: string
+          status?: string
+          subject?: string
+          user_id?: string
         }
         Relationships: [
           {
             foreignKeyName: "conversations_user_id_fkey"
             columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
-          }
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          account_type: string
+          created_at: string
+          credits_total: number
+          credits_used: number
+          email: string
+          full_name: string | null
+          id: string
+          organization_name: string | null
+          phone: string | null
+          plan: string
+          role: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          account_type?: string
+          created_at?: string
+          credits_total?: number
+          credits_used?: number
+          email: string
+          full_name?: string | null
+          id: string
+          organization_name?: string | null
+          phone?: string | null
+          plan?: string
+          role?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          account_type?: string
+          created_at?: string
+          credits_total?: number
+          credits_used?: number
+          email?: string
+          full_name?: string | null
+          id?: string
+          organization_name?: string | null
+          phone?: string | null
+          plan?: string
+          role?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      provider_configs: {
+        Row: {
+          api_key_encrypted: string
+          config_json: Json | null
+          id: string
+          is_active: boolean
+          provider_name: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          api_key_encrypted: string
+          config_json?: Json | null
+          id?: string
+          is_active?: boolean
+          provider_name: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          api_key_encrypted?: string
+          config_json?: Json | null
+          id?: string
+          is_active?: boolean
+          provider_name?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "provider_configs_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -175,10 +178,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      is_admin: {
-        Args: { uid: string }
-        Returns: boolean
-      }
+      is_admin: { Args: { uid: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
