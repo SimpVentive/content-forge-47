@@ -41,7 +41,7 @@ const App = () => (
               <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
               <Route path="/help" element={<PublicRoute><Help /></PublicRoute>} />
               <Route path="/welcome" element={<Welcome />} />
-              <Route path="/studio" element={<Index />} />
+              <Route path="/studio" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/forge" element={<ProtectedRoute><Index /></ProtectedRoute>} />
               <Route path="/admin" element={<AdminRoute><AdminShell /></AdminRoute>}>
                 <Route index element={<AdminDashboard />} />
