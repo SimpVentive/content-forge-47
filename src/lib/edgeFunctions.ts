@@ -30,7 +30,7 @@ export async function spendCredits(amount: number, reason?: string) {
 }
 
 export async function createRazorpayOrder(creditsPurchased: number, amountInrPaise: number, receipt?: string) {
-  return callEdgeFunction("razorpay-create-order", { credits_purchased: creditsPurchased, amount_inr_paise: amountInrPaise, receipt });
+  return callEdgeFunction<{ order_id: string }>("razorpay-create-order", { credits_purchased: creditsPurchased, amount_inr_paise: amountInrPaise, receipt });
 }
 
 export async function verifyRazorpayPayment(orderId: string, paymentId: string, signature: string) {
