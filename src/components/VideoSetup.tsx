@@ -2,12 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Upload } from "lucide-react";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
-
-interface VideoSettings {
-  selectedAvatar: "rachel" | "josh" | "anna" | string;
-  videoQuality: "720p" | "1080p" | "4k";
-  backgroundStyle: "simple" | "office" | "classroom";
-}
+import { useContentForge } from "@/hooks/ContentForgeContext";
 
 const avatars = [
   { id: "rachel", name: "Rachel", role: "Professional Female" },
@@ -27,16 +22,18 @@ const backgrounds = [
   { id: "classroom", label: "Classroom - Educational", desc: "Classroom or training room" },
 ];
 
-export const VideoSetup = ({ onContinue, isSOP = false }: { onContinue: (settings: VideoSettings) => void; isSOP?: boolean }) => {
+export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
   const navigate = useNavigate();
-  const [settings, setSettings] = useState<VideoSettings>({
+  const { setVideoSettings } = useContentForge();
+  const [settings, setSettings] = useState({
     selectedAvatar: "rachel",
     videoQuality: "1080p",
     backgroundStyle: "office",
   });
 
   const handleContinue = () => {
-    onContinue(settings);
+    setVideoSettings(settings);
+    navigate("/forge", { state: { learningType: "video" } });
   };
 
   return (

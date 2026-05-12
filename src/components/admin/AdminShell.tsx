@@ -68,6 +68,17 @@ const NAV: NavSection[] = [
           </svg>
         ),
       },
+      {
+        to: "/admin/settings",
+        name: "Video Settings",
+        tid: "nav-settings",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.2" />
+            <path d="M7 1v2M7 11v2M13 7h-2M3 7H1M11.1 2.9L9.7 4.3M4.3 9.7L2.9 11.1M11.1 11.1L9.7 9.7M4.3 4.3L2.9 2.9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        ),
+      },
     ],
   },
   {
