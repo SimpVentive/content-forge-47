@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useContentForge } from "@/hooks/ContentForgeContext";
 import type { CourseParameters } from "@/components/contentforge/CourseParametersDialog";
 import { estimateMinutesFromText } from "@/components/contentforge/Sidebar";
 import { Sidebar } from "@/components/contentforge/Sidebar";
@@ -48,11 +49,19 @@ const Index = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const learningType = (location.state as any)?.learningType || "static";
+  const { videoSettings, learningMode, setLearningMode } = useContentForge();
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
   const [inputText, setInputText] = useState(SAMPLE_NOTES);
-  const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(
-    Object.fromEntries(AGENTS.map((a) => [a.id, true]))
-  );
+  const [agentToggles, setAgentToggles] = useState<Record<string, boolean>>(() => {
+    const base = Object.fromEntries(AGENTS.map((a) => [a.id, true]));
+    if (learningType === "video") {
+      // animation, youtube, compliance are static-only
+      base.animation = false;
+      base.youtube = false;
+      base.compliance = false;
+    }
+    return base;
+  });
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [showParamsDialog, setShowParamsDialog] = useState(false);
   const [courseParams, setCourseParams] = useState<CourseParameters | null>(null);
@@ -89,12 +98,29 @@ const Index = () => {
     void refreshDrafts();
   }, []);
 
+  // Sync learningMode from learningType on mount
   useEffect(() => {
-    if (prevIsRunning.current && !isRunning && rawOutputs.youtube) {
-      setTimeout(() => setShowVideoWorkflow(true), 800);
+    if (learningType === "video" && learningMode === "static_elearning") {
+      setLearningMode("video_learning");
+    }
+  }, [learningType]);
+
+  useEffect(() => {
+    if (prevIsRunning.current && !isRunning) {
+      if (rawOutputs.heygenVideos) {
+        // Video mode complete — route to preview
+        try {
+          const videos = JSON.parse(rawOutputs.heygenVideos);
+          navigate("/preview/videos", { state: { videos, courseTitle } });
+        } catch {
+          // parse failed; stay on page
+        }
+      } else if (rawOutputs.youtube) {
+        setTimeout(() => setShowVideoWorkflow(true), 800);
+      }
     }
     prevIsRunning.current = isRunning;
-  }, [isRunning, rawOutputs.youtube]);
+  }, [isRunning, rawOutputs.youtube, rawOutputs.heygenVideos]);
 
   useEffect(() => {
     if (!isRunning) {
@@ -205,11 +231,24 @@ const Index = () => {
       setAgentToggles((prev) => ({ ...prev, assessment: true }));
     }
 
+    // For video mode: verify HeyGen is configured
+    if (learningType === "video") {
+      const heygenConfig = JSON.parse(localStorage.getItem("heygenSettings") || "{}");
+      if (!heygenConfig?.apiKey) {
+        toast.warning("Video generation not configured. Contact admin to set up HeyGen API.");
+        return;
+      }
+    }
+
     const estimated = estimateMinutesFromText(inputText);
 
     // Admins bypass credit checks and deductions (for internal testing).
     if (isAdmin) {
-      runPipeline(courseTitle, inputText, agentToggles, params);
+      runPipeline(courseTitle, inputText, agentToggles, {
+        ...params,
+        learningMode: learningMode,
+        videoSettings: learningType === "video" ? videoSettings : undefined,
+      });
       toast.success("Admin run — credits not deducted");
       return;
     }
@@ -225,7 +264,11 @@ const Index = () => {
     try {
       await spendCredits(estimated, "course_generation");
       await refreshProfile();
-      runPipeline(courseTitle, inputText, agentToggles, params);
+      runPipeline(courseTitle, inputText, agentToggles, {
+        ...params,
+        learningMode: learningMode,
+        videoSettings: learningType === "video" ? videoSettings : undefined,
+      });
       toast.success(`${estimated} credits deducted`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to deduct credits");
@@ -286,6 +329,13 @@ const Index = () => {
               {learningType === "video" ? "🎥 Video" : "📊 Static"}
             </span>
           </div>
+          {learningType === "video" && videoSettings && (
+            <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 leading-tight">
+              <span className="font-semibold">Avatar:</span> {videoSettings.selectedAvatar} ·{" "}
+              <span className="font-semibold">Q:</span> {videoSettings.videoQuality} ·{" "}
+              <a href="/setup/video" className="underline text-cyan-600 ml-1">Change</a>
+            </div>
+          )}
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 text-sm font-medium text-slate-700">
             <Clock3 className="w-4 h-4" />
             <span>{(profile?.credits_total ?? 0) - (profile?.credits_used ?? 0)} credits</span>

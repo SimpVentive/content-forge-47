@@ -1,6 +1,8 @@
 import { useState, useCallback, useRef } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
+import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
+import { getAgentModeInstructions } from "@/lib/videoModeService";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -639,7 +641,7 @@ export function useAgentPipeline() {
     setLogs([]);
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number }) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: "static_elearning" | "video_learning" | "sop_video"; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string } }) => {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const languageDirective = buildLanguageDirective(textLanguage, narratorLanguage);
@@ -674,6 +676,31 @@ export function useAgentPipeline() {
     const instructionalPatternGuidance = getInstructionalPatternGuidance(durationMinutes, params?.level);
     const assessmentLevelGuidance = getAssessmentLevelGuidance(params?.level);
     const levelCalibration = getLevelCalibration(params?.level);
+
+    // Video mode setup
+    const learningMode = params?.learningMode || "static_elearning";
+    const isVideoMode = learningMode !== "static_elearning";
+    const videoSettings = params?.videoSettings;
+
+    // Helper functions for video mode
+    const extractModuleScript = (voiceParsed: any, writerRes: string, moduleTitle: string, moduleIndex: number): string => {
+      if (voiceParsed) {
+        const modules = voiceParsed.modules || voiceParsed.narration_modules || [];
+        const match = modules[moduleIndex] || modules.find((m: any) =>
+          (m.module_title || m.title || "").toLowerCase().includes(moduleTitle.toLowerCase().slice(0, 20))
+        );
+        if (match?.narration || match?.script) return match.narration || match.script;
+      }
+      const sectionRegex = new RegExp(`## ${escapeRegex(moduleTitle)}([\\s\\S]*?)(?=^## |$)`, "mi");
+      const match = writerRes.match(sectionRegex);
+      return match?.[1]?.trim() || writerRes.slice(0, 2000);
+    };
+    const stripVideoMarkers = (script: string): string => {
+      return script.replace(/\[(VIDEO CUE|ACTION|PAUSE [0-9]+s|WHITEBOARD|DIAGRAM TYPE):[^\]]*\]/gi, "").replace(/\s{2,}/g, " ").trim();
+    };
+    const escapeRegex = (s: string): string => {
+      return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    };
 
     cancelledRef.current = false;
     setIsRunning(true);
@@ -844,11 +871,16 @@ OUTPUT FORMAT — ABSOLUTE:
 
       Write content that feels expensive, practical, and memorable — something a learner would actually respect, not skim out of obligation.`;
 
+        // Append video mode instructions if needed
+        const writerSystemPromptWithMode = isVideoMode
+          ? `${writerSystemPrompt}\n\n[EXECUTION MODE: ${learningMode}]\n${getAgentModeInstructions("writer", learningMode as any)}`
+          : writerSystemPrompt;
+
         if (parsedModules.length === 0) {
           // Fallback: single call if we can't parse modules
           addLog("Writer Agent: Drafting all content...");
           writerResult = await runAgentWithLanguage(
-            writerSystemPrompt,
+            writerSystemPromptWithMode,
             `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nPlanned Topic Count: ${totalTopics}\n\nDuration Plan:\n${summarizeDurationPlan(durationPlan)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"} and reach approximately ${targetNarrationWords} words in total.`,
             addLog, "Writer Agent"
           );
@@ -874,7 +906,7 @@ OUTPUT FORMAT — ABSOLUTE:
             addLog(`Writer Agent: Drafting Module ${mi + 1}/${parsedModules.length} — ${modTitle}...`);
 
             const moduleContentRaw = await runAgentWithLanguage(
-              writerSystemPrompt,
+              writerSystemPromptWithMode,
               `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nModule Runtime Target: ${moduleDurationPlan?.targetMinutes ?? "auto"} minutes\nModule Word Budget: ${moduleDurationPlan?.targetWords ?? "auto"} words\nModule Topic Word Range: ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange}\nTopics:\n${topics}\n\nStructured Topic Blueprint JSON (FOR YOUR REFERENCE ONLY — DO NOT ECHO):\n${topicBlueprint}\n\nDuration Plan JSON (FOR YOUR REFERENCE ONLY — DO NOT ECHO):\n${JSON.stringify(moduleDurationPlan || null, null, 2)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging MARKDOWN PROSE for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange} words minimum. NEVER output JSON or code blocks — output flowing prose only. Your first character must be "#".`,
               addLog, "Writer Agent"
             );
@@ -1173,8 +1205,9 @@ OUTPUT FORMAT — ABSOLUTE:
       if (toggles["voice"] !== false) {
         setStatus("voice", "running");
         addLog("Voice Agent: Reformatting script for narration...");
+        const voiceSystemPrompt = `${languageDirective}You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at ${NARRATION_WORDS_PER_MINUTE} words per minute. Preserve section structure, and keep the overall read-time within +/- ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target unless the script makes that impossible. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }${isVideoMode ? `\n\n[EXECUTION MODE: ${learningMode}]\n${getAgentModeInstructions("voice_narration", learningMode as any)}` : ""}`;
         voiceResult = await runAgentWithLanguage(
-          `${languageDirective}You are a Voice and Narration Agent. Given a course script, reformat it as a professional narration script optimised for text-to-speech or voice recording. The narration language must be ${narratorLanguage}. If the source script is in a different language, translate it naturally while preserving meaning. For each section: (1) rewrite the script with natural spoken-word phrasing (shorter sentences, contractions, conversational), (2) add SSML-style narration cues in brackets like [PAUSE 1s], [EMPHASIZE], [SLOW DOWN], (3) estimate word count and approximate read time at ${NARRATION_WORDS_PER_MINUTE} words per minute. Preserve section structure, and keep the overall read-time within +/- ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target unless the script makes that impossible. Return the full narration script with cues and a summary: { total_words, estimated_duration_minutes, sections: [{ title, narration_text, word_count }] }`,
+          voiceSystemPrompt,
           `Script:\n${writerResult}\n\nOn-screen text language: ${textLanguage}\nNarrator language: ${narratorLanguage}\nTarget Duration Minutes: ${durationMinutes}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}`,
           addLog, "Voice Agent"
         );
@@ -1238,6 +1271,67 @@ OUTPUT FORMAT — ABSOLUTE:
         addLog(`Voice Agent: Complete. ${durationMsg}`);
       } else {
         setStatus("voice", "idle");
+      }
+
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
+
+      // ──── VIDEO GENERATION (video modes only) ────
+      let heygenVideosResult: GeneratedVideo[] = [];
+      if (isVideoMode && !isCancelled()) {
+        addLog("HeyGen Video Agent: Starting video generation...");
+        try {
+          const heygenConfig = JSON.parse(localStorage.getItem("heygenSettings") || "{}");
+          if (!heygenConfig?.apiKey) {
+            throw new Error("HeyGen API not configured. Contact admin.");
+          }
+
+          // Parse modules from architect output
+          const archParsed = tryParseJson(archResult) || {};
+          const modules: any[] = archParsed.modules || archParsed.course_modules || [];
+
+          const voiceIdMap: Record<string, string> = {
+            rachel: "Rachel_public_3_20240108",
+            josh: "josh_lite3_20230714",
+            anna: "Daisy-inskirt-20220818",
+          };
+          const avatarId = videoSettings?.selectedAvatar || heygenConfig.defaultAvatar || "rachel";
+          const voiceId = voiceIdMap[avatarId] || voiceIdMap["rachel"];
+
+          // Parse voice output for per-module narration
+          const voiceParsed = tryParseJson(voiceResult);
+
+          for (let i = 0; i < modules.length; i++) {
+            if (isCancelled()) break;
+            const mod = modules[i];
+            const moduleTitle = mod.module_title || mod.title || `Module ${i + 1}`;
+
+            // Extract narration: prefer voice JSON narration for module, fall back to writer text
+            const script = extractModuleScript(voiceParsed, writerResult, moduleTitle, i);
+
+            addLog(`HeyGen Video Agent: Generating "${moduleTitle}" (${i + 1}/${modules.length})...`);
+            const pending = await generateHeyGenVideo({
+              avatarId,
+              script: stripVideoMarkers(script),
+              voiceId,
+              backgroundStyle: (videoSettings?.backgroundStyle || heygenConfig.defaultBackground || "office") as any,
+              quality: (videoSettings?.videoQuality || heygenConfig.defaultVideoQuality || "1080p") as any,
+              videoTitle: moduleTitle,
+            });
+
+            addLog(`HeyGen Video Agent: Polling completion for "${moduleTitle}"...`);
+            const videoUrl = await pollForVideoCompletion(pending.videoId, 120, 5000);
+            heygenVideosResult.push({ ...pending, videoUrl, status: "ready" });
+          }
+
+          setRawOutputs((prev) => ({ ...prev, heygenVideos: JSON.stringify(heygenVideosResult) }));
+          addLog(`HeyGen Video Agent: Complete. ${heygenVideosResult.length} video(s) ready.`);
+        } catch (err) {
+          addLog(`HeyGen Video Agent: Error — ${(err as Error).message}`);
+          // Store failed placeholder so Index.tsx can still navigate if needed
+          if (heygenVideosResult.length > 0) {
+            setRawOutputs((prev) => ({ ...prev, heygenVideos: JSON.stringify(heygenVideosResult) }));
+          }
+        }
       }
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }

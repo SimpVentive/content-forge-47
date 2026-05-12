@@ -34,9 +34,9 @@ export function getAgentModeInstructions(agentName: string, mode: VideoMode): st
     },
     voice_narration: {
       static_elearning:
-        "Generate text-to-speech narration with timing cues. Output format:\n{\n  "text": "narration text",\n  "duration_seconds": 45,\n  "voice_id": "selected voice",\n  "speed": 1.0\n}",
+        'Generate text-to-speech narration with timing cues. Output format:\n{\n  "text": "narration text",\n  "duration_seconds": 45,\n  "voice_id": "selected voice",\n  "speed": 1.0\n}',
       video_learning:
-        "Generate TTS narration synchronized with video script. For each [ACTION] marker, provide precise timing:\n{\n  "text": "narration",\n  "start_second": 0,\n  "duration_seconds": 30,\n  "voice_id": "voice",\n  "emotional_tone": "professional/friendly/urgent"\n}",
+        'Generate TTS narration synchronized with video script. For each [ACTION] marker, provide precise timing:\n{\n  "text": "narration",\n  "start_second": 0,\n  "duration_seconds": 30,\n  "voice_id": "voice",\n  "emotional_tone": "professional/friendly/urgent"\n}',
       sop_video:
         'Generate TTS for each SOP step with pause timing for whiteboard. Output:\n{\n  "step_number": 1,\n  "narration_text": "step instructions",\n  "narration_duration": 15,\n  "whiteboard_pause": 20,\n  "total_duration": 35,\n  "voice_id": "rachel"\n}',
     },

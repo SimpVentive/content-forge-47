@@ -26,6 +26,7 @@ export interface RawAgentOutputs {
   quality: string;
   voice: string;
   assembly: string;
+  heygenVideos?: string;
 }
 
 export const AGENTS: Omit<AgentInfo, "status">[] = [
