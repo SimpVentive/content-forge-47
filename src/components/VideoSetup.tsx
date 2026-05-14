@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Upload } from "lucide-react";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { useContentForge } from "@/hooks/ContentForgeContext";
+import { AVATAR_TRAINERS } from "@/lib/avatarTrainers";
 
-const avatars = [
-  { id: "rachel", name: "Rachel", role: "Professional Female" },
-  { id: "josh", name: "Josh", role: "Professional Male" },
-  { id: "anna", name: "Anna", role: "Friendly Female" },
-];
+const avatars = AVATAR_TRAINERS.map((t) => ({
+  id: t.id,
+  name: t.name,
+  role: t.subtitle,
+  image: `/trainers/${t.id}.png`,
+}));
 
 const qualities = [
   { id: "720p", label: "720p - Fast", desc: "Faster generation (3-5 min per video)" },
@@ -25,8 +27,12 @@ const backgrounds = [
 export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
   const navigate = useNavigate();
   const { setVideoSettings } = useContentForge();
-  const [settings, setSettings] = useState({
-    selectedAvatar: "rachel",
+  const [settings, setSettings] = useState<{
+    selectedAvatar: string;
+    videoQuality: "720p" | "1080p" | "4k";
+    backgroundStyle: "simple" | "office" | "classroom";
+  }>({
+    selectedAvatar: avatars[0].id,
     videoQuality: "1080p",
     backgroundStyle: "office",
   });
@@ -70,7 +76,13 @@ export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
                     : "border-[#e2e8f0] hover:border-[#4f46e5]"
                 }`}
               >
-                <div className="w-full h-32 bg-gradient-to-b from-slate-200 to-slate-100 rounded-lg mb-3" />
+                <div className="w-full h-32 rounded-lg mb-3 overflow-hidden bg-gradient-to-b from-slate-200 to-slate-100">
+                  <img
+                    src={avatar.image}
+                    alt={avatar.name}
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
                 <p className="font-semibold text-[#0f172a]">{avatar.name}</p>
                 <p className="text-xs text-[#6b7280]">{avatar.role}</p>
               </button>
