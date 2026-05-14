@@ -20,7 +20,7 @@ const Login = () => {
   // already signed in? bounce out
   if (!isLoading && isAuthenticated) {
     const state = location.state as LocationState;
-    return <Navigate to={state?.from?.pathname ?? "/forge"} replace />;
+    return <Navigate to={state?.from?.pathname ?? "/new-course"} replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -34,7 +34,7 @@ const Login = () => {
       return;
     }
     const state = location.state as LocationState;
-    navigate(state?.from?.pathname ?? "/forge", { replace: true });
+    navigate(state?.from?.pathname ?? "/new-course", { replace: true });
   };
 
   return (
