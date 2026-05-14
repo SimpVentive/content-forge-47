@@ -27,8 +27,12 @@ const backgrounds = [
 export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
   const navigate = useNavigate();
   const { setVideoSettings } = useContentForge();
-  const [settings, setSettings] = useState({
-    selectedAvatar: "rachel",
+  const [settings, setSettings] = useState<{
+    selectedAvatar: string;
+    videoQuality: "720p" | "1080p" | "4k";
+    backgroundStyle: "simple" | "office" | "classroom";
+  }>({
+    selectedAvatar: avatars[0].id,
     videoQuality: "1080p",
     backgroundStyle: "office",
   });
