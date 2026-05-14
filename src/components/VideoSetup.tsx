@@ -76,7 +76,13 @@ export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
                     : "border-[#e2e8f0] hover:border-[#4f46e5]"
                 }`}
               >
-                <div className="w-full h-32 bg-gradient-to-b from-slate-200 to-slate-100 rounded-lg mb-3" />
+                <div className="w-full h-32 rounded-lg mb-3 overflow-hidden bg-gradient-to-b from-slate-200 to-slate-100">
+                  <img
+                    src={avatar.image}
+                    alt={avatar.name}
+                    className="w-full h-full object-cover object-top"
+                  />
+                </div>
                 <p className="font-semibold text-[#0f172a]">{avatar.name}</p>
                 <p className="text-xs text-[#6b7280]">{avatar.role}</p>
               </button>
