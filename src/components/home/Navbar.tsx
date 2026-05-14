@@ -76,7 +76,7 @@ export const Navbar = () => {
                     </div>
                   </div>
                   <Link
-                    to="/forge"
+                    to="/new-course"
                     onClick={() => setOpenMenu(false)}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                   >
@@ -152,7 +152,7 @@ export const Navbar = () => {
             {isAuthenticated ? (
               <>
                 <Link
-                  to="/forge"
+                  to="/new-course"
                   onClick={() => setOpenMobile(false)}
                   className="mt-2 rounded-lg bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white"
                 >

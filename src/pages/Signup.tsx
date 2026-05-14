@@ -22,7 +22,7 @@ const Signup = () => {
   const [pendingConfirm, setPendingConfirm] = useState(false);
 
   if (!isLoading && isAuthenticated) {
-    return <Navigate to="/forge" replace />;
+    return <Navigate to="/new-course" replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -52,7 +52,7 @@ const Signup = () => {
     setTimeout(() => {
       // useAuth state updates asynchronously after the auth listener fires
       if (!isAuthenticated) setPendingConfirm(true);
-      else navigate("/forge", { replace: true });
+      else navigate("/new-course", { replace: true });
     }, 200);
   };
 
