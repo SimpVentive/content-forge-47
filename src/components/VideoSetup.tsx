@@ -1,9 +1,15 @@
-import { useState } from "react";
+import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Upload } from "lucide-react";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { useContentForge } from "@/hooks/ContentForgeContext";
 import { AVATAR_TRAINERS } from "@/lib/avatarTrainers";
+
+type UploadedAvatar = {
+  url: string;
+  name: string;
+  type: "image" | "video";
+};
 
 const avatars = AVATAR_TRAINERS.map((t) => ({
   id: t.id,
@@ -27,6 +33,8 @@ const backgrounds = [
 export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
   const navigate = useNavigate();
   const { setVideoSettings } = useContentForge();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedAvatar, setUploadedAvatar] = useState<UploadedAvatar | null>(null);
   const [settings, setSettings] = useState<{
     selectedAvatar: string;
     videoQuality: "720p" | "1080p" | "4k";
@@ -36,6 +44,32 @@ export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
     videoQuality: "1080p",
     backgroundStyle: "office",
   });
+
+  useEffect(() => {
+    return () => {
+      if (uploadedAvatar?.url) URL.revokeObjectURL(uploadedAvatar.url);
+    };
+  }, [uploadedAvatar?.url]);
+
+  const handleAvatarUpload = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+      event.target.value = "";
+      return;
+    }
+
+    if (uploadedAvatar?.url) URL.revokeObjectURL(uploadedAvatar.url);
+
+    const url = URL.createObjectURL(file);
+    setUploadedAvatar({
+      url,
+      name: file.name,
+      type: file.type.startsWith("video/") ? "video" : "image",
+    });
+    setSettings((current) => ({ ...current, selectedAvatar: "custom-upload" }));
+  };
 
   const handleContinue = () => {
     setVideoSettings(settings);
@@ -76,11 +110,11 @@ export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
                     : "border-[#e2e8f0] hover:border-[#4f46e5]"
                 }`}
               >
-                <div className="w-full h-32 rounded-lg mb-3 overflow-hidden bg-gradient-to-b from-slate-200 to-slate-100">
+                <div className="w-full aspect-[4/5] rounded-lg mb-3 overflow-hidden bg-gradient-to-b from-slate-200 to-slate-100">
                   <img
                     src={avatar.image}
                     alt={avatar.name}
-                    className="w-full h-full object-cover object-top"
+                    className="w-full h-full object-contain object-center"
                   />
                 </div>
                 <p className="font-semibold text-[#0f172a]">{avatar.name}</p>
@@ -89,10 +123,41 @@ export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
             ))}
 
             {/* Upload Custom */}
-            <button className="w-full p-4 rounded-xl border-2 border-dashed border-[#4f46e5] bg-white hover:bg-[#f0f2f7] transition-all col-span-2 md:col-span-1">
-              <Upload className="w-6 h-6 text-[#4f46e5] mx-auto mb-2" />
-              <p className="text-xs font-medium text-[#6b7280]">Upload your avatar</p>
-              <p className="text-[10px] text-[#94a3b8] mt-1">2-min video</p>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={`w-full p-4 rounded-xl border-2 border-dashed bg-white transition-all col-span-2 md:col-span-1 ${
+                settings.selectedAvatar === "custom-upload"
+                  ? "border-[#4f46e5] bg-[#4f46e5]/5"
+                  : "border-[#4f46e5] hover:bg-[#f0f2f7]"
+              }`}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
+              {uploadedAvatar ? (
+                <>
+                  <div className="w-full aspect-[4/5] rounded-lg mb-3 overflow-hidden bg-gradient-to-b from-slate-200 to-slate-100">
+                    {uploadedAvatar.type === "video" ? (
+                      <video src={uploadedAvatar.url} className="w-full h-full object-contain object-center" muted playsInline />
+                    ) : (
+                      <img src={uploadedAvatar.url} alt="Uploaded avatar" className="w-full h-full object-contain object-center" />
+                    )}
+                  </div>
+                  <p className="text-xs font-semibold text-[#0f172a] truncate">{uploadedAvatar.name}</p>
+                  <p className="text-[10px] text-[#94a3b8] mt-1">Click to replace</p>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-6 h-6 text-[#4f46e5] mx-auto mb-2" />
+                  <p className="text-xs font-medium text-[#6b7280]">Upload your avatar</p>
+                  <p className="text-[10px] text-[#94a3b8] mt-1">Image or 2-min video</p>
+                </>
+              )}
             </button>
           </div>
         </div>
