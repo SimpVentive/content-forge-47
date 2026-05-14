@@ -3,12 +3,14 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Upload } from "lucide-react";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { useContentForge } from "@/hooks/ContentForgeContext";
+import { AVATAR_TRAINERS } from "@/lib/avatarTrainers";
 
-const avatars = [
-  { id: "rachel", name: "Rachel", role: "Professional Female" },
-  { id: "josh", name: "Josh", role: "Professional Male" },
-  { id: "anna", name: "Anna", role: "Friendly Female" },
-];
+const avatars = AVATAR_TRAINERS.map((t) => ({
+  id: t.id,
+  name: t.name,
+  role: t.subtitle,
+  image: `/trainers/${t.id}.png`,
+}));
 
 const qualities = [
   { id: "720p", label: "720p - Fast", desc: "Faster generation (3-5 min per video)" },
