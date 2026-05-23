@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +36,8 @@ export const BrandLogo = ({ size = "sm", variant = "light", asLink = true, class
   const sz = SIZES[size];
   const contentColor = variant === "dark" ? "text-white" : "text-[#1e3a5f]";
   const navigate = useNavigate();
+  const location = useLocation();
+  const isHome = location.pathname === "/";
   const [open, setOpen] = useState(false);
 
   const inner = (
@@ -57,7 +59,7 @@ export const BrandLogo = ({ size = "sm", variant = "light", asLink = true, class
       <button
         type="button"
         data-testid="brand-logo"
-        onClick={() => setOpen(true)}
+        onClick={() => { if (isHome) { window.scrollTo({ top: 0, behavior: "smooth" }); } else { setOpen(true); } }}
         className="inline-flex items-center bg-transparent border-0 p-0 cursor-pointer"
       >
         {inner}
