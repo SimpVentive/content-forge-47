@@ -36,6 +36,8 @@ export const BrandLogo = ({ size = "sm", variant = "light", asLink = true, class
   const sz = SIZES[size];
   const contentColor = variant === "dark" ? "text-white" : "text-[#1e3a5f]";
   const navigate = useNavigate();
+  const location = useLocation();
+  const isHome = location.pathname === "/";
   const [open, setOpen] = useState(false);
 
   const inner = (
