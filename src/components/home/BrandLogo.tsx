@@ -59,7 +59,7 @@ export const BrandLogo = ({ size = "sm", variant = "light", asLink = true, class
       <button
         type="button"
         data-testid="brand-logo"
-        onClick={() => setOpen(true)}
+        onClick={() => { if (isHome) { window.scrollTo({ top: 0, behavior: "smooth" }); } else { setOpen(true); } }}
         className="inline-flex items-center bg-transparent border-0 p-0 cursor-pointer"
       >
         {inner}
