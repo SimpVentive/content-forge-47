@@ -231,9 +231,10 @@ const Index = () => {
       setAgentToggles((prev) => ({ ...prev, assessment: true }));
     }
 
-    // For video mode: verify HeyGen is configured
+    // For video mode: verify HeyGen is configured (auto-seeded on app boot)
     if (learningType === "video") {
-      const heygenConfig = JSON.parse(localStorage.getItem("heygenSettings") || "{}");
+      const { getHeyGenSettings } = await import("@/lib/heygenDefaults");
+      const heygenConfig = getHeyGenSettings();
       if (!heygenConfig?.apiKey) {
         toast.warning("Video generation not configured. Contact admin to set up HeyGen API.");
         return;
