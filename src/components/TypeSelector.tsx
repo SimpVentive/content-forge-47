@@ -44,7 +44,7 @@ export const TypeSelector = () => {
     <div className="min-h-screen bg-[#f0f2f7] px-6 py-12">
       {/* Logo */}
       <div className="mb-12 flex justify-center">
-        <img src={contentForgeLogo} alt="ContentForge" className="h-10 object-contain" />
+        <BrandLogo size="2xl" />
       </div>
 
       {/* Header Section */}
