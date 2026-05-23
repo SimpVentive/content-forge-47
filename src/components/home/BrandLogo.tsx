@@ -14,7 +14,7 @@ import {
 const LOGO_URL =
   "https://customer-assets.emergentagent.com/job_design-preview-170/artifacts/7e6vqb4u_image.png";
 
-type Size = "sm" | "md" | "lg";
+type Size = "sm" | "md" | "lg" | "xl" | "2xl";
 type Variant = "light" | "dark";
 
 type Props = {
@@ -28,6 +28,8 @@ const SIZES: Record<Size, { img: string; text: string }> = {
   sm: { img: "h-12 w-12", text: "text-2xl" },
   md: { img: "h-14 w-14", text: "text-3xl" },
   lg: { img: "h-16 w-16", text: "text-4xl" },
+  xl: { img: "h-24 w-24", text: "text-5xl" },
+  "2xl": { img: "h-32 w-32", text: "text-6xl" },
 };
 
 export const BrandLogo = ({ size = "sm", variant = "light", asLink = true, className = "" }: Props) => {
