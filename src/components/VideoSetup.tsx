@@ -19,48 +19,21 @@ const backgrounds = [
 export const VideoSetup = ({ isSOP = false }: { isSOP?: boolean }) => {
   const navigate = useNavigate();
   const { setVideoSettings } = useContentForge();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadedAvatar, setUploadedAvatar] = useState<UploadedAvatar | null>(null);
   const [settings, setSettings] = useState<{
     selectedAvatar: string;
     videoQuality: "720p" | "1080p" | "4k";
     backgroundStyle: "simple" | "office" | "classroom";
   }>({
-    selectedAvatar: avatars[0].id,
+    selectedAvatar: "", // filled from Course Setup instructor at run time
     videoQuality: "1080p",
     backgroundStyle: "office",
   });
-
-  useEffect(() => {
-    return () => {
-      if (uploadedAvatar?.url) URL.revokeObjectURL(uploadedAvatar.url);
-    };
-  }, [uploadedAvatar?.url]);
-
-  const handleAvatarUpload = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      event.target.value = "";
-      return;
-    }
-
-    if (uploadedAvatar?.url) URL.revokeObjectURL(uploadedAvatar.url);
-
-    const url = URL.createObjectURL(file);
-    setUploadedAvatar({
-      url,
-      name: file.name,
-      type: file.type.startsWith("video/") ? "video" : "image",
-    });
-    setSettings((current) => ({ ...current, selectedAvatar: "custom-upload" }));
-  };
 
   const handleContinue = () => {
     setVideoSettings(settings);
     navigate("/forge", { state: { learningType: "video" } });
   };
+
 
   return (
     <div className="min-h-screen bg-[#f0f2f7] px-6 py-12">
