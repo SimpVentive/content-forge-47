@@ -173,6 +173,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [backgroundStyle, setBackgroundStyle] = useState<CourseParameters["backgroundStyle"]>("office");
   const [showMismatchWarning, setShowMismatchWarning] = useState(false);
   const [mismatchType, setMismatchType] = useState<"more" | "less">("more");
+  const [showModeConfirm, setShowModeConfirm] = useState(false);
+  const [pendingLearningType, setPendingLearningType] = useState<CourseParameters["learningType"] | null>(null);
   const avatarEnv = import.meta.env as Record<string, string | undefined>;
 
   const selectedMinutes = getDurationMinutes(duration);
@@ -296,6 +298,25 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     setShowMismatchWarning(false);
   };
 
+  const handleModeToggleClick = (newType: CourseParameters["learningType"]) => {
+    if (newType === localLearningType) return; // No change
+    setPendingLearningType(newType);
+    setShowModeConfirm(true);
+  };
+
+  const handleConfirmModeSwitch = () => {
+    if (pendingLearningType) {
+      setLocalLearningType(pendingLearningType);
+      setShowModeConfirm(false);
+      setPendingLearningType(null);
+    }
+  };
+
+  const handleCancelModeSwitch = () => {
+    setShowModeConfirm(false);
+    setPendingLearningType(null);
+  };
+
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
@@ -359,6 +380,55 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
         </div>
       )}
 
+      {/* Mode Switch Confirmation Dialog */}
+      {showModeConfirm && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-[500px] max-w-[92vw] bg-card rounded-2xl shadow-2xl overflow-hidden animate-fade-in"
+            style={{ fontFamily: bodyFont }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="h-1.5 w-full bg-blue-500" />
+            <div className="px-8 pt-7 pb-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-6 h-6 text-blue-500" />
+                </div>
+                <h3 className="text-[18px] font-extrabold tracking-tight text-foreground leading-tight">
+                  Change Learning Format?
+                </h3>
+              </div>
+
+              <p className="text-[14px] text-foreground leading-relaxed mb-6">
+                You selected <span className="font-bold">{localLearningType === "static" ? "Video Course" : "Static E-Learning"}</span>.
+                Switch to <span className="font-bold">{pendingLearningType === "static" ? "Static E-Learning" : "Video Course"}</span>?
+              </p>
+              <p className="text-[13px] text-muted-foreground mb-5">
+                This will change which agents run during generation and the available course settings.
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={handleConfirmModeSwitch}
+                  className="w-full h-[52px] rounded-lg text-[14px] font-medium text-white transition-all duration-200 ease-in-out flex items-center justify-center gap-2 shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:brightness-110"
+                  style={{ background: "#2563EB", fontFamily: buttonFont }}
+                >
+                  Yes, switch to {pendingLearningType === "static" ? "Static E-Learning" : "Video Course"}
+                </button>
+                <button
+                  onClick={handleCancelModeSwitch}
+                  className="w-full h-[52px] rounded-lg text-[14px] font-medium border transition-all duration-200 ease-in-out flex items-center justify-center gap-2"
+                  style={{ fontFamily: buttonFont, color: "#2563EB", borderColor: "#2563EB", backgroundColor: "#FFFFFF" }}
+                >
+                  No, keep {localLearningType === "static" ? "Static E-Learning" : "Video Course"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         className="relative w-[1080px] max-w-[96vw] h-[92vh] max-h-[92vh] rounded-[28px] shadow-2xl overflow-hidden animate-fade-in border border-white/30"
         style={{ fontFamily: bodyFont, backgroundColor: "#F9FAFB" }}
@@ -392,7 +462,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </label>
             <div className="flex gap-2">
               <button
-                onClick={() => setLocalLearningType("static")}
+                onClick={() => handleModeToggleClick("static")}
                 className={`flex-1 px-4 py-2.5 rounded-[12px] border text-[13px] font-semibold transition-all duration-200 ease-in-out ${
                   localLearningType === "static"
                     ? "text-white border-transparent"
@@ -403,7 +473,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 Static E-Learning
               </button>
               <button
-                onClick={() => setLocalLearningType("video")}
+                onClick={() => handleModeToggleClick("video")}
                 className={`flex-1 px-4 py-2.5 rounded-[12px] border text-[13px] font-semibold transition-all duration-200 ease-in-out ${
                   localLearningType === "video"
                     ? "text-white border-transparent"
