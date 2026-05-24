@@ -228,14 +228,23 @@ const Index = () => {
   const handleParamsConfirm = async (params: CourseParameters) => {
     setCourseParams(params);
     setShowParamsDialog(false);
+
+    // Update agent toggles based on assessment requirement and learning type
     if (!params.assessmentRequired) {
       setAgentToggles((prev) => ({ ...prev, assessment: false }));
     } else {
       setAgentToggles((prev) => ({ ...prev, assessment: true }));
     }
 
+    // Re-sync agent toggles based on confirmed learning type
+    if (params.learningType === "video") {
+      setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: true }));
+    } else {
+      setAgentToggles((prev) => ({ ...prev, animation: true, youtube: true, compliance: true, heygen: false }));
+    }
+
     // For video mode: verify HeyGen is configured (auto-seeded on app boot)
-    if (learningType === "video") {
+    if (params.learningType === "video") {
       const { getHeyGenSettings } = await import("@/lib/heygenDefaults");
       const heygenConfig = getHeyGenSettings();
       if (!heygenConfig?.apiKey) {
@@ -246,10 +255,14 @@ const Index = () => {
 
     const estimated = estimateMinutesFromText(inputText);
 
-    // For video mode: use the instructor selected in Course Setup as the HeyGen avatar.
+    // Build effective video settings from params for video mode
     const effectiveVideoSettings =
-      learningType === "video" && videoSettings
-        ? { ...videoSettings, selectedAvatar: params.avatarTrainerId || videoSettings.selectedAvatar || "rachel" }
+      params.learningType === "video"
+        ? {
+            selectedAvatar: params.avatarTrainerId || "rachel",
+            videoQuality: params.videoQuality,
+            backgroundStyle: params.backgroundStyle,
+          }
         : undefined;
 
     // Admins bypass credit checks and deductions (for internal testing).
@@ -338,11 +351,11 @@ const Index = () => {
               {learningType === "video" ? "🎥 Video" : "📊 Static"}
             </span>
           </div>
-          {learningType === "video" && videoSettings && (
+          {learningType === "video" && courseParams && (
             <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 leading-tight">
-              <span className="font-semibold">Q:</span> {videoSettings.videoQuality} ·{" "}
-              <span className="font-semibold">BG:</span> {videoSettings.backgroundStyle}
-              <a href="/setup/video" className="underline text-cyan-600 ml-2">Change</a>
+              <span className="font-semibold">Q:</span> {courseParams.videoQuality} ·{" "}
+              <span className="font-semibold">BG:</span> {courseParams.backgroundStyle}
+              <button onClick={() => setShowParamsDialog(true)} className="underline text-cyan-600 ml-2 hover:text-cyan-700 transition-colors">Change</button>
             </div>
           )}
 
@@ -467,6 +480,7 @@ const Index = () => {
             courseTitle={courseTitle}
             estimatedMinutes={estimateMinutesFromText(inputText)}
             youtubeAgentEnabled={agentToggles.youtube}
+            initialLearningType={learningType as "static" | "video"}
             onConfirm={handleParamsConfirm}
             onCancel={() => setShowParamsDialog(false)}
           />

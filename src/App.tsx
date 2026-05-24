@@ -18,7 +18,6 @@ const Login = lazy(() => import("./pages/Login"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Signup = lazy(() => import("./pages/Signup"));
 const TypeSelector = lazy(() => import("./components/TypeSelector").then(m => ({ default: m.TypeSelector })));
-const VideoSetup = lazy(() => import("./components/VideoSetup").then(m => ({ default: m.VideoSetup })));
 const VideoPreviewPage = lazy(() => import("./pages/VideoPreviewPage"));
 const AdminShell = lazy(() => import("./components/admin/AdminShell"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
@@ -48,7 +47,6 @@ const App = () => (
                 <Route path="/help" element={<PublicRoute><Help /></PublicRoute>} />
                 <Route path="/welcome" element={<Welcome />} />
                 <Route path="/new-course" element={<ProtectedRoute><TypeSelector /></ProtectedRoute>} />
-                <Route path="/setup/video" element={<ProtectedRoute><VideoSetup /></ProtectedRoute>} />
                 <Route path="/preview/videos" element={<ProtectedRoute><VideoPreviewPage /></ProtectedRoute>} />
                 <Route path="/studio" element={<ProtectedRoute><Index /></ProtectedRoute>} />
                 <Route path="/forge" element={<ProtectedRoute><Index /></ProtectedRoute>} />

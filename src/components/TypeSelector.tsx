@@ -32,11 +32,7 @@ export const TypeSelector = () => {
 
     // Small delay for visual feedback
     setTimeout(() => {
-      if (type === "static") {
-        navigate("/forge", { state: { learningType: "static" } });
-      } else {
-        navigate("/setup/video", { state: { learningType: "video" } });
-      }
+      navigate("/forge", { state: { learningType: type } });
     }, 300);
   };
 

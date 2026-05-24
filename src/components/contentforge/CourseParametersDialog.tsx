@@ -25,6 +25,9 @@ export interface CourseParameters {
     minFontSize: number;
     lineSpacing: number;
   };
+  learningType: "static" | "video";
+  videoQuality: "720p" | "1080p" | "4k";
+  backgroundStyle: "simple" | "office" | "classroom";
 }
 
 interface CourseParametersDialogProps {
@@ -33,6 +36,8 @@ interface CourseParametersDialogProps {
   estimatedMinutes?: number | null;
   /** Whether the YouTube agent is enabled in the orchestrator. Hides YouTube-only setup sections when false. */
   youtubeAgentEnabled?: boolean;
+  /** Pre-selected learning mode (static or video). Defaults to "static". */
+  initialLearningType?: "static" | "video";
   onConfirm: (params: CourseParameters) => void;
   onCancel: () => void;
 }
@@ -95,6 +100,18 @@ const FLIP_STYLE_OPTIONS = [
   { value: "bound", label: "Bound Flipchart" },
 ] as const;
 
+const VIDEO_QUALITIES = [
+  { id: "720p", label: "720p - Fast", desc: "Faster generation (3-5 min per video)" },
+  { id: "1080p", label: "1080p - Standard", desc: "Standard HD (5-8 min per video)" },
+  { id: "4k", label: "4K - Premium", desc: "Highest quality (10-15 min per video)" },
+] as const;
+
+const BACKGROUND_STYLES = [
+  { id: "simple", label: "Simple - Plain Color", desc: "Minimalist, distraction-free" },
+  { id: "office", label: "Office - Professional Setting", desc: "Modern office background" },
+  { id: "classroom", label: "Classroom - Educational", desc: "Classroom or training room" },
+] as const;
+
 // Map duration to YouTube video count
 export const DURATION_VIDEO_COUNT: Record<string, number> = {
   "3min": 3,
@@ -127,11 +144,12 @@ const InfoHint: React.FC<{ text: string }> = ({ text }) => (
 );
 
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
-  open, courseTitle, estimatedMinutes, youtubeAgentEnabled = true, onConfirm, onCancel,
+  open, courseTitle, estimatedMinutes, youtubeAgentEnabled = true, initialLearningType = "static", onConfirm, onCancel,
 }) => {
   const headingFont = '"Poppins", sans-serif';
   const bodyFont = '"Inter", sans-serif';
   const buttonFont = '"Poppins", sans-serif';
+  const [localLearningType, setLocalLearningType] = useState<CourseParameters["learningType"]>(initialLearningType);
   const [level, setLevel] = useState<CourseParameters["level"]>("intermediate");
   const [textLanguage, setTextLanguage] = useState("English");
   const [narratorLanguage, setNarratorLanguage] = useState("English");
@@ -151,6 +169,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [maxLines, setMaxLines] = useState<CourseParameters["slideLayout"]["maxLines"]>(10);
   const [minFontSize, setMinFontSize] = useState<CourseParameters["slideLayout"]["minFontSize"]>(12.5);
   const [lineSpacing, setLineSpacing] = useState<CourseParameters["slideLayout"]["lineSpacing"]>(2);
+  const [videoQuality, setVideoQuality] = useState<CourseParameters["videoQuality"]>("1080p");
+  const [backgroundStyle, setBackgroundStyle] = useState<CourseParameters["backgroundStyle"]>("office");
   const [showMismatchWarning, setShowMismatchWarning] = useState(false);
   const [mismatchType, setMismatchType] = useState<"more" | "less">("more");
   const avatarEnv = import.meta.env as Record<string, string | undefined>;
@@ -209,6 +229,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       flipStyle,
       maxYoutubeVideos,
       slideLayout: { maxLines, minFontSize, lineSpacing },
+      learningType: localLearningType,
+      videoQuality,
+      backgroundStyle,
     });
   };
 
@@ -237,6 +260,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       flipStyle,
       maxYoutubeVideos,
       slideLayout: { maxLines, minFontSize, lineSpacing },
+      learningType: localLearningType,
+      videoQuality,
+      backgroundStyle,
     });
   };
 
@@ -260,6 +286,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       flipStyle,
       maxYoutubeVideos,
       slideLayout: { maxLines, minFontSize, lineSpacing },
+      learningType: localLearningType,
+      videoQuality,
+      backgroundStyle,
     });
   };
 
@@ -356,6 +385,37 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
               {/* Body */}
               <div className="px-6 py-5 space-y-5 overflow-y-auto [scrollbar-gutter:stable] pr-4 flex-1">
+          {/* Learning Mode Toggle */}
+          <div className={surfaceCardClass}>
+            <label className="text-[13px] text-[#2E2E2E] mb-3 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+              Learning Format
+            </label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setLocalLearningType("static")}
+                className={`flex-1 px-4 py-2.5 rounded-[12px] border text-[13px] font-semibold transition-all duration-200 ease-in-out ${
+                  localLearningType === "static"
+                    ? "text-white border-transparent"
+                    : "border-[#E5E7EB] bg-white text-[#2E2E2E] hover:border-[#6EC1E4]"
+                }`}
+                style={localLearningType === "static" ? { background: "#2563EB" } : undefined}
+              >
+                Static E-Learning
+              </button>
+              <button
+                onClick={() => setLocalLearningType("video")}
+                className={`flex-1 px-4 py-2.5 rounded-[12px] border text-[13px] font-semibold transition-all duration-200 ease-in-out ${
+                  localLearningType === "video"
+                    ? "text-white border-transparent"
+                    : "border-[#E5E7EB] bg-white text-[#2E2E2E] hover:border-[#6EC1E4]"
+                }`}
+                style={localLearningType === "video" ? { background: "#0891b2" } : undefined}
+              >
+                Video Course
+              </button>
+            </div>
+          </div>
+
           {/* Course Level */}
           <div className={surfaceCardClass}>
             <label className="text-[13px] text-[#2E2E2E] mb-2 flex items-center gap-1.5" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
@@ -509,7 +569,59 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
           </div>
 
-          {youtubeAgentEnabled && (
+          {localLearningType === "video" && (
+          <div>
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-2 flex items-center gap-1.5" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Video Quality
+                <InfoHint text="Higher quality means slower video generation." />
+              </label>
+              <p className="text-[11px] text-[#6B7280] mb-3">Higher quality = slower generation</p>
+              <div className="space-y-2">
+                {VIDEO_QUALITIES.map((q) => (
+                  <button
+                    key={q.id}
+                    onClick={() => setVideoQuality(q.id as CourseParameters["videoQuality"])}
+                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                      videoQuality === q.id
+                        ? "border-[#0891b2] bg-[#0891b2]/5"
+                        : "border-[#E5E7EB] bg-white hover:border-[#0891b2]"
+                    }`}
+                  >
+                    <p className="font-semibold text-[#2E2E2E]">{q.label}</p>
+                    <p className="text-xs text-[#6B7280]">{q.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-2 flex items-center gap-1.5" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Background Style
+                <InfoHint text="Choose the environment your avatar appears in." />
+              </label>
+              <p className="text-[11px] text-[#6B7280] mb-3">What environment should your avatar appear in?</p>
+              <div className="space-y-2">
+                {BACKGROUND_STYLES.map((bg) => (
+                  <button
+                    key={bg.id}
+                    onClick={() => setBackgroundStyle(bg.id as CourseParameters["backgroundStyle"])}
+                    className={`w-full p-4 rounded-lg border-2 text-left transition-all ${
+                      backgroundStyle === bg.id
+                        ? "border-[#0891b2] bg-[#0891b2]/5"
+                        : "border-[#E5E7EB] bg-white hover:border-[#0891b2]"
+                    }`}
+                  >
+                    <p className="font-semibold text-[#2E2E2E]">{bg.label}</p>
+                    <p className="text-xs text-[#6B7280]">{bg.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          )}
+
+          {localLearningType === "static" && youtubeAgentEnabled && (
           <div className={surfaceCardClass}>
             <div>
               <div className="flex items-center gap-1.5">
@@ -559,7 +671,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           </div>
           )}
 
-          {youtubeAgentEnabled && (
+          {localLearningType === "static" && youtubeAgentEnabled && (
           <div className={surfaceCardClass}>
             <div className="flex items-center gap-1.5 mb-2">
               <p className="text-[13px] font-bold text-foreground">YouTube Video Count</p>
