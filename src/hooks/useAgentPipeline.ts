@@ -1327,8 +1327,7 @@ OUTPUT FORMAT — ABSOLUTE:
             });
 
             addLog(`HeyGen Video Agent: Polling completion for "${moduleTitle}"...`);
-            // TODO: TESTING - Hard coded to 5 seconds. Reset to: pollForVideoCompletion(pending.videoId, 120, 5000)
-            const videoUrl = await pollForVideoCompletion(pending.videoId, 1, 5000);
+            const videoUrl = await pollForVideoCompletion(pending.videoId, 120, 5000);
             heygenVideosResult.push({ ...pending, videoUrl, status: "ready" });
           }
 

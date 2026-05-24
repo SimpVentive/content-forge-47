@@ -76,6 +76,7 @@ const VOICE_ACCENTS = [
 ];
 
 const DURATIONS = [
+  { value: "1min", label: "1 min", minutes: 1 }, // Testing
   { value: "3min", label: "3 min", minutes: 3 },
   { value: "5min", label: "5 min", minutes: 5 },
   { value: "10min", label: "10 min", minutes: 10 },
@@ -114,6 +115,7 @@ const BACKGROUND_STYLES = [
 
 // Map duration to YouTube video count
 export const DURATION_VIDEO_COUNT: Record<string, number> = {
+  "1min": 1,  // Testing
   "3min": 3,
   "5min": 5,
   "10min": 8,
@@ -875,6 +877,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
             </div>
           </div>
 
+          {localLearningType === "static" && (
           <div className={surfaceCardClass}>
             <div>
               <div className="flex items-center gap-1.5">
@@ -964,6 +967,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </div>
             </div>
           </div>
+          )}
 
           {/* Assessment Toggle */}
           <div className={surfaceCardClass + " flex items-center justify-between"}>
