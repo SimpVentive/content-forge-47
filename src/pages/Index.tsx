@@ -243,12 +243,18 @@ const Index = () => {
 
     const estimated = estimateMinutesFromText(inputText);
 
+    // For video mode: use the instructor selected in Course Setup as the HeyGen avatar.
+    const effectiveVideoSettings =
+      learningType === "video" && videoSettings
+        ? { ...videoSettings, selectedAvatar: params.avatarTrainerId || videoSettings.selectedAvatar || "rachel" }
+        : undefined;
+
     // Admins bypass credit checks and deductions (for internal testing).
     if (isAdmin) {
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
         learningMode: learningMode,
-        videoSettings: learningType === "video" ? videoSettings : undefined,
+        videoSettings: effectiveVideoSettings,
       });
       toast.success("Admin run — credits not deducted");
       return;
@@ -268,13 +274,14 @@ const Index = () => {
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
         learningMode: learningMode,
-        videoSettings: learningType === "video" ? videoSettings : undefined,
+        videoSettings: effectiveVideoSettings,
       });
       toast.success(`${estimated} credits deducted`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to deduct credits");
     }
   };
+
 
   const hasRun = logs.length > 0;
   const hasOutput = Object.values(rawOutputs).some((v) => v);
