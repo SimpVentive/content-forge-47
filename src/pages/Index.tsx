@@ -542,7 +542,7 @@ const Index = () => {
                     <div>
                       <p className="text-[14px] font-[900] uppercase tracking-[0.16em] text-[#315a9b]">Orchestration In Progress</p>
                       <p className="mt-1 text-[14px] font-semibold leading-relaxed text-[#1f3557]">
-                        Multiple AI Agents are orchestrating the content of your E-Learning. This may take a minute or two.
+                        Multiple AI Agents are orchestrating the content of your {learningType === "video" ? "Video Learning" : "E-Learning"}. This may take a minute or two.
                       </p>
                     </div>
                   </div>
