@@ -59,6 +59,9 @@ const Index = () => {
       base.animation = false;
       base.youtube = false;
       base.compliance = false;
+    } else {
+      // heygen is video-only
+      base.heygen = false;
     }
     return base;
   });
