@@ -1294,8 +1294,15 @@ OUTPUT FORMAT — ABSOLUTE:
             josh: "josh_lite3_20230714",
             anna: "Daisy-inskirt-20220818",
           };
-          const avatarId = videoSettings?.selectedAvatar || heygenConfig.defaultAvatar || "rachel";
+          // Course Setup instructor IDs → closest HeyGen public avatar.
+          const TRAINER_TO_HEYGEN: Record<string, "rachel" | "josh" | "anna"> = {
+            priya: "rachel", soumya: "anna", irina: "rachel",
+            arjun: "josh", vedprakash: "josh", atul: "josh", john: "josh",
+          };
+          const rawAvatar = videoSettings?.selectedAvatar || heygenConfig.defaultAvatar || "rachel";
+          const avatarId = TRAINER_TO_HEYGEN[rawAvatar] || (voiceIdMap[rawAvatar] ? rawAvatar : "rachel");
           const voiceId = voiceIdMap[avatarId] || voiceIdMap["rachel"];
+
 
           // Parse voice output for per-module narration
           const voiceParsed = tryParseJson(voiceResult);
