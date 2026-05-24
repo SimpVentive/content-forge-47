@@ -339,11 +339,12 @@ const Index = () => {
           </div>
           {learningType === "video" && videoSettings && (
             <div className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-3 py-1.5 leading-tight">
-              <span className="font-semibold">Avatar:</span> {videoSettings.selectedAvatar} ·{" "}
               <span className="font-semibold">Q:</span> {videoSettings.videoQuality} ·{" "}
-              <a href="/setup/video" className="underline text-cyan-600 ml-1">Change</a>
+              <span className="font-semibold">BG:</span> {videoSettings.backgroundStyle}
+              <a href="/setup/video" className="underline text-cyan-600 ml-2">Change</a>
             </div>
           )}
+
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 text-sm font-medium text-slate-700">
             <Clock3 className="w-4 h-4" />
             <span>{(profile?.credits_total ?? 0) - (profile?.credits_used ?? 0)} credits</span>
