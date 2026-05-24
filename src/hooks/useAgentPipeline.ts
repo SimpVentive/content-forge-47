@@ -1278,6 +1278,7 @@ OUTPUT FORMAT — ABSOLUTE:
       // ──── VIDEO GENERATION (video modes only) ────
       let heygenVideosResult: GeneratedVideo[] = [];
       if (isVideoMode && !isCancelled()) {
+        setStatus("heygen", "running");
         addLog("HeyGen Video Agent: Starting video generation...");
         try {
           const heygenConfig = JSON.parse(localStorage.getItem("heygenSettings") || "{}");
@@ -1332,13 +1333,17 @@ OUTPUT FORMAT — ABSOLUTE:
 
           setRawOutputs((prev) => ({ ...prev, heygenVideos: JSON.stringify(heygenVideosResult) }));
           addLog(`HeyGen Video Agent: Complete. ${heygenVideosResult.length} video(s) ready.`);
+          setStatus("heygen", "complete");
         } catch (err) {
           addLog(`HeyGen Video Agent: Error — ${(err as Error).message}`);
+          setStatus("heygen", "error");
           // Store failed placeholder so Index.tsx can still navigate if needed
           if (heygenVideosResult.length > 0) {
             setRawOutputs((prev) => ({ ...prev, heygenVideos: JSON.stringify(heygenVideosResult) }));
           }
         }
+      } else {
+        setStatus("heygen", "idle");
       }
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
