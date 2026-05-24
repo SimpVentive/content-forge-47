@@ -308,31 +308,29 @@ const Index = () => {
         requiredCredits={requiredCredits}
         onClose={() => setShowInsufficientCredits(false)}
       />
-      <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6 relative">
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center justify-center">
-            <img src={contentForgeLogo} alt="ContentForge" className="w-16 h-16 object-contain drop-shadow-lg" />
+      <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6 gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <img src={contentForgeLogo} alt="ContentForge" className="w-12 h-12 object-contain drop-shadow-lg shrink-0" />
+          <div className="flex items-center gap-1 select-none shrink-0">
+            <span className="text-[24px] font-[900] tracking-tight text-[#1e3a5f]">
+              Content
+            </span>
+            <span
+              className="relative text-[24px] font-[900] tracking-tight"
+              style={{
+                textShadow: '0 1px 2px rgba(184,134,11,0.4)',
+                backgroundImage: "linear-gradient(135deg, #b8860b 0%, #daa520 40%, #ffd700 60%, #b8860b 100%)",
+                backgroundSize: "220% 100%",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+              }}
+            >
+              Forge
+              <svg className="absolute -top-2 -right-3 w-3.5 h-3.5 animate-pulse" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" fill="#b8860b" />
+              </svg>
+            </span>
           </div>
-        </div>
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5 select-none">
-          <span className="text-[38px] font-[900] tracking-tight text-[#1e3a5f]">
-            Content
-          </span>
-          <span
-            className="relative text-[38px] font-[900] tracking-tight"
-            style={{
-              textShadow: '0 1px 2px rgba(184,134,11,0.4)',
-              backgroundImage: "linear-gradient(135deg, #b8860b 0%, #daa520 40%, #ffd700 60%, #b8860b 100%)",
-              backgroundSize: "220% 100%",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            Forge
-            <svg className="absolute -top-2.5 -right-4 w-5 h-5 animate-pulse" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z" fill="#b8860b" />
-            </svg>
-          </span>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 text-sm font-medium text-blue-700 border border-blue-200">
