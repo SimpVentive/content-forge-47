@@ -1,22 +1,8 @@
-import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Upload } from "lucide-react";
-import contentForgeLogo from "@/assets/contentforge-logo.png";
+import { ArrowLeft } from "lucide-react";
+import { useState } from "react";
 import { useContentForge } from "@/hooks/ContentForgeContext";
-import { AVATAR_TRAINERS } from "@/lib/avatarTrainers";
 
-type UploadedAvatar = {
-  url: string;
-  name: string;
-  type: "image" | "video";
-};
-
-const avatars = AVATAR_TRAINERS.map((t) => ({
-  id: t.id,
-  name: t.name,
-  role: t.subtitle,
-  image: `/trainers/${t.id}.png`,
-}));
 
 const qualities = [
   { id: "720p", label: "720p - Fast", desc: "Faster generation (3-5 min per video)" },
