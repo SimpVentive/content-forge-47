@@ -25,9 +25,15 @@ export interface CourseParameters {
     minFontSize: number;
     lineSpacing: number;
   };
-  learningType: "static" | "video";
+  learningType: "static" | "video" | "image";
   videoQuality: "720p" | "1080p" | "4k";
   backgroundStyle: "simple" | "office" | "classroom";
+  imageStyleVariant?: "realistic" | "illustrated" | "flat-design" | "cartoon";
+  imageCount?: 1 | 2 | 3;
+  imageAspectRatio?: "landscape" | "portrait" | "square";
+  showAvatarNarrator?: boolean;
+  showCaption?: boolean;
+  voiceoverPace?: "slow" | "normal" | "fast";
 }
 
 interface CourseParametersDialogProps {
@@ -36,8 +42,8 @@ interface CourseParametersDialogProps {
   estimatedMinutes?: number | null;
   /** Whether the YouTube agent is enabled in the orchestrator. Hides YouTube-only setup sections when false. */
   youtubeAgentEnabled?: boolean;
-  /** Pre-selected learning mode (static or video). Defaults to "static". */
-  initialLearningType?: "static" | "video";
+  /** Pre-selected learning mode (static, video, or image). Defaults to "static". */
+  initialLearningType?: "static" | "video" | "image";
   onConfirm: (params: CourseParameters) => void;
   onCancel: () => void;
 }
@@ -113,6 +119,27 @@ const BACKGROUND_STYLES = [
   { id: "classroom", label: "Classroom - Educational", desc: "Classroom or training room" },
 ] as const;
 
+const IMAGE_STYLES = [
+  { id: "realistic", label: "Realistic" },
+  { id: "illustrated", label: "Illustrated" },
+  { id: "flat-design", label: "Flat Design" },
+  { id: "cartoon", label: "Cartoon" },
+] as const;
+
+const IMAGE_COUNTS = [1, 2, 3] as const;
+
+const IMAGE_ASPECT_RATIOS = [
+  { id: "landscape", label: "Landscape" },
+  { id: "portrait", label: "Portrait" },
+  { id: "square", label: "Square" },
+] as const;
+
+const VOICEOVER_PACES = [
+  { id: "slow", label: "Slow" },
+  { id: "normal", label: "Normal" },
+  { id: "fast", label: "Fast" },
+] as const;
+
 // Map duration to YouTube video count
 export const DURATION_VIDEO_COUNT: Record<string, number> = {
   "1min": 1,  // Testing
@@ -173,6 +200,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [lineSpacing, setLineSpacing] = useState<CourseParameters["slideLayout"]["lineSpacing"]>(2);
   const [videoQuality, setVideoQuality] = useState<CourseParameters["videoQuality"]>("1080p");
   const [backgroundStyle, setBackgroundStyle] = useState<CourseParameters["backgroundStyle"]>("office");
+  const [imageStyleVariant, setImageStyleVariant] = useState<CourseParameters["imageStyleVariant"]>("illustrated");
+  const [imageCount, setImageCount] = useState<CourseParameters["imageCount"]>(1);
+  const [imageAspectRatio, setImageAspectRatio] = useState<CourseParameters["imageAspectRatio"]>("landscape");
+  const [showAvatarNarrator, setShowAvatarNarrator] = useState(false);
+  const [showCaption, setShowCaption] = useState(true);
+  const [voiceoverPace, setVoiceoverPace] = useState<CourseParameters["voiceoverPace"]>("normal");
   const [showMismatchWarning, setShowMismatchWarning] = useState(false);
   const [mismatchType, setMismatchType] = useState<"more" | "less">("more");
   const [showModeConfirm, setShowModeConfirm] = useState(false);
@@ -236,6 +269,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       learningType: localLearningType,
       videoQuality,
       backgroundStyle,
+      imageStyleVariant,
+      imageCount,
+      imageAspectRatio,
+      showAvatarNarrator,
+      showCaption,
+      voiceoverPace,
     });
   };
 
@@ -267,6 +306,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       learningType: localLearningType,
       videoQuality,
       backgroundStyle,
+      imageStyleVariant,
+      imageCount,
+      imageAspectRatio,
+      showAvatarNarrator,
+      showCaption,
+      voiceoverPace,
     });
   };
 
@@ -293,6 +338,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       learningType: localLearningType,
       videoQuality,
       backgroundStyle,
+      imageStyleVariant,
+      imageCount,
+      imageAspectRatio,
+      showAvatarNarrator,
+      showCaption,
+      voiceoverPace,
     });
   };
 
@@ -403,8 +454,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </div>
 
               <p className="text-[14px] text-foreground leading-relaxed mb-6">
-                You selected <span className="font-bold">{localLearningType === "static" ? "Video Course" : "Static E-Learning"}</span>.
-                Switch to <span className="font-bold">{pendingLearningType === "static" ? "Static E-Learning" : "Video Course"}</span>?
+                You selected <span className="font-bold">{localLearningType === "static" ? "Static E-Learning" : localLearningType === "video" ? "Video Course" : "Image Course"}</span>.
+                Switch to <span className="font-bold">{pendingLearningType === "static" ? "Static E-Learning" : pendingLearningType === "video" ? "Video Course" : "Image Course"}</span>?
               </p>
               <p className="text-[13px] text-muted-foreground mb-5">
                 This will change which agents run during generation and the available course settings.
@@ -416,14 +467,14 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   className="w-full h-[52px] rounded-lg text-[14px] font-medium text-white transition-all duration-200 ease-in-out flex items-center justify-center gap-2 shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:brightness-110"
                   style={{ background: "#2563EB", fontFamily: buttonFont }}
                 >
-                  Yes, switch to {pendingLearningType === "static" ? "Static E-Learning" : "Video Course"}
+                  Yes, switch to {pendingLearningType === "static" ? "Static E-Learning" : pendingLearningType === "video" ? "Video Course" : "Image Course"}
                 </button>
                 <button
                   onClick={handleCancelModeSwitch}
                   className="w-full h-[52px] rounded-lg text-[14px] font-medium border transition-all duration-200 ease-in-out flex items-center justify-center gap-2"
                   style={{ fontFamily: buttonFont, color: "#2563EB", borderColor: "#2563EB", backgroundColor: "#FFFFFF" }}
                 >
-                  No, keep {localLearningType === "static" ? "Static E-Learning" : "Video Course"}
+                  No, keep {localLearningType === "static" ? "Static E-Learning" : localLearningType === "video" ? "Video Course" : "Image Course"}
                 </button>
               </div>
             </div>
@@ -463,6 +514,17 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               Learning Format
             </label>
             <div className="flex gap-2">
+              <button
+                onClick={() => handleModeToggleClick("image")}
+                className={`flex-1 px-4 py-2.5 rounded-[12px] border text-[13px] font-semibold transition-all duration-200 ease-in-out ${
+                  localLearningType === "image"
+                    ? "text-white border-transparent"
+                    : "border-[#E5E7EB] bg-white text-[#2E2E2E] hover:border-[#6EC1E4]"
+                }`}
+                style={localLearningType === "image" ? { background: "#b45309" } : undefined}
+              >
+                Image Course
+              </button>
               <button
                 onClick={() => handleModeToggleClick("static")}
                 className={`flex-1 px-4 py-2.5 rounded-[12px] border text-[13px] font-semibold transition-all duration-200 ease-in-out ${
@@ -611,6 +673,204 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </div>
             </div>
           </div>
+
+          {/* Image Course Sections */}
+          {localLearningType === "image" && (
+          <div className="space-y-5">
+            {/* Avatar Narrator */}
+            <div className={surfaceCardClass + " flex items-center justify-between"}>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[13px] font-bold text-foreground">Show Avatar Narrator</p>
+                  <InfoHint text="An animated avatar will appear alongside each image explaining the content." />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">Display an animated instructor with images</p>
+              </div>
+              <button
+                onClick={() => setShowAvatarNarrator(!showAvatarNarrator)}
+                className={`w-12 h-6 rounded-full transition-all duration-200 ease-in-out relative ${
+                  showAvatarNarrator ? "bg-[#34D399]" : "bg-[#D1D5DB]"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full bg-white shadow-sm absolute top-0.5 transition-all duration-200 ease-in-out ${
+                  showAvatarNarrator ? "left-[26px]" : "left-[2px]"
+                }`} />
+              </button>
+            </div>
+
+            {/* Show instructor grid when avatar narrator is enabled */}
+            {showAvatarNarrator && (
+            <div className={surfaceCardClass}>
+              <div className="space-y-2">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[12px] font-bold text-foreground">Select Your Instructor</p>
+                  <InfoHint text="Choose the virtual trainer shown to learners. Indian languages default to Indian trainers in auto mode." />
+                  <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                    {trainerAutoMode ? "Auto" : "Manual"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                  {AVATAR_TRAINERS.map((trainer) => {
+                    const selected = avatarTrainerId === trainer.id;
+                    const trainerMedia = getTrainerMedia(trainer.id, avatarEnv);
+
+                    return (
+                      <button
+                        key={trainer.id}
+                        onClick={() => {
+                          setAvatarTrainerId(trainer.id);
+                          setTrainerAutoMode(false);
+                        }}
+                        className={`overflow-hidden rounded-[12px] border bg-white text-left transition-all duration-200 ease-in-out ${
+                          selected ? "border-transparent shadow-[0_8px_20px_rgba(181,126,220,0.2)]" : "border-[#E5E7EB] hover:border-[#6EC1E4]"
+                        }`}
+                        style={selected ? { boxShadow: "0 0 0 2px rgba(37,99,235,0.25), 0 8px 20px rgba(37,99,235,0.2)" } : undefined}
+                        type="button"
+                      >
+                        <div className="relative flex h-[112px] items-center justify-center bg-[#F3F4F6]">
+                          <img
+                            src={trainerMedia.imageUrl}
+                            alt={trainer.name}
+                            className={`h-24 w-24 rounded-full border-2 border-[#E5E7EB] object-cover transition-transform duration-300 ${selected ? "scale-[1.05]" : "scale-100"}`}
+                            onError={(event) => {
+                              event.currentTarget.src = "/placeholder.svg";
+                            }}
+                          />
+                          {selected ? (
+                            <span className="absolute bottom-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-black text-white shadow"
+                              style={{ background: "#2563EB" }}>
+                              <Check className="h-3.5 w-3.5" />
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="px-2 py-1.5">
+                          <p className={`truncate text-[12px] font-bold ${selected ? "text-primary" : "text-foreground"}`}>{trainer.name}</p>
+                          <p className="text-[10px] text-muted-foreground">{trainer.region === "india" ? "India trainer" : "Global trainer"}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            )}
+
+            {/* Image Style */}
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Image Visual Style
+                <InfoHint text="Choose the visual style for all generated images." />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {IMAGE_STYLES.map((style) => (
+                  <button
+                    key={style.id}
+                    onClick={() => setImageStyleVariant(style.id as CourseParameters["imageStyleVariant"])}
+                    className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
+                      imageStyleVariant === style.id
+                        ? "text-white"
+                        : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
+                    }`}
+                    style={imageStyleVariant === style.id ? { background: "#b45309", borderColor: "transparent" } : undefined}
+                  >
+                    {style.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Images per Step */}
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Images per SOP Step
+                <InfoHint text="How many images to generate per step of the procedure." />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {IMAGE_COUNTS.map((count) => (
+                  <button
+                    key={count}
+                    onClick={() => setImageCount(count as CourseParameters["imageCount"])}
+                    className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
+                      imageCount === count
+                        ? "text-white"
+                        : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
+                    }`}
+                    style={imageCount === count ? { background: "#b45309", borderColor: "transparent" } : undefined}
+                  >
+                    {count}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Image Aspect Ratio */}
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Image Aspect Ratio
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {IMAGE_ASPECT_RATIOS.map((ratio) => (
+                  <button
+                    key={ratio.id}
+                    onClick={() => setImageAspectRatio(ratio.id as CourseParameters["imageAspectRatio"])}
+                    className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
+                      imageAspectRatio === ratio.id
+                        ? "text-white"
+                        : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
+                    }`}
+                    style={imageAspectRatio === ratio.id ? { background: "#b45309", borderColor: "transparent" } : undefined}
+                  >
+                    {ratio.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Caption Below Image */}
+            <div className={surfaceCardClass + " flex items-center justify-between"}>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[13px] font-bold text-foreground">Show Caption Below Image</p>
+                  <InfoHint text="Displays a short text caption under each image during playback." />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">Display text beneath images</p>
+              </div>
+              <button
+                onClick={() => setShowCaption(!showCaption)}
+                className={`w-12 h-6 rounded-full transition-all duration-200 ease-in-out relative ${
+                  showCaption ? "bg-[#34D399]" : "bg-[#D1D5DB]"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full bg-white shadow-sm absolute top-0.5 transition-all duration-200 ease-in-out ${
+                  showCaption ? "left-[26px]" : "left-[2px]"
+                }`} />
+              </button>
+            </div>
+
+            {/* Voiceover Pace */}
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Voiceover Pace
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {VOICEOVER_PACES.map((pace) => (
+                  <button
+                    key={pace.id}
+                    onClick={() => setVoiceoverPace(pace.id as CourseParameters["voiceoverPace"])}
+                    className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
+                      voiceoverPace === pace.id
+                        ? "text-white"
+                        : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
+                    }`}
+                    style={voiceoverPace === pace.id ? { background: "#b45309", borderColor: "transparent" } : undefined}
+                  >
+                    {pace.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          )}
 
           {/* Duration */}
           <div className={surfaceCardClass}>
@@ -1043,12 +1303,29 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Text Language:</span> {textLanguage}</p>
                     <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Narration Language:</span> {narratorLanguage}</p>
                     <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Narrator Voice:</span> {selectedVoiceLabel}</p>
-                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Instructor:</span> {selectedTrainer.name}</p>
+
+                    {localLearningType === "image" ? (
+                      <>
+                        <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Avatar:</span> {showAvatarNarrator ? selectedTrainer.name : "None"}</p>
+                        <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Image Style:</span> {IMAGE_STYLES.find((s) => s.id === imageStyleVariant)?.label || "Illustrated"}</p>
+                        <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Images per Step:</span> {imageCount}</p>
+                        <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Aspect Ratio:</span> {IMAGE_ASPECT_RATIOS.find((r) => r.id === imageAspectRatio)?.label || "Landscape"}</p>
+                        <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Caption:</span> {showCaption ? "Enabled" : "Disabled"}</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Instructor:</span> {selectedTrainer.name}</p>
+                        {localLearningType === "static" && (
+                          <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Flip Style:</span> {FLIP_STYLE_OPTIONS.find((option) => option.value === flipStyle)?.label || "Bound Flipchart"}</p>
+                        )}
+                      </>
+                    )}
+
                     <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Duration:</span> {selectedDurationLabel}</p>
-                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Flip Style:</span> {FLIP_STYLE_OPTIONS.find((option) => option.value === flipStyle)?.label || "Bound Flipchart"}</p>
                   </div>
                 </div>
 
+                {((localLearningType === "image" && showAvatarNarrator) || localLearningType !== "image") && (
                 <div className="mt-4 overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
                   <div className="relative h-[280px] w-full overflow-hidden bg-[#F3F4F6]">
                     <img
@@ -1066,8 +1343,10 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     </div>
                   </div>
                 </div>
+                )}
               </div>
 
+              {((localLearningType === "image" && showAvatarNarrator) || localLearningType !== "image") && (
               <div className="mt-6 rounded-[12px] bg-white border border-[#E5E7EB] p-4 shadow-[0_4px_12px_rgba(0,0,0,0.08)]">
                 <div className="flex items-center gap-3">
                   <img
@@ -1082,6 +1361,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   </div>
                 </div>
               </div>
+              )}
             </aside>
           </div>
         </TooltipProvider>

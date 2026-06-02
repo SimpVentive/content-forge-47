@@ -237,14 +237,14 @@ const Index = () => {
     }
 
     // Re-sync agent toggles based on confirmed learning type
-    if (params.learningType === "video") {
+    if (params.learningType === "video" || params.learningType === "image") {
       setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: true }));
     } else {
       setAgentToggles((prev) => ({ ...prev, animation: true, youtube: true, compliance: true, heygen: false }));
     }
 
-    // For video mode: verify HeyGen is configured (auto-seeded on app boot)
-    if (params.learningType === "video") {
+    // For video and image modes: verify HeyGen is configured (auto-seeded on app boot)
+    if (params.learningType === "video" || params.learningType === "image") {
       const { getHeyGenSettings } = await import("@/lib/heygenDefaults");
       const heygenConfig = getHeyGenSettings();
       if (!heygenConfig?.apiKey) {
@@ -348,7 +348,7 @@ const Index = () => {
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 text-sm font-medium text-blue-700 border border-blue-200">
             <span className="capitalize text-xs font-semibold px-1.5 py-0.5 rounded bg-blue-200">
-              {learningType === "video" ? "🎥 Video" : "📊 Static"}
+              {learningType === "video" ? "🎥 Video" : learningType === "image" ? "🖼️ Image" : "📊 Static"}
             </span>
           </div>
           {learningType === "video" && courseParams && (
@@ -542,7 +542,7 @@ const Index = () => {
                     <div>
                       <p className="text-[14px] font-[900] uppercase tracking-[0.16em] text-[#315a9b]">Orchestration In Progress</p>
                       <p className="mt-1 text-[14px] font-semibold leading-relaxed text-[#1f3557]">
-                        Multiple AI Agents are orchestrating the content of your {learningType === "video" ? "Video Learning" : "E-Learning"}. This may take a minute or two.
+                        Multiple AI Agents are orchestrating the content of your {learningType === "video" ? "Video Learning" : learningType === "image" ? "Image-Based Learning" : "E-Learning"}. This may take a minute or two.
                       </p>
                     </div>
                   </div>
