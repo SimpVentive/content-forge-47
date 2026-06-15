@@ -27,6 +27,8 @@ export interface RawAgentOutputs {
   voice: string;
   assembly: string;
   heygenVideos?: string;
+  narrativeScenes?: string; // JSON string of TopicNarrative[] for image-based learning
+  flipbookHTML?: string; // Generated interactive HTML flipbook
 }
 
 export const AGENTS: Omit<AgentInfo, "status">[] = [

@@ -3,6 +3,7 @@ import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/t
 import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
+import { buildNarrativeScenePrompt, buildImageGenerationPrompts, type TopicNarrative } from "@/lib/visualNarrativeService";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -960,6 +961,86 @@ OUTPUT FORMAT — ABSOLUTE:
       }
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
+      // ──── AGENT 3c: Visual Narrative (image-based learning only) ────
+      let narrativeScenes: TopicNarrative[] = [];
+      if (learningMode === "image_based_learning" && toggles["visual"] !== false) {
+        setStatus("visual", "running");
+        addLog("Visual Narrative Agent: Generating scene breakdowns for image storytelling...");
+        try {
+          const sceneCount = params?.imageNarrativeSceneCount || 4;
+          const parsedArch = tryParseJson(archResult) || {};
+          const modules = parsedArch.modules || [];
+
+          for (let mi = 0; mi < Math.min(modules.length, 2); mi++) {
+            if (isCancelled()) break;
+            const mod = modules[mi];
+            const modTitle = mod.module_title || mod.title || `Module ${mi + 1}`;
+            const topics = (mod.topics || mod.sections || []);
+
+            for (let ti = 0; ti < Math.min(topics.length, 2); ti++) {
+              if (isCancelled()) break;
+              const topic = topics[ti];
+              const topicTitle = typeof topic === "string" ? topic : topic.topic_title || topic.title || `Topic ${ti + 1}`;
+              const objective = typeof topic === "string" ? "" : topic.learning_objective || topic.objective || "";
+
+              addLog(`Visual Narrative Agent: Creating ${sceneCount}-scene narrative for "${topicTitle}"...`);
+
+              const narrativePrompt = buildNarrativeScenePrompt(
+                topicTitle,
+                objective,
+                writerResult.slice(0, 1500),
+                sceneCount,
+                params?.level || "intermediate"
+              );
+
+              const narrativeResult = await runAgentWithLanguage(
+                `${languageDirective}${narrativePrompt}`,
+                `Create a ${sceneCount}-scene visual narrative for: ${topicTitle}. Make it story-like, with each scene building on the previous. Output ONLY valid JSON.`,
+                addLog,
+                "Visual Narrative Agent",
+                45000
+              );
+
+              try {
+                const parsed = tryParseJson(narrativeResult);
+                if (parsed?.scenes && Array.isArray(parsed.scenes)) {
+                  const enhanced = buildImageGenerationPrompts(
+                    parsed.scenes.map((s: any) => ({
+                      sceneNumber: s.sceneNumber || 0,
+                      title: s.title || "",
+                      caption: s.caption || "",
+                      narration: s.narration || "",
+                      imagePrompt: s.imagePrompt || "",
+                    })),
+                    topicTitle,
+                    params?.imageStyleVariant || "illustrated",
+                    params?.imageAspectRatio || "landscape"
+                  );
+
+                  narrativeScenes.push({
+                    topicTitle,
+                    topicObjective: objective,
+                    sceneCount,
+                    scenes: enhanced,
+                    totalNarrativeText: enhanced.map(s => s.caption).join(" "),
+                  });
+                }
+              } catch {
+                addLog(`Visual Narrative Agent: Failed to parse narrative for ${topicTitle}. Continuing...`);
+              }
+            }
+          }
+
+          setStatus("visual", "complete");
+          setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
+          addLog(`Visual Narrative Agent: Complete. ${narrativeScenes.length} topic narratives generated.`);
+        } catch (err) {
+          addLog(`Visual Narrative Agent: Error — ${(err as Error).message}. Continuing...`);
+          setStatus("visual", "error");
+        }
+      }
+
+      if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 4: Visual Design ────
       if (toggles["visual"] !== false) {
         setStatus("visual", "running");
@@ -977,6 +1058,49 @@ OUTPUT FORMAT — ABSOLUTE:
           outline: prev.outline + `\n\n---\n\n## Visual Design Plan\n\n${visualResult}`,
         }));
         addLog("Visual Design Agent: Complete. Design plan ready.");
+
+        // ── Narrative Image Generation (image-based learning) ──
+        if (learningMode === "image_based_learning" && narrativeScenes.length > 0) {
+          addLog("Visual Design Agent: Generating narrative scene images with Flux 2...");
+          try {
+            for (let ni = 0; ni < narrativeScenes.length; ni++) {
+              if (isCancelled()) break;
+              const narrative = narrativeScenes[ni];
+
+              for (let si = 0; si < narrative.scenes.length; si++) {
+                if (isCancelled()) break;
+                const scene = narrative.scenes[si];
+
+                addLog(`Visual Design Agent: Generating image ${ni + 1}.${si + 1} — "${narrative.topicTitle}" Scene ${scene.sceneNumber}...`);
+
+                try {
+                  const { data: imageData, error: imageError } = await supabase.functions.invoke("generate-slide-image", {
+                    body: {
+                      prompt: scene.imagePrompt,
+                      style: params?.imageStyleVariant || "illustrated",
+                      altText: scene.caption,
+                      moduleTitle: `${narrative.topicTitle}`,
+                      topicTitle: `Scene ${scene.sceneNumber}: ${scene.title}`,
+                    },
+                  });
+
+                  if (!imageError && imageData?.imageDataUrl) {
+                    scene.imageDataUrl = imageData.imageDataUrl;
+                  } else {
+                    addLog(`Visual Design Agent: Image generation failed for scene ${scene.sceneNumber}. Will use placeholder.`);
+                  }
+                } catch (imgErr) {
+                  addLog(`Visual Design Agent: Image generation error for scene ${scene.sceneNumber}: ${(imgErr as Error).message}`);
+                }
+              }
+            }
+
+            setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
+            addLog(`Visual Design Agent: Generated ${narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0)} narrative scene images.`);
+          } catch (narrativeImgErr) {
+            addLog(`Visual Design Agent: Narrative image generation error — ${(narrativeImgErr as Error).message}`);
+          }
+        }
 
         // ── SVG Generation Pass ──
         addLog("Visual Design Agent: Generating SVG infographics and AI scene visuals...");
