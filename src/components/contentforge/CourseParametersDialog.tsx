@@ -34,6 +34,9 @@ export interface CourseParameters {
   showAvatarNarrator?: boolean;
   showCaption?: boolean;
   voiceoverPace?: "slow" | "normal" | "fast";
+  imageNarrativeSceneCount?: 3 | 4 | 5 | 6;
+  flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal";
+  imageOutputFormat?: "interactive-html" | "video" | "pdf";
 }
 
 interface CourseParametersDialogProps {
@@ -140,6 +143,20 @@ const VOICEOVER_PACES = [
   { id: "fast", label: "Fast" },
 ] as const;
 
+const IMAGE_NARRATIVE_SCENE_COUNTS = [3, 4, 5, 6] as const;
+
+const FLIPBOOK_DISPLAY_STYLES = [
+  { id: "page-flip", label: "Page Flip", desc: "Realistic page-turning animation" },
+  { id: "smooth-slide", label: "Smooth Slide", desc: "Smooth carousel transition" },
+  { id: "step-reveal", label: "Step Reveal", desc: "Progressive reveal with captions" },
+] as const;
+
+const IMAGE_OUTPUT_FORMATS = [
+  { id: "interactive-html", label: "Interactive HTML", desc: "Web-ready flipbook for LMS/browser" },
+  { id: "video", label: "Video", desc: "Stitched video sequence with narration" },
+  { id: "pdf", label: "PDF Flipbook", desc: "PDF with flip effect and captions" },
+] as const;
+
 // Map duration to YouTube video count
 export const DURATION_VIDEO_COUNT: Record<string, number> = {
   "1min": 1,  // Testing
@@ -206,6 +223,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [showAvatarNarrator, setShowAvatarNarrator] = useState(false);
   const [showCaption, setShowCaption] = useState(true);
   const [voiceoverPace, setVoiceoverPace] = useState<CourseParameters["voiceoverPace"]>("normal");
+  const [imageNarrativeSceneCount, setImageNarrativeSceneCount] = useState<CourseParameters["imageNarrativeSceneCount"]>(4);
+  const [flipbookDisplayStyle, setFlipbookDisplayStyle] = useState<CourseParameters["flipbookDisplayStyle"]>("smooth-slide");
+  const [imageOutputFormat, setImageOutputFormat] = useState<CourseParameters["imageOutputFormat"]>("interactive-html");
   const [showMismatchWarning, setShowMismatchWarning] = useState(false);
   const [mismatchType, setMismatchType] = useState<"more" | "less">("more");
   const [showModeConfirm, setShowModeConfirm] = useState(false);
@@ -275,6 +295,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       showAvatarNarrator,
       showCaption,
       voiceoverPace,
+      imageNarrativeSceneCount,
+      flipbookDisplayStyle,
+      imageOutputFormat,
     });
   };
 
@@ -344,6 +367,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       showAvatarNarrator,
       showCaption,
       voiceoverPace,
+      imageNarrativeSceneCount,
+      flipbookDisplayStyle,
+      imageOutputFormat,
     });
   };
 
@@ -865,6 +891,78 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     style={voiceoverPace === pace.id ? { background: "#b45309", borderColor: "transparent" } : undefined}
                   >
                     {pace.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Image Narrative Scene Count */}
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Scenes per Topic (Visual Story)
+                <InfoHint text="Create a narrative story with multiple connected images per topic, like a comic strip. More scenes = richer storytelling." />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {IMAGE_NARRATIVE_SCENE_COUNTS.map((count) => (
+                  <button
+                    key={count}
+                    onClick={() => setImageNarrativeSceneCount(count as CourseParameters["imageNarrativeSceneCount"])}
+                    className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
+                      imageNarrativeSceneCount === count
+                        ? "text-white"
+                        : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
+                    }`}
+                    style={imageNarrativeSceneCount === count ? { background: "#b45309", borderColor: "transparent" } : undefined}
+                  >
+                    {count} Scenes
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Flipbook Display Style */}
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Display Style
+                <InfoHint text="How the image sequence will be displayed to learners." />
+              </label>
+              <div className="space-y-2">
+                {FLIPBOOK_DISPLAY_STYLES.map((style) => (
+                  <button
+                    key={style.id}
+                    onClick={() => setFlipbookDisplayStyle(style.id as CourseParameters["flipbookDisplayStyle"])}
+                    className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                      flipbookDisplayStyle === style.id
+                        ? "border-[#b45309] bg-orange-50"
+                        : "border-[#E5E7EB] hover:border-[#b45309]"
+                    }`}
+                  >
+                    <p className="text-[13px] font-semibold text-[#2E2E2E]">{style.label}</p>
+                    <p className="text-[11px] text-[#6B7280]">{style.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Image Output Format */}
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Final Output Format
+                <InfoHint text="Choose how the image narrative will be delivered to learners." />
+              </label>
+              <div className="space-y-2">
+                {IMAGE_OUTPUT_FORMATS.map((format) => (
+                  <button
+                    key={format.id}
+                    onClick={() => setImageOutputFormat(format.id as CourseParameters["imageOutputFormat"])}
+                    className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                      imageOutputFormat === format.id
+                        ? "border-[#b45309] bg-orange-50"
+                        : "border-[#E5E7EB] hover:border-[#b45309]"
+                    }`}
+                  >
+                    <p className="text-[13px] font-semibold text-[#2E2E2E]">{format.label}</p>
+                    <p className="text-[11px] text-[#6B7280]">{format.desc}</p>
                   </button>
                 ))}
               </div>
