@@ -36,11 +36,10 @@ serve(async (req) => {
 
   try {
     const { prompt, style, altText, moduleTitle, topicTitle } = await req.json();
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
-    const model = Deno.env.get("AI_IMAGE_MODEL") || "openai/gpt-image-1";
+    const apiKey = Deno.env.get("BFL_API_KEY");
 
     if (!apiKey) {
-      throw new Error("LOVABLE_API_KEY is not set");
+      throw new Error("BFL_API_KEY (Black Forest Labs Flux 2) is not set");
     }
 
     if (!prompt || typeof prompt !== "string") {
@@ -61,19 +60,19 @@ serve(async (req) => {
       prompt,
     ].join(" ");
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+    // Call Black Forest Labs Flux 2 API
+    const response = await fetch("https://api.bfl.ml/v1/image", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        "X-API-Key": apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model,
         prompt: enhancedPrompt,
-        size: "1536x1024",
-        quality: "medium",
-        n: 1,
-        response_format: "b64_json",
+        width: 1536,
+        height: 1024,
+        steps: 28,
+        guidance_scale: 7.5,
       }),
     });
 
@@ -83,8 +82,8 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-    if (response.status === 402) {
-      return new Response(JSON.stringify({ error: "AI credits exhausted. Add funds in Settings -> Workspace -> Usage." }), {
+    if (response.status === 402 || response.status === 403) {
+      return new Response(JSON.stringify({ error: "Invalid or expired API key. Please check BFL_API_KEY configuration." }), {
         status: 402,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -93,31 +92,20 @@ serve(async (req) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || data.error || "AI image generation failed");
+      throw new Error(data.error?.message || data.error || "Flux 2 image generation failed");
     }
 
-    const imagePayload = data?.data?.[0] || data?.images?.[0] || null;
-    if (!imagePayload) {
-      throw new Error("AI image generation returned no image payload");
+    // Flux 2 returns a result with a URL that needs polling or direct fetch
+    const imageUrl = data?.result?.sample || data?.result?.images?.[0] || data?.sample || null;
+    if (!imageUrl) {
+      throw new Error("Flux 2 image generation returned no image URL");
     }
 
-    if (imagePayload.b64_json) {
-      return new Response(JSON.stringify({
-        imageDataUrl: `data:image/png;base64,${imagePayload.b64_json}`,
-        mimeType: "image/png",
-      }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (imagePayload.url) {
-      const fetched = await fetchImageAsDataUrl(imagePayload.url);
-      return new Response(JSON.stringify(fetched), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    throw new Error("Unsupported AI image response format");
+    // Fetch the image and convert to base64
+    const fetched = await fetchImageAsDataUrl(imageUrl);
+    return new Response(JSON.stringify(fetched), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return new Response(JSON.stringify({ error: message }), {
