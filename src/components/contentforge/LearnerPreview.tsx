@@ -623,6 +623,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   const writerText = rawOutputs.writer || "";
   const assessData = tryParseJSON(rawOutputs.assessment);
   const visualData = tryParseJSON(rawOutputs.visual);
+  const narrativeScenesData = tryParseJSON(rawOutputs.narrativeScenes);
   const durationMinutes = getDurationMinutes(courseDuration);
 
   // Extract modules
@@ -687,6 +688,16 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       }
 
       const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes, maxLines);
+
+      // For image-based learning, use narrative scenes; otherwise use visual design plan
+      let narrativeForTopic = null;
+      if (narrativeScenesData) {
+        const narratives = Array.isArray(narrativeScenesData) ? narrativeScenesData : [narrativeScenesData];
+        narrativeForTopic = narratives.find((n: any) =>
+          normalizeModuleKey(n.topicTitle || "") === normalizeModuleKey(topic)
+        );
+      }
+
       const topicVisual = getTopicVisual(matchedVisualModule, topic);
       const generatedImageDataUrl = typeof topicVisual?.generated_image_data_url === "string" && topicVisual.generated_image_data_url.trim().length > 0
         ? topicVisual.generated_image_data_url
@@ -697,7 +708,19 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       const screenTemplate = topicVisual?.screen_template === "dashboard" || topicVisual?.screen_template === "guided-notes" || topicVisual?.screen_template === "scenario" || topicVisual?.screen_template === "media-quiz" || topicVisual?.screen_template === "summary-panel"
         ? topicVisual.screen_template
         : undefined;
+
       contentChunks.forEach((chunk, chunkIndex) => {
+        // For image-based learning with narrative scenes, use the first scene's image on the first chunk
+        let visualUrl = undefined;
+        let visualAlt = undefined;
+        if (narrativeForTopic && chunkIndex === 0) {
+          const scenes = Array.isArray(narrativeForTopic.scenes) ? narrativeForTopic.scenes : [];
+          if (scenes.length > 0) {
+            visualUrl = scenes[0].imageDataUrl;
+            visualAlt = scenes[0].caption || `${topic} visual`;
+          }
+        }
+
         slides.push({
           type: "content",
           moduleIndex: mi,
@@ -709,10 +732,10 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
           content: chunk.text,
           wasTrimmedForLayout: chunk.wasTrimmed,
           infographicSvg: ti === 0 && chunkIndex === 0 ? infographicDescription : undefined,
-          visualImageDataUrl: chunkIndex === 0 ? generatedImageDataUrl : undefined,
+          visualImageDataUrl: chunkIndex === 0 ? (visualUrl || generatedImageDataUrl) : undefined,
           visualSvg: chunkIndex === 0 ? generatedSceneSvg : undefined,
           visualPlacement: chunkIndex === 0 ? topicVisual?.placement : undefined,
-          visualAltText: chunkIndex === 0 ? topicVisual?.alt_text : undefined,
+          visualAltText: chunkIndex === 0 ? (visualAlt || topicVisual?.alt_text) : undefined,
           visualPrompt: chunkIndex === 0 ? topicVisual?.image_prompt : undefined,
           visualApproved: chunkIndex === 0 ? Boolean(topicVisual?.image_approved) : undefined,
           contentTemplate: chunkIndex === 0 ? screenTemplate : "guided-notes",

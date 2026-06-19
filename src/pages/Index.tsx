@@ -118,7 +118,7 @@ const Index = () => {
         } catch {
           // parse failed; stay on page
         }
-      } else if (rawOutputs.youtube) {
+      } else if (rawOutputs.youtube && courseParams?.learningType !== "image") {
         setTimeout(() => setShowVideoWorkflow(true), 800);
       }
     }
