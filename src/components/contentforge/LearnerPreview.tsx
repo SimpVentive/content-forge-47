@@ -687,8 +687,6 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         sectionText = `Content for "${topic}" will appear here after running the pipeline.`;
       }
 
-      const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes, maxLines);
-
       // For image-based learning, use narrative scenes; otherwise use visual design plan
       let narrativeForTopic = null;
       if (narrativeScenesData) {
@@ -698,49 +696,65 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         );
       }
 
-      const topicVisual = getTopicVisual(matchedVisualModule, topic);
-      const generatedImageDataUrl = typeof topicVisual?.generated_image_data_url === "string" && topicVisual.generated_image_data_url.trim().length > 0
-        ? topicVisual.generated_image_data_url
-        : undefined;
-      const generatedSceneSvg = typeof topicVisual?.generated_scene_svg === "string" && topicVisual.generated_scene_svg.trim().length > 0
-        ? normalizeSvg(topicVisual.generated_scene_svg)
-        : undefined;
-      const screenTemplate = topicVisual?.screen_template === "dashboard" || topicVisual?.screen_template === "guided-notes" || topicVisual?.screen_template === "scenario" || topicVisual?.screen_template === "media-quiz" || topicVisual?.screen_template === "summary-panel"
-        ? topicVisual.screen_template
-        : undefined;
-
-      contentChunks.forEach((chunk, chunkIndex) => {
-        // For image-based learning with narrative scenes, use the first scene's image on the first chunk
-        let visualUrl = undefined;
-        let visualAlt = undefined;
-        if (narrativeForTopic && chunkIndex === 0) {
-          const scenes = Array.isArray(narrativeForTopic.scenes) ? narrativeForTopic.scenes : [];
-          if (scenes.length > 0) {
-            visualUrl = scenes[0].imageDataUrl;
-            visualAlt = scenes[0].caption || `${topic} visual`;
-          }
-        }
-
-        slides.push({
-          type: "content",
-          moduleIndex: mi,
-          moduleTitle: mod.title,
-          topicIndex: ti,
-          topicTitle: topic,
-          topicPartIndex: chunkIndex,
-          topicPartCount: contentChunks.length,
-          content: chunk.text,
-          wasTrimmedForLayout: chunk.wasTrimmed,
-          infographicSvg: ti === 0 && chunkIndex === 0 ? infographicDescription : undefined,
-          visualImageDataUrl: chunkIndex === 0 ? (visualUrl || generatedImageDataUrl) : undefined,
-          visualSvg: chunkIndex === 0 ? generatedSceneSvg : undefined,
-          visualPlacement: chunkIndex === 0 ? topicVisual?.placement : undefined,
-          visualAltText: chunkIndex === 0 ? (visualAlt || topicVisual?.alt_text) : undefined,
-          visualPrompt: chunkIndex === 0 ? topicVisual?.image_prompt : undefined,
-          visualApproved: chunkIndex === 0 ? Boolean(topicVisual?.image_approved) : undefined,
-          contentTemplate: chunkIndex === 0 ? screenTemplate : "guided-notes",
+      // If narrative scenes exist, create one slide per scene (image-based learning flow)
+      if (narrativeForTopic && Array.isArray(narrativeForTopic.scenes) && narrativeForTopic.scenes.length > 0) {
+        narrativeForTopic.scenes.forEach((scene: any, sceneIndex: number) => {
+          slides.push({
+            type: "content",
+            moduleIndex: mi,
+            moduleTitle: mod.title,
+            topicIndex: ti,
+            topicTitle: topic,
+            topicPartIndex: sceneIndex,
+            topicPartCount: narrativeForTopic.scenes.length,
+            content: scene.caption || scene.narration || "",
+            wasTrimmedForLayout: false,
+            infographicSvg: ti === 0 && sceneIndex === 0 ? infographicDescription : undefined,
+            visualImageDataUrl: scene.imageDataUrl,
+            visualSvg: undefined,
+            visualPlacement: "top",
+            visualAltText: scene.caption || `${topic} - Scene ${scene.sceneNumber}`,
+            visualPrompt: scene.imagePrompt,
+            visualApproved: Boolean(scene.imageDataUrl),
+            contentTemplate: "scenario",
+          });
         });
-      });
+      } else {
+        // Fallback to content chunks for non-image-based or when no narrative scenes
+        const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes, maxLines);
+        const topicVisual = getTopicVisual(matchedVisualModule, topic);
+        const generatedImageDataUrl = typeof topicVisual?.generated_image_data_url === "string" && topicVisual.generated_image_data_url.trim().length > 0
+          ? topicVisual.generated_image_data_url
+          : undefined;
+        const generatedSceneSvg = typeof topicVisual?.generated_scene_svg === "string" && topicVisual.generated_scene_svg.trim().length > 0
+          ? normalizeSvg(topicVisual.generated_scene_svg)
+          : undefined;
+        const screenTemplate = topicVisual?.screen_template === "dashboard" || topicVisual?.screen_template === "guided-notes" || topicVisual?.screen_template === "scenario" || topicVisual?.screen_template === "media-quiz" || topicVisual?.screen_template === "summary-panel"
+          ? topicVisual.screen_template
+          : undefined;
+
+        contentChunks.forEach((chunk, chunkIndex) => {
+          slides.push({
+            type: "content",
+            moduleIndex: mi,
+            moduleTitle: mod.title,
+            topicIndex: ti,
+            topicTitle: topic,
+            topicPartIndex: chunkIndex,
+            topicPartCount: contentChunks.length,
+            content: chunk.text,
+            wasTrimmedForLayout: chunk.wasTrimmed,
+            infographicSvg: ti === 0 && chunkIndex === 0 ? infographicDescription : undefined,
+            visualImageDataUrl: chunkIndex === 0 ? generatedImageDataUrl : undefined,
+            visualSvg: chunkIndex === 0 ? generatedSceneSvg : undefined,
+            visualPlacement: chunkIndex === 0 ? topicVisual?.placement : undefined,
+            visualAltText: chunkIndex === 0 ? topicVisual?.alt_text : undefined,
+            visualPrompt: chunkIndex === 0 ? topicVisual?.image_prompt : undefined,
+            visualApproved: chunkIndex === 0 ? Boolean(topicVisual?.image_approved) : undefined,
+            contentTemplate: chunkIndex === 0 ? screenTemplate : "guided-notes",
+          });
+        });
+      }
       topicCounter++;
     });
 
