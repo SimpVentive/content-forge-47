@@ -971,13 +971,13 @@ OUTPUT FORMAT — ABSOLUTE:
           const parsedArch = tryParseJson(archResult) || {};
           const modules = parsedArch.modules || [];
 
-          for (let mi = 0; mi < Math.min(modules.length, 2); mi++) {
+          for (let mi = 0; mi < modules.length; mi++) {
             if (isCancelled()) break;
             const mod = modules[mi];
             const modTitle = mod.module_title || mod.title || `Module ${mi + 1}`;
             const topics = (mod.topics || mod.sections || []);
 
-            for (let ti = 0; ti < Math.min(topics.length, 2); ti++) {
+            for (let ti = 0; ti < topics.length; ti++) {
               if (isCancelled()) break;
               const topic = topics[ti];
               const topicTitle = typeof topic === "string" ? topic : topic.topic_title || topic.title || `Topic ${ti + 1}`;
