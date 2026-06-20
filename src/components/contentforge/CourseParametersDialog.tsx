@@ -873,76 +873,82 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </button>
             </div>
 
-            {/* Voiceover Pace */}
-            <div className={surfaceCardClass}>
-              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
-                Voiceover Pace
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {VOICEOVER_PACES.map((pace) => (
-                  <button
-                    key={pace.id}
-                    onClick={() => setVoiceoverPace(pace.id as CourseParameters["voiceoverPace"])}
-                    className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
-                      voiceoverPace === pace.id
-                        ? "text-white"
-                        : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
-                    }`}
-                    style={voiceoverPace === pace.id ? { background: "#b45309", borderColor: "transparent" } : undefined}
-                  >
-                    {pace.label}
-                  </button>
-                ))}
+            {/* Voiceover Pace - Only for Static E-Learning */}
+            {localLearningType !== "image" && (
+              <div className={surfaceCardClass}>
+                <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                  Voiceover Pace
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {VOICEOVER_PACES.map((pace) => (
+                    <button
+                      key={pace.id}
+                      onClick={() => setVoiceoverPace(pace.id as CourseParameters["voiceoverPace"])}
+                      className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
+                        voiceoverPace === pace.id
+                          ? "text-white"
+                          : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
+                      }`}
+                      style={voiceoverPace === pace.id ? { background: "#b45309", borderColor: "transparent" } : undefined}
+                    >
+                      {pace.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Image Narrative Scene Count */}
-            <div className={surfaceCardClass}>
-              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
-                Scenes per Topic (Visual Story)
-                <InfoHint text="Create a narrative story with multiple connected images per topic, like a comic strip. More scenes = richer storytelling." />
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {IMAGE_NARRATIVE_SCENE_COUNTS.map((count) => (
-                  <button
-                    key={count}
-                    onClick={() => setImageNarrativeSceneCount(count as CourseParameters["imageNarrativeSceneCount"])}
-                    className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
-                      imageNarrativeSceneCount === count
-                        ? "text-white"
-                        : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
-                    }`}
-                    style={imageNarrativeSceneCount === count ? { background: "#b45309", borderColor: "transparent" } : undefined}
+            {/* Image Narrative Scene Count - Only for Image Course */}
+            {localLearningType === "image" && (
+              <div className={surfaceCardClass}>
+                <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                  Scenes per Topic (Visual Story)
+                  <InfoHint text="Create a narrative story with multiple connected images per topic, like a comic strip. More scenes = richer storytelling." />
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {IMAGE_NARRATIVE_SCENE_COUNTS.map((count) => (
+                    <button
+                      key={count}
+                      onClick={() => setImageNarrativeSceneCount(count as CourseParameters["imageNarrativeSceneCount"])}
+                      className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
+                        imageNarrativeSceneCount === count
+                          ? "text-white"
+                          : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
+                      }`}
+                      style={imageNarrativeSceneCount === count ? { background: "#b45309", borderColor: "transparent" } : undefined}
                   >
                     {count} Scenes
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* Flipbook Display Style */}
-            <div className={surfaceCardClass}>
-              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
-                Display Style
-                <InfoHint text="How the image sequence will be displayed to learners." />
-              </label>
-              <div className="space-y-2">
-                {FLIPBOOK_DISPLAY_STYLES.map((style) => (
-                  <button
-                    key={style.id}
-                    onClick={() => setFlipbookDisplayStyle(style.id as CourseParameters["flipbookDisplayStyle"])}
-                    className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
-                      flipbookDisplayStyle === style.id
-                        ? "border-[#b45309] bg-orange-50"
-                        : "border-[#E5E7EB] hover:border-[#b45309]"
-                    }`}
-                  >
-                    <p className="text-[13px] font-semibold text-[#2E2E2E]">{style.label}</p>
-                    <p className="text-[11px] text-[#6B7280]">{style.desc}</p>
-                  </button>
-                ))}
               </div>
-            </div>
+            )}
+
+            {/* Flipbook Display Style - Only for Image Course */}
+            {localLearningType === "image" && (
+              <div className={surfaceCardClass}>
+                <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                  Display Style
+                  <InfoHint text="How the image sequence will be displayed to learners." />
+                </label>
+                <div className="space-y-2">
+                  {FLIPBOOK_DISPLAY_STYLES.map((style) => (
+                    <button
+                      key={style.id}
+                      onClick={() => setFlipbookDisplayStyle(style.id as CourseParameters["flipbookDisplayStyle"])}
+                      className={`w-full p-3 rounded-lg border-2 text-left transition-all ${
+                        flipbookDisplayStyle === style.id
+                          ? "border-[#b45309] bg-orange-50"
+                          : "border-[#E5E7EB] hover:border-[#b45309]"
+                      }`}
+                    >
+                      <p className="text-[13px] font-semibold text-[#2E2E2E]">{style.label}</p>
+                      <p className="text-[11px] text-[#6B7280]">{style.desc}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Image Output Format */}
             <div className={surfaceCardClass}>
