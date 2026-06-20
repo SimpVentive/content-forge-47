@@ -40,6 +40,7 @@ export const TypeSelector = () => {
 
     // Small delay for visual feedback
     setTimeout(() => {
+      localStorage.setItem("selectedLearningType", type);
       navigate("/forge", { state: { learningType: type } });
     }, 300);
   };

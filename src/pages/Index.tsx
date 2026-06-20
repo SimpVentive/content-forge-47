@@ -48,7 +48,8 @@ const Index = () => {
   const { profile, refreshProfile, isAdmin } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const learningType = (location.state as any)?.learningType || "static";
+  // Try location.state first, fall back to localStorage, then default to "static"
+  const learningType = (location.state as any)?.learningType || localStorage.getItem("selectedLearningType") || "static";
   const { videoSettings, learningMode, setLearningMode } = useContentForge();
   const [courseTitle, setCourseTitle] = useState(SAMPLE_TITLE);
   const [inputText, setInputText] = useState(SAMPLE_NOTES);
@@ -115,6 +116,11 @@ const Index = () => {
     if (learningType === "video" && learningMode === "static_elearning") {
       setLearningMode("video_learning");
     }
+  }, [learningType]);
+
+  // Persist learningType to localStorage
+  useEffect(() => {
+    localStorage.setItem("selectedLearningType", learningType);
   }, [learningType]);
 
   useEffect(() => {
@@ -279,10 +285,12 @@ const Index = () => {
     }
 
     // Re-sync agent toggles based on confirmed learning type
-    if (params.learningType === "video" || params.learningType === "image") {
-      setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: true }));
+    if (params.learningType === "video") {
+      setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: true, "visual-narrative": false }));
+    } else if (params.learningType === "image") {
+      setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: false, "visual-narrative": true }));
     } else {
-      setAgentToggles((prev) => ({ ...prev, animation: true, youtube: true, compliance: true, heygen: false }));
+      setAgentToggles((prev) => ({ ...prev, animation: true, youtube: true, compliance: true, heygen: false, "visual-narrative": false }));
     }
 
     // For video and image modes: verify HeyGen is configured (auto-seeded on app boot)
