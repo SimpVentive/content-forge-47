@@ -587,6 +587,7 @@ const Index = () => {
             narratorLanguage={courseParams?.narratorLanguage}
             onUpdateVisualTopic={updateVisualTopicAsset}
             onUpdateCourseContent={updateCourseContent}
+            onOpenLearnerPreview={() => setShowLearnerPreview(true)}
           />
         </ResizablePanel>
       </ResizablePanelGroup>

@@ -32,6 +32,7 @@ interface OutputPanelProps {
   narratorLanguage?: string;
   onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
   onUpdateCourseContent?: (section: "outline" | "script" | "assessment" | "package", value: string) => void;
+  onOpenLearnerPreview?: () => void;
 }
 
 const tabs = [
@@ -374,7 +375,7 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
   );
 };
 
-export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic, onUpdateCourseContent }) => {
+export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic, onUpdateCourseContent, onOpenLearnerPreview }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
@@ -569,7 +570,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
     setShowScriptDialog(false);
     toast.success("Script saved");
     // Auto-open Learner Preview after script approval
-    setTimeout(() => setShowLearnerPreview(true), 300);
+    setTimeout(() => onOpenLearnerPreview?.(), 300);
   };
 
   const handleScriptDialogCancelEdit = () => {
