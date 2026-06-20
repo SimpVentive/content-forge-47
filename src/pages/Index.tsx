@@ -480,7 +480,7 @@ const Index = () => {
             courseTitle={courseTitle}
             estimatedMinutes={estimateMinutesFromText(inputText)}
             youtubeAgentEnabled={agentToggles.youtube}
-            initialLearningType={learningType as "static" | "video"}
+            initialLearningType={learningType as "static" | "video" | "image"}
             onConfirm={handleParamsConfirm}
             onCancel={() => setShowParamsDialog(false)}
           />
