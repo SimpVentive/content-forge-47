@@ -568,6 +568,8 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
     setScriptDialogEditing(false);
     setShowScriptDialog(false);
     toast.success("Script saved");
+    // Auto-open Learner Preview after script approval
+    setTimeout(() => setShowLearnerPreview(true), 300);
   };
 
   const handleScriptDialogCancelEdit = () => {
