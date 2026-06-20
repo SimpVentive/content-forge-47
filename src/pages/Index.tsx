@@ -189,6 +189,19 @@ const Index = () => {
     });
   }, [courseParams?.learningType]);
 
+  // Update learningMode when courseParams learning type changes
+  useEffect(() => {
+    if (!courseParams) return;
+
+    if (courseParams.learningType === "video") {
+      setLearningMode("video_learning");
+    } else if (courseParams.learningType === "image") {
+      setLearningMode("image_based_learning");
+    } else {
+      setLearningMode("static_elearning");
+    }
+  }, [courseParams?.learningType, setLearningMode]);
+
   const elapsedLabel = useMemo(() => {
     const mins = Math.floor(runElapsedSeconds / 60);
     const secs = runElapsedSeconds % 60;
