@@ -7,7 +7,8 @@ interface SlidePreviewProps {
   courseTitle: string;
 }
 
-function tryParseJSON(raw: string): any | null {
+function tryParseJSON(raw: string | undefined | null): any | null {
+  if (!raw || typeof raw !== "string") return null;
   try { return JSON.parse(raw); } catch {
     const match = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (match) { try { return JSON.parse(match[1].trim()); } catch { return null; } }
