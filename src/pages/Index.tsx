@@ -59,9 +59,18 @@ const Index = () => {
       base.animation = false;
       base.youtube = false;
       base.compliance = false;
-    } else {
-      // heygen is video-only
+      // visual-narrative is image-only
+      base["visual-narrative"] = false;
+    } else if (learningType === "static") {
+      // heygen is video-only, visual-narrative is image-only
       base.heygen = false;
+      base["visual-narrative"] = false;
+    } else if (learningType === "image") {
+      // heygen is video-only, animation/youtube/compliance are static-only
+      base.heygen = false;
+      base.animation = false;
+      base.youtube = false;
+      base.compliance = false;
     }
     return base;
   });
