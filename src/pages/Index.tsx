@@ -148,6 +148,39 @@ const Index = () => {
     return () => window.clearInterval(timer);
   }, [isRunning]);
 
+  // Update agent toggles when learning type changes via course params
+  useEffect(() => {
+    if (!courseParams) return;
+
+    setAgentToggles((prev) => {
+      const updated = { ...prev };
+      const learningType = courseParams.learningType;
+
+      if (learningType === "video") {
+        updated.animation = false;
+        updated.youtube = false;
+        updated.compliance = false;
+        updated["visual-narrative"] = false;
+      } else if (learningType === "static") {
+        updated.heygen = false;
+        updated["visual-narrative"] = false;
+        // Re-enable static-only agents
+        updated.animation = true;
+        updated.youtube = true;
+        updated.compliance = true;
+      } else if (learningType === "image") {
+        updated.heygen = false;
+        updated.animation = false;
+        updated.youtube = false;
+        updated.compliance = false;
+        // Enable visual-narrative for image mode
+        updated["visual-narrative"] = true;
+      }
+
+      return updated;
+    });
+  }, [courseParams?.learningType]);
+
   const elapsedLabel = useMemo(() => {
     const mins = Math.floor(runElapsedSeconds / 60);
     const secs = runElapsedSeconds % 60;
