@@ -963,7 +963,7 @@ OUTPUT FORMAT — ABSOLUTE:
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 3c: Visual Narrative (image-based learning only) ────
       let narrativeScenes: TopicNarrative[] = [];
-      if (learningMode === "image_based_learning" && toggles["visual"] !== false) {
+      if (learningMode === "image_based_learning" && toggles["visual-narrative"] !== false) {
         setStatus("visual", "running");
         addLog("Visual Narrative Agent: Generating scene breakdowns for image storytelling...");
         try {

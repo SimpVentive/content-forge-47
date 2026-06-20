@@ -6,8 +6,8 @@ export interface VideoSettings {
   backgroundStyle: "simple" | "office" | "classroom";
 }
 
-export type LearningType = "static" | "video";
-export type LearningMode = "static_elearning" | "video_learning" | "sop_video";
+export type LearningType = "static" | "video" | "image";
+export type LearningMode = "static_elearning" | "video_learning" | "sop_video" | "image_based_learning";
 
 export interface ContentForgeContextValue {
   learningType: LearningType;

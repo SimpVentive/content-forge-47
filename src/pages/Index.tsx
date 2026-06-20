@@ -115,8 +115,10 @@ const Index = () => {
   useEffect(() => {
     if (learningType === "video" && learningMode === "static_elearning") {
       setLearningMode("video_learning");
+    } else if (learningType === "image" && learningMode === "static_elearning") {
+      setLearningMode("image_based_learning");
     }
-  }, [learningType]);
+  }, [learningType, learningMode, setLearningMode]);
 
   // Persist learningType to localStorage
   useEffect(() => {
