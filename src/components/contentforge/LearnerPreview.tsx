@@ -9,7 +9,8 @@ import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } f
 import { toast } from "sonner";
 
 /* helpers */
-function tryParseJSON(raw: string): any | null {
+function tryParseJSON(raw: string | undefined | null): any | null {
+  if (!raw) return null;
   try { return JSON.parse(raw); } catch {
     const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (m) { try { return JSON.parse(m[1].trim()); } catch { return null; } }
