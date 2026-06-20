@@ -712,7 +712,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
             infographicSvg: ti === 0 && sceneIndex === 0 ? infographicDescription : undefined,
             visualImageDataUrl: scene.imageDataUrl,
             visualSvg: undefined,
-            visualPlacement: "top",
+            visualPlacement: "hero",
             visualAltText: scene.caption || `${topic} - Scene ${scene.sceneNumber}`,
             visualPrompt: scene.imagePrompt,
             visualApproved: Boolean(scene.imageDataUrl),
