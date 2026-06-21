@@ -2,6 +2,7 @@
 import { OutputData, RawAgentOutputs } from "@/types/agents";
 import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2 } from "lucide-react";
 import { exportScormPackage } from "@/lib/scormExport";
+import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { toast } from "sonner";
 import { VoicePreview } from "./VoicePreview";
 import { SlidePreview } from "./SlidePreview";
@@ -55,6 +56,27 @@ function tryParseJSON(raw: string): any | null {
     }
     return null;
   }
+}
+
+function exportFlipbookHTML(courseTitle: string, rawOutputs: RawAgentOutputs) {
+  let html = rawOutputs.flipbookHTML;
+  if (!html) {
+    const narratives = tryParseJSON(rawOutputs.narrativeScenes || "");
+    if (!Array.isArray(narratives) || narratives.length === 0) {
+      throw new Error("No flipbook scenes found. Regenerate with Image Course selected.");
+    }
+    html = generateFlipbookHTML(narratives, courseTitle, "smooth-slide");
+  }
+
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${courseTitle.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 50) || "course"}_Flipbook.html`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 /* Assessment Renderer */
