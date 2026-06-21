@@ -311,8 +311,14 @@ const Index = () => {
       setAgentToggles((prev) => ({ ...prev, animation: true, youtube: true, compliance: true, heygen: false, "visual-narrative": false }));
     }
 
-    // For video and image modes: verify HeyGen is configured (auto-seeded on app boot)
-    if (params.learningType === "video" || params.learningType === "image") {
+    const pipelineLearningMode = params.learningType === "video"
+      ? "video_learning"
+      : params.learningType === "image"
+        ? "image_based_learning"
+        : "static_elearning";
+
+    // For video mode: verify HeyGen is configured (auto-seeded on app boot)
+    if (params.learningType === "video") {
       const { getHeyGenSettings } = await import("@/lib/heygenDefaults");
       const heygenConfig = getHeyGenSettings();
       if (!heygenConfig?.apiKey) {
@@ -335,10 +341,10 @@ const Index = () => {
 
     // Admins bypass credit checks and deductions (for internal testing).
     if (isAdmin) {
-      console.log("Running pipeline with learningMode:", learningMode, "params.learningType:", params.learningType);
+      console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
-        learningMode: learningMode,
+        learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
       toast.success("Admin run — credits not deducted");
@@ -356,10 +362,10 @@ const Index = () => {
     try {
       await spendCredits(estimated, "course_generation");
       await refreshProfile();
-      console.log("Running pipeline with learningMode:", learningMode, "params.learningType:", params.learningType);
+      console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
-        learningMode: learningMode,
+        learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
       toast.success(`${estimated} credits deducted`);
