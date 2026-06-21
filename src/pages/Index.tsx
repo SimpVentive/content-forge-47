@@ -194,10 +194,13 @@ const Index = () => {
     if (!courseParams) return;
 
     if (courseParams.learningType === "video") {
+      console.log("Setting learningMode to video_learning");
       setLearningMode("video_learning");
     } else if (courseParams.learningType === "image") {
+      console.log("Setting learningMode to image_based_learning");
       setLearningMode("image_based_learning");
     } else {
+      console.log("Setting learningMode to static_elearning");
       setLearningMode("static_elearning");
     }
   }, [courseParams?.learningType, setLearningMode]);
@@ -332,6 +335,7 @@ const Index = () => {
 
     // Admins bypass credit checks and deductions (for internal testing).
     if (isAdmin) {
+      console.log("Running pipeline with learningMode:", learningMode, "params.learningType:", params.learningType);
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
         learningMode: learningMode,
@@ -352,6 +356,7 @@ const Index = () => {
     try {
       await spendCredits(estimated, "course_generation");
       await refreshProfile();
+      console.log("Running pipeline with learningMode:", learningMode, "params.learningType:", params.learningType);
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
         learningMode: learningMode,
