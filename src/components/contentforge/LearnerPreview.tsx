@@ -1273,6 +1273,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [startTime] = useState(Date.now());
   const [showCompletion, setShowCompletion] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [previewNarrationLanguage, setPreviewNarrationLanguage] = useState<string>("English");
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [voiceActivityLevel, setVoiceActivityLevel] = useState(0);
