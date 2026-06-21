@@ -46,8 +46,16 @@ serve(async (req) => {
     if (!response.ok) {
       const errText = await response.text();
       console.error("ElevenLabs error:", response.status, errText);
-      return new Response(JSON.stringify({ error: `ElevenLabs API error: ${response.status}` }), {
-        status: response.status,
+      const isBilling = response.status === 401 || response.status === 402;
+      const message = isBilling
+        ? "ElevenLabs credits exhausted or API key invalid. Top up at elevenlabs.io to resume voice generation."
+        : `ElevenLabs API error: ${response.status}`;
+      return new Response(JSON.stringify({
+        error: message,
+        error_type: isBilling ? "BILLING_ERROR" : "SERVICE_UNAVAILABLE",
+        fallback: true,
+      }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
