@@ -60,48 +60,63 @@ serve(async (req) => {
       prompt,
     ].join(" ");
 
-    // Call Black Forest Labs Flux 2 API
-    const response = await fetch("https://api.bfl.ml/v1/image", {
+    // Submit job to Black Forest Labs (async API — returns task id to poll)
+    const submitRes = await fetch("https://api.bfl.ai/v1/flux-pro-1.1", {
       method: "POST",
       headers: {
-        "X-API-Key": apiKey,
+        "x-key": apiKey,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         prompt: enhancedPrompt,
         width: 1536,
         height: 1024,
-        steps: 28,
-        guidance_scale: 7.5,
+        prompt_upsampling: false,
+        safety_tolerance: 2,
+        output_format: "png",
       }),
     });
 
-    if (response.status === 429) {
-      return new Response(JSON.stringify({ error: "Rate limited. Please try again shortly." }), {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    if (response.status === 402 || response.status === 403) {
-      return new Response(JSON.stringify({ error: "Invalid or expired API key. Please check BFL_API_KEY configuration." }), {
-        status: 402,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || data.error || "Flux 2 image generation failed");
-    }
-
-    // Flux 2 returns a result with a URL that needs polling or direct fetch
-    const imageUrl = data?.result?.sample || data?.result?.images?.[0] || data?.sample || null;
-    if (!imageUrl) {
-      throw new Error("Flux 2 image generation returned no image URL");
+    const submitData = await submitRes.json().catch(() => ({}));
+    if (!submitRes.ok) {
+      console.error("BFL submit failed:", submitRes.status, submitData);
+      if (submitRes.status === 401 || submitRes.status === 402 || submitRes.status === 403) {
+        return new Response(JSON.stringify({ error: "Invalid or expired BFL_API_KEY." }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (submitRes.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limited. Please try again shortly." }), {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const msg = submitData?.error || submitData?.detail || `BFL submit failed: ${submitRes.status}`;
+      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
     }
 
-    // Fetch the image and convert to base64
+    const taskId = submitData?.id;
+    const pollUrl = submitData?.polling_url || (taskId ? `https://api.bfl.ai/v1/get_result?id=${taskId}` : null);
+    if (!pollUrl) throw new Error("BFL returned no task id");
+
+    let imageUrl: string | null = null;
+    for (let i = 0; i < 30; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      const pollRes = await fetch(pollUrl, { headers: { "x-key": apiKey, "accept": "application/json" } });
+      const pollData = await pollRes.json().catch(() => ({}));
+      const status = pollData?.status;
+      if (status === "Ready") {
+        imageUrl = pollData?.result?.sample;
+        break;
+      }
+      if (status && status !== "Pending" && status !== "Processing" && status !== "Queued") {
+        throw new Error(`BFL ${status}: ${JSON.stringify(pollData?.result || pollData)}`);
+      }
+    }
+
+    if (!imageUrl) throw new Error("BFL generation timed out");
+
     const fetched = await fetchImageAsDataUrl(imageUrl);
     return new Response(JSON.stringify(fetched), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
