@@ -378,6 +378,7 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
 export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic, onUpdateCourseContent, onOpenLearnerPreview }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
+  const [showPostPreviewDialog, setShowPostPreviewDialog] = useState(false);
   const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
@@ -585,7 +586,10 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
         <LearnerPreview
           courseTitle={courseTitle}
           rawOutputs={rawOutputs}
-          onClose={() => setShowLearnerPreview(false)}
+          onClose={() => {
+            setShowLearnerPreview(false);
+            setShowPostPreviewDialog(true);
+          }}
           insertedVideos={allInsertedVideos}
           courseDuration={courseDuration}
           avatarTrainerId={avatarTrainerId}
@@ -600,6 +604,39 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           narratorLanguage={narratorLanguage}
           onUpdateVisualTopic={onUpdateVisualTopic}
         />
+      )}
+
+      {/* Post-Preview Dialog */}
+      {showPostPreviewDialog && (
+        <div className="fixed inset-0 z-[9998] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowPostPreviewDialog(false)} />
+          <div className="relative w-[420px] max-w-[92vw] rounded-2xl bg-card shadow-2xl overflow-hidden animate-fade-in">
+            <div className="h-1.5 w-full bg-primary" />
+            <div className="px-7 pt-7 pb-6">
+              <h2 className="text-[18px] font-bold text-foreground mb-2">Package Ready</h2>
+              <p className="text-[14px] text-foreground/80 mb-6">
+                Would you like to generate the downloadable package now?
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowPostPreviewDialog(false)}
+                  className="px-5 h-10 rounded-xl text-[13px] font-semibold bg-secondary text-foreground hover:bg-secondary/80 transition-all"
+                >
+                  No, Later
+                </button>
+                <button
+                  onClick={() => {
+                    setShowPostPreviewDialog(false);
+                    setActiveTab("package");
+                  }}
+                  className="px-5 h-10 rounded-xl text-[13px] font-semibold bg-primary text-primary-foreground hover:brightness-110 transition-all"
+                >
+                  Yes, Generate Package
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {showScriptConfirm && (
