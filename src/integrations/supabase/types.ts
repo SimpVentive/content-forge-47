@@ -14,6 +14,83 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_provider_rates: {
+        Row: {
+          cost_per_unit: number
+          created_at: string
+          currency: string
+          id: string
+          last_updated: string
+          notes: string | null
+          provider_name: string
+          unit_description: string | null
+          updated_at: string
+        }
+        Insert: {
+          cost_per_unit: number
+          created_at?: string
+          currency?: string
+          id?: string
+          last_updated?: string
+          notes?: string | null
+          provider_name: string
+          unit_description?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cost_per_unit?: number
+          created_at?: string
+          currency?: string
+          id?: string
+          last_updated?: string
+          notes?: string | null
+          provider_name?: string
+          unit_description?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      api_usage_logs: {
+        Row: {
+          cost: number
+          course_id: string | null
+          created_at: string
+          id: string
+          provider_name: string
+          reason: string | null
+          units_used: number
+          user_id: string
+        }
+        Insert: {
+          cost: number
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          provider_name: string
+          reason?: string | null
+          units_used: number
+          user_id: string
+        }
+        Update: {
+          cost?: number
+          course_id?: string | null
+          created_at?: string
+          id?: string
+          provider_name?: string
+          reason?: string | null
+          units_used?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "api_usage_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_transactions: {
         Row: {
           amount_inr: number
@@ -172,6 +249,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      provider_purchases: {
+        Row: {
+          cost_inr: number
+          created_at: string
+          id: string
+          notes: string | null
+          provider_name: string
+          purchase_date: string
+          units_purchased: number
+        }
+        Insert: {
+          cost_inr: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          provider_name: string
+          purchase_date: string
+          units_purchased: number
+        }
+        Update: {
+          cost_inr?: number
+          created_at?: string
+          id?: string
+          notes?: string | null
+          provider_name?: string
+          purchase_date?: string
+          units_purchased?: number
+        }
+        Relationships: []
       }
     }
     Views: {
