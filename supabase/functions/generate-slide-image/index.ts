@@ -69,7 +69,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         prompt: enhancedPrompt,
-        width: 1536,
+        width: 1440,
         height: 1024,
         prompt_upsampling: false,
         safety_tolerance: 2,
