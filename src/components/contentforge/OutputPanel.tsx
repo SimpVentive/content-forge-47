@@ -157,6 +157,9 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
 
   if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
+  const isFlipbook = !!data?.flipbook_assets;
+  const checklistComplete = checklist.filter(Boolean).length === checklist.length;
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Learner Preview Modal */}
@@ -180,6 +183,20 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           onUpdateVisualTopic={onUpdateVisualTopic}
         />
       )}
+
+      {/* STATUS BANNER */}
+      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-2xl p-6">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
+              <h2 className="text-[20px] font-bold text-emerald-900">✓ Ready to Export!</h2>
+            </div>
+            <p className="text-[14px] text-emerald-800">Your {isFlipbook ? "flipbook" : "course"} package is complete and ready to download.</p>
+          </div>
+          <div className="text-[28px]">📦</div>
+        </div>
+      </div>
 
       {/* 1. Slide Preview */}
       {archRaw && visualRaw && (
@@ -305,39 +322,79 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       )}
 
-      {/* 6. Action Buttons - Preview + Export */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => setShowLearnerPreview(true)}
-          className="flex-1 h-12 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 border-2 border-[#4f46e5] text-[#4f46e5] hover:bg-[#4f46e5]/5 transition-all"
-        >
-          <Play className="w-4 h-4" />
-          Preview as Learner
-        </button>
-        <button
-          onClick={async () => {
-            setExporting(true);
-            try {
-              const hasVoice = !!rawOutputs.voice;
-              await exportScormPackage(courseTitle, rawOutputs, {
-                includeVoice: hasVoice,
-                onProgress: (msg) => toast.info(msg, { duration: 3000 }),
-              });
-              toast.success(hasVoice
-                ? "SCORM package with voice narration exported!"
-                : "SCORM package exported successfully!");
-            } catch (err: any) {
-              toast.error(err?.message || "Export failed");
-            } finally {
-              setExporting(false);
-            }
-          }}
-          disabled={exporting}
-          className="flex-1 h-12 rounded-xl text-[15px] font-bold text-primary-foreground flex items-center justify-center gap-2 bg-primary hover:brightness-110 transition-all disabled:opacity-60"
-        >
-          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {exporting ? "Generating audio and exporting..." : "Export SCORM Package"}
-        </button>
+      {/* DEPLOYMENT CHECKLIST PROGRESS */}
+      {data.deployment_checklist && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <p className="text-[13px] font-semibold text-blue-900 mb-2">Pre-Export Checklist</p>
+          <div className="w-full bg-blue-200 rounded-full h-2">
+            <div
+              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(checklist.filter(Boolean).length / checklist.length) * 100}%` }}
+            />
+          </div>
+          <p className="text-[12px] text-blue-800 mt-2">
+            {checklist.filter(Boolean).length} of {checklist.length} items completed
+          </p>
+        </div>
+      )}
+
+      {/* 6. ACTION BUTTONS - BIG AND PROMINENT */}
+      <div className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setShowLearnerPreview(true)}
+            className="h-14 rounded-xl text-[14px] font-bold flex items-center justify-center gap-2 border-2 border-blue-500 text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all"
+          >
+            <Play className="w-5 h-5" />
+            Preview Course
+          </button>
+          <button
+            onClick={async () => {
+              setExporting(true);
+              try {
+                const hasVoice = !!rawOutputs.voice;
+                await exportScormPackage(courseTitle, rawOutputs, {
+                  includeVoice: hasVoice,
+                  onProgress: (msg) => toast.info(msg, { duration: 3000 }),
+                });
+                toast.success(isFlipbook
+                  ? "Flipbook HTML package exported successfully!"
+                  : hasVoice
+                    ? "SCORM package with voice narration exported!"
+                    : "SCORM package exported successfully!");
+              } catch (err: any) {
+                toast.error(err?.message || "Export failed");
+              } finally {
+                setExporting(false);
+              }
+            }}
+            disabled={exporting}
+            className="h-14 rounded-xl text-[14px] font-bold text-white flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 transition-all disabled:opacity-60 shadow-lg"
+          >
+            {exporting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="w-5 h-5" />
+                {isFlipbook ? "Export Flipbook" : "Export Package"}
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* NEXT STEPS */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+          <p className="text-[13px] font-bold text-amber-900 mb-2">📋 Next Steps:</p>
+          <ol className="text-[12px] text-amber-800 space-y-1 list-decimal list-inside">
+            <li>Review the deployment checklist above</li>
+            <li>Click "{isFlipbook ? "Export Flipbook" : "Export Package"}" to download</li>
+            <li>{isFlipbook ? "Upload the HTML to your LMS or web server" : "Import SCORM package to your LMS"}</li>
+            <li>Test with learners and gather feedback</li>
+          </ol>
+        </div>
       </div>
     </div>
   );
