@@ -62,6 +62,17 @@ const NAV: NavSection[] = [
           </svg>
         ),
       },
+      {
+        to: "/admin/credits",
+        name: "Credits",
+        tid: "nav-credits",
+        icon: (
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <rect x="1" y="3" width="12" height="8" rx="1" stroke="currentColor" strokeWidth="1.2" />
+            <circle cx="7" cy="7" r="2" stroke="currentColor" strokeWidth="1.2" />
+          </svg>
+        ),
+      },
     ],
   },
   {

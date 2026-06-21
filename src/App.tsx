@@ -24,6 +24,7 @@ const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminUsers = lazy(() => import("./pages/admin/Users"));
 const AdminBilling = lazy(() => import("./pages/admin/Billing"));
 const AdminProviderCosts = lazy(() => import("./pages/admin/ProviderCosts"));
+const AdminCredits = lazy(() => import("./pages/admin/Credits"));
 const AdminProviders = lazy(() => import("./pages/admin/Providers"));
 const AdminConversations = lazy(() => import("./pages/admin/Conversations"));
 const HeyGenSettings = lazy(() => import("./pages/admin/HeyGenSettings"));
@@ -56,6 +57,7 @@ const App = () => (
                   <Route path="users" element={<AdminUsers />} />
                   <Route path="billing" element={<AdminBilling />} />
                   <Route path="provider-costs" element={<AdminProviderCosts />} />
+                  <Route path="credits" element={<AdminCredits />} />
                   <Route path="providers" element={<AdminProviders />} />
                   <Route path="conversations" element={<AdminConversations />} />
                   <Route path="settings" element={<HeyGenSettings />} />

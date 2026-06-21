@@ -29,6 +29,22 @@ export async function spendCredits(amount: number, reason?: string) {
   return callEdgeFunction("credits-spend", { amount, reason });
 }
 
+export async function logApiUsage(
+  providerName: string,
+  unitsUsed: number,
+  costInr: number,
+  reason?: string,
+  courseId?: string
+) {
+  return callEdgeFunction("log-api-usage", {
+    provider_name: providerName,
+    units_used: unitsUsed,
+    cost_inr: costInr,
+    reason,
+    course_id: courseId,
+  });
+}
+
 export async function createRazorpayOrder(creditsPurchased: number, amountInrPaise: number, receipt?: string) {
   return callEdgeFunction<{ order_id: string }>("razorpay-create-order", { credits_purchased: creditsPurchased, amount_inr_paise: amountInrPaise, receipt });
 }
