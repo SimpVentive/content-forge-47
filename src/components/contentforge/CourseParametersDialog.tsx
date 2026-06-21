@@ -405,6 +405,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
       imageOutputFormat,
+      flipbookVoiceoverEnabled,
+      flipbookNarrationLanguage,
     });
   };
 
