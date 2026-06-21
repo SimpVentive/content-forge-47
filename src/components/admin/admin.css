@@ -124,6 +124,9 @@
 .cf-admin .link-btn { font-size: 11px; color: var(--txt2); cursor: pointer; padding: 3px 8px; border-radius: var(--r-sm); transition: all 0.12s; border: 0.5px solid transparent; background: transparent; font-family: inherit; }
 .cf-admin .link-btn:hover { background: var(--bg1); border-color: var(--bdr0); color: var(--txt0); }
 
+/* SECTION */
+.cf-admin .section { background: var(--bg0); border: 0.5px solid var(--bdr0); border-radius: var(--r-lg); padding: 1rem; }
+
 /* GRIDS */
 .cf-admin .g2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
 .cf-admin .g3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }

@@ -24,7 +24,7 @@ const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
 const AdminUsers = lazy(() => import("./pages/admin/Users"));
 const AdminBilling = lazy(() => import("./pages/admin/Billing"));
 const AdminProviderCosts = lazy(() => import("./pages/admin/ProviderCosts"));
-const AdminCredits = lazy(() => import("./pages/admin/Credits"));
+const AdminCredits = lazy(() => import("./pages/admin/CreditsDashboard"));
 const AdminProviders = lazy(() => import("./pages/admin/Providers"));
 const AdminConversations = lazy(() => import("./pages/admin/Conversations"));
 const HeyGenSettings = lazy(() => import("./pages/admin/HeyGenSettings"));
