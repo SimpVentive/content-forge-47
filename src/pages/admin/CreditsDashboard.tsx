@@ -8,28 +8,32 @@ type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 type ApiUsageLog = Database["public"]["Tables"]["api_usage_logs"]["Row"];
 type ProviderRate = Database["public"]["Tables"]["api_provider_rates"]["Row"];
 type BillingTransaction = Database["public"]["Tables"]["billing_transactions"]["Row"];
+type ProviderPurchase = Database["public"]["Tables"]["provider_purchases"]["Row"];
 
 const CreditsDashboard = () => {
   const [users, setUsers] = useState<Profile[]>([]);
   const [apiUsageLogs, setApiUsageLogs] = useState<ApiUsageLog[]>([]);
   const [providerRates, setProviderRates] = useState<ProviderRate[]>([]);
   const [transactions, setTransactions] = useState<BillingTransaction[]>([]);
+  const [providerPurchases, setProviderPurchases] = useState<ProviderPurchase[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
     try {
-      const [usersData, logsData, ratesData, txData] = await Promise.all([
+      const [usersData, logsData, ratesData, txData, purchasesData] = await Promise.all([
         supabase.from("profiles").select("*").order("full_name"),
         supabase.from("api_usage_logs").select("*").gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()),
         supabase.from("api_provider_rates").select("*").order("provider_name"),
         supabase.from("billing_transactions").select("*").eq("status", "paid"),
+        supabase.from("provider_purchases").select("*").order("purchase_date", { ascending: false }),
       ]);
 
       setUsers(usersData.data || []);
       setApiUsageLogs(logsData.data || []);
       setProviderRates(ratesData.data || []);
       setTransactions(txData.data || []);
+      setProviderPurchases(purchasesData.data || []);
     } catch (err) {
       console.error(err);
       toast.error("Failed to load dashboard data");
@@ -69,7 +73,7 @@ const CreditsDashboard = () => {
     const topProvider = Object.entries(byProvider).sort((a, b) => b[1].cost - a[1].cost)[0];
 
     return { totalPurchased, totalUsed, totalRemaining, monthSpent, topUsers, byProvider, topProvider };
-  }, [users, transactions, apiUsageLogs]);
+  }, [users, transactions, apiUsageLogs, providerPurchases]);
 
   if (loading) {
     return <div style={{ color: "var(--txt2)", fontSize: 13 }}>Loading dashboard…</div>;
@@ -258,6 +262,84 @@ const CreditsDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Spending by Provider */}
+      <div className="section" style={{ marginTop: 32 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, color: "#0f172a" }}>Spending by Provider (30 Days)</div>
+        {Object.entries(stats.byProvider).length === 0 ? (
+          <div style={{ color: "#999", fontSize: 13, padding: "20px", textAlign: "center" }}>
+            No API usage recorded yet
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #ddd", background: "#f9f9f9" }}>
+                  <th style={{ padding: "12px", textAlign: "left", fontWeight: 600 }}>Provider</th>
+                  <th style={{ padding: "12px", textAlign: "right", fontWeight: 600 }}>API Calls</th>
+                  <th style={{ padding: "12px", textAlign: "right", fontWeight: 600 }}>Cost (₹)</th>
+                  <th style={{ padding: "12px", textAlign: "right", fontWeight: 600 }}>% of Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(stats.byProvider)
+                  .sort((a, b) => b[1].cost - a[1].cost)
+                  .map(([provider, data]) => (
+                    <tr key={provider} style={{ borderBottom: "1px solid #eee" }}>
+                      <td style={{ padding: "12px", fontWeight: 500 }}>{provider}</td>
+                      <td style={{ padding: "12px", textAlign: "right", color: "#666" }}>{data.count}</td>
+                      <td style={{ padding: "12px", textAlign: "right", fontWeight: 500 }}>
+                        ₹{data.cost.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                      </td>
+                      <td style={{ padding: "12px", textAlign: "right", color: "#666" }}>
+                        {stats.monthSpent > 0 ? ((data.cost / stats.monthSpent) * 100).toFixed(1) : "0"}%
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Purchase History */}
+      <div className="section" style={{ marginTop: 32 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 16, color: "#0f172a" }}>Purchase History</div>
+        {providerPurchases.length === 0 ? (
+          <div style={{ color: "#999", fontSize: 13, padding: "20px", textAlign: "center" }}>
+            No purchases recorded yet
+          </div>
+        ) : (
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid #ddd", background: "#f9f9f9" }}>
+                  <th style={{ padding: "12px", textAlign: "left", fontWeight: 600 }}>Date</th>
+                  <th style={{ padding: "12px", textAlign: "left", fontWeight: 600 }}>Provider</th>
+                  <th style={{ padding: "12px", textAlign: "right", fontWeight: 600 }}>Units</th>
+                  <th style={{ padding: "12px", textAlign: "right", fontWeight: 600 }}>Cost (₹)</th>
+                  <th style={{ padding: "12px", textAlign: "left", fontWeight: 600 }}>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {providerPurchases.map((purchase) => (
+                  <tr key={purchase.id} style={{ borderBottom: "1px solid #eee" }}>
+                    <td style={{ padding: "12px", color: "#666" }}>
+                      {purchase.purchase_date ? new Date(purchase.purchase_date).toLocaleDateString("en-IN") : "—"}
+                    </td>
+                    <td style={{ padding: "12px", fontWeight: 500 }}>{purchase.provider_name}</td>
+                    <td style={{ padding: "12px", textAlign: "right", color: "#666" }}>{fmtNum(purchase.units_purchased ?? 0)}</td>
+                    <td style={{ padding: "12px", textAlign: "right", fontWeight: 500 }}>
+                      ₹{(purchase.cost_inr ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                    </td>
+                    <td style={{ padding: "12px", color: "#999", fontSize: 12 }}>{purchase.notes || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
