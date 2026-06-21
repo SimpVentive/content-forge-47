@@ -38,7 +38,17 @@ export interface CourseParameters {
   imageNarrativeSceneCount?: 3 | 4 | 5 | 6;
   flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal";
   imageOutputFormat?: "interactive-html" | "video" | "pdf";
+  flipbookVoiceoverEnabled?: boolean;
+  flipbookNarrationLanguage?: string;
 }
+
+// ElevenLabs multilingual v2 supported languages
+export const ELEVENLABS_LANGUAGES = [
+  "English","Hindi","Spanish","French","German","Italian","Portuguese","Polish",
+  "Turkish","Russian","Dutch","Czech","Arabic","Chinese","Japanese","Korean",
+  "Hungarian","Norwegian","Finnish","Swedish","Danish","Bulgarian","Romanian",
+  "Greek","Filipino","Indonesian","Malay","Slovak","Ukrainian","Croatian","Tamil",
+];
 
 interface CourseParametersDialogProps {
   open: boolean;
