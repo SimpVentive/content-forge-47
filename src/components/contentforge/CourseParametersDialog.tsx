@@ -38,7 +38,17 @@ export interface CourseParameters {
   imageNarrativeSceneCount?: 3 | 4 | 5 | 6;
   flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal";
   imageOutputFormat?: "interactive-html" | "video" | "pdf";
+  flipbookVoiceoverEnabled?: boolean;
+  flipbookNarrationLanguage?: string;
 }
+
+// ElevenLabs multilingual v2 supported languages
+export const ELEVENLABS_LANGUAGES = [
+  "English","Hindi","Spanish","French","German","Italian","Portuguese","Polish",
+  "Turkish","Russian","Dutch","Czech","Arabic","Chinese","Japanese","Korean",
+  "Hungarian","Norwegian","Finnish","Swedish","Danish","Bulgarian","Romanian",
+  "Greek","Filipino","Indonesian","Malay","Slovak","Ukrainian","Croatian","Tamil",
+];
 
 interface CourseParametersDialogProps {
   open: boolean;
@@ -239,6 +249,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [imageNarrativeSceneCount, setImageNarrativeSceneCount] = useState<CourseParameters["imageNarrativeSceneCount"]>(4);
   const [flipbookDisplayStyle, setFlipbookDisplayStyle] = useState<CourseParameters["flipbookDisplayStyle"]>("smooth-slide");
   const [imageOutputFormat, setImageOutputFormat] = useState<CourseParameters["imageOutputFormat"]>("interactive-html");
+  const [flipbookVoiceoverEnabled, setFlipbookVoiceoverEnabled] = useState<boolean>(false);
+  const [flipbookNarrationLanguage, setFlipbookNarrationLanguage] = useState<string>("English");
   const [showMismatchWarning, setShowMismatchWarning] = useState(false);
   const [mismatchType, setMismatchType] = useState<"more" | "less">("more");
   const [showModeConfirm, setShowModeConfirm] = useState(false);
@@ -312,6 +324,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
       imageOutputFormat,
+      flipbookVoiceoverEnabled,
+      flipbookNarrationLanguage,
     });
   };
 
@@ -353,6 +367,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
       imageOutputFormat,
+      flipbookVoiceoverEnabled,
+      flipbookNarrationLanguage,
     });
   };
 
@@ -389,6 +405,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
       imageOutputFormat,
+      flipbookVoiceoverEnabled,
+      flipbookNarrationLanguage,
     });
   };
 
@@ -992,6 +1010,54 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Voiceover (Image Course only) */}
+            {localLearningType === "image" && (
+              <div className={surfaceCardClass}>
+                <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                  Voiceover Narration
+                  <InfoHint text="Add a spoken narration to each scene. Learners can also toggle this on/off in the preview." />
+                </label>
+                <div className="flex gap-2 mb-3">
+                  {[
+                    { id: true, label: "Yes" },
+                    { id: false, label: "No" },
+                  ].map((opt) => (
+                    <button
+                      key={String(opt.id)}
+                      onClick={() => setFlipbookVoiceoverEnabled(opt.id)}
+                      className={`h-10 px-5 rounded-full text-[13px] font-semibold border transition-all ${
+                        flipbookVoiceoverEnabled === opt.id
+                          ? "text-white"
+                          : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
+                      }`}
+                      style={flipbookVoiceoverEnabled === opt.id ? { background: "#b45309", borderColor: "transparent" } : undefined}
+                      type="button"
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {flipbookVoiceoverEnabled && (
+                  <>
+                    <label className="text-[12px] text-[#6B7280] mb-1 block">Narration language</label>
+                    <select
+                      value={flipbookNarrationLanguage}
+                      onChange={(e) => setFlipbookNarrationLanguage(e.target.value)}
+                      className="w-full h-10 px-3 rounded-lg border border-[#E5E7EB] text-[13px] text-[#2E2E2E] bg-white focus:outline-none focus:border-[#b45309]"
+                    >
+                      {ELEVENLABS_LANGUAGES.map((lang) => (
+                        <option key={lang} value={lang}>{lang}</option>
+                      ))}
+                    </select>
+                    <p className="text-[11px] text-[#6B7280] mt-2">
+                      Narration generates on demand from the learner preview to save credits.
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
 
             {/* Image Output Format */}
             <div className={surfaceCardClass}>
