@@ -1555,6 +1555,7 @@ OUTPUT FORMAT — ABSOLUTE:
       if (toggles["assembly"] !== false) {
         setStatus("assembly", "running");
         addLog("Final Assembly: Packaging all outputs...");
+        console.log("🔍 Assembly Agent learningMode:", learningMode);
         const modeInstructions = getAgentModeInstructions("assembly", learningMode);
         const assemblyInput = `Course Title: ${courseTitle}\n\nOutline:\n${archResult}\n\nScript:\n${writerResult}\n\nVisual Plan:\n${visualResult}\n\nAssessment:\n${assessmentResult}\n\nQuality Review:\n${qualityResult}\n\nNarration:\n${voiceResult}\n\nCompliance:\n${complianceResult}`;
         const assemblyResult = await runAgentWithLanguage(
