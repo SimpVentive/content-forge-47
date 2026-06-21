@@ -1557,15 +1557,26 @@ OUTPUT FORMAT — ABSOLUTE:
         addLog("Final Assembly: Packaging all outputs...");
         const modeInstructions = getAgentModeInstructions("assembly", learningMode);
         const assemblyInput = `Course Title: ${courseTitle}\n\nOutline:\n${archResult}\n\nScript:\n${writerResult}\n\nVisual Plan:\n${visualResult}\n\nAssessment:\n${assessmentResult}\n\nQuality Review:\n${qualityResult}\n\nNarration:\n${voiceResult}\n\nCompliance:\n${complianceResult}`;
+
+        // Format-specific assembly prompts
+        let assemblyPrompt = "";
+        if (learningMode === "image_based_learning") {
+          assemblyPrompt = `You are a Final Assembly Agent for Interactive Image-Based Learning (Flipbook). Given all course outputs, produce a final package summary. Include: (1) Course metadata — title, total modules, total topics, estimated completion time, difficulty level, (2) Flipbook asset manifest — list all images, fonts, interactive elements, and narration files, (3) Flipbook deployment checklist — 10-item checklist covering: image quality verification, flip animation settings, navigation functionality, responsive layout testing, audio sync verification, interactive element testing, accessibility compliance, mobile device testing, upload to delivery platform, learner testing, (4) Quality assurance summary — confirm all agents completed, include key quality scores, gaps. \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn as JSON: { metadata: {}, scorm_manifest: { assets: [] }, deployment_checklist: [], qa_summary: { agents_completed: [], quality_scores: {}, gaps: [] } }`;
+        } else if (learningMode === "video_learning") {
+          assemblyPrompt = `You are a Final Assembly Agent for Video-Based eLearning. Given all course outputs, produce a final package summary. Include: (1) Course metadata — title, total modules, total topics, estimated completion time, difficulty level, (2) Video asset manifest — list all video files, audio tracks, subtitles, and supplementary materials, (3) Video LMS deployment checklist — 10-item checklist covering: video quality testing, audio sync, subtitle accuracy, platform upload, metadata configuration, playback testing, mobile compatibility, learner access verification, analytics setup, launch check, (4) Quality assurance summary. \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn as JSON: { metadata: {}, scorm_manifest: { assets: [] }, deployment_checklist: [], qa_summary: { agents_completed: [], quality_scores: {}, gaps: [] } }`;
+        } else {
+          assemblyPrompt = `You are a Final Assembly Agent for eLearning. Given the full course output (outline, script, assessment, narration, visual plan, quality review), produce a final course package summary. Include: (1) Course metadata — title, total modules, total topics, estimated completion time, difficulty level, (2) SCORM manifest summary — list of all assets needed (slides, audio files, images, assessments), (3) LMS deployment checklist — 10-item checklist of steps to publish to an LMS, (4) Quality assurance summary — confirm all agents completed, include key quality scores, and list any remaining gaps. \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn as JSON: { metadata: {}, scorm_manifest: { assets: [] }, deployment_checklist: [], qa_summary: { agents_completed: [], quality_scores: {}, gaps: [] } }`;
+        }
+
         const assemblyResult = await runAgentWithLanguage(
-          `You are a Final Assembly Agent for eLearning. Given the full course output (outline, script, assessment, narration, visual plan, quality review), produce a final course package summary. Include: (1) Course metadata — title, total modules, total topics, estimated completion time, difficulty level, (2) SCORM manifest summary — list of all assets needed (slides, audio files, images, assessments), (3) LMS deployment checklist — 10-item checklist of steps to publish to an LMS, (4) Quality assurance summary — confirm all agents completed, include key quality scores, and list any remaining gaps. \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn as JSON: { metadata: {}, scorm_manifest: { assets: [] }, deployment_checklist: [], qa_summary: { agents_completed: [], quality_scores: {}, gaps: [] } }`,
+          assemblyPrompt,
           assemblyInput,
           addLog, "Final Assembly"
         );
         setStatus("assembly", "complete");
         setRawOutputs((prev) => ({ ...prev, assembly: assemblyResult }));
         setOutputData((prev) => ({ ...prev, package: assemblyResult }));
-        addLog("Final Assembly: Complete. Course package ready for LMS deployment.");
+        addLog("Final Assembly: Complete. Course package ready for deployment.");
         addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
       } else {
         setStatus("assembly", "idle");
