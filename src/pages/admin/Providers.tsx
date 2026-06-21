@@ -12,9 +12,23 @@ type FormState = {
   is_active: boolean;
   notes: string;
   base_url: string;
+  unit_rate: string;
+  unit_description: string;
+  units_purchased: string;
+  cost_paid: string;
 };
 
-const EMPTY: FormState = { provider_name: "", api_key: "", is_active: true, notes: "", base_url: "" };
+const EMPTY: FormState = {
+  provider_name: "",
+  api_key: "",
+  is_active: true,
+  notes: "",
+  base_url: "",
+  unit_rate: "",
+  unit_description: "",
+  units_purchased: "",
+  cost_paid: ""
+};
 
 const readConfig = (cfg: Json | null): { notes: string; base_url: string } => {
   if (cfg && typeof cfg === "object" && !Array.isArray(cfg)) {
@@ -112,6 +126,41 @@ const Providers = () => {
         if (error) throw error;
         toast.success(`Provider added: ${form.provider_name}`);
       }
+
+      // Save unit rate if provided
+      if (form.unit_rate) {
+        const unitRate = parseFloat(form.unit_rate);
+        const { error: rateError } = await supabase.from("api_provider_rates").upsert({
+          provider_name: form.provider_name,
+          cost_per_unit: unitRate,
+          unit_description: form.unit_description || "unit",
+          currency: "INR",
+        }, { onConflict: "provider_name" });
+        if (rateError) {
+          console.error("Failed to save rate:", rateError);
+          toast.warning("Provider saved, but rate update failed");
+        }
+      }
+
+      // Log purchase if provided
+      if (form.units_purchased && form.cost_paid) {
+        const unitsPurchased = parseInt(form.units_purchased, 10);
+        const costInr = parseFloat(form.cost_paid);
+        if (unitsPurchased > 0 && costInr > 0) {
+          const { error: purchaseError } = await supabase.from("provider_purchases").insert({
+            provider_name: form.provider_name,
+            purchase_date: new Date().toISOString().split("T")[0],
+            units_purchased: unitsPurchased,
+            cost_inr: costInr,
+            notes: `Initial purchase via provider setup`,
+          });
+          if (purchaseError) {
+            console.error("Failed to log purchase:", purchaseError);
+            toast.warning("Provider saved, but purchase log failed");
+          }
+        }
+      }
+
       setShowDrawer(false);
       void load();
     } catch (err) {
@@ -351,6 +400,56 @@ const Providers = () => {
                   onChange={(e) => setForm({ ...form, base_url: e.target.value })}
                 />
               </div>
+              {/* Pricing Section */}
+              <div style={{ borderTop: "1px solid #ddd", paddingTop: 16, marginTop: 16 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: "#0f172a" }}>Pricing & Usage</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <div className="field-label">Unit Rate (₹)</div>
+                    <input
+                      className="inp inp-full"
+                      type="number"
+                      placeholder="0.055"
+                      step="0.0001"
+                      value={form.unit_rate}
+                      onChange={(e) => setForm({ ...form, unit_rate: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <div className="field-label">Unit Description</div>
+                    <input
+                      className="inp inp-full"
+                      placeholder="e.g. per image, per token"
+                      value={form.unit_description}
+                      onChange={(e) => setForm({ ...form, unit_description: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <div>
+                    <div className="field-label">Units Purchased</div>
+                    <input
+                      className="inp inp-full"
+                      type="number"
+                      placeholder="1000"
+                      value={form.units_purchased}
+                      onChange={(e) => setForm({ ...form, units_purchased: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <div className="field-label">Cost Paid (₹)</div>
+                    <input
+                      className="inp inp-full"
+                      type="number"
+                      placeholder="55.00"
+                      step="0.01"
+                      value={form.cost_paid}
+                      onChange={(e) => setForm({ ...form, cost_paid: e.target.value })}
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div>
                 <div className="field-label">Notes</div>
                 <textarea
