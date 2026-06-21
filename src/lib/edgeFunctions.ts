@@ -52,3 +52,7 @@ export async function createRazorpayOrder(creditsPurchased: number, amountInrPai
 export async function verifyRazorpayPayment(orderId: string, paymentId: string, signature: string) {
   return callEdgeFunction("razorpay-verify", { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: signature });
 }
+
+export async function fetchProviderUsage() {
+  return callEdgeFunction("fetch-provider-usage", {}, "GET");
+}

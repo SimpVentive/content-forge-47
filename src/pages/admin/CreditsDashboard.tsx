@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { fmtNum } from "@/components/admin/format";
+import { fetchProviderUsage } from "@/lib/edgeFunctions";
 import type { Database } from "@/integrations/supabase/types";
 
 type Profile = Database["public"]["Tables"]["profiles"]["Row"];
@@ -17,6 +18,7 @@ const CreditsDashboard = () => {
   const [transactions, setTransactions] = useState<BillingTransaction[]>([]);
   const [providerPurchases, setProviderPurchases] = useState<ProviderPurchase[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fetchingUsage, setFetchingUsage] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -45,6 +47,21 @@ const CreditsDashboard = () => {
   useEffect(() => {
     void load();
   }, []);
+
+  const handleFetchProviderUsage = async () => {
+    setFetchingUsage(true);
+    try {
+      const result = await fetchProviderUsage();
+      toast.success(`✅ Fetched usage from ${result.usageCount || 0} providers`);
+      // Reload data to show new usage
+      await load();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to fetch provider usage");
+    } finally {
+      setFetchingUsage(false);
+    }
+  };
 
   const stats = useMemo(() => {
     const totalPurchased = transactions.reduce((sum, t) => sum + (t.credits_purchased ?? 0), 0);
@@ -89,6 +106,16 @@ const CreditsDashboard = () => {
           <div>
             <div className="ph-title">Credits Dashboard</div>
             <div className="ph-sub">Overview of your API credits, spending, and usage</div>
+          </div>
+          <div className="ph-actions">
+            <button
+              className="btn btn-primary"
+              onClick={() => void handleFetchProviderUsage()}
+              disabled={fetchingUsage}
+              style={{ opacity: fetchingUsage ? 0.6 : 1 }}
+            >
+              {fetchingUsage ? "⏳ Fetching..." : "🔄 Fetch Real Usage"}
+            </button>
           </div>
         </div>
       </div>
