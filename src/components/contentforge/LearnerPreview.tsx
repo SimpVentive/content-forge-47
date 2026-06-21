@@ -7,6 +7,7 @@ import { FLIP_STYLES, HIGHLIGHT_PALETTES, PreviewActionBar, type FlipStyle, type
 import { AvatarNarrator } from "./AvatarNarrator";
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
 import { toast } from "sonner";
+import { logApiUsage } from "@/lib/edgeFunctions";
 
 /* helpers */
 function tryParseJSON(raw: string | undefined | null): any | null {
@@ -1615,6 +1616,21 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       const audio = new Audio(url);
       wireAudio(audio);
       await audio.play().catch(() => {});
+
+      // Log ElevenLabs TTS usage
+      try {
+        const textLength = narrationText.slice(0, 2500).length;
+        const costInr = (textLength * 0.0003) / 1000 * 10; // Rough estimate
+        await logApiUsage(
+          "ElevenLabs",
+          textLength,
+          costInr,
+          "Text-to-speech narration playback",
+          undefined
+        ).catch(() => {});
+      } catch (e) {
+        // Silently fail
+      }
     } catch (err) {
       console.error("TTS fetch failed:", err);
     } finally {

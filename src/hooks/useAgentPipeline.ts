@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
 import { buildNarrativeScenePrompt, buildImageGenerationPrompts, type TopicNarrative } from "@/lib/visualNarrativeService";
+import { logApiUsage } from "@/lib/edgeFunctions";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -516,6 +517,25 @@ async function callClaude(systemPrompt: string, userMessage: string): Promise<st
 
   if (error) throw new Error(error.message);
   if (data?.error) throw new Error(data.error);
+
+  // Log API usage for Claude (estimated tokens and cost)
+  try {
+    const inputChars = (systemPrompt + userMessage).length;
+    const outputChars = (data.text || "").length;
+    const estimatedTokens = Math.ceil((inputChars + outputChars) / 4);
+    const costInr = (estimatedTokens / 1000) * 0.05; // ~₹0.05 per 1K tokens (adjust as needed)
+
+    await logApiUsage(
+      "Anthropic Claude",
+      estimatedTokens,
+      costInr,
+      "AI agent processing",
+      undefined
+    ).catch(() => {}); // Don't fail if logging fails
+  } catch (e) {
+    // Silently fail logging, don't interrupt the pipeline
+  }
+
   return data.text;
 }
 
@@ -1088,6 +1108,18 @@ OUTPUT FORMAT — ABSOLUTE:
 
                   if (!imageError && imageData?.imageDataUrl) {
                     scene.imageDataUrl = imageData.imageDataUrl;
+                    // Log BFL API usage
+                    try {
+                      await logApiUsage(
+                        "BFL (Flux 2)",
+                        1, // 1 image
+                        0.055, // Cost per image
+                        `Narrative image generation: Scene ${scene.sceneNumber}`,
+                        undefined
+                      ).catch(() => {});
+                    } catch (e) {
+                      // Silently fail, don't interrupt pipeline
+                    }
                   } else {
                     addLog(`Visual Design Agent: Image generation failed for scene ${scene.sceneNumber}. Will use placeholder.`);
                   }
@@ -1159,6 +1191,18 @@ OUTPUT FORMAT — ABSOLUTE:
                     topicVisual.generated_image_data_url = imageData.imageDataUrl;
                     topicVisual.generated_image_mime_type = imageData.mimeType || "image/png";
                     topicVisual.image_approved = false;
+                    // Log BFL API usage
+                    try {
+                      await logApiUsage(
+                        "BFL (Flux 2)",
+                        1, // 1 image
+                        0.055, // Cost per image
+                        `Visual design image: ${topicTitle}`,
+                        undefined
+                      ).catch(() => {});
+                    } catch (e) {
+                      // Silently fail, don't interrupt pipeline
+                    }
                     continue;
                   }
                 } catch {
@@ -1254,6 +1298,18 @@ OUTPUT FORMAT — ABSOLUTE:
             setRawOutputs((prev) => ({ ...prev, youtube: youtubeResult }));
             setStatus("youtube", "complete");
             addLog(`YouTube Agent: Found ${totalVideos} videos across all modules. Ready for review.`);
+            // Log YouTube API usage (estimate: 1 credit per search)
+            try {
+              await logApiUsage(
+                "YouTube Search",
+                1,
+                0.01, // Minimal cost for YouTube search
+                `YouTube video search: ${totalVideos} videos found`,
+                undefined
+              ).catch(() => {});
+            } catch (e) {
+              // Silently fail, don't interrupt pipeline
+            }
           }
         } catch (err) {
           addLog(`YouTube Agent: Error — ${(err as Error).message}`);
@@ -1462,6 +1518,21 @@ OUTPUT FORMAT — ABSOLUTE:
             addLog(`HeyGen Video Agent: Polling completion for "${moduleTitle}"...`);
             const videoUrl = await pollForVideoCompletion(pending.videoId, 120, 5000);
             heygenVideosResult.push({ ...pending, videoUrl, status: "ready" });
+
+            // Log HeyGen API usage (estimate based on script length)
+            try {
+              const videoDurationMinutes = Math.max(1, Math.ceil(stripVideoMarkers(script).split(" ").length / 150)); // ~150 words per minute
+              const costInr = videoDurationMinutes * 0.5; // ₹0.50 per minute
+              await logApiUsage(
+                "HeyGen",
+                videoDurationMinutes,
+                costInr,
+                `Avatar video generation: ${moduleTitle}`,
+                undefined
+              ).catch(() => {});
+            } catch (e) {
+              // Silently fail, don't interrupt pipeline
+            }
           }
 
           setRawOutputs((prev) => ({ ...prev, heygenVideos: JSON.stringify(heygenVideosResult) }));
