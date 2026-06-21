@@ -1562,30 +1562,38 @@ OUTPUT FORMAT — ABSOLUTE:
         let assemblyPrompt = "";
         console.log("🔍 Assembly Agent learningMode:", learningMode, "Type:", typeof learningMode);
         if (learningMode === "image_based_learning") {
-          assemblyPrompt = `You are a Final Assembly Agent for Interactive Image-Based Learning (Flipbook/Digital Assets). This is NOT an LMS course. This is NOT SCORM. Generate a flipbook-specific package summary.
+          assemblyPrompt = `You are a Flipbook Package Assembly Agent. You are creating a flipbook/digital asset publication package. This is completely different from SCORM or LMS courses.
 
-CRITICAL: Do NOT mention SCORM, LMS, or traditional e-learning deployment. Focus ONLY on flipbook/image-based delivery.
+Your task: Generate a flipbook publication package summary with these sections:
 
-Include:
-(1) Course metadata — title, modules, topics, completion time, difficulty
-(2) Flipbook Asset Manifest — images, fonts, SVG elements, narration files
-(3) Flipbook Quality Checklist (ONLY these items, NOT SCORM):
-   - Image quality verification (resolution, compression)
-   - Flip/page transition animation settings
-   - Navigation button functionality
-   - Responsive layout testing (mobile/desktop)
-   - Audio narration sync verification
-   - Interactive element testing (click zones, buttons)
-   - Accessibility compliance (alt text, color contrast)
-   - Mobile device display testing
-   - Upload to flipbook platform/hosting
-   - User acceptance testing
-(4) Quality Assurance Summary
+(1) METADATA: title, total_modules, total_topics, estimated_completion_time, difficulty_level, format: "flipbook"
+
+(2) FLIPBOOK_ASSETS: List every file needed - all images, SVG files, audio narration files, CSS, fonts, JavaScript interactions
+
+(3) FLIPBOOK_DEPLOYMENT_CHECKLIST: Generate exactly these 10 items:
+   1. Verify image resolution and quality (minimum 300 DPI for print, 72 DPI for web)
+   2. Configure flip animation settings (page turn speed, easing function)
+   3. Test all navigation buttons and controls (next, previous, goto page)
+   4. Test responsive layout on mobile devices (iPhone, iPad, Android)
+   5. Sync audio narration with page reveals and animations
+   6. Test all interactive elements (clickable zones, hotspots, buttons)
+   7. Validate accessibility (alt-text on images, color contrast, keyboard navigation)
+   8. Test on real mobile devices and multiple browsers
+   9. Upload all assets to flipbook hosting platform
+   10. Conduct user acceptance testing with target audience
+
+(4) QUALITY_SUMMARY: Confirm which agents completed, list any gaps
+
+Return ONLY this JSON format (no scorm_manifest):
+{
+  "metadata": { "title": "", "modules": 0, "topics": 0, "completion_time": "", "difficulty": "", "format": "flipbook" },
+  "flipbook_assets": { "images": [], "audio_files": [], "interactive_elements": [] },
+  "deployment_checklist": [],
+  "qa_summary": { "agents_completed": [], "quality_scores": {}, "gaps": [] }
+}
 
 [LEARNING MODE: ${learningMode}]
-${modeInstructions}
-
-Return JSON: { metadata: {}, scorm_manifest: { assets: [] }, deployment_checklist: [], qa_summary: { agents_completed: [], quality_scores: {}, gaps: [] } }`;
+${modeInstructions}`;
         } else if (learningMode === "video_learning") {
           assemblyPrompt = `You are a Final Assembly Agent for Video-Based eLearning. Given all course outputs, produce a final package summary. Include: (1) Course metadata — title, total modules, total topics, estimated completion time, difficulty level, (2) Video asset manifest — list all video files, audio tracks, subtitles, and supplementary materials, (3) Video LMS deployment checklist — 10-item checklist covering: video quality testing, audio sync, subtitle accuracy, platform upload, metadata configuration, playback testing, mobile compatibility, learner access verification, analytics setup, launch check, (4) Quality assurance summary. \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn as JSON: { metadata: {}, scorm_manifest: { assets: [] }, deployment_checklist: [], qa_summary: { agents_completed: [], quality_scores: {}, gaps: [] } }`;
         } else {

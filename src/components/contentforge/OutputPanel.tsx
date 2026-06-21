@@ -205,8 +205,44 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       </div>
 
-      {/* 3. SCORM Manifest */}
-      {data.scorm_manifest?.assets && (
+      {/* 3. Flipbook Assets OR SCORM Manifest */}
+      {data.flipbook_assets ? (
+        <div>
+          <h3 className="text-[15px] font-bold text-foreground mb-2">Flipbook Assets</h3>
+          <div className="bg-secondary/50 rounded-xl p-3 space-y-3">
+            {data.flipbook_assets.images && data.flipbook_assets.images.length > 0 && (
+              <div>
+                <p className="text-[12px] font-semibold text-foreground/70 mb-1">Images</p>
+                <div className="space-y-0.5">
+                  {data.flipbook_assets.images.map((img: string, i: number) => (
+                    <div key={i} className="text-[12px] text-foreground/80 pl-2">• {img}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {data.flipbook_assets.audio_files && data.flipbook_assets.audio_files.length > 0 && (
+              <div>
+                <p className="text-[12px] font-semibold text-foreground/70 mb-1">Audio Files</p>
+                <div className="space-y-0.5">
+                  {data.flipbook_assets.audio_files.map((audio: string, i: number) => (
+                    <div key={i} className="text-[12px] text-foreground/80 pl-2">🔊 {audio}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {data.flipbook_assets.interactive_elements && data.flipbook_assets.interactive_elements.length > 0 && (
+              <div>
+                <p className="text-[12px] font-semibold text-foreground/70 mb-1">Interactive Elements</p>
+                <div className="space-y-0.5">
+                  {data.flipbook_assets.interactive_elements.map((elem: string, i: number) => (
+                    <div key={i} className="text-[12px] text-foreground/80 pl-2">⚡ {elem}</div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : data.scorm_manifest?.assets ? (
         <div>
           <h3 className="text-[15px] font-bold text-foreground mb-2">SCORM Manifest</h3>
           <div className="bg-secondary/50 rounded-xl p-3 space-y-1">
@@ -218,7 +254,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
             ))}
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* 4. Deployment Checklist */}
       {data.deployment_checklist && (
