@@ -185,7 +185,9 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
     meta.package_type === "Interactive Flipbook" ||
     data.flipbook_manifest
   );
-  const manifestAssets = isFlipbookPackage ? data.flipbook_manifest?.assets : data.scorm_manifest?.assets;
+  const manifestAssets = Array.isArray(isFlipbookPackage ? data.flipbook_manifest?.assets : data.scorm_manifest?.assets)
+    ? (isFlipbookPackage ? data.flipbook_manifest.assets : data.scorm_manifest.assets)
+    : undefined;
 
   return (
     <div className="space-y-6 animate-fade-in">

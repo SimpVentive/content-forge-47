@@ -350,6 +350,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       showAvatarNarrator,
       showCaption,
       voiceoverPace,
+      imageNarrativeSceneCount,
+      flipbookDisplayStyle,
+      imageOutputFormat,
     });
   };
 
