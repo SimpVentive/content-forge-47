@@ -79,18 +79,24 @@ export function buildImageGenerationPrompts(
   scenes: NarrativeScene[],
   topicTitle: string,
   imageStyle: string,
-  aspectRatio: string
+  aspectRatio: string,
+  characterEthnicity?: string
 ): NarrativeScene[] {
+  const ethnicityGuidance = characterEthnicity && characterEthnicity !== "diverse"
+    ? `Character ethnicity: Feature predominantly ${characterEthnicity} characters and cultural representation.`
+    : "Diverse mix of ethnicities and cultural backgrounds.";
+
   return scenes.map((scene, index) => ({
     ...scene,
     imagePrompt: [
-      "Create an original, realistic, diverse training image for corporate learning.",
+      "Create an original, realistic training image for corporate learning.",
       `Topic: ${topicTitle}. Scene ${index + 1}/${scenes.length}: ${scene.title}.`,
       `Scene context: ${scene.caption}`,
       `Visual requirements: ${scene.imagePrompt}`,
       `Style: ${imageStyle}. Aspect ratio: ${aspectRatio}.`,
+      ethnicityGuidance,
       "No logos, no watermarks, no copyrighted content. Use authentic corporate/workplace aesthetics.",
-      "Diverse characters, realistic emotions, contemporary setting, professional composition.",
+      "Realistic emotions, contemporary setting, professional composition.",
     ].join(" "),
   }));
 }

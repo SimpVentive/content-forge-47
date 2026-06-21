@@ -1015,7 +1015,8 @@ OUTPUT FORMAT — ABSOLUTE:
                     })),
                     topicTitle,
                     params?.imageStyleVariant || "illustrated",
-                    params?.imageAspectRatio || "landscape"
+                    params?.imageAspectRatio || "landscape",
+                    params?.characterEthnicity || "diverse"
                   );
 
                   narrativeScenes.push({

@@ -29,6 +29,7 @@ export interface CourseParameters {
   videoQuality: "720p" | "1080p" | "4k";
   backgroundStyle: "simple" | "office" | "classroom";
   imageStyleVariant?: "realistic" | "illustrated" | "flat-design" | "cartoon";
+  characterEthnicity?: "diverse" | "indian" | "south-asian" | "east-asian" | "african" | "caucasian" | "middle-eastern" | "latino";
   imageCount?: 1 | 2 | 3;
   imageAspectRatio?: "landscape" | "portrait" | "square";
   showAvatarNarrator?: boolean;
@@ -129,6 +130,17 @@ const IMAGE_STYLES = [
   { id: "cartoon", label: "Cartoon" },
 ] as const;
 
+const CHARACTER_ETHNICITIES = [
+  { id: "diverse", label: "Diverse Mix" },
+  { id: "indian", label: "Indian" },
+  { id: "south-asian", label: "South Asian" },
+  { id: "east-asian", label: "East Asian" },
+  { id: "african", label: "African" },
+  { id: "caucasian", label: "Caucasian" },
+  { id: "middle-eastern", label: "Middle Eastern" },
+  { id: "latino", label: "Latino/Hispanic" },
+] as const;
+
 const IMAGE_COUNTS = [1, 2, 3] as const;
 
 const IMAGE_ASPECT_RATIOS = [
@@ -218,6 +230,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [videoQuality, setVideoQuality] = useState<CourseParameters["videoQuality"]>("1080p");
   const [backgroundStyle, setBackgroundStyle] = useState<CourseParameters["backgroundStyle"]>("office");
   const [imageStyleVariant, setImageStyleVariant] = useState<CourseParameters["imageStyleVariant"]>("illustrated");
+  const [characterEthnicity, setCharacterEthnicity] = useState<CourseParameters["characterEthnicity"]>("diverse");
   const [imageCount, setImageCount] = useState<CourseParameters["imageCount"]>(1);
   const [imageAspectRatio, setImageAspectRatio] = useState<CourseParameters["imageAspectRatio"]>("landscape");
   const [showAvatarNarrator, setShowAvatarNarrator] = useState(false);
@@ -290,6 +303,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       videoQuality,
       backgroundStyle,
       imageStyleVariant,
+      characterEthnicity,
       imageCount,
       imageAspectRatio,
       showAvatarNarrator,
@@ -330,6 +344,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       videoQuality,
       backgroundStyle,
       imageStyleVariant,
+      characterEthnicity,
       imageCount,
       imageAspectRatio,
       showAvatarNarrator,
@@ -362,6 +377,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       videoQuality,
       backgroundStyle,
       imageStyleVariant,
+      characterEthnicity,
       imageCount,
       imageAspectRatio,
       showAvatarNarrator,
@@ -800,6 +816,30 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     style={imageStyleVariant === style.id ? { background: "#b45309", borderColor: "transparent" } : undefined}
                   >
                     {style.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Character Ethnicity */}
+            <div className={surfaceCardClass}>
+              <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
+                Character Ethnicity
+                <InfoHint text="Specify the ethnicity representation for characters in generated images." />
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {CHARACTER_ETHNICITIES.map((ethnicity) => (
+                  <button
+                    key={ethnicity.id}
+                    onClick={() => setCharacterEthnicity(ethnicity.id as CourseParameters["characterEthnicity"])}
+                    className={`h-10 px-4 rounded-full text-[13px] font-semibold border transition-all duration-200 ease-in-out ${
+                      characterEthnicity === ethnicity.id
+                        ? "text-white"
+                        : "border-[#E5E7EB] text-[#2E2E2E] hover:border-[#b45309]"
+                    }`}
+                    style={characterEthnicity === ethnicity.id ? { background: "#b45309", borderColor: "transparent" } : undefined}
+                  >
+                    {ethnicity.label}
                   </button>
                 ))}
               </div>
