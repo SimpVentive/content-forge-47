@@ -1,17 +1,52 @@
-import { Check, Shield, FileText, Loader2 } from "lucide-react";
+import { Check, Shield, FileText, Loader2, Info, Image as ImageIcon, BookOpen, Video } from "lucide-react";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
 import { createRazorpayOrder, verifyRazorpayPayment } from "@/lib/edgeFunctions";
 
-type Pack = { id: string; credits: number; price: number; perCredit: number; tag: string | null };
+type Pack = {
+  id: string;
+  name: string;
+  credits: number;
+  priceInr: number;
+  perCredit: number;
+  tag: string | null;
+  blurb: string;
+  includes: { image: string; elearning: string; video: string };
+};
 
 const PACKS: Pack[] = [
-  { id: "p10", credits: 10, price: 4990, perCredit: 499, tag: null },
-  { id: "p50", credits: 50, price: 24950, perCredit: 499, tag: "Best value" },
-  { id: "p200", credits: 200, price: 99800, perCredit: 499, tag: null },
-  { id: "p500", credits: 500, price: 249500, perCredit: 499, tag: null },
+  {
+    id: "starter",
+    name: "Starter",
+    credits: 100,
+    priceInr: 249,
+    perCredit: 2.49,
+    tag: null,
+    blurb: "Kick the tyres and ship your first course.",
+    includes: { image: "10 image-based lessons", elearning: "5 min of e-learning", video: "1 min of video" },
+  },
+  {
+    id: "growth",
+    name: "Growth",
+    credits: 500,
+    priceInr: 999,
+    perCredit: 2.0,
+    tag: "Best value",
+    blurb: "For teams shipping courses every month.",
+    includes: { image: "50 image-based lessons", elearning: "25 min of e-learning", video: "5 min of video" },
+  },
+  {
+    id: "studio",
+    name: "Studio",
+    credits: 1000,
+    priceInr: 1899,
+    perCredit: 1.89,
+    tag: null,
+    blurb: "For studios producing at scale across formats.",
+    includes: { image: "100 image-based lessons", elearning: "50 min of e-learning", video: "10 min of video" },
+  },
 ];
 
 export const PricingSection = () => {
