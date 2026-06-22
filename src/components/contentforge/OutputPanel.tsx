@@ -32,12 +32,13 @@ interface OutputPanelProps {
   flipStylePreference?: "dramatic" | "subtle" | "bound";
   textLanguage?: string;
   narratorLanguage?: string;
+  learningType?: "static" | "video" | "image";
   onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
   onUpdateCourseContent?: (section: "outline" | "script" | "assessment" | "package", value: string) => void;
   onOpenLearnerPreview?: () => void;
 }
 
-const tabs = [
+const baseTabs = [
   { key: "outline" as const, label: "Outline", icon: BookOpen },
   { key: "videos" as const, label: "Videos", icon: Youtube },
   { key: "script" as const, label: "Script", icon: FileText },
@@ -692,7 +693,7 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
   );
 };
 
-export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic, onUpdateCourseContent, onOpenLearnerPreview }) => {
+export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, learningType, onUpdateVisualTopic, onUpdateCourseContent, onOpenLearnerPreview }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [showPostPreviewDialog, setShowPostPreviewDialog] = useState(false);
@@ -706,6 +707,12 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
   const prevIsRunningRef = React.useRef<boolean>(Boolean(isRunning));
   const hasOutput = Object.values(rawOutputs).some(v => v);
   const isImageSeriesOutput = getNarrativeImageItems(rawOutputs).length > 0;
+
+  // Filter tabs based on learning type - image-based learning doesn't have videos tab
+  const tabs = learningType === "image"
+    ? baseTabs.filter(tab => tab.key !== "videos")
+    : baseTabs;
+
   const content = (activeTab === "preview" || activeTab === "videos") ? null : outputData[activeTab as keyof OutputData];
   const canEditTab = activeTab === "outline" || activeTab === "script" || activeTab === "assessment" || activeTab === "package";
 

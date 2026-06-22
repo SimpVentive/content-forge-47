@@ -693,6 +693,7 @@ const Index = () => {
             flipStylePreference={courseParams?.flipStyle}
             textLanguage={courseParams?.textLanguage || courseParams?.language}
             narratorLanguage={courseParams?.narratorLanguage}
+            learningType={courseParams?.learningType}
             onUpdateVisualTopic={updateVisualTopicAsset}
             onUpdateCourseContent={updateCourseContent}
             onOpenLearnerPreview={() => setShowLearnerPreview(true)}
