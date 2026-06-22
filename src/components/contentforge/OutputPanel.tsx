@@ -360,7 +360,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               </h2>
             </div>
             <p className={`text-[14px] ${qaReport?.passed || approvedByAdmin ? "text-emerald-800" : "text-amber-800"}`}>
-              Your {isImageSeries ? "image series" : isFlipbook ? "flipbook" : "course package"} {qaReport?.passed || approvedByAdmin ? "is complete and ready to download." : "has quality issues - please review or approve to continue."}
+              Your {isImageSeries ? "storyboard" : isFlipbook ? "flipbook" : "course package"} {qaReport?.passed || approvedByAdmin ? "is complete and ready to view." : "has quality issues - please review or approve to continue."}
             </p>
           </div>
           <div className="text-[28px]">{qaReport?.passed || approvedByAdmin ? (isImageSeries ? "🖼️" : "📦") : "🔍"}</div>
