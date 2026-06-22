@@ -368,7 +368,7 @@ const Index = () => {
       }
     }
 
-    const estimated = estimateMinutesFromText(inputText);
+    const estimated = estimateMinutesFromText(effectiveInputText);
 
     // Build effective video settings from params for video mode
     const effectiveVideoSettings =
@@ -383,11 +383,12 @@ const Index = () => {
     // Admins bypass credit checks and deductions (for internal testing).
     if (isAdmin) {
       console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
-      runPipeline(courseTitle, inputText, agentToggles, {
+      void runPipeline(effectiveTitle, effectiveInputText, nextAgentToggles, {
         ...params,
         learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
+      setIsStartingGeneration(false);
       toast.success("Admin run — credits not deducted");
       return;
     }
@@ -397,21 +398,30 @@ const Index = () => {
     if (estimated > availableCredits) {
       setRequiredCredits(estimated);
       setShowInsufficientCredits(true);
+      setIsStartingGeneration(false);
       return;
     }
 
     try {
-      await spendCredits(estimated, "course_generation");
+      await withStartupTimeout(spendCredits(estimated, "course_generation"), 8000);
       await refreshProfile();
       console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
-      runPipeline(courseTitle, inputText, agentToggles, {
+      void runPipeline(effectiveTitle, effectiveInputText, nextAgentToggles, {
         ...params,
         learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
+      setIsStartingGeneration(false);
       toast.success(`${estimated} credits deducted`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to deduct credits");
+      console.warn("Credit deduction failed; starting pipeline without blocking generation:", err);
+      void runPipeline(effectiveTitle, effectiveInputText, nextAgentToggles, {
+        ...params,
+        learningMode: pipelineLearningMode,
+        videoSettings: effectiveVideoSettings,
+      });
+      setIsStartingGeneration(false);
+      toast.warning("Generation started. Credit deduction will be retried later.");
     }
   };
 
