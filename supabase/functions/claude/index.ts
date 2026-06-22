@@ -50,7 +50,9 @@ serve(async (req) => {
     const data = await response.json();
 
     if (!response.ok) {
-      throw new Error(data.error?.message || "AI gateway error");
+      console.error("AI gateway error", response.status, JSON.stringify(data));
+      const msg = data?.error?.message || data?.error || `AI gateway error (${response.status})`;
+      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
     }
 
     const text = data.choices?.[0]?.message?.content || "";
