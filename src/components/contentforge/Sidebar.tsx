@@ -175,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     } else {
       const text = await readFileAsText(file);
       if (text && text.length > 0) {
-        setInputText(text);
+        setInputText(isHtmlUpload(file.name, text) ? stripHtmlToReadableText(text) : text);
       } else {
         setInputText(`[Document] Uploaded: ${file.name} - Could not extract text. Try pasting content directly.`);
       }
