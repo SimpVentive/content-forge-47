@@ -1,7 +1,8 @@
 ﻿import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
-import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2 } from "lucide-react";
+import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2, AlertCircle, Info } from "lucide-react";
 import { exportScormPackage } from "@/lib/scormExport";
+import { validateCourse, type QAReport } from "@/lib/qaValidator";
 import { toast } from "sonner";
 import { VoicePreview } from "./VoicePreview";
 import { SlidePreview } from "./SlidePreview";
@@ -159,6 +160,22 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
 
   const isFlipbook = !!data?.flipbook_assets;
   const checklistComplete = checklist.filter(Boolean).length === checklist.length;
+  const [qaReport, setQaReport] = useState<QAReport | null>(null);
+  const [approvedByAdmin, setApprovedByAdmin] = useState(false);
+
+  React.useEffect(() => {
+    const runQA = async () => {
+      if (raw && archRaw && visualRaw) {
+        try {
+          const report = await validateCourse(raw, data?.metadata || {}, data?.flipbook_assets?.images || []);
+          setQaReport(report);
+        } catch (err) {
+          console.error("QA validation error:", err);
+        }
+      }
+    };
+    runQA();
+  }, [raw, archRaw, visualRaw]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -184,17 +201,107 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         />
       )}
 
+      {/* QA REPORT */}
+      {qaReport && (
+        <div className={`border-2 rounded-2xl p-6 ${
+          qaReport.passed
+            ? "bg-emerald-50 border-emerald-200"
+            : "bg-amber-50 border-amber-300"
+        }`}>
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-start gap-3">
+              {qaReport.passed ? (
+                <Check className="w-6 h-6 text-emerald-600 mt-0.5 flex-shrink-0" />
+              ) : (
+                <AlertCircle className="w-6 h-6 text-amber-600 mt-0.5 flex-shrink-0" />
+              )}
+              <div>
+                <h3 className={`text-[16px] font-bold ${qaReport.passed ? "text-emerald-900" : "text-amber-900"}`}>
+                  Quality Score: {qaReport.score}/100
+                </h3>
+                <p className={`text-[13px] ${qaReport.passed ? "text-emerald-800" : "text-amber-800"}`}>
+                  {qaReport.summary}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {qaReport.issues.length > 0 && (
+            <div className="space-y-2 mb-4">
+              {qaReport.issues.slice(0, 5).map((issue, i) => (
+                <div key={i} className={`text-[12px] p-3 rounded-lg ${
+                  issue.type === "error"
+                    ? "bg-red-100 text-red-800 border border-red-300"
+                    : issue.type === "warning"
+                      ? "bg-yellow-100 text-yellow-800 border border-yellow-300"
+                      : "bg-blue-100 text-blue-800 border border-blue-300"
+                }`}>
+                  <div className="font-semibold flex items-center gap-2">
+                    {issue.type === "error" ? "❌" : issue.type === "warning" ? "⚠️" : "ℹ️"}
+                    [{issue.section.toUpperCase()}] {issue.message}
+                  </div>
+                  {issue.details && <div className="text-[11px] mt-1 opacity-80">{issue.details}</div>}
+                </div>
+              ))}
+              {qaReport.issues.length > 5 && (
+                <div className="text-[12px] text-gray-600 italic">
+                  + {qaReport.issues.length - 5} more issue(s)
+                </div>
+              )}
+            </div>
+          )}
+
+          {qaReport.recommendations.length > 0 && (
+            <div className="bg-white/50 rounded-lg p-3">
+              <p className="text-[12px] font-semibold mb-2">Recommendations:</p>
+              <ul className="text-[12px] space-y-1">
+                {qaReport.recommendations.map((rec, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className="text-amber-500">•</span>
+                    <span>{rec}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {!qaReport.passed && (
+            <div className="mt-4 flex items-center gap-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={approvedByAdmin}
+                  onChange={(e) => setApprovedByAdmin(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <span className="text-[13px] font-semibold text-amber-900">
+                  I have reviewed these issues and approve export anyway
+                </span>
+              </label>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* STATUS BANNER */}
-      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-2xl p-6">
+      <div className={`border-2 rounded-2xl p-6 ${
+        qaReport?.passed || approvedByAdmin
+          ? "bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-200"
+          : "bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300"
+      }`}>
         <div className="flex items-start justify-between">
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse" />
-              <h2 className="text-[20px] font-bold text-emerald-900">✓ Ready to Export!</h2>
+              <div className={`w-3 h-3 rounded-full ${qaReport?.passed || approvedByAdmin ? "bg-emerald-500" : "bg-amber-500"} animate-pulse`} />
+              <h2 className={`text-[20px] font-bold ${qaReport?.passed || approvedByAdmin ? "text-emerald-900" : "text-amber-900"}`}>
+                {qaReport?.passed || approvedByAdmin ? "✓ Ready to Export!" : "⚠ Review Required Before Export"}
+              </h2>
             </div>
-            <p className="text-[14px] text-emerald-800">Your {isFlipbook ? "flipbook" : "course"} package is complete and ready to download.</p>
+            <p className={`text-[14px] ${qaReport?.passed || approvedByAdmin ? "text-emerald-800" : "text-amber-800"}`}>
+              Your {isFlipbook ? "flipbook" : "course"} package {qaReport?.passed || approvedByAdmin ? "is complete and ready to download." : "has quality issues - please review or approve to continue."}
+            </p>
           </div>
-          <div className="text-[28px]">📦</div>
+          <div className="text-[28px]">{qaReport?.passed || approvedByAdmin ? "📦" : "🔍"}</div>
         </div>
       </div>
 
@@ -350,6 +457,10 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           </button>
           <button
             onClick={async () => {
+              if (qaReport && !qaReport.passed && !approvedByAdmin) {
+                toast.error("Please address QA issues or approve to continue");
+                return;
+              }
               setExporting(true);
               try {
                 const hasVoice = !!rawOutputs.voice;
@@ -368,8 +479,8 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
                 setExporting(false);
               }
             }}
-            disabled={exporting}
-            className="h-14 rounded-xl text-[14px] font-bold text-white flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 transition-all disabled:opacity-60 shadow-lg"
+            disabled={exporting || (qaReport && !qaReport.passed && !approvedByAdmin)}
+            className="h-14 rounded-xl text-[14px] font-bold text-white flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-lg"
           >
             {exporting ? (
               <>
