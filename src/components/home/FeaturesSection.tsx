@@ -26,12 +26,17 @@ export const FeaturesSection = () => (
         </p>
       </div>
 
-      <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-3" data-testid="features-grid">
-        {FEATURES.map(({ icon: Icon, title, desc }) => (
+      <div className="mt-12 grid gap-5 md:grid-cols-2 lg:grid-cols-4" data-testid="features-grid">
+        {FEATURES.map(({ icon: Icon, title, desc, badge }) => (
           <div
             key={title}
-            className="group rounded-2xl border border-slate-200 bg-white p-6 transition-all hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-100/50"
+            className="group relative rounded-2xl border border-slate-200 bg-white p-6 transition-all hover:-translate-y-1 hover:border-indigo-200 hover:shadow-lg hover:shadow-indigo-100/50"
           >
+            {badge && (
+              <span className="absolute right-4 top-4 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                {badge}
+              </span>
+            )}
             <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 transition-colors group-hover:bg-indigo-600 group-hover:text-white">
               <Icon className="h-5 w-5" />
             </div>
