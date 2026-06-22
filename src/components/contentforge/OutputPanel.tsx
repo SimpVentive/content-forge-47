@@ -545,14 +545,19 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               }
               setExporting(true);
               try {
-                const hasVoice = !!rawOutputs.voice;
-                await exportScormPackage(courseTitle, rawOutputs, {
-                  includeVoice: hasVoice,
-                  onProgress: (msg) => toast.info(msg, { duration: 3000 }),
-                });
-                toast.success(hasVoice
-                  ? "SCORM package with voice narration exported!"
-                  : "SCORM package exported successfully!");
+                if (isImageSeries) {
+                  const count = await downloadNarrativeImages(courseTitle, rawOutputs);
+                  toast.success(`${count} image${count === 1 ? "" : "s"} downloaded`);
+                } else {
+                  const hasVoice = !!rawOutputs.voice;
+                  await exportScormPackage(courseTitle, rawOutputs, {
+                    includeVoice: hasVoice,
+                    onProgress: (msg) => toast.info(msg, { duration: 3000 }),
+                  });
+                  toast.success(hasVoice
+                    ? "SCORM package with voice narration exported!"
+                    : "SCORM package exported successfully!");
+                }
               } catch (err: any) {
                 toast.error(err?.message || "Export failed");
               } finally {
@@ -569,8 +574,8 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               </>
             ) : (
               <>
-                <Download className="w-5 h-5" />
-                Export Package
+                {isImageSeries ? <Images className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                {isImageSeries ? "Download Images" : "Export Package"}
               </>
 
             )}
@@ -581,11 +586,20 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <p className="text-[13px] font-bold text-amber-900 mb-2">📋 Next Steps:</p>
           <ol className="text-[12px] text-amber-800 space-y-1 list-decimal list-inside">
-            <li>Review the deployment checklist above</li>
-            <li>Click "Export Package" to download</li>
-            <li>Import SCORM package to your LMS</li>
-
-            <li>Test with learners and gather feedback</li>
+            {isImageSeries ? (
+              <>
+                <li>Review the image sequence above</li>
+                <li>Click "Download Images" to save the generated series</li>
+                <li>Use the images directly in your document, deck, or training flow</li>
+              </>
+            ) : (
+              <>
+                <li>Review the deployment checklist above</li>
+                <li>Click "Export Package" to download</li>
+                <li>Import SCORM package to your LMS</li>
+                <li>Test with learners and gather feedback</li>
+              </>
+            )}
           </ol>
         </div>
       </div>
