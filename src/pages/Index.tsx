@@ -250,19 +250,43 @@ const Index = () => {
     }
   };
 
+  const getDefaultCourseParams = (): CourseParameters => ({
+    level: "intermediate",
+    language: "English",
+    textLanguage: "English",
+    narratorLanguage: "English",
+    voiceAccent: "Rachel",
+    avatarTrainerId: "irina",
+    duration: "15min",
+    videoDurationHandling: "within-course",
+    assessmentRequired: true,
+    learnerNotesEnabled: false,
+    resourcesPanelEnabled: true,
+    glossaryEnabled: true,
+    discussionEnabled: true,
+    assessmentIntensity: "standard",
+    flipStyle: "bound",
+    maxYoutubeVideos: 20,
+    slideLayout: { maxLines: 10, minFontSize: 12.5, lineSpacing: 2 },
+    learningType: learningType as "static" | "video" | "image",
+    videoQuality: "1080p",
+    backgroundStyle: "office",
+    imageStyleVariant: "illustrated",
+    characterEthnicity: "diverse",
+    imageCount: 1,
+    imageAspectRatio: "landscape",
+    showAvatarNarrator: false,
+    showCaption: true,
+    voiceoverPace: "normal",
+    imageNarrativeSceneCount: 4,
+    flipbookDisplayStyle: "smooth-slide",
+    imageOutputFormat: "interactive-html",
+    flipbookVoiceoverEnabled: false,
+    flipbookNarrationLanguage: "English",
+  });
+
   const handleGenerateClick = () => {
-    if (isStartingGeneration || isRunning) return;
-
-    if (!courseTitle.trim()) {
-      const fallbackTitle = `Untitled Course ${new Date().toLocaleDateString()}`;
-      setCourseTitle(fallbackTitle);
-    }
-
-    if (!inputText.trim()) {
-      setInputText("Create a concise training course from the uploaded file name and available context.");
-    }
-
-    setShowParamsDialog(true);
+    void handleParamsConfirm(courseParams || getDefaultCourseParams());
   };
 
   const handleSaveDraft = async () => {
