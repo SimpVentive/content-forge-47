@@ -208,6 +208,9 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; avatarTrainerId?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; learnerNotesEnabled?: boolean; resourcesPanelEnabled?: boolean; glossaryEnabled?: boolean; discussionEnabled?: boolean; assessmentIntensity?: "light" | "standard" | "deep"; flipStylePreference?: "dramatic" | "subtle" | "bound"; textLanguage?: string; narratorLanguage?: string; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
+  const narrativeImages = getNarrativeImageItems(rawOutputs);
+  const hasNarrativeImages = narrativeImages.length > 0;
+  const isImageSeries = hasNarrativeImages || meta?.output_format === "Image Series" || meta?.package_type === "Image Series";
   const [checklist, setChecklist] = useState<boolean[]>(
     new Array((data?.deployment_checklist || []).length).fill(false)
   );
@@ -356,7 +359,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               </h2>
             </div>
             <p className={`text-[14px] ${qaReport?.passed || approvedByAdmin ? "text-emerald-800" : "text-amber-800"}`}>
-              Your {isFlipbook ? "flipbook" : "course"} package {qaReport?.passed || approvedByAdmin ? "is complete and ready to download." : "has quality issues - please review or approve to continue."}
+              Your {isImageSeries ? "image series" : isFlipbook ? "flipbook" : "course package"} {qaReport?.passed || approvedByAdmin ? "is complete and ready to download." : "has quality issues - please review or approve to continue."}
             </p>
           </div>
           <div className="text-[28px]">{qaReport?.passed || approvedByAdmin ? "📦" : "🔍"}</div>
@@ -371,7 +374,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
       {/* 2. Metadata */}
       <div>
         <h3 className="text-[18px] font-extrabold text-foreground mb-4">
-          {meta.title || (isFlipbook ? "Flipbook Package" : "Course Package")}
+          {meta.title || (isImageSeries ? "Image Series" : isFlipbook ? "Flipbook Package" : "Course Package")}
         </h3>
         <div className="grid grid-cols-2 gap-3">
           {[
@@ -389,8 +392,27 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       </div>
 
-      {/* 3. Flipbook Assets OR SCORM Manifest */}
-      {data.flipbook_assets ? (
+      {/* 3. Image Series OR package manifest */}
+      {hasNarrativeImages ? (
+        <div>
+          <h3 className="text-[15px] font-bold text-foreground mb-2">Generated Image Series</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {narrativeImages.map((item, index) => (
+              <div key={`${item.topicTitle}-${item.sceneNumber}-${index}`} className="bg-secondary/50 rounded-xl overflow-hidden border border-border/60">
+                {item.imageDataUrl ? (
+                  <img src={item.imageDataUrl} alt={item.caption || item.title} className="w-full aspect-video object-cover" />
+                ) : (
+                  <div className="w-full aspect-video flex items-center justify-center bg-secondary text-[12px] text-muted-foreground">Image pending</div>
+                )}
+                <div className="p-3 space-y-1">
+                  <p className="text-[12px] font-bold text-foreground">{String(index + 1).padStart(2, "0")}. {item.title}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{item.caption}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : data.flipbook_assets ? (
         <div>
           <h3 className="text-[15px] font-bold text-foreground mb-2">Flipbook Assets</h3>
           <div className="bg-secondary/50 rounded-xl p-3 space-y-3">
