@@ -189,6 +189,53 @@ export const PricingSection = () => {
               </div>
             );
           })}
+
+          <div
+            data-testid="pack-card-dlas"
+            className="relative flex flex-col rounded-2xl border border-slate-900 bg-slate-900 p-6 text-white transition-all hover:-translate-y-1 hover:shadow-lg"
+          >
+            <span className="absolute -top-3 left-6 rounded-full bg-amber-400 px-3 py-1 text-xs font-semibold text-slate-900">
+              Enterprise
+            </span>
+            <div className="mb-5">
+              <div className="text-sm font-semibold text-amber-400">DLAS</div>
+              <div className="mt-1 text-sm font-medium text-slate-300">Digital Learning as a Service</div>
+              <div className="mt-3 flex items-baseline gap-2">
+                <span className="text-4xl font-semibold tracking-tight text-white">Custom</span>
+              </div>
+              <div className="mt-1 text-xs text-slate-400">Volume pricing &amp; SLAs</div>
+            </div>
+
+            <p className="mb-4 text-sm text-slate-300">
+              For enterprise customers looking for large and specialized digital learning services.
+            </p>
+
+            <div className="mb-6 space-y-2 rounded-lg bg-slate-800/60 p-3 text-xs text-slate-200">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Includes
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-3.5 w-3.5 text-amber-400" />
+                <span>Dedicated production team</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-3.5 w-3.5 text-amber-400" />
+                <span>Custom integrations &amp; SSO</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Check className="h-3.5 w-3.5 text-amber-400" />
+                <span>Priority support &amp; SLAs</span>
+              </div>
+            </div>
+
+            <a
+              href="mailto:sales@unitol.ai?subject=DLAS%20Enquiry"
+              data-testid="contact-dlas"
+              className="mt-auto w-full rounded-lg bg-amber-400 px-4 py-2.5 text-center text-sm font-semibold text-slate-900 transition-colors hover:bg-amber-300"
+            >
+              Contact us
+            </a>
+          </div>
         </div>
 
 
