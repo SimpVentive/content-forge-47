@@ -1520,6 +1520,42 @@ export async function exportScormPackage(
     }
   });
 
+  // Extract images from data URLs and add them as separate files
+  // This is necessary because large data URLs can exceed SCORM player limits
+  const imageReplacementMap = new Map<string, string>();
+  scriptMap.forEach((sections) => {
+    sections.forEach((section, idx) => {
+      if (section.visualImageDataUrl && section.visualImageDataUrl.startsWith("data:")) {
+        try {
+          const matches = section.visualImageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
+          if (matches) {
+            const mimeType = matches[1];
+            const base64Data = matches[2];
+            const ext = mimeType.includes("png") ? "png" : mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png";
+            const binary = atob(base64Data);
+            const bytes = new Uint8Array(binary.length);
+            for (let b = 0; b < binary.length; b++) bytes[b] = binary.charCodeAt(b);
+            const fileName = `image_${imageReplacementMap.size + 1}.${ext}`;
+            const filePath = `images/${fileName}`;
+            zip.file(filePath, bytes);
+            imageReplacementMap.set(section.visualImageDataUrl, filePath);
+          }
+        } catch (err) {
+          console.warn(`Image extraction failed for section ${idx}:`, err);
+        }
+      }
+    });
+  });
+
+  // Replace data URLs with relative paths in scriptMap
+  scriptMap.forEach((sections) => {
+    sections.forEach((section) => {
+      if (section.visualImageDataUrl && imageReplacementMap.has(section.visualImageDataUrl)) {
+        section.visualImageDataUrl = imageReplacementMap.get(section.visualImageDataUrl) || section.visualImageDataUrl;
+      }
+    });
+  });
+
   // Add module HTML pages
   modules.forEach((mod, i) => {
     const sections = scriptMap.get(mod.title) || [{

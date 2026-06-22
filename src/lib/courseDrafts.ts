@@ -122,26 +122,42 @@ export async function saveCourseDraftCloudFirst(draft: Omit<CourseDraft, "savedA
   const local = saveCourseDraft(draft);
 
   try {
+    const payload = {
+      id: local.id,
+      title: local.title,
+      input_text: local.inputText,
+      course_params: local.courseParams,
+      workflow_clips: local.workflowClips,
+      raw_outputs: local.rawOutputs,
+      output_data: local.outputData,
+      saved_at: local.savedAt,
+    };
+
+    // Use upsert approach: try to update first, then insert if not found
     await remoteFetch(REMOTE_TABLE, {
       method: "POST",
-      body: JSON.stringify([
-        {
-          id: local.id,
-          title: local.title,
-          input_text: local.inputText,
-          course_params: local.courseParams,
-          workflow_clips: local.workflowClips,
-          raw_outputs: local.rawOutputs,
-          output_data: local.outputData,
-          saved_at: local.savedAt,
-        },
-      ]),
+      body: JSON.stringify([payload]),
       headers: {
         Prefer: "resolution=merge-duplicates,return=representation",
       },
+    }).catch(async (err) => {
+      // If POST fails, try DELETE then INSERT for cleaner upsert
+      try {
+        await remoteFetch(`${REMOTE_TABLE}?id=eq.${encodeURIComponent(local.id)}`, {
+          method: "DELETE",
+        });
+      } catch {
+        // Ignore delete failure
+      }
+      // Now try insert again
+      return remoteFetch(REMOTE_TABLE, {
+        method: "POST",
+        body: JSON.stringify([payload]),
+      });
     });
-  } catch {
+  } catch (err) {
     // Keep local version when remote table/RLS is unavailable.
+    console.warn("Failed to save draft to remote:", err);
   }
 
   return local;
