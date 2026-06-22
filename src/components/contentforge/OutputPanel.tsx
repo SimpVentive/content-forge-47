@@ -180,8 +180,13 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
 
   if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
-<<<<<<< HEAD
-  const isFlipbook = !!data?.flipbook_assets;
+  const isFlipbook = !!data?.flipbook_assets || meta.package_type === "Interactive Flipbook" || !!data?.flipbook_manifest;
+  const isFlipbookPackage = isFlipbook;
+  const manifestAssets = Array.isArray(data?.scorm_manifest?.assets)
+    ? data.scorm_manifest.assets
+    : Array.isArray(data?.flipbook_manifest?.assets)
+      ? data.flipbook_manifest.assets
+      : undefined;
   const checklistComplete = checklist.filter(Boolean).length === checklist.length;
   const [qaReport, setQaReport] = useState<QAReport | null>(null);
   const [approvedByAdmin, setApprovedByAdmin] = useState(false);
@@ -199,17 +204,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
     };
     runQA();
   }, [raw, archRaw, visualRaw]);
-=======
-  const isFlipbookPackage = Boolean(
-    rawOutputs.flipbookHTML ||
-    rawOutputs.narrativeScenes ||
-    meta.package_type === "Interactive Flipbook" ||
-    data.flipbook_manifest
-  );
-  const manifestAssets = Array.isArray(isFlipbookPackage ? data.flipbook_manifest?.assets : data.scorm_manifest?.assets)
-    ? (isFlipbookPackage ? data.flipbook_manifest.assets : data.scorm_manifest.assets)
-    : undefined;
->>>>>>> f89ff03fe22abb5925ac5214ed5d8190e4851113
+
 
   return (
     <div className="space-y-6 animate-fade-in">
