@@ -18,8 +18,19 @@ export function generateFlipbookHTML(
   courseTitle: string,
   displayStyle: "page-flip" | "smooth-slide" | "step-reveal" = "page-flip"
 ): string {
+  // Add a title page at the beginning
+  const pages: FlipbookPage[] = [
+    {
+      title: courseTitle,
+      content: "Professional Learning Guide",
+      images: [],
+      speaker: "",
+      pageNumber: 0,
+    },
+  ];
+
   // Convert narratives to flipbook pages
-  const pages: FlipbookPage[] = narratives.flatMap((narrative, topicIdx) =>
+  const contentPages = narratives.flatMap((narrative, topicIdx) =>
     narrative.scenes.map((scene, sceneIdx) => ({
       title: scene.title,
       content: scene.caption || "",
@@ -28,6 +39,8 @@ export function generateFlipbookHTML(
       pageNumber: topicIdx * 10 + sceneIdx + 1,
     }))
   );
+
+  pages.push(...contentPages);
 
   const pagesHTML = pages
     .map(

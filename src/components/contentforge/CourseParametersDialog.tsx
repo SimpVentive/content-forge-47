@@ -83,17 +83,23 @@ const LANGUAGES = [
 ];
 
 const VOICE_ACCENTS = [
-  { value: "Rachel", voiceId: "21m00Tcm4TlvDq8ikWAM", label: "Rachel - American Female (Professional)" },
-  { value: "Adam", voiceId: "pNInz6obpgDQGcFmaJgB", label: "Adam - American Male (Authoritative)" },
-  { value: "Elli", voiceId: "MF3mGyEYCl7XYWbV9V6O", label: "Elli - American Female (Warm)" },
-  { value: "Sarah", voiceId: "EXAVITQu4vr4xnSDxMaL", label: "Sarah - American Female (Soft)" },
-  { value: "Charlie", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie - Australian Male (Casual)" },
-  { value: "George", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George - British Male (Formal)" },
-  { value: "Matilda", voiceId: "XrExE9yKIg1WjnnlVkGX", label: "Matilda - American Female (Friendly)" },
-  { value: "Brian", voiceId: "nPczCjzI2devNBz1zQrb", label: "Brian - American Male (Deep)" },
-  { value: "Lily", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily - British Female (Narrative)" },
-  { value: "Daniel", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel - British Male (Warm)" },
+  { value: "Rachel", voiceId: "21m00Tcm4TlvDq8ikWAM", label: "Rachel - Professional", languages: ["English", "Spanish", "French"] },
+  { value: "Adam", voiceId: "pNInz6obpgDQGcFmaJgB", label: "Adam - Authoritative", languages: ["English"] },
+  { value: "Elli", voiceId: "MF3mGyEYCl7XYWbV9V6O", label: "Elli - Warm", languages: ["English"] },
+  { value: "Sarah", voiceId: "EXAVITQu4vr4xnSDxMaL", label: "Sarah - Soft", languages: ["English", "Hindi", "Spanish"] },
+  { value: "Charlie", voiceId: "IKne3meq5aSn9XLyUdCD", label: "Charlie - Casual", languages: ["English", "Spanish"] },
+  { value: "George", voiceId: "JBFqnCBsd6RMkjVDRZzb", label: "George - Formal", languages: ["English", "Spanish"] },
+  { value: "Matilda", voiceId: "XrExE9yKIg1WjnnlVkGX", label: "Matilda - Friendly", languages: ["English"] },
+  { value: "Brian", voiceId: "nPczCjzI2devNBz1zQrb", label: "Brian - Deep", languages: ["English", "Spanish"] },
+  { value: "Lily", voiceId: "pFZP5JQG7iQjIQuC4Bku", label: "Lily - Narrative", languages: ["English"] },
+  { value: "Daniel", voiceId: "onwK4e9ZLuTAKqWW03F9", label: "Daniel - Warm", languages: ["English", "Hindi", "Tamil", "Spanish"] },
 ];
+
+function getAvailableVoicesForLanguage(language: string) {
+  const recommended = VOICE_ACCENTS.filter(v => v.languages.includes(language));
+  if (recommended.length > 0) return recommended;
+  return VOICE_ACCENTS;
+}
 
 const DURATIONS = [
   { value: "1min", label: "1 min", minutes: 1 }, // Testing
@@ -269,6 +275,14 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     if (!trainerAutoMode) return;
     setAvatarTrainerId(getDefaultTrainerIdForLanguage(narratorLanguage));
   }, [narratorLanguage, trainerAutoMode]);
+
+  useEffect(() => {
+    const availableVoices = getAvailableVoicesForLanguage(narratorLanguage);
+    const currentVoiceStillAvailable = availableVoices.some(v => v.value === voiceAccent);
+    if (!currentVoiceStillAvailable && availableVoices.length > 0) {
+      setVoiceAccent(availableVoices[0].value);
+    }
+  }, [narratorLanguage, voiceAccent]);
 
   // Check for mismatch when user tries to generate
   const mismatchInfo = useMemo(() => {
@@ -673,7 +687,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   onChange={(e) => setVoiceAccent(e.target.value)}
                   className="w-full h-10 border border-[#E5E7EB] rounded-[20px] px-4 text-[13px] bg-[#F3F4F6] text-[#2E2E2E] focus:outline-none focus:border-[#6EC1E4] transition-colors duration-200 ease-in-out appearance-none cursor-pointer"
                 >
-                  {VOICE_ACCENTS.map((v) => (
+                  {getAvailableVoicesForLanguage(narratorLanguage).map((v) => (
                     <option key={v.value} value={v.value}>{v.label}</option>
                   ))}
                 </select>
@@ -1117,6 +1131,13 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
           {localLearningType === "video" && (
           <div>
+            <div style={{ padding: "16px", backgroundColor: "#f0f9ff", borderLeft: "4px solid #0891b2", borderRadius: "8px", marginBottom: "20px" }}>
+              <p style={{ fontSize: "12px", fontWeight: 600, color: "#0891b2", margin: "0 0 6px 0" }}>📹 VIDEO COURSE SETUP</p>
+              <p style={{ fontSize: "13px", color: "#1e293b", margin: "0", lineHeight: "1.5" }}>
+                Your course will be generated as an AI-narrated video with a professional avatar trainer. Select your preferred video quality and background environment below.
+              </p>
+            </div>
+
             <div className={surfaceCardClass}>
               <label className="text-[13px] text-[#2E2E2E] mb-2 flex items-center gap-1.5" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
                 Video Quality

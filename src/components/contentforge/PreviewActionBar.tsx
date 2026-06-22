@@ -20,9 +20,39 @@ export const HIGHLIGHT_PALETTES = {
     border: "hsl(var(--highlight-sky-border))",
     foreground: "hsl(var(--highlight-sky-foreground))",
   },
+  orange: {
+    label: "Warm Orange",
+    background: "#fed7aa",
+    border: "#f97316",
+    foreground: "#7c2d12",
+  },
+  pink: {
+    label: "Soft Pink",
+    background: "#fbcfe8",
+    border: "#ec4899",
+    foreground: "#831843",
+  },
+  purple: {
+    label: "Soft Purple",
+    background: "#e9d5ff",
+    border: "#a855f7",
+    foreground: "#6b21a8",
+  },
+  red: {
+    label: "Coral Red",
+    background: "#fecaca",
+    border: "#ef4444",
+    foreground: "#7f1d1d",
+  },
+  green: {
+    label: "Forest Green",
+    background: "#bbf7d0",
+    border: "#22c55e",
+    foreground: "#15803d",
+  },
 } as const;
 
-export type HighlightPalette = keyof typeof HIGHLIGHT_PALETTES;
+export type HighlightPalette = "yellow" | "mint" | "sky" | "orange" | "pink" | "purple" | "red" | "green";
 
 export const FLIP_STYLES = {
   dramatic: {

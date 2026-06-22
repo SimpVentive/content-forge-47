@@ -423,6 +423,12 @@ const Index = () => {
           setCreditEstimate(null);
           setPendingParams(null);
         }}
+        onPurchase={() => {
+          setShowCreditConfirmation(false);
+          setCreditEstimate(null);
+          setPendingParams(null);
+          navigate("/#pricing");
+        }}
       />
       <InsufficientCreditsModal
         open={showInsufficientCredits}

@@ -8,6 +8,7 @@ import { AvatarNarrator } from "./AvatarNarrator";
 import { NarrativeFlipbook } from "./NarrativeFlipbook";
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
+import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
 
@@ -51,53 +52,6 @@ function getInfographicDescription(visualModule: any, module: Module): string {
   return candidate?.trim() || buildFallbackInfographicText(module);
 }
 
-// Stage directions / production markers the writer/architect agent embeds inline
-// (e.g. "(Visual: An empty desk...)", "Narration:", "*(Interaction: drag-and-drop)*",
-// "Topic 1:" prefixes). These are authoring scaffolding, not learner-facing prose —
-// strip them from any text that flows into Situation / What to Notice / Better Move
-// / Key Takeaway / Did You Know / avatar narration.
-function stripStageDirections(text: string): string {
-  return text
-    // parenthetical visual/audio/stage cues: (Visual: ...), (Audio: ...), (SFX: ...), (On screen: ...)
-    .replace(/\(\s*(?:Visual|Image|Audio|SFX|On[- ]?screen|Caption|B-?roll|Cut to|On screen text)\s*:[^)]*\)/gi, "")
-    // bracketed interaction markers: *(Interaction: drag-and-drop)*, [Interaction: ...]
-    // Tolerant of malformed markers (missing closing bracket) — terminate at the
-    // first sentence break or line end if no closing bracket is found.
-    .replace(/[\*_]?\s*[\(\[]\s*Interaction\s*:[^)\]\.\n]*(?:[\)\]]|(?=[\.\n])|$)\s*[\*_]?/gi, "")
-    // standalone "Narration:" / "Visual:" / "Audio:" speaker prefixes when they start a clause
-    .replace(/(^|[\.\!\?\s])(?:Narration|Visual|Audio|Caption|On[- ]?screen)\s*:\s*/gi, "$1")
-    // "Topic 1:", "Topic 12:" leading scaffolding
-    .replace(/^\s*Topic\s+\d+\s*:\s*/i, "");
-}
-
-function stripNarratorMarkdown(text: string): string {
-  return stripStageDirections(text)
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/\*\*(.*?)\*\*/g, "$1")
-    .replace(/\*(.*?)\*/g, "$1")
-    .replace(/`(.*?)`/g, "$1")
-    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function isPlaceholderToken(text: string): boolean {
-  const normalized = stripNarratorMarkdown(text).toLowerCase();
-  if (!normalized) return true;
-  if (/^[#*\-_.:;|/\\\[\](){}]+$/.test(normalized)) return true;
-  if (normalized === "n/a" || normalized === "na" || normalized === "null" || normalized === "undefined") return true;
-  return false;
-}
-
-// Strip a leading option-letter prefix like "A)", "A.", "(A)", "A -" so the
-// renderer's own "A. " label doesn't double up.
-function stripOptionPrefix(opt: string): string {
-  return String(opt ?? "").replace(/^\s*\(?[A-Da-d]\)?\s*[\.\):\-]\s*/, "");
-}
-
-function safeLearnerText(text: string, fallback = ""): string {
-  return isPlaceholderToken(text) ? fallback : stripNarratorMarkdown(text);
-}
 
 function getNarratorExcerpt(text: string, sentenceCount = 3): string {
   const normalized = stripNarratorMarkdown(text);

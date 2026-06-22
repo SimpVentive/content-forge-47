@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
+import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 
 /* ── helpers ── */
 function tryParseJSON(raw: string): any | null {
@@ -30,10 +31,6 @@ function escapeJsString(s: unknown): string {
 }
 
 // Strip a leading option-letter prefix so the renderer's own "A. " label doesn't double up.
-function stripOptionPrefix(opt: string): string {
-  return String(opt ?? "").replace(/^\s*\(?[A-Da-d]\)?\s*[\.\):\-]\s*/, "");
-}
-
 interface Module { title: string; topics: string[]; }
 
 interface ModuleSection {
@@ -53,16 +50,27 @@ function normalizeTextKey(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/gi, " ").trim();
 }
 
-function stripMarkdown(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, " ")
-    .replace(/^#{1,6}\s+/gm, "")
-    .replace(/^[-*+]\s+/gm, "")
-    .replace(/\[(.*?)\]\((.*?)\)/g, "$1")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/[*_~>#]+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+function generateFallbackScenarioSvg(heading: string, content: string): string {
+  const shortHeading = heading.substring(0, 40);
+  const shortContent = content.substring(0, 60);
+  return `
+    <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="scenarioBg" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" style="stop-color:#f0f4f8;stop-opacity:1" />
+          <stop offset="100%" style="stop-color:#e8ecf1;stop-opacity:1" />
+        </linearGradient>
+      </defs>
+      <rect width="400" height="300" fill="url(#scenarioBg)"/>
+      <rect x="20" y="20" width="360" height="100" rx="8" fill="white" stroke="#d0d8e0" stroke-width="1"/>
+      <text x="30" y="45" font-family="Arial" font-size="16" font-weight="bold" fill="#1a3a52">${escapeXml(shortHeading)}</text>
+      <text x="30" y="70" font-family="Arial" font-size="12" fill="#4a5f7f" width="340">${escapeXml(shortContent)}</text>
+      <circle cx="100" cy="200" r="35" fill="#6ec1e4" opacity="0.3"/>
+      <circle cx="320" cy="240" r="28" fill="#f59e0b" opacity="0.3"/>
+      <path d="M 80 170 Q 160 140 240 170" stroke="#6ec1e4" stroke-width="2" fill="none" opacity="0.5"/>
+      <text x="200" y="285" font-family="Arial" font-size="11" fill="#7a8a9e" text-anchor="middle">Scenario Context</text>
+    </svg>
+  `;
 }
 
 function parseTopicLabel(topic: unknown): string {
@@ -72,7 +80,7 @@ function parseTopicLabel(topic: unknown): string {
     if (parsed && parsed !== trimmed) {
       return parseTopicLabel(parsed);
     }
-    return stripMarkdown(trimmed).replace(/^"|"$/g, "").trim();
+    return stripNarratorMarkdown(trimmed).replace(/^"|"$/g, "").trim();
   }
 
   if (Array.isArray(topic)) {
@@ -90,7 +98,7 @@ function parseTopicLabel(topic: unknown): string {
       (topic as Record<string, unknown>).text,
     ].find((value) => typeof value === "string" && value.trim().length > 0);
 
-    return candidate ? parseTopicLabel(candidate) : stripMarkdown(JSON.stringify(topic));
+    return candidate ? parseTopicLabel(candidate) : stripNarratorMarkdown(JSON.stringify(topic));
   }
 
   return "";
@@ -204,7 +212,7 @@ function extractTakeaway(markdown: string): { cleanedMarkdown: string; takeaway:
   const explicitMarker = /(?:^|\n)\s*(?:Key Takeaway|Takeaway|Remember|Tip)\s*:\s*([^\n]+)/i;
   const explicitMatch = normalized.match(explicitMarker);
   if (explicitMatch) {
-    const takeaway = stripMarkdown(explicitMatch[1]).trim();
+    const takeaway = stripNarratorMarkdown(explicitMatch[1]).trim();
     const cleanedMarkdown = normalized
       .replace(explicitMarker, "")
       .replace(/\n{3,}/g, "\n\n")
@@ -219,7 +227,7 @@ function extractTakeaway(markdown: string): { cleanedMarkdown: string; takeaway:
   const paragraphs = normalized.trim().split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
   if (paragraphs.length > 1) {
     const last = paragraphs[paragraphs.length - 1];
-    const lastPlain = stripMarkdown(last).trim();
+    const lastPlain = stripNarratorMarkdown(last).trim();
     if (lastPlain.length > 0 && lastPlain.length < 120) {
       const cleanedMarkdown = paragraphs.slice(0, -1).join("\n\n").trim();
       return { cleanedMarkdown, takeaway: lastPlain };
@@ -305,7 +313,7 @@ function parseScript(writerRaw: string, modules: Module[], visualRaw?: string): 
       const rawMarkdown = sectionMap.get(normalizeTextKey(heading)) || `Content for ${heading}`;
       const { cleanedMarkdown, takeaway } = extractTakeaway(rawMarkdown);
       const bodyMarkdown = cleanedMarkdown || rawMarkdown;
-      const plainText = stripMarkdown(bodyMarkdown);
+      const plainText = stripNarratorMarkdown(bodyMarkdown);
       const visual = moduleVisuals.get(normalizeTextKey(heading));
       return {
         heading,
@@ -361,17 +369,20 @@ function resolveCorrectIndex(correctAnswer: unknown, options: string[]): number 
 
 function parseAssessment(assessRaw: string): { question: string; options: string[]; correct: number }[] {
   const data = tryParseJSON(assessRaw);
-  if (data?.mcq) {
-    return data.mcq.map((q: any) => {
-      const options = q.options || q.choices || [];
-      return {
-        question: q.question || q.stem || "",
-        options,
-        correct: resolveCorrectIndex(q.correct_answer, options),
-      };
-    });
-  }
-  return [];
+  if (!data) return [];
+
+  const quizzes = data.mcq || data.questions || data.quiz || data.assessments || data.items || [];
+  if (!Array.isArray(quizzes) || quizzes.length === 0) return [];
+
+  return quizzes.map((q: any) => {
+    const options = q.options || q.choices || q.answers || [];
+    const correctAnswer = q.correct_answer || q.correct || q.correctOption || q.answerIndex;
+    return {
+      question: q.question || q.stem || q.prompt || "",
+      options: Array.isArray(options) ? options : [],
+      correct: resolveCorrectIndex(correctAnswer, Array.isArray(options) ? options : []),
+    };
+  }).filter(q => q.question && q.options.length > 0);
 }
 
 interface NarrationSection {
@@ -605,7 +616,7 @@ function buildModuleHtml(
             </div>
             <div class="dashboard-info-card dashboard-info-card-warm">
               <div class="dashboard-card-label">Did you know?</div>
-              <p>${escapeHtml(section.keyTakeaway || getFirstSentences(stripMarkdown(section.bodyMarkdown), 1) || section.moduleContent)}</p>
+              <p>${escapeHtml(section.keyTakeaway || getFirstSentences(stripNarratorMarkdown(section.bodyMarkdown), 1) || section.moduleContent)}</p>
             </div>
           </div>
         </div>
@@ -613,7 +624,7 @@ function buildModuleHtml(
   };
 
   const renderScenarioSection = (section: ModuleSection, sectionIndex: number) => {
-    const supportingText = getFirstSentences(stripMarkdown(section.bodyMarkdown), 2) || section.moduleContent;
+    const supportingText = getFirstSentences(stripNarratorMarkdown(section.bodyMarkdown), 2) || section.moduleContent;
     return `
       <section class="lesson-section lesson-template-scenario" id="section-${sectionIndex + 1}">
         <div class="scenario-grid">
@@ -635,7 +646,7 @@ function buildModuleHtml(
               <div class="dashboard-hero-frame">
                 ${section.visualImageDataUrl
                   ? `<img src="${escapeAttribute(section.visualImageDataUrl)}" alt="${escapeAttribute(section.visualAltText || section.heading)}" class="section-visual-image"/>`
-                  : section.visualSvg || `<div class="scenario-empty-visual">Scenario visual placeholder</div>`}
+                  : section.visualSvg || generateFallbackScenarioSvg(section.heading, supportingText)}
               </div>
             </div>
             <div class="dashboard-info-card dashboard-info-card-warm">
@@ -686,7 +697,7 @@ function buildModuleHtml(
   };
 
   const renderSummaryPanelSection = (section: ModuleSection, sectionIndex: number) => {
-    const bulletSentences = splitIntoSentences(stripMarkdown(section.bodyMarkdown)).slice(0, 3);
+    const bulletSentences = splitIntoSentences(stripNarratorMarkdown(section.bodyMarkdown)).slice(0, 3);
     return `
       <section class="lesson-section lesson-template-summary-panel" id="section-${sectionIndex + 1}">
         <div class="summary-panel-header">
@@ -706,7 +717,7 @@ function buildModuleHtml(
           </div>
           <div class="summary-panel-card summary-panel-card-warm">
             <div class="dashboard-card-label">Apply next</div>
-            <p>${escapeHtml(getFirstSentences(stripMarkdown(section.bodyMarkdown), 1) || section.moduleContent)}</p>
+            <p>${escapeHtml(getFirstSentences(stripNarratorMarkdown(section.bodyMarkdown), 1) || section.moduleContent)}</p>
           </div>
         </div>
       </section>`;
@@ -1008,7 +1019,7 @@ function buildModuleHtml(
     .hl-sentence.active-yellow { background: var(--hl-yellow-bg, #fef9c3); box-shadow: inset 4px 0 0 var(--hl-yellow-border, #fde047); }
     .hl-sentence.active-mint { background: var(--hl-mint-bg, #d1fae5); box-shadow: inset 4px 0 0 var(--hl-mint-border, #6ee7b7); }
     .hl-sentence.active-sky { background: var(--hl-sky-bg, #dbeafe); box-shadow: inset 4px 0 0 var(--hl-sky-border, #93c5fd); }
-    .audio-section { background: linear-gradient(135deg, var(--audio-bg-start, #eef2ff), var(--audio-bg-end, #e0e7ff)); border: 1px solid var(--audio-border, #c7d2fe); border-radius: 16px; padding: 24px; margin-bottom: 28px; }
+    .audio-section { background: linear-gradient(135deg, var(--audio-bg-start, #eef2ff), var(--audio-bg-end, #e0e7ff)); border: 1px solid var(--audio-border, #c7d2fe); border-radius: 16px; padding: 24px; margin-bottom: 28px; position: sticky; top: 0; z-index: 100; }
     .audio-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
     .audio-section h2 { font-size: 18px; color: var(--primary); margin: 0; }
     .audio-player { width: 100%; height: 48px; border-radius: 12px; accent-color: var(--primary); background: var(--card); color-scheme: light dark; }
@@ -1016,6 +1027,7 @@ function buildModuleHtml(
     .audio-player::-webkit-media-controls-current-time-display,
     .audio-player::-webkit-media-controls-time-remaining-display { color: var(--text); }
     .audio-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .audio-screen { position: sticky; top: 0; z-index: 200; }
     .palette-bar { display: flex; align-items: center; gap: 6px; }
     .palette-label { font-size: 12px; font-weight: 600; color: var(--muted); }
     .palette-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.2s; }
