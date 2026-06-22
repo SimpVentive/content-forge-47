@@ -221,6 +221,13 @@ export const PricingSection = () => {
             </div>
           </div>
         </div>
+
+        <p className="mt-6 flex items-start gap-2 text-[11px] leading-relaxed text-slate-500">
+          <Info className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" />
+          <span>
+            <span className="font-medium text-slate-600">Note:</span> Credits are consumed based on actual generation usage — AI tokens, image renders, voice minutes — not by a fixed output length. The figures above are realistic estimates; your mileage may vary with depth, language, and media choices.
+          </span>
+        </p>
       </div>
     </section>
   );
