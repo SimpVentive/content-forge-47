@@ -581,9 +581,10 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           <ol className="text-[12px] text-amber-800 space-y-1 list-decimal list-inside">
             {isImageSeries ? (
               <>
-                <li>Review the image sequence above</li>
-                <li>Click "Download Images" to save the generated series</li>
-                <li>Use the images directly in your document, deck, or training flow</li>
+                <li>Flip through the storyboard above using ← → arrows or A/D keys</li>
+                <li>Each scene shows an image with a caption — like a training comic strip</li>
+                <li>Click "Download Images" to save all scenes as individual files</li>
+                <li>If voice narration was selected, audio for each scene is included in the export</li>
               </>
             ) : (
               <>
