@@ -512,8 +512,9 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
             ) : (
               <>
                 <Download className="w-5 h-5" />
-                {isFlipbook ? "Export Flipbook" : "Export Package"}
+                Export Package
               </>
+
             )}
           </button>
         </div>
