@@ -119,16 +119,8 @@ export const PricingSection = () => {
           </p>
         </div>
 
-        <div className="mb-8 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
-          <p>
-            <span className="font-semibold">Note:</span> Credits are consumed based on actual generation usage —
-            AI tokens, image renders, voice minutes — not by a fixed output length. The figures below are realistic
-            estimates of what a pack typically produces; your mileage may vary with depth, language, and media choices.
-          </p>
-        </div>
-
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3" data-testid="pack-grid">
+
           {PACKS.map((pack) => {
             const isHighlight = pack.tag === "Best value";
             return (
@@ -229,6 +221,13 @@ export const PricingSection = () => {
             </div>
           </div>
         </div>
+
+        <p className="mt-6 flex items-start gap-2 text-[11px] leading-relaxed text-slate-500">
+          <Info className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" />
+          <span>
+            <span className="font-medium text-slate-600">Note:</span> Credits are consumed based on actual generation usage — AI tokens, image renders, voice minutes — not by a fixed output length. The figures above are realistic estimates; your mileage may vary with depth, language, and media choices.
+          </span>
+        </p>
       </div>
     </section>
   );
