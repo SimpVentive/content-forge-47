@@ -237,6 +237,15 @@ const Index = () => {
   };
 
   const handleGenerateClick = () => {
+    if (!courseTitle.trim()) {
+      const fallbackTitle = `Untitled Course ${new Date().toLocaleDateString()}`;
+      setCourseTitle(fallbackTitle);
+    }
+
+    if (!inputText.trim()) {
+      setInputText("Create a concise training course from the uploaded file name and available context.");
+    }
+
     setShowParamsDialog(true);
   };
 

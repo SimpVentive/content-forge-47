@@ -51,6 +51,19 @@ const readFileAsBase64 = (file: File): Promise<string> => {
   });
 };
 
+const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 /** Extract a clean course name from filename */
 const titleFromFilename = (filename: string): string => {
   // Remove extension
@@ -89,6 +102,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
     // Auto-detect course title from filename
     const detectedTitle = titleFromFilename(file.name);
+    // Apply the title immediately so Generate is never blocked while extraction runs.
+    if (!courseTitle.trim()) {
+      setCourseTitle(detectedTitle);
+    }
     
     if (isBinaryFile(file.name)) {
       // Show extracting state
@@ -100,9 +117,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
         const mimeType = MIME_MAP[ext] || file.type || "application/octet-stream";
 
-        const { data, error } = await supabase.functions.invoke("extract-document", {
-          body: { fileBase64: base64, fileName: file.name, mimeType },
-        });
+        const { data, error } = await withTimeout(
+          supabase.functions.invoke("extract-document", {
+            body: { fileBase64: base64, fileName: file.name, mimeType },
+          }),
+          25000,
+          "Document extraction timed out"
+        );
 
         if (error) throw new Error(error.message);
         if (data?.error) throw new Error(data.error);
@@ -129,10 +150,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
     }
 
-    // Auto-apply title if empty; only ask when overwriting an existing different title
-    if (!courseTitle.trim()) {
-      setCourseTitle(detectedTitle);
-    } else if (courseTitle.trim().toLowerCase() !== detectedTitle.toLowerCase()) {
+    // Only ask when overwriting an existing different title
+    if (courseTitle.trim() && courseTitle.trim().toLowerCase() !== detectedTitle.toLowerCase()) {
       setSuggestedTitle(detectedTitle);
       setShowTitleConfirm(true);
     }
@@ -210,7 +229,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".txt,.md,.csv,.json,.xml,.html,.doc,.docx,.ppt,.pptx,.pdf"
+            accept=".txt,.md,.csv,.json,.xml,.html,.htm,.doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx"
             className="hidden"
             onChange={handleFileSelect}
           />
@@ -265,7 +284,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onGenerate}
             type="button"
-            disabled={!courseTitle.trim() || !inputText.trim() || isExtracting}
+            disabled={isExtracting}
             className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] hover:-translate-y-0.5 active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             style={{ background: '#2563EB' }}
           >
