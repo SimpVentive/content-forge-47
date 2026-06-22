@@ -3,12 +3,45 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode, Component } from "react";
 import { AuthProvider } from "@/hooks/useAuth";
 import { ContentForgeProvider } from "@/hooks/ContentForgeContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { PublicRoute } from "@/components/auth/PublicRoute";
 import { AdminRoute } from "@/components/auth/AdminRoute";
+
+// Error boundary for debugging
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean; error?: Error }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    console.error("ErrorBoundary caught error:", error);
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("ErrorBoundary error details:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "20px", color: "red", fontFamily: "monospace" }}>
+          <h1>⚠️ Application Error</h1>
+          <p>{this.state.error?.message}</p>
+          <pre style={{ backgroundColor: "#f5f5f5", padding: "10px", overflow: "auto", maxHeight: "300px" }}>
+            {this.state.error?.stack}
+          </pre>
+          <p>Check browser console for more details</p>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const HomePage = lazy(() => import("./pages/home/HomePage"));
 const Index = lazy(() => import("./pages/Index"));
@@ -29,19 +62,22 @@ const AdminProviders = lazy(() => import("./pages/admin/Providers"));
 const AdminConversations = lazy(() => import("./pages/admin/Conversations"));
 const HeyGenSettings = lazy(() => import("./pages/admin/HeyGenSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const Debug = lazy(() => import("./pages/Debug"));
 
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <AuthProvider>
-          <ContentForgeProvider>
+  <ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <AuthProvider>
+            <ContentForgeProvider>
             <Suspense fallback={<div className="flex items-center justify-center h-screen bg-background"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" /></div>}>
               <Routes>
+                <Route path="/debug" element={<Debug />} />
                 <Route path="/" element={<PublicRoute><HomePage /></PublicRoute>} />
                 <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
                 <Route path="/admin/login" element={<AdminLogin />} />
@@ -69,7 +105,8 @@ const App = () => (
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
-  </QueryClientProvider>
+    </QueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
