@@ -9,6 +9,7 @@ import { SlidePreview } from "./SlidePreview";
 import { InfographicPreview } from "./InfographicPreview";
 import { LearnerPreview } from "./LearnerPreview";
 import { VideosTab, InsertedVideo } from "./VideosTab";
+import { NarrativeFlipbook } from "./NarrativeFlipbook";
 
 interface OutputPanelProps {
   outputData: OutputData;
@@ -359,7 +360,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               </h2>
             </div>
             <p className={`text-[14px] ${qaReport?.passed || approvedByAdmin ? "text-emerald-800" : "text-amber-800"}`}>
-              Your {isImageSeries ? "image series" : isFlipbook ? "flipbook" : "course package"} {qaReport?.passed || approvedByAdmin ? "is complete and ready to download." : "has quality issues - please review or approve to continue."}
+              Your {isImageSeries ? "storyboard" : isFlipbook ? "flipbook" : "course package"} {qaReport?.passed || approvedByAdmin ? "is complete and ready to view." : "has quality issues - please review or approve to continue."}
             </p>
           </div>
           <div className="text-[28px]">{qaReport?.passed || approvedByAdmin ? (isImageSeries ? "🖼️" : "📦") : "🔍"}</div>
@@ -392,25 +393,17 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       </div>
 
-      {/* 3. Image Series OR package manifest */}
+      {/* 3. Storyboard (image-based course) OR package manifest */}
       {hasNarrativeImages ? (
         <div>
-          <h3 className="text-[15px] font-bold text-foreground mb-2">Generated Image Series</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {narrativeImages.map((item, index) => (
-              <div key={`${item.topicTitle}-${item.sceneNumber}-${index}`} className="bg-secondary/50 rounded-xl overflow-hidden border border-border/60">
-                {item.imageDataUrl ? (
-                  <img src={item.imageDataUrl} alt={item.caption || item.title} className="w-full aspect-video object-cover" />
-                ) : (
-                  <div className="w-full aspect-video flex items-center justify-center bg-secondary text-[12px] text-muted-foreground">Image pending</div>
-                )}
-                <div className="p-3 space-y-1">
-                  <p className="text-[12px] font-bold text-foreground">{String(index + 1).padStart(2, "0")}. {item.title}</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">{item.caption}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h3 className="text-[15px] font-bold text-foreground mb-2">Storyboard</h3>
+          <p className="text-[12px] text-muted-foreground mb-3">
+            {narrativeImages.length} scenes • Use ← → or A/D keys, or the on-screen arrows to navigate.
+          </p>
+          <NarrativeFlipbook
+            narratives={(tryParseJSON(rawOutputs.narrativeScenes || "") as any[]) || []}
+            displayStyle="smooth-slide"
+          />
         </div>
       ) : data.flipbook_assets ? (
         <div>
@@ -588,9 +581,10 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           <ol className="text-[12px] text-amber-800 space-y-1 list-decimal list-inside">
             {isImageSeries ? (
               <>
-                <li>Review the image sequence above</li>
-                <li>Click "Download Images" to save the generated series</li>
-                <li>Use the images directly in your document, deck, or training flow</li>
+                <li>Flip through the storyboard above using ← → arrows or A/D keys</li>
+                <li>Each scene shows an image with a caption — like a training comic strip</li>
+                <li>Click "Download Images" to save all scenes as individual files</li>
+                <li>If voice narration was selected, audio for each scene is included in the export</li>
               </>
             ) : (
               <>
