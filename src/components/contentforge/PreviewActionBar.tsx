@@ -73,11 +73,20 @@ export const PreviewActionBar: React.FC<PreviewActionBarProps> = ({
       const savedCollapsed = window.localStorage.getItem("contentforge.previewActionBar.collapsed");
 
       if (savedPosition) {
-        const parsed = JSON.parse(savedPosition) as { x?: number; y?: number };
-        if (typeof parsed.x === "number" && typeof parsed.y === "number") {
-          setPosition({ x: parsed.x, y: parsed.y });
+        try {
+          const parsed = JSON.parse(savedPosition) as { x?: number; y?: number };
+          if (typeof parsed.x === "number" && typeof parsed.y === "number" && isFinite(parsed.x) && isFinite(parsed.y)) {
+            setPosition({ x: parsed.x, y: parsed.y });
+          } else {
+            throw new Error("Invalid position values");
+          }
+        } catch (parseErr) {
+          console.warn("Failed to parse saved position, using default");
+          localStorage.removeItem("contentforge.previewActionBar.position");
         }
-      } else {
+      }
+
+      if (!savedPosition || !isFinite((savedPosition as any)?.x)) {
         const estimatedWidth = Math.min(560, Math.max(360, window.innerWidth - 48));
         setPosition({
           x: Math.max(16, window.innerWidth - estimatedWidth - 24),
@@ -88,8 +97,9 @@ export const PreviewActionBar: React.FC<PreviewActionBarProps> = ({
       if (savedCollapsed === "true") {
         setIsCollapsed(true);
       }
-    } catch {
-      // Ignore storage issues and keep session defaults.
+    } catch (err) {
+      console.warn("PreviewActionBar initialization error:", err);
+      // Keep defaults - bar will be expanded with controls visible
     }
   }, []);
 

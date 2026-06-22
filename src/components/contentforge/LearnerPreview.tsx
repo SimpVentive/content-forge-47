@@ -375,7 +375,9 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxL
   }
 
   // Cap chunks-per-topic by duration so a 3-min course doesn't blow up to 12+ slides.
-  const maxChunksPerTopic = durationMinutes <= 3 ? 1
+  // For very short courses (<=3 min), allow up to 2 chunks to avoid excessive truncation
+  const maxChunksPerTopic = durationMinutes <= 2 ? 2
+    : durationMinutes <= 3 ? 2
     : durationMinutes <= 5 ? 2
     : durationMinutes <= 10 ? 3
     : durationMinutes <= 20 ? 4
@@ -687,17 +689,30 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       if (!sectionText && writerParts[topicCounter]) {
         sectionText = writerParts[topicCounter].replace(/^##\s+.+\n/, "").trim();
       }
+      // If no content found, use empty string instead of placeholder
+      // Empty content will be handled by empty state UI in slide rendering
       if (!sectionText) {
-        sectionText = `Content for "${topic}" will appear here after running the pipeline.`;
+        sectionText = "";
       }
 
       // For image-based learning, use narrative scenes; otherwise use visual design plan
       let narrativeForTopic = null;
       if (narrativeScenesData) {
         const narratives = Array.isArray(narrativeScenesData) ? narrativeScenesData : [narrativeScenesData];
+        const normalizedTopic = normalizeModuleKey(topic);
+
+        // First try exact match on normalized titles
         narrativeForTopic = narratives.find((n: any) =>
-          normalizeModuleKey(n.topicTitle || "") === normalizeModuleKey(topic)
+          normalizeModuleKey(n.topicTitle || "") === normalizedTopic
         );
+
+        // If no exact match, try by index as fallback
+        if (!narrativeForTopic && ti < narratives.length) {
+          const fallback = narratives[ti];
+          if (fallback && Array.isArray(fallback.scenes) && fallback.scenes.length > 0) {
+            narrativeForTopic = fallback;
+          }
+        }
       }
 
       // If narrative scenes exist, create a flipbook slide (image-based learning flow)
@@ -783,12 +798,13 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       });
     }
 
-    // 3b. Insert video slides for this module (fuzzy match module titles).
-    // Videos with no assigned module are placed in the first module so they still appear.
+    // 3b. Insert video slides for this module (exact match module titles).
+    // Videos with no assigned module are NOT automatically placed - they appear in a separate "unassigned" list.
     const modVideos = insertedVideos.filter(v => {
       const assigned = (v.moduleTitle || "").trim();
-      if (!assigned) return mi === 0;
-      return assigned === mod.title || normalizeModuleKey(assigned) === normalizeModuleKey(mod.title);
+      if (!assigned) return false; // Don't auto-assign unassigned videos
+      // Exact match on normalized titles
+      return normalizeModuleKey(assigned) === normalizeModuleKey(mod.title);
     });
     modVideos.forEach(vid => {
       slides.push({
@@ -1606,7 +1622,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       audioUrlsRef.current[currentSlide] = url;
       const audio = new Audio(url);
       wireAudio(audio);
-      await audio.play().catch(() => {});
+      await audio.play().catch((err) => {
+        console.error("Audio playback failed:", err);
+      });
 
       // Log ElevenLabs TTS usage
       try {
@@ -1638,7 +1656,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     if (audioUrlsRef.current[currentSlide]) {
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
       wireAudio(audio);
-      audio.play().catch(() => {});
+      audio.play().catch((err) => {
+        console.error("Cached audio playback failed:", err);
+      });
       return;
     }
     // Otherwise fetch and play
@@ -2456,45 +2476,53 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </h2>
 
                     <div className="space-y-2.5">
-                      {safeChartEntries.map((line, index) => {
-                        const isActive = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 && line.sentenceIndex === highlightSentenceIdx;
+                      {safeChartEntries.length > 0 ? (
+                        safeChartEntries.map((line, index) => {
+                          const isActive = highlightEnabled && isPlaying && highlightSentenceIdx >= 0 && line.sentenceIndex === highlightSentenceIdx;
 
-                        return (
-                        <div key={`${line.tone}-${index}`} className="flex items-start gap-3"
-                          style={{ animation: `chartLineIn 360ms cubic-bezier(0.22, 1, 0.36, 1) ${120 + index * 55}ms both` }}>
-                          <div className="mt-[0.72em] h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{ background: line.tone === "takeaway" ? "#f59e0b" : line.tone === "challenge" ? "#7c3aed" : "#1d4ed8" }}
-                          />
-                          <p
-                            className="font-[700] tracking-[0.01em]"
-                            style={{
-                              color: isActive
-                                ? activeHighlightPalette.foreground
-                                : line.tone === "takeaway"
-                                  ? "#92400e"
-                                  : line.tone === "challenge"
-                                    ? "#5b21b6"
-                                    : line.tone === "lead"
-                                      ? "#1e3a8a"
-                                      : "#2c5ea5",
-                              ...contentTextStyle,
-                              ...clampSingleLine,
-                              padding: "2px 8px",
-                              borderRadius: "10px",
-                              transition: "background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease",
-                              ...(isActive
-                                ? {
-                                    background: activeHighlightPalette.background,
-                                    boxShadow: `inset 4px 0 0 ${activeHighlightPalette.border}`,
-                                  }
-                                : {}),
-                            }}
-                          >
-                            {line.text}
+                          return (
+                          <div key={`${line.tone}-${index}`} className="flex items-start gap-3"
+                            style={{ animation: `chartLineIn 360ms cubic-bezier(0.22, 1, 0.36, 1) ${120 + index * 55}ms both` }}>
+                            <div className="mt-[0.72em] h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{ background: line.tone === "takeaway" ? "#f59e0b" : line.tone === "challenge" ? "#7c3aed" : "#1d4ed8" }}
+                            />
+                            <p
+                              className="font-[700] tracking-[0.01em]"
+                              style={{
+                                color: isActive
+                                  ? activeHighlightPalette.foreground
+                                  : line.tone === "takeaway"
+                                    ? "#92400e"
+                                    : line.tone === "challenge"
+                                      ? "#5b21b6"
+                                      : line.tone === "lead"
+                                        ? "#1e3a8a"
+                                        : "#2c5ea5",
+                                ...contentTextStyle,
+                                ...clampSingleLine,
+                                padding: "2px 8px",
+                                borderRadius: "10px",
+                                transition: "background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease",
+                                ...(isActive
+                                  ? {
+                                      background: activeHighlightPalette.background,
+                                      boxShadow: `inset 4px 0 0 ${activeHighlightPalette.border}`,
+                                    }
+                                  : {}),
+                              }}
+                            >
+                              {line.text}
+                            </p>
+                          </div>
+                          );
+                        })
+                      ) : (
+                        <div className="text-center py-12">
+                          <p className="text-[14px] font-medium text-[#7c8eb0]">
+                            Content for this section will appear after the course has been fully generated.
                           </p>
                         </div>
-                        );
-                      })}
+                      )}
                     </div>
                   </div>
                 </div>
