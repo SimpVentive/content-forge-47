@@ -335,7 +335,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
       {/* 2. Metadata */}
       <div>
         <h3 className="text-[18px] font-extrabold text-foreground mb-4">
-          {meta.title || (isFlipbookPackage ? "Flipbook Package" : "Course Package")}
+          {meta.title || (isFlipbook ? "Flipbook Package" : "Course Package")}
         </h3>
         <div className="grid grid-cols-2 gap-3">
           {[
