@@ -52,7 +52,7 @@ const CreditsDashboard = () => {
     setFetchingUsage(true);
     try {
       const result = await fetchProviderUsage();
-      toast.success(`✅ Fetched usage from ${result.usageCount || 0} providers`);
+      toast.success(`✅ Fetched usage from ${(result as any)?.usageCount || 0} providers`);
       // Reload data to show new usage
       await load();
     } catch (err) {

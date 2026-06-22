@@ -1613,7 +1613,7 @@ OUTPUT FORMAT — ABSOLUTE:
         // Format-specific assembly prompts
         let assemblyPrompt = "";
         console.log("🔍 Assembly Agent learningMode:", learningMode, "Type:", typeof learningMode);
-        if (learningMode === "image_based_learning") {
+        if ((learningMode as string) === "image_based_learning") {
           assemblyPrompt = `You are a Flipbook Package Assembly Agent. You are creating a flipbook/digital asset publication package. This is completely different from SCORM or LMS courses.
 
 Your task: Generate a flipbook publication package summary with these sections:
