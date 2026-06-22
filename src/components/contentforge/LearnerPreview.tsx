@@ -287,7 +287,7 @@ function buildFlipChartLines(
   return lines.slice(0, availableLines);
 }
 
-type SlideType = "title" | "content" | "assessment" | "summary" | "video";
+type SlideType = "title" | "content" | "assessment" | "summary" | "video" | "narrative-flipbook";
 
 interface Slide {
   type: SlideType;
