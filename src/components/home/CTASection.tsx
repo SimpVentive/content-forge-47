@@ -19,7 +19,7 @@ export const CTASection = () => {
             1 credit = 1 minute of content
           </span>
           <h2 className="relative mt-5 text-4xl font-semibold tracking-tight text-white md:text-5xl">
-            Ready to forge your first course?
+            Ready to <span className="text-amber-400">FORGE</span> your first course?
           </h2>
           <p className="relative mx-auto mt-4 max-w-xl text-indigo-100">
             Pick a credit pack, upload your material, and let the agents do the heavy lifting. Your first course goes live today.
