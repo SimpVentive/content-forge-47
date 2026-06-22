@@ -274,11 +274,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Extracting...
               </>
-            ) : showTitleConfirm ? (
-              <>
-                <X className="w-4 h-4" />
-                Confirm Title Choice
-              </>
             ) : (
               <>
                 <Zap className="w-4 h-4" />
