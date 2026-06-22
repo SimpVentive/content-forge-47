@@ -24,7 +24,7 @@ export const InsufficientCreditsModal = ({ open, requiredCredits, onClose }: Ins
         </DialogHeader>
         <div className="mt-4 space-y-4">
           <p className="text-sm text-slate-600">
-            Buy more credits now and they'll be available instantly. 1 credit = 1 minute of generated content.
+            Buy more credits now and they'll be available instantly. Credits are consumed based on actual generation usage, not a fixed output length.
           </p>
           <div className="flex gap-3">
             <Button variant="outline" onClick={onClose}>
