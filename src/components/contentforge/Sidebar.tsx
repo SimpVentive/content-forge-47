@@ -52,6 +52,35 @@ const readFileAsBase64 = (file: File): Promise<string> => {
   });
 };
 
+const stripHtmlToReadableText = (html: string): string => {
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, "text/html");
+    doc.querySelectorAll("script, style, svg, noscript").forEach((node) => node.remove());
+    const title = doc.querySelector("title")?.textContent?.trim() || "";
+    const bodyText = doc.body?.textContent || doc.documentElement.textContent || "";
+    return [title, bodyText]
+      .filter(Boolean)
+      .join("\n\n")
+      .replace(/\u00a0/g, " ")
+      .replace(/[ \t]+/g, " ")
+      .replace(/\n\s*\n\s*\n+/g, "\n\n")
+      .trim();
+  } catch {
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+};
+
+const isHtmlUpload = (filename: string, text: string): boolean => {
+  const lower = filename.toLowerCase();
+  return lower.endsWith(".html") || lower.endsWith(".htm") || /^\s*<!doctype html/i.test(text) || /^\s*<html/i.test(text);
+};
+
 const withTimeout = async <T,>(promise: Promise<T>, ms: number, message: string): Promise<T> => {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -146,7 +175,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     } else {
       const text = await readFileAsText(file);
       if (text && text.length > 0) {
-        setInputText(text);
+        setInputText(isHtmlUpload(file.name, text) ? stripHtmlToReadableText(text) : text);
       } else {
         setInputText(`[Document] Uploaded: ${file.name} - Could not extract text. Try pasting content directly.`);
       }
