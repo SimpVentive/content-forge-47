@@ -135,13 +135,16 @@ export async function fetchAllProviderUsage() {
 
 // Log usage to database
 export async function logProviderUsage(usageData: ProviderUsageData) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
   const { error } = await supabase.from("api_usage_logs").insert({
+    user_id: user.id,
     provider_name: usageData.provider,
     units_used: usageData.used,
-    cost: 0, // Will be calculated based on rates
+    cost: 0,
     reason: `Usage snapshot - ${usageData.remaining}/${usageData.total} remaining`,
     created_at: usageData.lastUpdated,
-  });
+  } as any);
 
   if (error) {
     console.error(`Failed to log ${usageData.provider} usage:`, error);
