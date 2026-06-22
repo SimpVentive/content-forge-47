@@ -44,6 +44,19 @@ const VideoClipWorkflow = lazy(() =>
   }))
 );
 
+const withStartupTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error("Credit check timed out")), ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 const Index = () => {
   const { profile, refreshProfile, isAdmin } = useAuth();
   const location = useLocation();
@@ -86,6 +99,7 @@ const Index = () => {
   const [drafts, setDrafts] = useState<CourseDraft[]>([]);
   const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   const [requiredCredits, setRequiredCredits] = useState(0);
+  const [isStartingGeneration, setIsStartingGeneration] = useState(false);
   const prevIsRunning = useRef(false);
 
   const {
