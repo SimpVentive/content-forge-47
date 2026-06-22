@@ -1462,10 +1462,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   // Narration text for current slide - with fallback to slide content
   const getNarrationForSlide = useCallback((slideIdx: number) => {
     const s = slides[slideIdx];
-    if (!s || s.type !== "content") return "";
+    if (!s) return "";
 
-    // Try voice agent output first
-    if (narrationSections.length) {
+    // Only get narration for content and assessment slides
+    if (s.type !== "content" && s.type !== "assessment") return "";
+
+    // Try voice agent output first (for content slides)
+    if (s.type === "content" && narrationSections.length) {
       const contentSlides = slides.filter(sl => sl.type === "content");
       const contentIdx = contentSlides.indexOf(s);
       if (contentIdx >= 0 && narrationSections[contentIdx]) {
@@ -1474,13 +1477,23 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     }
 
-    // Fallback: build narration from slide content
-    const parts = parseContentParts(s.content || "");
-    const lines: string[] = [];
-    if (parts.hook) lines.push(parts.hook);
-    parts.body.forEach(p => lines.push(p));
-    if (parts.takeaway) lines.push(`Key takeaway: ${parts.takeaway}`);
-    return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
+    // For content slides, fallback: build narration from slide content
+    if (s.type === "content") {
+      const parts = parseContentParts(s.content || "");
+      const lines: string[] = [];
+      if (parts.hook) lines.push(parts.hook);
+      parts.body.forEach(p => lines.push(p));
+      if (parts.takeaway) lines.push(`Key takeaway: ${parts.takeaway}`);
+      return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
+    }
+
+    // For assessment slides, use the question as narration
+    if (s.type === "assessment" && s.question) {
+      const q = s.question;
+      return q.question || "";
+    }
+
+    return "";
   }, [slides, narrationSections]);
 
   // Split narration into sentences for highlighting
