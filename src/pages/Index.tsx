@@ -645,6 +645,7 @@ const Index = () => {
             onGenerate={handleGenerateClick}
             onStop={stopPipeline}
             isRunning={isRunning}
+            isStartingGeneration={isStartingGeneration}
             agentToggles={agentToggles}
             setAgentToggles={setAgentToggles}
           />
