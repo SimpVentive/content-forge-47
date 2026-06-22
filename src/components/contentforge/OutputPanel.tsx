@@ -9,6 +9,7 @@ import { SlidePreview } from "./SlidePreview";
 import { InfographicPreview } from "./InfographicPreview";
 import { LearnerPreview } from "./LearnerPreview";
 import { VideosTab, InsertedVideo } from "./VideosTab";
+import { NarrativeFlipbook } from "./NarrativeFlipbook";
 
 interface OutputPanelProps {
   outputData: OutputData;
