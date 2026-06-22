@@ -360,8 +360,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       </div>
 
-<<<<<<< HEAD
-      {/* 3. Flipbook Assets OR SCORM Manifest */}
+      {/* 3. Flipbook Assets OR Package Manifest */}
       {data.flipbook_assets ? (
         <div>
           <h3 className="text-[15px] font-bold text-foreground mb-2">Flipbook Assets</h3>
@@ -398,11 +397,8 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
             )}
           </div>
         </div>
-      ) : data.scorm_manifest?.assets ? (
-=======
-      {/* 3. Package Manifest */}
-      {manifestAssets && (
->>>>>>> f89ff03fe22abb5925ac5214ed5d8190e4851113
+      ) : manifestAssets ? (
+
         <div>
           <h3 className="text-[15px] font-bold text-foreground mb-2">{isFlipbookPackage ? "Flipbook Manifest" : "SCORM Manifest"}</h3>
           <div className="bg-secondary/50 rounded-xl p-3 space-y-1">
