@@ -362,7 +362,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               Your {isImageSeries ? "image series" : isFlipbook ? "flipbook" : "course package"} {qaReport?.passed || approvedByAdmin ? "is complete and ready to download." : "has quality issues - please review or approve to continue."}
             </p>
           </div>
-          <div className="text-[28px]">{qaReport?.passed || approvedByAdmin ? "📦" : "🔍"}</div>
+          <div className="text-[28px]">{qaReport?.passed || approvedByAdmin ? (isImageSeries ? "🖼️" : "📦") : "🔍"}</div>
         </div>
       </div>
 
@@ -770,11 +770,11 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
         return (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mb-4">
-              <Package className="w-8 h-8 text-amber-600" />
+              {isImageSeriesOutput ? <Images className="w-8 h-8 text-amber-600" /> : <Package className="w-8 h-8 text-amber-600" />}
             </div>
-            <h3 className="text-[16px] font-extrabold text-foreground mb-2">Package Not Ready Yet</h3>
+            <h3 className="text-[16px] font-extrabold text-foreground mb-2">{isImageSeriesOutput ? "Images Not Ready Yet" : "Package Not Ready Yet"}</h3>
             <p className="text-[13px] text-muted-foreground leading-relaxed max-w-[320px]">
-              You haven't inserted videos into your course yet. Once you complete the video placement, you can generate and export the SCORM package.
+              {isImageSeriesOutput ? "Run the image course pipeline to generate the visual sequence." : "You haven't inserted videos into your course yet. Once you complete the video placement, you can generate and export the SCORM package."}
             </p>
             <div className="mt-4 flex flex-col gap-2 items-center">
               <span className="text-[11px] text-muted-foreground">Steps to complete:</span>
@@ -788,7 +788,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
               </div>
               <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
                 <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px]">3</span>
-                Export SCORM package
+                {isImageSeriesOutput ? "Download images" : "Export SCORM package"}
               </div>
             </div>
           </div>
