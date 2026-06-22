@@ -181,11 +181,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
     }
 
-    // Only ask when overwriting an existing different title
-    if (courseTitle.trim() && courseTitle.trim().toLowerCase() !== detectedTitle.toLowerCase()) {
-      setSuggestedTitle(detectedTitle);
-      setShowTitleConfirm(true);
-    }
+    // Always show title confirmation after file upload
+    setSuggestedTitle(detectedTitle);
+    setShowTitleConfirm(true);
   };
 
   const handleConfirmTitle = (useDetected: boolean) => {
