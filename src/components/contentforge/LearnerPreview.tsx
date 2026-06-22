@@ -5,6 +5,8 @@ import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
 import { FLIP_STYLES, HIGHLIGHT_PALETTES, PreviewActionBar, type FlipStyle, type HighlightPalette } from "./PreviewActionBar";
 import { AvatarNarrator } from "./AvatarNarrator";
+import { NarrativeFlipbook } from "./NarrativeFlipbook";
+import type { TopicNarrative } from "@/lib/visualNarrativeService";
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
@@ -698,29 +700,17 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         );
       }
 
-      // If narrative scenes exist, create one slide per scene (image-based learning flow)
+      // If narrative scenes exist, create a flipbook slide (image-based learning flow)
       if (narrativeForTopic && Array.isArray(narrativeForTopic.scenes) && narrativeForTopic.scenes.length > 0) {
-        narrativeForTopic.scenes.forEach((scene: any, sceneIndex: number) => {
-          slides.push({
-            type: "content",
-            moduleIndex: mi,
-            moduleTitle: mod.title,
-            topicIndex: ti,
-            topicTitle: topic,
-            topicPartIndex: sceneIndex,
-            topicPartCount: narrativeForTopic.scenes.length,
-            content: scene.caption || scene.narration || "",
-            wasTrimmedForLayout: false,
-            infographicSvg: ti === 0 && sceneIndex === 0 ? infographicDescription : undefined,
-            visualImageDataUrl: scene.imageDataUrl,
-            visualSvg: undefined,
-            visualPlacement: "hero",
-            visualAltText: scene.caption || `${topic} - Scene ${scene.sceneNumber}`,
-            visualPrompt: scene.imagePrompt,
-            visualApproved: Boolean(scene.imageDataUrl),
-            contentTemplate: "scenario",
-          });
-        });
+        slides.push({
+          type: "narrative-flipbook",
+          moduleIndex: mi,
+          moduleTitle: mod.title,
+          topicIndex: ti,
+          topicTitle: topic,
+          narrative: narrativeForTopic,
+          infographicSvg: ti === 0 ? infographicDescription : undefined,
+        } as any);
       } else {
         // Fallback to content chunks for non-image-based or when no narrative scenes
         const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes, maxLines);
@@ -1951,6 +1941,46 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             </div>
           </div>
         );
+
+      case "narrative-flipbook": {
+        const narrative = (slide as any).narrative as TopicNarrative;
+        const sceneIndex = ((slide as any).sceneIndex || 0);
+        const scenes = narrative?.scenes || [];
+
+        return (
+          <div className="mx-auto max-w-[1280px] space-y-6" key={currentSlide}>
+            <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-8 shadow-[0_22px_54px_rgba(15,23,42,0.1)] space-y-6">
+              {/* Header */}
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Interactive Story</p>
+                  <h2 className="mt-1 text-[32px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
+                  <p className="mt-2 text-[14px] text-[#5f7898]">{narrative.topicObjective}</p>
+                </div>
+              </div>
+
+              {/* Flipbook */}
+              <NarrativeFlipbook
+                narratives={[narrative]}
+                displayStyle="smooth-slide"
+                onSceneChange={(topicIdx, sceneIdx) => {
+                  // Update scene index for voice sync
+                }}
+              />
+
+              {/* Narration below flipbook */}
+              {scenes.length > 0 && (
+                <div className="rounded-[22px] bg-[#f3f8fd] border border-[#d8e2ef] p-6">
+                  <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592] mb-3">Scene Narration</p>
+                  <p className="text-[16px] leading-relaxed text-[#1a3a5c] font-[500]">
+                    {scenes[0]?.narration || scenes[0]?.caption || "Listen to the scene narration as you view the image."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      }
 
       case "content": {
         const parts = parseContentParts(slide.content || "");

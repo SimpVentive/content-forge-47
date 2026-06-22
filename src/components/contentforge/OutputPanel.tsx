@@ -180,7 +180,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
 
   if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
-  const isFlipbook = !!data?.flipbook_assets;
+  const isFlipbook = !!data?.flipbook_assets || !!rawOutputs.flipbookHTML || !!rawOutputs.narrativeScenes;
   const checklistComplete = checklist.filter(Boolean).length === checklist.length;
   const [qaReport, setQaReport] = useState<QAReport | null>(null);
   const [approvedByAdmin, setApprovedByAdmin] = useState(false);
@@ -487,16 +487,19 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               }
               setExporting(true);
               try {
-                const hasVoice = !!rawOutputs.voice;
-                await exportScormPackage(courseTitle, rawOutputs, {
-                  includeVoice: hasVoice,
-                  onProgress: (msg) => toast.info(msg, { duration: 3000 }),
-                });
-                toast.success(isFlipbook
-                  ? "Flipbook HTML package exported successfully!"
-                  : hasVoice
+                if (isFlipbook) {
+                  exportFlipbookHTML(courseTitle, rawOutputs);
+                  toast.success("Flipbook HTML package exported successfully!");
+                } else {
+                  const hasVoice = !!rawOutputs.voice;
+                  await exportScormPackage(courseTitle, rawOutputs, {
+                    includeVoice: hasVoice,
+                    onProgress: (msg) => toast.info(msg, { duration: 3000 }),
+                  });
+                  toast.success(hasVoice
                     ? "SCORM package with voice narration exported!"
                     : "SCORM package exported successfully!");
+                }
               } catch (err: any) {
                 toast.error(err?.message || "Export failed");
               } finally {

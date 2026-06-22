@@ -1557,9 +1557,16 @@ OUTPUT FORMAT — ABSOLUTE:
         setStatus("assembly", "running");
         addLog("Final Assembly: Packaging all outputs...");
         console.log("🔍 Assembly Agent learningMode:", learningMode);
+        console.log("🔍 narrativeScenes count:", narrativeScenes.length, "with scenes:", narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0));
         if (learningMode === "image_based_learning") {
           const displayStyle = params?.flipbookDisplayStyle || "smooth-slide";
-          const flipbookHtml = generateFlipbookHTML(narrativeScenes, courseTitle, displayStyle);
+          let flipbookHtml = "";
+          try {
+            flipbookHtml = generateFlipbookHTML(narrativeScenes, courseTitle, displayStyle);
+            addLog(`Final Assembly: Generated flipbook HTML (${flipbookHtml.length} bytes)`);
+          } catch (htmlErr) {
+            addLog(`Final Assembly: Failed to generate flipbook HTML — ${(htmlErr as Error).message}`);
+          }
           const archParsed = tryParseJson(archResult) || {};
           const modules = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
           const totalTopics = Array.isArray(modules)
