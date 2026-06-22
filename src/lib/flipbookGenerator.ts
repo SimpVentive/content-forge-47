@@ -1,43 +1,59 @@
 /**
- * HTML Flipbook Generator
- * Generates standalone interactive flipbook HTML from narrative scenes
+ * Professional Flipbook Generator with turn.js
+ * Generates high-quality interactive flipbooks with realistic page-turn animations
  */
 
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
 
+export interface FlipbookPage {
+  title?: string;
+  content: string;
+  images?: string[];
+  speaker?: string;
+  pageNumber: number;
+}
+
 export function generateFlipbookHTML(
   narratives: TopicNarrative[],
   courseTitle: string,
-  displayStyle: "page-flip" | "smooth-slide" | "step-reveal" = "smooth-slide"
+  displayStyle: "page-flip" | "smooth-slide" | "step-reveal" = "page-flip"
 ): string {
-  // Prepare scene data for embedding
-  const scenesJSON = JSON.stringify(
-    narratives.flatMap((narrative, topicIdx) =>
-      narrative.scenes.map((scene) => ({
-        topicIndex: topicIdx,
-        sceneIndex: scene.sceneNumber - 1,
-        topicTitle: narrative.topicTitle,
-        sceneNumber: scene.sceneNumber,
-        title: scene.title,
-        caption: scene.caption,
-        imageDataUrl: scene.imageDataUrl || "",
-      }))
-    )
+  // Convert narratives to flipbook pages
+  const pages: FlipbookPage[] = narratives.flatMap((narrative, topicIdx) =>
+    narrative.scenes.map((scene, sceneIdx) => ({
+      title: scene.title,
+      content: scene.caption || "",
+      images: scene.imageDataUrl ? [scene.imageDataUrl] : [],
+      speaker: "",
+      pageNumber: topicIdx * 10 + sceneIdx + 1,
+    }))
   );
 
-  const displayStyleClass =
-    displayStyle === "page-flip"
-      ? "transition-all duration-500 ease-in-out"
-      : displayStyle === "step-reveal"
-        ? "transition-opacity duration-300"
-        : "transition-all duration-400";
+  const pagesHTML = pages
+    .map(
+      (page) => `
+    <div class="page">
+      <div class="page-inner">
+        ${page.title ? `<h1 class="page-title">${escapeHtml(page.title)}</h1>` : ""}
+        <div class="page-content">
+          ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
+          ${page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : ""}
+        </div>
+        <div class="page-number">Page ${page.pageNumber}</div>
+      </div>
+    </div>
+  `
+    )
+    .join("\n");
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(courseTitle)} - Visual Narrative Flipbook</title>
+  <title>${escapeHtml(courseTitle)} - Professional Flipbook</title>
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/turn.js@4/turn.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -45,339 +61,330 @@ export function generateFlipbookHTML(
       box-sizing: border-box;
     }
 
+    html, body {
+      width: 100%;
+      height: 100%;
+    }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      min-height: 100vh;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      padding: 20px;
-    }
-
-    .container {
-      width: 100%;
-      max-width: 1000px;
-    }
-
-    .header {
-      text-align: center;
-      color: white;
-      margin-bottom: 30px;
-    }
-
-    .header h1 {
-      font-size: 2.5rem;
-      font-weight: 700;
-      margin-bottom: 10px;
-      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-    }
-
-    .header p {
-      font-size: 1.1rem;
-      opacity: 0.9;
-    }
-
-    .flipbook-wrapper {
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
       overflow: hidden;
     }
 
     .flipbook-container {
-      position: relative;
-      background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
-      aspect-ratio: 16 / 9;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      background: white;
+    }
+
+    .flipbook-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 15px 20px;
+      text-align: center;
+      z-index: 100;
+    }
+
+    .flipbook-header h1 {
+      font-size: 22px;
+      margin: 0;
+    }
+
+    .flipbook-canvas {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex: 1;
+      background: #f5f5f5;
       overflow: hidden;
     }
 
-    .scene-image {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      ${displayStyleClass};
-    }
-
-    .scene-image.transitioning {
-      opacity: 0.75;
-    }
-
-    .image-placeholder {
-      width: 100%;
-      height: 100%;
-      background: linear-gradient(135deg, #d1d5db 0%, #f3f4f6 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-direction: column;
-      color: #6b7280;
-    }
-
-    .spinner {
-      width: 60px;
-      height: 60px;
-      border: 4px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin-bottom: 20px;
-    }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
-
-    .caption-area {
+    #flipbook {
+      position: relative;
+      width: 90%;
+      max-width: 1200px;
+      height: 90%;
+      max-height: 800px;
       background: white;
-      border-top: 2px solid #e5e7eb;
-      padding: 24px;
-      min-height: 120px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    #flipbook .page {
+      width: 100%;
+      height: 100%;
+      background: white;
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      overflow: hidden;
     }
 
-    .scene-title {
-      font-size: 0.875rem;
-      font-weight: 700;
-      color: #111827;
-      margin-bottom: 8px;
-    }
-
-    .scene-caption {
-      font-size: 1.0625rem;
-      line-height: 1.6;
-      color: #374151;
-    }
-
-    .footer {
-      background: #f9fafb;
-      border-top: 1px solid #e5e7eb;
-      padding: 16px 24px;
+    .page-inner {
+      padding: 60px;
+      height: 100%;
       display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: space-between;
-      gap: 24px;
-      flex-wrap: wrap;
+      overflow-y: auto;
     }
 
-    .navigation {
-      display: flex;
-      align-items: center;
-      gap: 16px;
+    .page-title {
+      font-size: 32px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 30px;
+      border-bottom: 4px solid #667eea;
+      padding-bottom: 15px;
     }
 
-    .nav-button {
-      padding: 8px;
-      border-radius: 8px;
-      border: none;
-      background: transparent;
-      cursor: pointer;
-      color: #374151;
-      transition: all 0.2s ease;
+    .page-content {
+      flex: 1;
       display: flex;
-      align-items: center;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .page-image {
+      max-width: 100%;
+      max-height: 400px;
+      object-fit: contain;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    }
+
+    .page-text {
+      font-size: 16px;
+      line-height: 1.8;
+      color: #333;
+    }
+
+    .page-number {
+      font-size: 13px;
+      color: #999;
+      text-align: center;
+      margin-top: 20px;
+      border-top: 1px solid #eee;
+      padding-top: 15px;
+    }
+
+    .flipbook-controls {
+      background: white;
+      padding: 20px;
+      display: flex;
       justify-content: center;
-      width: 40px;
-      height: 40px;
+      align-items: center;
+      gap: 20px;
+      border-top: 1px solid #eee;
+      flex-wrap: wrap;
+      z-index: 100;
     }
 
-    .nav-button:hover:not(:disabled) {
-      background: #e5e7eb;
+    .btn {
+      padding: 12px 24px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
-    .nav-button:disabled {
-      opacity: 0.5;
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.4;
       cursor: not-allowed;
     }
 
-    .scene-counter {
-      font-size: 0.875rem;
-      color: #6b7280;
-      font-weight: 500;
-      white-space: nowrap;
+    .btn-secondary {
+      background: #f0f0f0;
+      color: #333;
+      border: 2px solid #ddd;
     }
 
-    .progress-bar {
-      flex: 1;
-      height: 8px;
-      background: #d1d5db;
-      border-radius: 4px;
-      overflow: hidden;
+    .btn-secondary:hover {
+      background: #e8e8e8;
+      border-color: #667eea;
     }
 
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-      transition: width 0.3s ease;
-    }
-
-    .topic-indicator {
-      text-align: right;
-      font-size: 0.875rem;
-      color: #6b7280;
-    }
-
-    .topic-indicator strong {
-      color: #111827;
-    }
-
-    .instruction-overlay {
-      position: absolute;
-      top: 16px;
-      right: 16px;
-      font-size: 0.75rem;
-      color: white;
-      background: rgba(0, 0, 0, 0.4);
-      padding: 8px 12px;
-      border-radius: 6px;
-      pointer-events: none;
-      backdrop-filter: blur(4px);
-      z-index: 10;
+    .page-info {
+      font-size: 15px;
+      font-weight: 600;
+      color: #0f172a;
+      min-width: 120px;
+      text-align: center;
     }
 
     @media (max-width: 768px) {
-      .header h1 {
-        font-size: 1.875rem;
+      #flipbook {
+        width: 95%;
+        height: 95%;
       }
 
-      .caption-area {
-        padding: 16px;
-        min-height: 100px;
+      .page-inner {
+        padding: 30px;
       }
 
-      .scene-caption {
-        font-size: 0.9375rem;
+      .page-title {
+        font-size: 20px;
       }
 
-      .footer {
+      .page-text {
+        font-size: 14px;
+      }
+
+      .flipbook-controls {
         flex-direction: column;
-        gap: 12px;
+        gap: 10px;
       }
 
-      .topic-indicator {
-        text-align: center;
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .page-info {
+        width: 100%;
       }
     }
 
-    /* SVG Icons */
-    .icon {
-      width: 20px;
-      height: 20px;
-      fill: currentColor;
+    @media print {
+      .flipbook-header,
+      .flipbook-controls {
+        display: none;
+      }
+
+      .flipbook-canvas {
+        background: white;
+      }
+
+      #flipbook {
+        box-shadow: none;
+      }
+
+      .page {
+        page-break-after: always;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
+  <div class="flipbook-container">
+    <div class="flipbook-header">
       <h1>${escapeHtml(courseTitle)}</h1>
-      <p>Interactive Visual Narrative</p>
     </div>
 
-    <div class="flipbook-wrapper">
-      <div class="flipbook-container">
-        <img id="sceneImage" class="scene-image" alt="Scene image" />
-        <div class="instruction-overlay">
-          ← → or A/D keys to navigate
-        </div>
+    <div class="flipbook-canvas">
+      <div id="flipbook">
+        ${pagesHTML}
       </div>
+    </div>
 
-      <div class="caption-area">
-        <div class="scene-title" id="sceneTitle"></div>
-        <div class="scene-caption" id="sceneCaption"></div>
+    <div class="flipbook-controls">
+      <button class="btn btn-primary" id="prevBtn">← Previous</button>
+      <div class="page-info">
+        Page <span id="currentPage">1</span> of <span id="totalPages">${pages.length}</span>
       </div>
-
-      <div class="footer">
-        <div class="navigation">
-          <button class="nav-button" id="prevBtn" aria-label="Previous scene">
-            <svg class="icon" viewBox="0 0 24 24">
-              <path d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
-            </svg>
-          </button>
-          <span class="scene-counter">Scene <span id="currentScene">1</span> of <span id="totalScenes">0</span></span>
-          <button class="nav-button" id="nextBtn" aria-label="Next scene">
-            <svg class="icon" viewBox="0 0 24 24">
-              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-            </svg>
-          </button>
-        </div>
-        <div class="progress-bar">
-          <div class="progress-fill" id="progressFill"></div>
-        </div>
-        <div class="topic-indicator">
-          <strong id="topicName">Topic</strong>
-        </div>
-      </div>
+      <button class="btn btn-primary" id="nextBtn">Next →</button>
+      <button class="btn btn-secondary" id="fullscreenBtn">⛶ Fullscreen</button>
+      <button class="btn btn-secondary" id="printBtn">🖨 Print</button>
     </div>
   </div>
 
   <script>
-    const scenes = ${scenesJSON};
-    let currentIndex = 0;
-    let isTransitioning = false;
+    $(function() {
+      const totalPages = ${pages.length};
 
-    function updateDisplay() {
-      const scene = scenes[currentIndex];
-      const totalScenes = scenes.length;
-      const progress = ((currentIndex + 1) / totalScenes) * 100;
+      // Initialize turn.js flipbook
+      $('#flipbook').turn({
+        width: 960,
+        height: 600,
+        autoCenter: true,
+        display: 'double',
+        acceleration: true,
+        gradients: true,
+        elevation: 50,
+        pages: totalPages,
+        when: {
+          turning: function(event, page, view) {
+            $('#currentPage').text(page);
+          }
+        }
+      });
 
-      // Update image
-      const img = document.getElementById('sceneImage');
-      if (scene.imageDataUrl) {
-        img.src = scene.imageDataUrl;
-        img.style.display = 'block';
-      } else {
-        img.style.display = 'none';
-      }
+      // Navigation
+      $('#prevBtn').click(() => {
+        $('#flipbook').turn('previous');
+      });
 
-      // Update text
-      document.getElementById('sceneTitle').textContent = scene.title;
-      document.getElementById('sceneCaption').textContent = scene.caption;
-      document.getElementById('currentScene').textContent = currentIndex + 1;
-      document.getElementById('totalScenes').textContent = totalScenes;
-      document.getElementById('topicName').textContent = scene.topicTitle;
+      $('#nextBtn').click(() => {
+        $('#flipbook').turn('next');
+      });
 
-      // Update progress
-      document.getElementById('progressFill').style.width = progress + '%';
+      // Disable prev button on first page
+      $('#flipbook').on('turning', function(event, page, view) {
+        $('#prevBtn').prop('disabled', page <= 1);
+        $('#nextBtn').prop('disabled', page >= totalPages);
+      });
 
-      // Update button states
-      document.getElementById('prevBtn').disabled = currentIndex === 0;
-      document.getElementById('nextBtn').disabled = currentIndex === totalScenes - 1;
-    }
+      // Fullscreen
+      $('#fullscreenBtn').click(() => {
+        const elem = document.getElementById('flipbook');
+        if (elem.requestFullscreen) {
+          elem.requestFullscreen();
+        } else if (elem.mozRequestFullScreen) {
+          elem.mozRequestFullScreen();
+        } else if (elem.webkitRequestFullscreen) {
+          elem.webkitRequestFullscreen();
+        }
+      });
 
-    function goToPrevious() {
-      if (isTransitioning || currentIndex === 0) return;
-      isTransitioning = true;
-      currentIndex--;
-      updateDisplay();
-      setTimeout(() => { isTransitioning = false; }, 300);
-    }
+      // Print
+      $('#printBtn').click(() => {
+        window.print();
+      });
 
-    function goToNext() {
-      if (isTransitioning || currentIndex === scenes.length - 1) return;
-      isTransitioning = true;
-      currentIndex++;
-      updateDisplay();
-      setTimeout(() => { isTransitioning = false; }, 300);
-    }
+      // Keyboard navigation
+      $(document).keydown(e => {
+        if (e.key === 'ArrowLeft') $('#flipbook').turn('previous');
+        if (e.key === 'ArrowRight') $('#flipbook').turn('next');
+      });
 
-    // Event listeners
-    document.getElementById('prevBtn').addEventListener('click', goToPrevious);
-    document.getElementById('nextBtn').addEventListener('click', goToNext);
-
-    // Keyboard navigation
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') goToPrevious();
-      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') goToNext();
+      // Initialize buttons
+      $('#prevBtn').prop('disabled', true);
     });
-
-    // Initialize
-    updateDisplay();
   </script>
 </body>
 </html>`;
+}
+
+function escapeHtml(text: string): string {
+  const map: { [key: string]: string } = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#039;",
+  };
+  return text.replace(/[&<>"']/g, (m) => map[m]);
+}
 }
 
 function escapeHtml(text: string): string {
