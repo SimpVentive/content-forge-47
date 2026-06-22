@@ -14,6 +14,14 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   return btoa(binary);
 }
 
+function softenPromptForTrainingImage(prompt: string): string {
+  return prompt
+    .replace(/\b(violence|violent|blood|bloody|injury|injured|weapon|weapons|gun|guns|knife|knives|explosion|explosive|fight|fighting|attack|attacking|hazardous|hazard|danger|dangerous|accident|emergency)\b/gi, "workplace safety concern")
+    .replace(/\bkill|killed|death|dead|fatal|fatality\b/gi, "serious incident")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function fetchImageAsDataUrl(url: string): Promise<{ imageDataUrl: string; mimeType: string }> {
   const response = await fetch(url);
   if (!response.ok) {
@@ -57,7 +65,8 @@ serve(async (req) => {
       `Accessibility intent: ${altText || "AI-generated visual for workplace learning."}.`,
       "No logos, no watermarks, no copyrighted characters, no branded products, no visible trademarks.",
       "Use a contemporary corporate training aesthetic with diverse people, realistic office lighting, and professional composition.",
-      prompt,
+      "Keep the scene safe and non-graphic. Show prevention, discussion, procedure, equipment, or calm observation only. No harm, weapons, blood, damage, or physical conflict.",
+      softenPromptForTrainingImage(prompt),
     ].join(" ");
 
     // Submit job to Black Forest Labs (async API — returns task id to poll)
