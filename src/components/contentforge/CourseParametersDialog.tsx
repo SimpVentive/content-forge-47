@@ -199,13 +199,14 @@ function getDurationMinutes(val: string): number {
 const InfoHint: React.FC<{ text: string }> = ({ text }) => (
   <Tooltip>
     <TooltipTrigger asChild>
-      <button
-        type="button"
-        className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary"
+      <span
+        className="inline-flex h-4.5 w-4.5 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-primary cursor-help"
+        role="button"
+        tabIndex={0}
         aria-label="More information"
       >
         <Info className="h-3.5 w-3.5" />
-      </button>
+      </span>
     </TooltipTrigger>
     <TooltipContent className="max-w-[260px] text-[11px] leading-relaxed">{text}</TooltipContent>
   </Tooltip>
