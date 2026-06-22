@@ -20,12 +20,12 @@ const PACKS: Pack[] = [
   {
     id: "starter",
     name: "Starter",
-    credits: 100,
-    priceInr: 249,
-    perCredit: 2.49,
+    credits: 200,
+    priceInr: 499,
+    perCredit: 2.495,
     tag: null,
     blurb: "Kick the tyres and ship your first course.",
-    includes: { image: "10 image-based lessons", elearning: "5 min of e-learning", video: "1 min of video" },
+    includes: { image: "20 image-based lessons", elearning: "10 min of e-learning", video: "2 min of video" },
   },
   {
     id: "growth",
