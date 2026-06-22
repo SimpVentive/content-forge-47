@@ -364,6 +364,7 @@ const Index = () => {
       const heygenConfig = getHeyGenSettings();
       if (!heygenConfig?.apiKey) {
         toast.warning("Video generation not configured. Contact admin to set up HeyGen API.");
+        setIsStartingGeneration(false);
         return;
       }
     }
