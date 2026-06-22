@@ -1554,7 +1554,7 @@ OUTPUT FORMAT — ABSOLUTE:
       // ──── AGENT 9: Final Assembly ────
       if (toggles["assembly"] !== false) {
         setStatus("assembly", "running");
-        addLog("Final Assembly: Packaging all outputs...");
+        addLog(learningMode === "image_based_learning" ? "Final Assembly: Preparing image series..." : "Final Assembly: Packaging all outputs...");
         console.log("🔍 Assembly Agent learningMode:", learningMode);
         if (learningMode === "image_based_learning") {
           const archParsed = tryParseJson(archResult) || {};
