@@ -2,8 +2,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 
 const FAQS: { q: string; a: string }[] = [
   {
-    q: "What is a credit and how long does it last?",
-    a: "1 credit = 1 minute of generated course content. Credits never expire — buy a pack once and use it whenever you need to publish.",
+    q: "How do credits work and how long do they last?",
+    a: "Credits are consumed based on actual generation usage — AI tokens, image renders, voice minutes — not by a fixed output length. The pack tiers list realistic estimates of what you can typically produce, but actual usage varies with depth, language, and media choices. Credits never expire.",
   },
   {
     q: "Which LMS platforms does the SCORM export work with?",
