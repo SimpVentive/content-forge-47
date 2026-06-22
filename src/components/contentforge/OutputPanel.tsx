@@ -524,8 +524,9 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           <p className="text-[13px] font-bold text-amber-900 mb-2">📋 Next Steps:</p>
           <ol className="text-[12px] text-amber-800 space-y-1 list-decimal list-inside">
             <li>Review the deployment checklist above</li>
-            <li>Click "{isFlipbook ? "Export Flipbook" : "Export Package"}" to download</li>
-            <li>{isFlipbook ? "Upload the HTML to your LMS or web server" : "Import SCORM package to your LMS"}</li>
+            <li>Click "Export Package" to download</li>
+            <li>Import SCORM package to your LMS</li>
+
             <li>Test with learners and gather feedback</li>
           </ol>
         </div>
