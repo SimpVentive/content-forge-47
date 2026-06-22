@@ -688,6 +688,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
   const [scriptDialogDraft, setScriptDialogDraft] = useState("");
   const prevIsRunningRef = React.useRef<boolean>(Boolean(isRunning));
   const hasOutput = Object.values(rawOutputs).some(v => v);
+  const isImageSeriesOutput = getNarrativeImageItems(rawOutputs).length > 0;
   const content = (activeTab === "preview" || activeTab === "videos") ? null : outputData[activeTab as keyof OutputData];
   const canEditTab = activeTab === "outline" || activeTab === "script" || activeTab === "assessment" || activeTab === "package";
 
@@ -913,9 +914,9 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           <div className="relative w-[420px] max-w-[92vw] rounded-2xl bg-card shadow-2xl overflow-hidden animate-fade-in">
             <div className="h-1.5 w-full bg-primary" />
             <div className="px-7 pt-7 pb-6">
-              <h2 className="text-[18px] font-bold text-foreground mb-2">Package Ready</h2>
+              <h2 className="text-[18px] font-bold text-foreground mb-2">{isImageSeriesOutput ? "Images Ready" : "Package Ready"}</h2>
               <p className="text-[14px] text-foreground/80 mb-6">
-                Would you like to generate the downloadable package now?
+                {isImageSeriesOutput ? "Would you like to view the generated image series now?" : "Would you like to generate the downloadable package now?"}
               </p>
               <div className="flex gap-3 justify-end">
                 <button
@@ -931,7 +932,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                   }}
                   className="px-5 h-10 rounded-xl text-[13px] font-semibold bg-primary text-primary-foreground hover:brightness-110 transition-all"
                 >
-                  Yes, Generate Package
+                  {isImageSeriesOutput ? "Yes, View Images" : "Yes, Generate Package"}
                 </button>
               </div>
             </div>
@@ -1119,8 +1120,8 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                       : "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5)",
                 }}
               >
-                <tab.icon className="w-3 h-3" />
-                {tab.label}
+                {isImageSeriesOutput && tab.key === "package" ? <Images className="w-3 h-3" /> : <tab.icon className="w-3 h-3" />}
+                {isImageSeriesOutput && tab.key === "package" ? "Images" : tab.label}
               </button>
             );
           })}
