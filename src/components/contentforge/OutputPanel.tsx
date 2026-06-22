@@ -117,6 +117,23 @@ async function downloadNarrativeImages(courseTitle: string, rawOutputs: RawAgent
   return images.length;
 }
 
+function exportFlipbookHTML(courseTitle: string, rawOutputs: RawAgentOutputs) {
+  let html = rawOutputs.flipbookHTML;
+  if (!html) {
+    throw new Error("No flipbook HTML generated. Make sure image-based course completed successfully.");
+  }
+
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${safeFilename(courseTitle)}_Flipbook.html`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 /* Assessment Renderer */
 const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
   const data = tryParseJSON(raw);
