@@ -72,7 +72,7 @@ export const PricingSection = () => {
 
     setProcessingPack(pack.id);
     try {
-      const orderRes = await createRazorpayOrder(pack.credits, pack.price, `order-${Date.now()}`);
+      const orderRes = await createRazorpayOrder(pack.credits, pack.priceInr * 100, `order-${Date.now()}`);
 
       const rzp = (window as any).Razorpay;
       if (!rzp) {
