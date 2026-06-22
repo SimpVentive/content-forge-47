@@ -129,9 +129,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
     }
 
-    // Show title confirmation if title is still default or empty
-    setSuggestedTitle(detectedTitle);
-    setShowTitleConfirm(true);
+    // Auto-apply title if empty; only ask when overwriting an existing different title
+    if (!courseTitle.trim()) {
+      setCourseTitle(detectedTitle);
+    } else if (courseTitle.trim().toLowerCase() !== detectedTitle.toLowerCase()) {
+      setSuggestedTitle(detectedTitle);
+      setShowTitleConfirm(true);
+    }
   };
 
   const handleConfirmTitle = (useDetected: boolean) => {
