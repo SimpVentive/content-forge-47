@@ -5,6 +5,7 @@ import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
 import { buildNarrativeScenePrompt, buildImageGenerationPrompts, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { logApiUsage } from "@/lib/edgeFunctions";
+import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -662,7 +663,7 @@ export function useAgentPipeline() {
     setLogs([]);
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string }) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string }) => {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const languageDirective = buildLanguageDirective(textLanguage, narratorLanguage);
@@ -1555,6 +1556,57 @@ OUTPUT FORMAT — ABSOLUTE:
       if (toggles["assembly"] !== false) {
         setStatus("assembly", "running");
         addLog("Final Assembly: Packaging all outputs...");
+        console.log("🔍 Assembly Agent learningMode:", learningMode);
+        if (learningMode === "image_based_learning") {
+          const displayStyle = params?.flipbookDisplayStyle || "smooth-slide";
+          const flipbookHtml = generateFlipbookHTML(narrativeScenes, courseTitle, displayStyle);
+          const archParsed = tryParseJson(archResult) || {};
+          const modules = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
+          const totalTopics = Array.isArray(modules)
+            ? modules.reduce((sum: number, mod: any) => sum + (mod.topics || mod.sections || mod.lessons || []).length, 0)
+            : narrativeScenes.length;
+          const sceneCount = narrativeScenes.reduce((sum, narrative) => sum + narrative.scenes.length, 0);
+          const assemblyResult = JSON.stringify({
+            metadata: {
+              title: courseTitle,
+              package_type: "Interactive Flipbook",
+              output_format: "HTML Flipbook",
+              total_modules: Array.isArray(modules) ? modules.length : "-",
+              total_topics: totalTopics || narrativeScenes.length,
+              total_scenes: sceneCount,
+              estimated_completion_time: params?.duration || "-",
+              difficulty_level: params?.level || "intermediate",
+            },
+            flipbook_manifest: {
+              assets: [
+                "index.html",
+                `${sceneCount} embedded scene images`,
+                "interactive navigation controls",
+                "captions and topic indicators",
+              ],
+              display_style: displayStyle,
+            },
+            deployment_checklist: [
+              "Download the HTML flipbook package.",
+              "Open index.html in a browser to verify all scene images load.",
+              "Check captions and topic sequence against the source material.",
+              "Upload the HTML file to your LMS or content portal as web content.",
+              "Confirm keyboard navigation works for learners.",
+              "Verify the flipbook on desktop and mobile screens.",
+            ],
+            qa_summary: {
+              agents_completed: ["Outline Agent", "Script Agent", "Visual Plan Agent", "Visual Narrative Agent", "Quality Review Agent", "Final Assembly Agent"],
+              quality_scores: {},
+              gaps: sceneCount === 0 ? ["No narrative scenes were generated; regenerate with Visual Narrative Agent enabled."] : [],
+            },
+          }, null, 2);
+
+          setStatus("assembly", "complete");
+          setRawOutputs((prev) => ({ ...prev, assembly: assemblyResult, narrativeScenes: JSON.stringify(narrativeScenes), flipbookHTML: flipbookHtml }));
+          setOutputData((prev) => ({ ...prev, package: assemblyResult }));
+          addLog("Final Assembly: Complete. Interactive flipbook package ready.");
+          addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
+        } else {
         const modeInstructions = getAgentModeInstructions("assembly", learningMode);
         const assemblyInput = `Course Title: ${courseTitle}\n\nOutline:\n${archResult}\n\nScript:\n${writerResult}\n\nVisual Plan:\n${visualResult}\n\nAssessment:\n${assessmentResult}\n\nQuality Review:\n${qualityResult}\n\nNarration:\n${voiceResult}\n\nCompliance:\n${complianceResult}`;
 
@@ -1610,6 +1662,7 @@ ${modeInstructions}`;
         setOutputData((prev) => ({ ...prev, package: assemblyResult }));
         addLog("Final Assembly: Complete. Course package ready for deployment.");
         addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
+        }
       } else {
         setStatus("assembly", "idle");
       }

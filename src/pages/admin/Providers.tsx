@@ -85,6 +85,7 @@ const Providers = () => {
     const { notes, base_url } = readConfig(p.config_json);
     setEditingId(p.id);
     setForm({
+      ...EMPTY,
       provider_name: p.provider_name,
       api_key: "",
       is_active: p.is_active,
