@@ -2107,7 +2107,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   {/* Situation */}
                   <div className="rounded-[22px] bg-[#f3f8fd] border border-[#d8e2ef] p-6">
                     <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592] mb-3">Situation</p>
-                    <p className="text-[18px] leading-relaxed text-[#1a3a5c] font-[500]">{scenarioLead}</p>
+                    <p className="text-[18px] leading-relaxed text-[#1a3a5c] font-[500]">
+                      {scenarioLead || `This scenario explores the challenges of ${slide.topicTitle || "this topic"}.`}
+                    </p>
                   </div>
 
                   {/* What to Notice + Better Move side by side */}
@@ -2115,17 +2117,23 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     <div className="rounded-[20px] border border-[#d8e2ef] bg-white p-5 shadow-sm">
                       <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592] mb-3">What to Notice</p>
                       <div className="space-y-2.5">
-                        {summaryBullets.slice(0, 4).map((bullet, index) => (
-                          <div key={`${bullet}-${index}`} className="flex items-start gap-2.5 text-[14px] text-[#24486f]">
-                            <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#2b5fa4]" />
-                            <span>{bullet}</span>
-                          </div>
-                        ))}
+                        {summaryBullets.length > 0 ? (
+                          summaryBullets.slice(0, 4).map((bullet, index) => (
+                            <div key={`${bullet}-${index}`} className="flex items-start gap-2.5 text-[14px] text-[#24486f]">
+                              <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#2b5fa4]" />
+                              <span>{bullet}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-[13px] text-[#7c8eb0] italic">Key observations will appear after the course has been fully generated.</p>
+                        )}
                       </div>
                     </div>
                     <div className="rounded-[20px] border border-[#f0d8a8] bg-[#fffbf0] p-5 shadow-sm">
                       <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#9a6a1a] mb-3">Better Move</p>
-                      <p className="text-[15px] leading-relaxed text-[#6f5b35]">{scenarioSupport}</p>
+                      <p className="text-[15px] leading-relaxed text-[#6f5b35]">
+                        {scenarioSupport || `A recommended approach for handling ${slide.topicTitle || "this situation"}.`}
+                      </p>
                     </div>
                   </div>
 
