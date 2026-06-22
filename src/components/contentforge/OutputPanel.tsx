@@ -393,25 +393,17 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       </div>
 
-      {/* 3. Image Series OR package manifest */}
+      {/* 3. Storyboard (image-based course) OR package manifest */}
       {hasNarrativeImages ? (
         <div>
-          <h3 className="text-[15px] font-bold text-foreground mb-2">Generated Image Series</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {narrativeImages.map((item, index) => (
-              <div key={`${item.topicTitle}-${item.sceneNumber}-${index}`} className="bg-secondary/50 rounded-xl overflow-hidden border border-border/60">
-                {item.imageDataUrl ? (
-                  <img src={item.imageDataUrl} alt={item.caption || item.title} className="w-full aspect-video object-cover" />
-                ) : (
-                  <div className="w-full aspect-video flex items-center justify-center bg-secondary text-[12px] text-muted-foreground">Image pending</div>
-                )}
-                <div className="p-3 space-y-1">
-                  <p className="text-[12px] font-bold text-foreground">{String(index + 1).padStart(2, "0")}. {item.title}</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">{item.caption}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <h3 className="text-[15px] font-bold text-foreground mb-2">Storyboard</h3>
+          <p className="text-[12px] text-muted-foreground mb-3">
+            {narrativeImages.length} scenes • Use ← → or A/D keys, or the on-screen arrows to navigate.
+          </p>
+          <NarrativeFlipbook
+            narratives={(tryParseJSON(rawOutputs.narrativeScenes || "") as any[]) || []}
+            displayStyle="smooth-slide"
+          />
         </div>
       ) : data.flipbook_assets ? (
         <div>
