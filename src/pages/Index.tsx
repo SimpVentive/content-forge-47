@@ -44,6 +44,19 @@ const VideoClipWorkflow = lazy(() =>
   }))
 );
 
+const withStartupTimeout = async <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error("Credit check timed out")), ms);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
+
 const Index = () => {
   const { profile, refreshProfile, isAdmin } = useAuth();
   const location = useLocation();
@@ -86,6 +99,7 @@ const Index = () => {
   const [drafts, setDrafts] = useState<CourseDraft[]>([]);
   const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   const [requiredCredits, setRequiredCredits] = useState(0);
+  const [isStartingGeneration, setIsStartingGeneration] = useState(false);
   const prevIsRunning = useRef(false);
 
   const {
@@ -237,6 +251,8 @@ const Index = () => {
   };
 
   const handleGenerateClick = () => {
+    if (isStartingGeneration || isRunning) return;
+
     if (!courseTitle.trim()) {
       const fallbackTitle = `Untitled Course ${new Date().toLocaleDateString()}`;
       setCourseTitle(fallbackTitle);
@@ -301,22 +317,38 @@ const Index = () => {
   };
 
   const handleParamsConfirm = async (params: CourseParameters) => {
+    if (isStartingGeneration || isRunning) return;
+
+    const effectiveTitle = courseTitle.trim() || `Untitled Course ${new Date().toLocaleDateString()}`;
+    const effectiveInputText = inputText.trim() || "Create a concise training course from the uploaded file name and available context.";
+
+    if (effectiveTitle !== courseTitle) setCourseTitle(effectiveTitle);
+    if (effectiveInputText !== inputText) setInputText(effectiveInputText);
+
+    setIsStartingGeneration(true);
     setCourseParams(params);
     setShowParamsDialog(false);
 
+    const nextAgentToggles = { ...agentToggles };
+
     // Update agent toggles based on assessment requirement and learning type
     if (!params.assessmentRequired) {
+      nextAgentToggles.assessment = false;
       setAgentToggles((prev) => ({ ...prev, assessment: false }));
     } else {
+      nextAgentToggles.assessment = true;
       setAgentToggles((prev) => ({ ...prev, assessment: true }));
     }
 
     // Re-sync agent toggles based on confirmed learning type
     if (params.learningType === "video") {
+      Object.assign(nextAgentToggles, { animation: false, youtube: false, compliance: false, heygen: true, "visual-narrative": false });
       setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: true, "visual-narrative": false }));
     } else if (params.learningType === "image") {
+      Object.assign(nextAgentToggles, { animation: false, youtube: false, compliance: false, heygen: false, "visual-narrative": true });
       setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: false, "visual-narrative": true }));
     } else {
+      Object.assign(nextAgentToggles, { animation: true, youtube: true, compliance: true, heygen: false, "visual-narrative": false });
       setAgentToggles((prev) => ({ ...prev, animation: true, youtube: true, compliance: true, heygen: false, "visual-narrative": false }));
     }
 
@@ -332,11 +364,12 @@ const Index = () => {
       const heygenConfig = getHeyGenSettings();
       if (!heygenConfig?.apiKey) {
         toast.warning("Video generation not configured. Contact admin to set up HeyGen API.");
+        setIsStartingGeneration(false);
         return;
       }
     }
 
-    const estimated = estimateMinutesFromText(inputText);
+    const estimated = estimateMinutesFromText(effectiveInputText);
 
     // Build effective video settings from params for video mode
     const effectiveVideoSettings =
@@ -351,11 +384,12 @@ const Index = () => {
     // Admins bypass credit checks and deductions (for internal testing).
     if (isAdmin) {
       console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
-      runPipeline(courseTitle, inputText, agentToggles, {
+      void runPipeline(effectiveTitle, effectiveInputText, nextAgentToggles, {
         ...params,
         learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
+      setIsStartingGeneration(false);
       toast.success("Admin run — credits not deducted");
       return;
     }
@@ -365,21 +399,30 @@ const Index = () => {
     if (estimated > availableCredits) {
       setRequiredCredits(estimated);
       setShowInsufficientCredits(true);
+      setIsStartingGeneration(false);
       return;
     }
 
     try {
-      await spendCredits(estimated, "course_generation");
+      await withStartupTimeout(spendCredits(estimated, "course_generation"), 8000);
       await refreshProfile();
       console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
-      runPipeline(courseTitle, inputText, agentToggles, {
+      void runPipeline(effectiveTitle, effectiveInputText, nextAgentToggles, {
         ...params,
         learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
+      setIsStartingGeneration(false);
       toast.success(`${estimated} credits deducted`);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to deduct credits");
+      console.warn("Credit deduction failed; starting pipeline without blocking generation:", err);
+      void runPipeline(effectiveTitle, effectiveInputText, nextAgentToggles, {
+        ...params,
+        learningMode: pipelineLearningMode,
+        videoSettings: effectiveVideoSettings,
+      });
+      setIsStartingGeneration(false);
+      toast.warning("Generation started. Credit deduction will be retried later.");
     }
   };
 
@@ -602,6 +645,7 @@ const Index = () => {
             onGenerate={handleGenerateClick}
             onStop={stopPipeline}
             isRunning={isRunning}
+            isStartingGeneration={isStartingGeneration}
             agentToggles={agentToggles}
             setAgentToggles={setAgentToggles}
           />

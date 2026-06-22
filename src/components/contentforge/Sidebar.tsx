@@ -17,6 +17,7 @@ interface SidebarProps {
   onGenerate: () => void;
   onStop: () => void;
   isRunning: boolean;
+  isStartingGeneration?: boolean;
   agentToggles: Record<string, boolean>;
   setAgentToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }
@@ -90,6 +91,7 @@ const MIME_MAP: Record<string, string> = {
 export const Sidebar: React.FC<SidebarProps> = ({
   courseTitle, setCourseTitle, inputText, setInputText,
   onGenerate, onStop, isRunning,
+  isStartingGeneration = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
@@ -284,14 +286,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onGenerate}
             type="button"
-            disabled={isExtracting}
+            disabled={isExtracting || isStartingGeneration}
             className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] hover:-translate-y-0.5 active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             style={{ background: '#2563EB' }}
           >
-            {isExtracting ? (
+            {isExtracting || isStartingGeneration ? (
               <>
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Extracting...
+                {isExtracting ? "Extracting..." : "Starting..."}
               </>
             ) : (
               <>
