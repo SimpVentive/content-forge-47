@@ -24,7 +24,9 @@ import {
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal";
+import { CreditConfirmationModal } from "@/components/CreditConfirmationModal";
 import { spendCredits } from "@/lib/edgeFunctions";
+import { estimateCredits, type CreditEstimate } from "@/lib/creditEstimator";
 
 const LearnerPreview = lazy(() =>
   import("@/components/contentforge/LearnerPreview").then((module) => ({
@@ -86,6 +88,9 @@ const Index = () => {
   const [drafts, setDrafts] = useState<CourseDraft[]>([]);
   const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   const [requiredCredits, setRequiredCredits] = useState(0);
+  const [showCreditConfirmation, setShowCreditConfirmation] = useState(false);
+  const [creditEstimate, setCreditEstimate] = useState<CreditEstimate | null>(null);
+  const [pendingParams, setPendingParams] = useState<CourseParameters | null>(null);
   const prevIsRunning = useRef(false);
 
   const {
@@ -311,12 +316,6 @@ const Index = () => {
       setAgentToggles((prev) => ({ ...prev, animation: true, youtube: true, compliance: true, heygen: false, "visual-narrative": false }));
     }
 
-    const pipelineLearningMode = params.learningType === "video"
-      ? "video_learning"
-      : params.learningType === "image"
-        ? "image_based_learning"
-        : "static_elearning";
-
     // For video mode: verify HeyGen is configured (auto-seeded on app boot)
     if (params.learningType === "video") {
       const { getHeyGenSettings } = await import("@/lib/heygenDefaults");
@@ -327,20 +326,23 @@ const Index = () => {
       }
     }
 
-    const estimated = estimateMinutesFromText(inputText);
-
-    // Build effective video settings from params for video mode
-    const effectiveVideoSettings =
-      params.learningType === "video"
-        ? {
-            selectedAvatar: params.avatarTrainerId || "rachel",
-            videoQuality: params.videoQuality,
-            backgroundStyle: params.backgroundStyle,
-          }
-        : undefined;
-
-    // Admins bypass credit checks and deductions (for internal testing).
+    // Admins bypass credit checks (for internal testing)
     if (isAdmin) {
+      const pipelineLearningMode = params.learningType === "video"
+        ? "video_learning"
+        : params.learningType === "image"
+          ? "image_based_learning"
+          : "static_elearning";
+
+      const effectiveVideoSettings =
+        params.learningType === "video"
+          ? {
+              selectedAvatar: params.avatarTrainerId || "rachel",
+              videoQuality: params.videoQuality,
+              backgroundStyle: params.backgroundStyle,
+            }
+          : undefined;
+
       console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
@@ -351,9 +353,40 @@ const Index = () => {
       return;
     }
 
+    // Estimate credits based on learning type and requirement text
+    const estimate = estimateCredits(inputText, params.learningType);
+
+    // Show confirmation modal
+    setCreditEstimate(estimate);
+    setPendingParams(params);
+    setShowCreditConfirmation(true);
+  };
+
+  const handleCreditConfirmation = async () => {
+    if (!creditEstimate || !pendingParams) return;
+
+    const params = pendingParams;
+    const estimated = creditEstimate.totalCredits;
+
+    const pipelineLearningMode = params.learningType === "video"
+      ? "video_learning"
+      : params.learningType === "image"
+        ? "image_based_learning"
+        : "static_elearning";
+
+    const effectiveVideoSettings =
+      params.learningType === "video"
+        ? {
+            selectedAvatar: params.avatarTrainerId || "rachel",
+            videoQuality: params.videoQuality,
+            backgroundStyle: params.backgroundStyle,
+          }
+        : undefined;
+
     const availableCredits = (profile?.credits_total ?? 0) - (profile?.credits_used ?? 0);
 
     if (estimated > availableCredits) {
+      setShowCreditConfirmation(false);
       setRequiredCredits(estimated);
       setShowInsufficientCredits(true);
       return;
@@ -362,6 +395,9 @@ const Index = () => {
     try {
       await spendCredits(estimated, "course_generation");
       await refreshProfile();
+      setShowCreditConfirmation(false);
+      setCreditEstimate(null);
+      setPendingParams(null);
       console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
@@ -392,6 +428,17 @@ const Index = () => {
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
+      <CreditConfirmationModal
+        open={showCreditConfirmation}
+        estimate={creditEstimate}
+        availableCredits={(profile?.credits_total ?? 0) - (profile?.credits_used ?? 0)}
+        onConfirm={handleCreditConfirmation}
+        onCancel={() => {
+          setShowCreditConfirmation(false);
+          setCreditEstimate(null);
+          setPendingParams(null);
+        }}
+      />
       <InsufficientCreditsModal
         open={showInsufficientCredits}
         requiredCredits={requiredCredits}

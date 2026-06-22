@@ -126,51 +126,62 @@ export function generateFlipbookHTML(
     }
 
     .page-inner {
-      padding: 60px;
+      padding: 40px;
       height: 100%;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: flex-start;
+      gap: 15px;
       overflow-y: auto;
     }
 
     .page-title {
-      font-size: 32px;
-      font-weight: 700;
+      font-size: 18px;
+      font-weight: 600;
       color: #0f172a;
-      margin-bottom: 30px;
-      border-bottom: 4px solid #667eea;
-      padding-bottom: 15px;
+      text-align: center;
+      margin: 0;
+      flex-shrink: 0;
     }
 
     .page-content {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 20px;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      width: 100%;
     }
 
     .page-image {
-      max-width: 100%;
-      max-height: 400px;
+      width: 100%;
+      height: auto;
+      max-height: 70%;
       object-fit: contain;
-      border-radius: 12px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      border-radius: 8px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+      flex-shrink: 0;
     }
 
     .page-text {
-      font-size: 16px;
-      line-height: 1.8;
-      color: #333;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #666;
+      text-align: center;
+      flex-shrink: 0;
+      margin-top: auto;
+      padding-top: 10px;
+      border-top: 1px solid #e0e0e0;
+      width: 100%;
     }
 
     .page-number {
-      font-size: 13px;
-      color: #999;
+      font-size: 11px;
+      color: #aaa;
       text-align: center;
-      margin-top: 20px;
-      border-top: 1px solid #eee;
-      padding-top: 15px;
+      margin-top: 10px;
+      flex-shrink: 0;
     }
 
     .flipbook-controls {
@@ -384,11 +395,4 @@ function escapeHtml(text: string): string {
     "'": "&#039;",
   };
   return text.replace(/[&<>"']/g, (m) => map[m]);
-}
-}
-
-function escapeHtml(text: string): string {
-  const div = document.createElement("div");
-  div.textContent = text;
-  return div.innerHTML;
 }

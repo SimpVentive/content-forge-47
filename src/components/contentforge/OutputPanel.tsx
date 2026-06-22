@@ -180,7 +180,6 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
 
   if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
-<<<<<<< HEAD
   const isFlipbook = !!data?.flipbook_assets;
   const checklistComplete = checklist.filter(Boolean).length === checklist.length;
   const [qaReport, setQaReport] = useState<QAReport | null>(null);
@@ -199,17 +198,6 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
     };
     runQA();
   }, [raw, archRaw, visualRaw]);
-=======
-  const isFlipbookPackage = Boolean(
-    rawOutputs.flipbookHTML ||
-    rawOutputs.narrativeScenes ||
-    meta.package_type === "Interactive Flipbook" ||
-    data.flipbook_manifest
-  );
-  const manifestAssets = Array.isArray(isFlipbookPackage ? data.flipbook_manifest?.assets : data.scorm_manifest?.assets)
-    ? (isFlipbookPackage ? data.flipbook_manifest.assets : data.scorm_manifest.assets)
-    : undefined;
->>>>>>> f89ff03fe22abb5925ac5214ed5d8190e4851113
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -365,7 +353,6 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       </div>
 
-<<<<<<< HEAD
       {/* 3. Flipbook Assets OR SCORM Manifest */}
       {data.flipbook_assets ? (
         <div>
@@ -404,14 +391,10 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           </div>
         </div>
       ) : data.scorm_manifest?.assets ? (
-=======
-      {/* 3. Package Manifest */}
-      {manifestAssets && (
->>>>>>> f89ff03fe22abb5925ac5214ed5d8190e4851113
         <div>
-          <h3 className="text-[15px] font-bold text-foreground mb-2">{isFlipbookPackage ? "Flipbook Manifest" : "SCORM Manifest"}</h3>
+          <h3 className="text-[15px] font-bold text-foreground mb-2">SCORM Manifest</h3>
           <div className="bg-secondary/50 rounded-xl p-3 space-y-1">
-            {manifestAssets.map((asset: string | { name?: string; type?: string }, i: number) => (
+            {data.scorm_manifest.assets.map((asset: string | { name?: string; type?: string }, i: number) => (
               <div key={i} className="flex items-center gap-2 text-[13px] text-foreground/80">
                 <span className="text-primary">File</span>
                 {typeof asset === "string" ? asset : asset.name || JSON.stringify(asset)}
@@ -470,7 +453,6 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       )}
 
-<<<<<<< HEAD
       {/* DEPLOYMENT CHECKLIST PROGRESS */}
       {data.deployment_checklist && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -505,31 +487,11 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               }
               setExporting(true);
               try {
-=======
-      {/* 6. Action Buttons - Preview + Export */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => setShowLearnerPreview(true)}
-          className="flex-1 h-12 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 border-2 border-[#4f46e5] text-[#4f46e5] hover:bg-[#4f46e5]/5 transition-all"
-        >
-          <Play className="w-4 h-4" />
-          Preview as Learner
-        </button>
-        <button
-          onClick={async () => {
-            setExporting(true);
-            try {
-              if (isFlipbookPackage) {
-                exportFlipbookHTML(courseTitle, rawOutputs);
-                toast.success("Flipbook HTML exported successfully!");
-              } else {
->>>>>>> f89ff03fe22abb5925ac5214ed5d8190e4851113
                 const hasVoice = !!rawOutputs.voice;
                 await exportScormPackage(courseTitle, rawOutputs, {
                   includeVoice: hasVoice,
                   onProgress: (msg) => toast.info(msg, { duration: 3000 }),
                 });
-<<<<<<< HEAD
                 toast.success(isFlipbook
                   ? "Flipbook HTML package exported successfully!"
                   : hasVoice
@@ -568,26 +530,6 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
             <li>Test with learners and gather feedback</li>
           </ol>
         </div>
-=======
-                toast.success(hasVoice
-                  ? "SCORM package with voice narration exported!"
-                  : "SCORM package exported successfully!");
-              }
-            } catch (err: any) {
-              toast.error(err?.message || "Export failed");
-            } finally {
-              setExporting(false);
-            }
-          }}
-          disabled={exporting}
-          className="flex-1 h-12 rounded-xl text-[15px] font-bold text-primary-foreground flex items-center justify-center gap-2 bg-primary hover:brightness-110 transition-all disabled:opacity-60"
-        >
-          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {exporting
-            ? (isFlipbookPackage ? "Exporting flipbook..." : "Generating audio and exporting...")
-            : (isFlipbookPackage ? "Export Flipbook HTML" : "Export SCORM Package")}
-        </button>
->>>>>>> f89ff03fe22abb5925ac5214ed5d8190e4851113
       </div>
     </div>
   );
