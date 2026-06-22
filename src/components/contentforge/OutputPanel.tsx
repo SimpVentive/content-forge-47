@@ -1,9 +1,8 @@
 ﻿import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
-import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2, AlertCircle, Info } from "lucide-react";
+import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2, AlertCircle, Info, Images } from "lucide-react";
 import { exportScormPackage } from "@/lib/scormExport";
 import { validateCourse, type QAReport } from "@/lib/qaValidator";
-import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { toast } from "sonner";
 import { VoicePreview } from "./VoicePreview";
 import { SlidePreview } from "./SlidePreview";
@@ -59,25 +58,62 @@ function tryParseJSON(raw: string): any | null {
   }
 }
 
-function exportFlipbookHTML(courseTitle: string, rawOutputs: RawAgentOutputs) {
-  let html = rawOutputs.flipbookHTML;
-  if (!html) {
-    const narratives = tryParseJSON(rawOutputs.narrativeScenes || "");
-    if (!Array.isArray(narratives) || narratives.length === 0) {
-      throw new Error("No flipbook scenes found. Regenerate with Image Course selected.");
-    }
-    html = generateFlipbookHTML(narratives, courseTitle, "smooth-slide");
-  }
+type NarrativeImageItem = {
+  topicTitle: string;
+  title: string;
+  caption: string;
+  sceneNumber: number;
+  imageDataUrl?: string;
+};
 
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
+function getNarrativeImageItems(rawOutputs: RawAgentOutputs): NarrativeImageItem[] {
+  const narratives = tryParseJSON(rawOutputs.narrativeScenes || "");
+  if (!Array.isArray(narratives)) return [];
+
+  return narratives.flatMap((narrative: any) =>
+    (Array.isArray(narrative?.scenes) ? narrative.scenes : []).map((scene: any, index: number) => ({
+      topicTitle: String(narrative?.topicTitle || "Topic"),
+      title: String(scene?.title || `Scene ${index + 1}`),
+      caption: String(scene?.caption || ""),
+      sceneNumber: Number(scene?.sceneNumber || index + 1),
+      imageDataUrl: typeof scene?.imageDataUrl === "string" ? scene.imageDataUrl : undefined,
+    }))
+  );
+}
+
+function safeFilename(value: string): string {
+  return (value || "image").replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").substring(0, 80) || "image";
+}
+
+function dataUrlExtension(dataUrl: string): string {
+  const mime = dataUrl.match(/^data:([^;]+);base64,/)?.[1] || "image/png";
+  if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
+  if (mime.includes("webp")) return "webp";
+  return "png";
+}
+
+function downloadDataUrl(dataUrl: string, filename: string) {
   const link = document.createElement("a");
-  link.href = url;
-  link.download = `${courseTitle.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 50) || "course"}_Flipbook.html`;
+  link.href = dataUrl;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+}
+
+async function downloadNarrativeImages(courseTitle: string, rawOutputs: RawAgentOutputs): Promise<number> {
+  const images = getNarrativeImageItems(rawOutputs).filter((item) => item.imageDataUrl);
+  if (images.length === 0) {
+    throw new Error("No generated images found yet. Regenerate with Image Course selected.");
+  }
+
+  images.forEach((item, index) => {
+    const ext = dataUrlExtension(item.imageDataUrl || "");
+    const filename = `${safeFilename(courseTitle)}_${String(index + 1).padStart(2, "0")}_${safeFilename(item.topicTitle)}_scene_${item.sceneNumber}.${ext}`;
+    window.setTimeout(() => downloadDataUrl(item.imageDataUrl || "", filename), index * 150);
+  });
+
+  return images.length;
 }
 
 /* Assessment Renderer */
