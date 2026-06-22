@@ -461,7 +461,6 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       )}
 
-<<<<<<< HEAD
       {/* DEPLOYMENT CHECKLIST PROGRESS */}
       {data.deployment_checklist && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -496,31 +495,11 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               }
               setExporting(true);
               try {
-=======
-      {/* 6. Action Buttons - Preview + Export */}
-      <div className="flex gap-3">
-        <button
-          onClick={() => setShowLearnerPreview(true)}
-          className="flex-1 h-12 rounded-xl text-[15px] font-bold flex items-center justify-center gap-2 border-2 border-[#4f46e5] text-[#4f46e5] hover:bg-[#4f46e5]/5 transition-all"
-        >
-          <Play className="w-4 h-4" />
-          Preview as Learner
-        </button>
-        <button
-          onClick={async () => {
-            setExporting(true);
-            try {
-              if (isFlipbookPackage) {
-                exportFlipbookHTML(courseTitle, rawOutputs);
-                toast.success("Flipbook HTML exported successfully!");
-              } else {
->>>>>>> f89ff03fe22abb5925ac5214ed5d8190e4851113
                 const hasVoice = !!rawOutputs.voice;
                 await exportScormPackage(courseTitle, rawOutputs, {
                   includeVoice: hasVoice,
                   onProgress: (msg) => toast.info(msg, { duration: 3000 }),
                 });
-<<<<<<< HEAD
                 toast.success(isFlipbook
                   ? "Flipbook HTML package exported successfully!"
                   : hasVoice
@@ -559,26 +538,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
             <li>Test with learners and gather feedback</li>
           </ol>
         </div>
-=======
-                toast.success(hasVoice
-                  ? "SCORM package with voice narration exported!"
-                  : "SCORM package exported successfully!");
-              }
-            } catch (err: any) {
-              toast.error(err?.message || "Export failed");
-            } finally {
-              setExporting(false);
-            }
-          }}
-          disabled={exporting}
-          className="flex-1 h-12 rounded-xl text-[15px] font-bold text-primary-foreground flex items-center justify-center gap-2 bg-primary hover:brightness-110 transition-all disabled:opacity-60"
-        >
-          {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-          {exporting
-            ? (isFlipbookPackage ? "Exporting flipbook..." : "Generating audio and exporting...")
-            : (isFlipbookPackage ? "Export Flipbook HTML" : "Export SCORM Package")}
-        </button>
->>>>>>> f89ff03fe22abb5925ac5214ed5d8190e4851113
+
       </div>
     </div>
   );
