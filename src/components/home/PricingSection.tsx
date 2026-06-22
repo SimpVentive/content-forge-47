@@ -107,19 +107,28 @@ export const PricingSection = () => {
   return (
     <section className="bg-slate-50 py-24" id="pricing">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-12 max-w-2xl">
+        <div className="mb-8 max-w-2xl">
           <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
             Pricing
           </span>
           <h2 className="mt-4 text-4xl font-semibold tracking-tight text-slate-900">
-            Create e-learning in minutes
+            Buy credits. Build courses.
           </h2>
           <p className="mt-3 text-slate-600">
-            <span className="font-semibold text-slate-900">1 credit = 1 minute</span> of generated content. No subscriptions. Credits never expire.
+            Pay-as-you-go credits. No subscriptions. Credits never expire.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4" data-testid="pack-grid">
+        <div className="mb-8 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+          <p>
+            <span className="font-semibold">Note:</span> Credits are consumed based on actual generation usage —
+            AI tokens, image renders, voice minutes — not by a fixed output length. The figures below are realistic
+            estimates of what a pack typically produces; your mileage may vary with depth, language, and media choices.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3" data-testid="pack-grid">
           {PACKS.map((pack) => {
             const isHighlight = pack.tag === "Best value";
             return (
@@ -135,14 +144,37 @@ export const PricingSection = () => {
                     {pack.tag}
                   </span>
                 )}
-                <div className="mb-6">
-                  <div className="text-sm font-medium text-slate-500">{pack.credits} Credits</div>
-                  <div className="mt-2 flex items-baseline gap-1">
+                <div className="mb-5">
+                  <div className="text-sm font-semibold text-indigo-600">{pack.name}</div>
+                  <div className="mt-1 text-sm font-medium text-slate-500">{pack.credits.toLocaleString("en-IN")} credits</div>
+                  <div className="mt-3 flex items-baseline gap-2">
                     <span className="text-4xl font-semibold tracking-tight text-slate-900">
-                      ₹{pack.price.toLocaleString("en-IN")}
+                      ₹{pack.priceInr.toLocaleString("en-IN")}
                     </span>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">₹{pack.perCredit} / credit</div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    ₹{pack.perCredit.toFixed(2)} / credit
+                  </div>
+                </div>
+
+                <p className="mb-4 text-sm text-slate-600">{pack.blurb}</p>
+
+                <div className="mb-6 space-y-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Roughly enough for
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ImageIcon className="h-3.5 w-3.5 text-indigo-500" />
+                    <span>{pack.includes.image}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-3.5 w-3.5 text-indigo-500" />
+                    <span>{pack.includes.elearning}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Video className="h-3.5 w-3.5 text-indigo-500" />
+                    <span>{pack.includes.video}</span>
+                  </div>
                 </div>
 
                 <button
@@ -166,6 +198,7 @@ export const PricingSection = () => {
             );
           })}
         </div>
+
 
         <div className="mt-14 grid grid-cols-1 gap-4 rounded-2xl border border-slate-200 bg-white p-6 md:grid-cols-3">
           <div className="flex items-center gap-3">
