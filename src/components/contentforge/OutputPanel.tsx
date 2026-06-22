@@ -1,9 +1,8 @@
 ﻿import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
-import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2, AlertCircle, Info } from "lucide-react";
+import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2, AlertCircle, Info, Images } from "lucide-react";
 import { exportScormPackage } from "@/lib/scormExport";
 import { validateCourse, type QAReport } from "@/lib/qaValidator";
-import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { toast } from "sonner";
 import { VoicePreview } from "./VoicePreview";
 import { SlidePreview } from "./SlidePreview";
@@ -59,25 +58,62 @@ function tryParseJSON(raw: string): any | null {
   }
 }
 
-function exportFlipbookHTML(courseTitle: string, rawOutputs: RawAgentOutputs) {
-  let html = rawOutputs.flipbookHTML;
-  if (!html) {
-    const narratives = tryParseJSON(rawOutputs.narrativeScenes || "");
-    if (!Array.isArray(narratives) || narratives.length === 0) {
-      throw new Error("No flipbook scenes found. Regenerate with Image Course selected.");
-    }
-    html = generateFlipbookHTML(narratives, courseTitle, "smooth-slide");
-  }
+type NarrativeImageItem = {
+  topicTitle: string;
+  title: string;
+  caption: string;
+  sceneNumber: number;
+  imageDataUrl?: string;
+};
 
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
+function getNarrativeImageItems(rawOutputs: RawAgentOutputs): NarrativeImageItem[] {
+  const narratives = tryParseJSON(rawOutputs.narrativeScenes || "");
+  if (!Array.isArray(narratives)) return [];
+
+  return narratives.flatMap((narrative: any) =>
+    (Array.isArray(narrative?.scenes) ? narrative.scenes : []).map((scene: any, index: number) => ({
+      topicTitle: String(narrative?.topicTitle || "Topic"),
+      title: String(scene?.title || `Scene ${index + 1}`),
+      caption: String(scene?.caption || ""),
+      sceneNumber: Number(scene?.sceneNumber || index + 1),
+      imageDataUrl: typeof scene?.imageDataUrl === "string" ? scene.imageDataUrl : undefined,
+    }))
+  );
+}
+
+function safeFilename(value: string): string {
+  return (value || "image").replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").substring(0, 80) || "image";
+}
+
+function dataUrlExtension(dataUrl: string): string {
+  const mime = dataUrl.match(/^data:([^;]+);base64,/)?.[1] || "image/png";
+  if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
+  if (mime.includes("webp")) return "webp";
+  return "png";
+}
+
+function downloadDataUrl(dataUrl: string, filename: string) {
   const link = document.createElement("a");
-  link.href = url;
-  link.download = `${courseTitle.replace(/[^a-zA-Z0-9_-]/g, "_").substring(0, 50) || "course"}_Flipbook.html`;
+  link.href = dataUrl;
+  link.download = filename;
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+}
+
+async function downloadNarrativeImages(courseTitle: string, rawOutputs: RawAgentOutputs): Promise<number> {
+  const images = getNarrativeImageItems(rawOutputs).filter((item) => item.imageDataUrl);
+  if (images.length === 0) {
+    throw new Error("No generated images found yet. Regenerate with Image Course selected.");
+  }
+
+  images.forEach((item, index) => {
+    const ext = dataUrlExtension(item.imageDataUrl || "");
+    const filename = `${safeFilename(courseTitle)}_${String(index + 1).padStart(2, "0")}_${safeFilename(item.topicTitle)}_scene_${item.sceneNumber}.${ext}`;
+    window.setTimeout(() => downloadDataUrl(item.imageDataUrl || "", filename), index * 150);
+  });
+
+  return images.length;
 }
 
 /* Assessment Renderer */
@@ -172,13 +208,14 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; avatarTrainerId?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; learnerNotesEnabled?: boolean; resourcesPanelEnabled?: boolean; glossaryEnabled?: boolean; discussionEnabled?: boolean; assessmentIntensity?: "light" | "standard" | "deep"; flipStylePreference?: "dramatic" | "subtle" | "bound"; textLanguage?: string; narratorLanguage?: string; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
+  const narrativeImages = getNarrativeImageItems(rawOutputs);
+  const hasNarrativeImages = narrativeImages.length > 0;
+  const isImageSeries = hasNarrativeImages || meta?.output_format === "Image Series" || meta?.package_type === "Image Series";
   const [checklist, setChecklist] = useState<boolean[]>(
     new Array((data?.deployment_checklist || []).length).fill(false)
   );
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [exporting, setExporting] = useState(false);
-
-  if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
   const isFlipbook = !!data?.flipbook_assets;
   const checklistComplete = checklist.filter(Boolean).length === checklist.length;
@@ -198,6 +235,8 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
     };
     runQA();
   }, [raw, archRaw, visualRaw]);
+
+  if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -320,10 +359,10 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               </h2>
             </div>
             <p className={`text-[14px] ${qaReport?.passed || approvedByAdmin ? "text-emerald-800" : "text-amber-800"}`}>
-              Your {isFlipbook ? "flipbook" : "course"} package {qaReport?.passed || approvedByAdmin ? "is complete and ready to download." : "has quality issues - please review or approve to continue."}
+              Your {isImageSeries ? "image series" : isFlipbook ? "flipbook" : "course package"} {qaReport?.passed || approvedByAdmin ? "is complete and ready to download." : "has quality issues - please review or approve to continue."}
             </p>
           </div>
-          <div className="text-[28px]">{qaReport?.passed || approvedByAdmin ? "📦" : "🔍"}</div>
+          <div className="text-[28px]">{qaReport?.passed || approvedByAdmin ? (isImageSeries ? "🖼️" : "📦") : "🔍"}</div>
         </div>
       </div>
 
@@ -335,7 +374,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
       {/* 2. Metadata */}
       <div>
         <h3 className="text-[18px] font-extrabold text-foreground mb-4">
-          {meta.title || (isFlipbook ? "Flipbook Package" : "Course Package")}
+          {meta.title || (isImageSeries ? "Image Series" : isFlipbook ? "Flipbook Package" : "Course Package")}
         </h3>
         <div className="grid grid-cols-2 gap-3">
           {[
@@ -353,8 +392,27 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         </div>
       </div>
 
-      {/* 3. Flipbook Assets OR SCORM Manifest */}
-      {data.flipbook_assets ? (
+      {/* 3. Image Series OR package manifest */}
+      {hasNarrativeImages ? (
+        <div>
+          <h3 className="text-[15px] font-bold text-foreground mb-2">Generated Image Series</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {narrativeImages.map((item, index) => (
+              <div key={`${item.topicTitle}-${item.sceneNumber}-${index}`} className="bg-secondary/50 rounded-xl overflow-hidden border border-border/60">
+                {item.imageDataUrl ? (
+                  <img src={item.imageDataUrl} alt={item.caption || item.title} className="w-full aspect-video object-cover" />
+                ) : (
+                  <div className="w-full aspect-video flex items-center justify-center bg-secondary text-[12px] text-muted-foreground">Image pending</div>
+                )}
+                <div className="p-3 space-y-1">
+                  <p className="text-[12px] font-bold text-foreground">{String(index + 1).padStart(2, "0")}. {item.title}</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">{item.caption}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : data.flipbook_assets ? (
         <div>
           <h3 className="text-[15px] font-bold text-foreground mb-2">Flipbook Assets</h3>
           <div className="bg-secondary/50 rounded-xl p-3 space-y-3">
@@ -487,14 +545,19 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               }
               setExporting(true);
               try {
-                const hasVoice = !!rawOutputs.voice;
-                await exportScormPackage(courseTitle, rawOutputs, {
-                  includeVoice: hasVoice,
-                  onProgress: (msg) => toast.info(msg, { duration: 3000 }),
-                });
-                toast.success(hasVoice
-                  ? "SCORM package with voice narration exported!"
-                  : "SCORM package exported successfully!");
+                if (isImageSeries) {
+                  const count = await downloadNarrativeImages(courseTitle, rawOutputs);
+                  toast.success(`${count} image${count === 1 ? "" : "s"} downloaded`);
+                } else {
+                  const hasVoice = !!rawOutputs.voice;
+                  await exportScormPackage(courseTitle, rawOutputs, {
+                    includeVoice: hasVoice,
+                    onProgress: (msg) => toast.info(msg, { duration: 3000 }),
+                  });
+                  toast.success(hasVoice
+                    ? "SCORM package with voice narration exported!"
+                    : "SCORM package exported successfully!");
+                }
               } catch (err: any) {
                 toast.error(err?.message || "Export failed");
               } finally {
@@ -511,8 +574,8 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               </>
             ) : (
               <>
-                <Download className="w-5 h-5" />
-                Export Package
+                {isImageSeries ? <Images className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                {isImageSeries ? "Download Images" : "Export Package"}
               </>
 
             )}
@@ -523,11 +586,20 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
           <p className="text-[13px] font-bold text-amber-900 mb-2">📋 Next Steps:</p>
           <ol className="text-[12px] text-amber-800 space-y-1 list-decimal list-inside">
-            <li>Review the deployment checklist above</li>
-            <li>Click "Export Package" to download</li>
-            <li>Import SCORM package to your LMS</li>
-
-            <li>Test with learners and gather feedback</li>
+            {isImageSeries ? (
+              <>
+                <li>Review the image sequence above</li>
+                <li>Click "Download Images" to save the generated series</li>
+                <li>Use the images directly in your document, deck, or training flow</li>
+              </>
+            ) : (
+              <>
+                <li>Review the deployment checklist above</li>
+                <li>Click "Export Package" to download</li>
+                <li>Import SCORM package to your LMS</li>
+                <li>Test with learners and gather feedback</li>
+              </>
+            )}
           </ol>
         </div>
       </div>
@@ -616,6 +688,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
   const [scriptDialogDraft, setScriptDialogDraft] = useState("");
   const prevIsRunningRef = React.useRef<boolean>(Boolean(isRunning));
   const hasOutput = Object.values(rawOutputs).some(v => v);
+  const isImageSeriesOutput = getNarrativeImageItems(rawOutputs).length > 0;
   const content = (activeTab === "preview" || activeTab === "videos") ? null : outputData[activeTab as keyof OutputData];
   const canEditTab = activeTab === "outline" || activeTab === "script" || activeTab === "assessment" || activeTab === "package";
 
@@ -697,11 +770,11 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
         return (
           <div className="flex flex-col items-center justify-center h-full text-center px-6">
             <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mb-4">
-              <Package className="w-8 h-8 text-amber-600" />
+              {isImageSeriesOutput ? <Images className="w-8 h-8 text-amber-600" /> : <Package className="w-8 h-8 text-amber-600" />}
             </div>
-            <h3 className="text-[16px] font-extrabold text-foreground mb-2">Package Not Ready Yet</h3>
+            <h3 className="text-[16px] font-extrabold text-foreground mb-2">{isImageSeriesOutput ? "Images Not Ready Yet" : "Package Not Ready Yet"}</h3>
             <p className="text-[13px] text-muted-foreground leading-relaxed max-w-[320px]">
-              You haven't inserted videos into your course yet. Once you complete the video placement, you can generate and export the SCORM package.
+              {isImageSeriesOutput ? "Run the image course pipeline to generate the visual sequence." : "You haven't inserted videos into your course yet. Once you complete the video placement, you can generate and export the SCORM package."}
             </p>
             <div className="mt-4 flex flex-col gap-2 items-center">
               <span className="text-[11px] text-muted-foreground">Steps to complete:</span>
@@ -715,7 +788,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
               </div>
               <div className="flex items-center gap-2 text-[12px] font-semibold text-foreground">
                 <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-[10px]">3</span>
-                Export SCORM package
+                {isImageSeriesOutput ? "Download images" : "Export SCORM package"}
               </div>
             </div>
           </div>
@@ -841,9 +914,9 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           <div className="relative w-[420px] max-w-[92vw] rounded-2xl bg-card shadow-2xl overflow-hidden animate-fade-in">
             <div className="h-1.5 w-full bg-primary" />
             <div className="px-7 pt-7 pb-6">
-              <h2 className="text-[18px] font-bold text-foreground mb-2">Package Ready</h2>
+              <h2 className="text-[18px] font-bold text-foreground mb-2">{isImageSeriesOutput ? "Images Ready" : "Package Ready"}</h2>
               <p className="text-[14px] text-foreground/80 mb-6">
-                Would you like to generate the downloadable package now?
+                {isImageSeriesOutput ? "Would you like to view the generated image series now?" : "Would you like to generate the downloadable package now?"}
               </p>
               <div className="flex gap-3 justify-end">
                 <button
@@ -859,7 +932,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                   }}
                   className="px-5 h-10 rounded-xl text-[13px] font-semibold bg-primary text-primary-foreground hover:brightness-110 transition-all"
                 >
-                  Yes, Generate Package
+                  {isImageSeriesOutput ? "Yes, View Images" : "Yes, Generate Package"}
                 </button>
               </div>
             </div>
@@ -1047,8 +1120,8 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                       : "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5)",
                 }}
               >
-                <tab.icon className="w-3 h-3" />
-                {tab.label}
+                {isImageSeriesOutput && tab.key === "package" ? <Images className="w-3 h-3" /> : <tab.icon className="w-3 h-3" />}
+                {isImageSeriesOutput && tab.key === "package" ? "Images" : tab.label}
               </button>
             );
           })}

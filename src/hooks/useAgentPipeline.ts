@@ -5,7 +5,6 @@ import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
 import { buildNarrativeScenePrompt, buildImageGenerationPrompts, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { logApiUsage } from "@/lib/edgeFunctions";
-import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -1555,11 +1554,9 @@ OUTPUT FORMAT — ABSOLUTE:
       // ──── AGENT 9: Final Assembly ────
       if (toggles["assembly"] !== false) {
         setStatus("assembly", "running");
-        addLog("Final Assembly: Packaging all outputs...");
+        addLog(learningMode === "image_based_learning" ? "Final Assembly: Preparing image series..." : "Final Assembly: Packaging all outputs...");
         console.log("🔍 Assembly Agent learningMode:", learningMode);
         if (learningMode === "image_based_learning") {
-          const displayStyle = params?.flipbookDisplayStyle || "smooth-slide";
-          const flipbookHtml = generateFlipbookHTML(narrativeScenes, courseTitle, displayStyle);
           const archParsed = tryParseJson(archResult) || {};
           const modules = archParsed.modules || archParsed.course_structure?.modules || archParsed.course_modules || [];
           const totalTopics = Array.isArray(modules)
@@ -1569,30 +1566,30 @@ OUTPUT FORMAT — ABSOLUTE:
           const assemblyResult = JSON.stringify({
             metadata: {
               title: courseTitle,
-              package_type: "Interactive Flipbook",
-              output_format: "HTML Flipbook",
+              package_type: "Image Series",
+              output_format: "Generated Images",
               total_modules: Array.isArray(modules) ? modules.length : "-",
               total_topics: totalTopics || narrativeScenes.length,
               total_scenes: sceneCount,
               estimated_completion_time: params?.duration || "-",
               difficulty_level: params?.level || "intermediate",
             },
-            flipbook_manifest: {
-              assets: [
-                "index.html",
-                `${sceneCount} embedded scene images`,
-                "interactive navigation controls",
-                "captions and topic indicators",
-              ],
-              display_style: displayStyle,
+            image_series: {
+              assets: narrativeScenes.flatMap((narrative) =>
+                narrative.scenes.map((scene) => ({
+                  topic: narrative.topicTitle,
+                  scene: scene.sceneNumber,
+                  title: scene.title,
+                  caption: scene.caption,
+                  generated: Boolean(scene.imageDataUrl),
+                }))
+              ),
             },
             deployment_checklist: [
-              "Download the HTML flipbook package.",
-              "Open index.html in a browser to verify all scene images load.",
+              "Review the generated image sequence.",
+              "Download the individual scene images.",
               "Check captions and topic sequence against the source material.",
-              "Upload the HTML file to your LMS or content portal as web content.",
-              "Confirm keyboard navigation works for learners.",
-              "Verify the flipbook on desktop and mobile screens.",
+              "Use the images directly in your document, deck, or training flow.",
             ],
             qa_summary: {
               agents_completed: ["Outline Agent", "Script Agent", "Visual Plan Agent", "Visual Narrative Agent", "Quality Review Agent", "Final Assembly Agent"],
@@ -1602,9 +1599,9 @@ OUTPUT FORMAT — ABSOLUTE:
           }, null, 2);
 
           setStatus("assembly", "complete");
-          setRawOutputs((prev) => ({ ...prev, assembly: assemblyResult, narrativeScenes: JSON.stringify(narrativeScenes), flipbookHTML: flipbookHtml }));
+          setRawOutputs((prev) => ({ ...prev, assembly: assemblyResult, narrativeScenes: JSON.stringify(narrativeScenes), flipbookHTML: "" }));
           setOutputData((prev) => ({ ...prev, package: assemblyResult }));
-          addLog("Final Assembly: Complete. Interactive flipbook package ready.");
+          addLog("Final Assembly: Complete. Image series ready.");
           addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
         } else {
         const modeInstructions = getAgentModeInstructions("assembly", learningMode);
