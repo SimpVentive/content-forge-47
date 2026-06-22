@@ -357,6 +357,20 @@ const Index = () => {
 
     const availableCredits = (profile?.credits_total ?? 0) - (profile?.credits_used ?? 0);
 
+    // Admins skip the deduction but still see the estimate first.
+    if (isAdmin) {
+      setShowCreditConfirmation(false);
+      setCreditEstimate(null);
+      setPendingParams(null);
+      runPipeline(courseTitle, inputText, agentToggles, {
+        ...params,
+        learningMode: pipelineLearningMode,
+        videoSettings: effectiveVideoSettings,
+      });
+      toast.success("Admin run — credits not deducted");
+      return;
+    }
+
     if (estimated > availableCredits) {
       setShowCreditConfirmation(false);
       setRequiredCredits(estimated);
@@ -370,7 +384,6 @@ const Index = () => {
       setShowCreditConfirmation(false);
       setCreditEstimate(null);
       setPendingParams(null);
-      console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
         learningMode: pipelineLearningMode,
