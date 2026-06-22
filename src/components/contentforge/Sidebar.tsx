@@ -129,9 +129,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
     }
 
-    // Show title confirmation if title is still default or empty
-    setSuggestedTitle(detectedTitle);
-    setShowTitleConfirm(true);
+    // Auto-apply title if empty; only ask when overwriting an existing different title
+    if (!courseTitle.trim()) {
+      setCourseTitle(detectedTitle);
+    } else if (courseTitle.trim().toLowerCase() !== detectedTitle.toLowerCase()) {
+      setSuggestedTitle(detectedTitle);
+      setShowTitleConfirm(true);
+    }
   };
 
   const handleConfirmTitle = (useDetected: boolean) => {
@@ -261,7 +265,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             onClick={onGenerate}
             type="button"
-            disabled={!courseTitle.trim() || !inputText.trim() || isExtracting || showTitleConfirm}
+            disabled={!courseTitle.trim() || !inputText.trim() || isExtracting}
             className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] hover:-translate-y-0.5 active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             style={{ background: '#2563EB' }}
           >
@@ -269,11 +273,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <>
                 <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 Extracting...
-              </>
-            ) : showTitleConfirm ? (
-              <>
-                <X className="w-4 h-4" />
-                Confirm Title Choice
               </>
             ) : (
               <>
