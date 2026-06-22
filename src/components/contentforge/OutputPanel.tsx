@@ -217,8 +217,6 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [exporting, setExporting] = useState(false);
 
-  if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
-
   const isFlipbook = !!data?.flipbook_assets;
   const checklistComplete = checklist.filter(Boolean).length === checklist.length;
   const [qaReport, setQaReport] = useState<QAReport | null>(null);
@@ -237,6 +235,8 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
     };
     runQA();
   }, [raw, archRaw, visualRaw]);
+
+  if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
   return (
     <div className="space-y-6 animate-fade-in">
