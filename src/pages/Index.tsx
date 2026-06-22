@@ -326,37 +326,9 @@ const Index = () => {
       }
     }
 
-    // Admins bypass credit checks (for internal testing)
-    if (isAdmin) {
-      const pipelineLearningMode = params.learningType === "video"
-        ? "video_learning"
-        : params.learningType === "image"
-          ? "image_based_learning"
-          : "static_elearning";
-
-      const effectiveVideoSettings =
-        params.learningType === "video"
-          ? {
-              selectedAvatar: params.avatarTrainerId || "rachel",
-              videoQuality: params.videoQuality,
-              backgroundStyle: params.backgroundStyle,
-            }
-          : undefined;
-
-      console.log("Running pipeline with learningMode:", pipelineLearningMode, "params.learningType:", params.learningType);
-      runPipeline(courseTitle, inputText, agentToggles, {
-        ...params,
-        learningMode: pipelineLearningMode,
-        videoSettings: effectiveVideoSettings,
-      });
-      toast.success("Admin run — credits not deducted");
-      return;
-    }
-
     // Estimate credits based on learning type and requirement text
+    // (Shown to everyone — admins still see the estimate, but deduction is skipped on confirm.)
     const estimate = estimateCredits(inputText, params.learningType);
-
-    // Show confirmation modal
     setCreditEstimate(estimate);
     setPendingParams(params);
     setShowCreditConfirmation(true);
