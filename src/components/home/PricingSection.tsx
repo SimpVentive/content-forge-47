@@ -119,7 +119,7 @@ export const PricingSection = () => {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-3" data-testid="pack-grid">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4" data-testid="pack-grid">
 
           {PACKS.map((pack) => {
             const isHighlight = pack.tag === "Best value";
