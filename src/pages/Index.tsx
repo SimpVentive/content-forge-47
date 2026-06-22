@@ -251,6 +251,8 @@ const Index = () => {
   };
 
   const handleGenerateClick = () => {
+    if (isStartingGeneration || isRunning) return;
+
     if (!courseTitle.trim()) {
       const fallbackTitle = `Untitled Course ${new Date().toLocaleDateString()}`;
       setCourseTitle(fallbackTitle);
@@ -315,22 +317,38 @@ const Index = () => {
   };
 
   const handleParamsConfirm = async (params: CourseParameters) => {
+    if (isStartingGeneration || isRunning) return;
+
+    const effectiveTitle = courseTitle.trim() || `Untitled Course ${new Date().toLocaleDateString()}`;
+    const effectiveInputText = inputText.trim() || "Create a concise training course from the uploaded file name and available context.";
+
+    if (effectiveTitle !== courseTitle) setCourseTitle(effectiveTitle);
+    if (effectiveInputText !== inputText) setInputText(effectiveInputText);
+
+    setIsStartingGeneration(true);
     setCourseParams(params);
     setShowParamsDialog(false);
 
+    const nextAgentToggles = { ...agentToggles };
+
     // Update agent toggles based on assessment requirement and learning type
     if (!params.assessmentRequired) {
+      nextAgentToggles.assessment = false;
       setAgentToggles((prev) => ({ ...prev, assessment: false }));
     } else {
+      nextAgentToggles.assessment = true;
       setAgentToggles((prev) => ({ ...prev, assessment: true }));
     }
 
     // Re-sync agent toggles based on confirmed learning type
     if (params.learningType === "video") {
+      Object.assign(nextAgentToggles, { animation: false, youtube: false, compliance: false, heygen: true, "visual-narrative": false });
       setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: true, "visual-narrative": false }));
     } else if (params.learningType === "image") {
+      Object.assign(nextAgentToggles, { animation: false, youtube: false, compliance: false, heygen: false, "visual-narrative": true });
       setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: false, "visual-narrative": true }));
     } else {
+      Object.assign(nextAgentToggles, { animation: true, youtube: true, compliance: true, heygen: false, "visual-narrative": false });
       setAgentToggles((prev) => ({ ...prev, animation: true, youtube: true, compliance: true, heygen: false, "visual-narrative": false }));
     }
 
