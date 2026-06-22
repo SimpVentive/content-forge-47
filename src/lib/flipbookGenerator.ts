@@ -52,8 +52,6 @@ export function generateFlipbookHTML(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(courseTitle)} - Professional Flipbook</title>
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/turn.js@4/turn.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -120,9 +118,13 @@ export function generateFlipbookHTML(
       width: 100%;
       height: 100%;
       background: white;
-      display: flex;
+      display: none;
       flex-direction: column;
       overflow: hidden;
+    }
+
+    #flipbook .page:first-child {
+      display: flex;
     }
 
     .page-inner {
@@ -165,15 +167,16 @@ export function generateFlipbookHTML(
     }
 
     .page-text {
-      font-size: 13px;
-      line-height: 1.5;
-      color: #666;
+      font-size: 16px;
+      line-height: 1.6;
+      color: #333;
       text-align: center;
       flex-shrink: 0;
       margin-top: auto;
-      padding-top: 10px;
-      border-top: 1px solid #e0e0e0;
+      padding-top: 15px;
+      border-top: 2px solid #e0e0e0;
       width: 100%;
+      font-weight: 500;
     }
 
     .page-number {
@@ -320,66 +323,73 @@ export function generateFlipbookHTML(
   </div>
 
   <script>
-    $(function() {
-      const totalPages = ${pages.length};
+    let currentPage = 1;
+    const totalPages = ${pages.length};
 
-      // Initialize turn.js flipbook
-      $('#flipbook').turn({
-        width: 960,
-        height: 600,
-        autoCenter: true,
-        display: 'double',
-        acceleration: true,
-        gradients: true,
-        elevation: 50,
-        pages: totalPages,
-        when: {
-          turning: function(event, page, view) {
-            $('#currentPage').text(page);
-          }
-        }
-      });
+    function showPage(pageNum) {
+      // Hide all pages
+      document.querySelectorAll('#flipbook .page').forEach(p => p.style.display = 'none');
 
-      // Navigation
-      $('#prevBtn').click(() => {
-        $('#flipbook').turn('previous');
-      });
+      // Show current page
+      const pages = document.querySelectorAll('#flipbook .page');
+      if (pages[pageNum - 1]) {
+        pages[pageNum - 1].style.display = 'flex';
+      }
 
-      $('#nextBtn').click(() => {
-        $('#flipbook').turn('next');
-      });
+      // Update page counter
+      document.getElementById('currentPage').textContent = pageNum;
 
-      // Disable prev button on first page
-      $('#flipbook').on('turning', function(event, page, view) {
-        $('#prevBtn').prop('disabled', page <= 1);
-        $('#nextBtn').prop('disabled', page >= totalPages);
+      // Update button states
+      document.getElementById('prevBtn').disabled = pageNum <= 1;
+      document.getElementById('nextBtn').disabled = pageNum >= totalPages;
+    }
+
+    function nextPage() {
+      if (currentPage < totalPages) {
+        currentPage++;
+        showPage(currentPage);
+      }
+    }
+
+    function prevPage() {
+      if (currentPage > 1) {
+        currentPage--;
+        showPage(currentPage);
+      }
+    }
+
+    // Initialize on load
+    window.addEventListener('DOMContentLoaded', () => {
+      showPage(1);
+
+      // Button events
+      document.getElementById('prevBtn').addEventListener('click', prevPage);
+      document.getElementById('nextBtn').addEventListener('click', nextPage);
+
+      // Keyboard navigation
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowLeft') prevPage();
+        if (e.key === 'ArrowRight') nextPage();
       });
 
       // Fullscreen
-      $('#fullscreenBtn').click(() => {
+      document.getElementById('fullscreenBtn').addEventListener('click', () => {
         const elem = document.getElementById('flipbook');
         if (elem.requestFullscreen) {
-          elem.requestFullscreen();
+          elem.requestFullscreen().catch(err => console.log('Fullscreen error:', err));
         } else if (elem.mozRequestFullScreen) {
           elem.mozRequestFullScreen();
         } else if (elem.webkitRequestFullscreen) {
           elem.webkitRequestFullscreen();
+        } else if (elem.msRequestFullscreen) {
+          elem.msRequestFullscreen();
         }
       });
 
       // Print
-      $('#printBtn').click(() => {
+      document.getElementById('printBtn').addEventListener('click', () => {
         window.print();
       });
-
-      // Keyboard navigation
-      $(document).keydown(e => {
-        if (e.key === 'ArrowLeft') $('#flipbook').turn('previous');
-        if (e.key === 'ArrowRight') $('#flipbook').turn('next');
-      });
-
-      // Initialize buttons
-      $('#prevBtn').prop('disabled', true);
     });
   </script>
 </body>
