@@ -83,17 +83,17 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
   return (
     <div className="w-full bg-white rounded-xl shadow-lg overflow-hidden">
       {/* Flipbook Container */}
-      <div className="relative bg-gradient-to-b from-white to-gray-50 aspect-video flex flex-col">
+      <div className="relative bg-gradient-to-b from-white to-gray-50 flex flex-col">
         {/* Scene Display */}
-        <div className="flex-1 overflow-hidden flex items-center justify-center bg-black/5 relative">
+        <div className="overflow-hidden flex items-center justify-center bg-black/5 relative max-h-[70vh]">
           {currentScene.imageDataUrl ? (
             <img
               src={currentScene.imageDataUrl}
               alt={currentScene.caption}
-              className={`w-full h-full object-cover ${transitionClass} ${isTransitioning ? "opacity-75" : "opacity-100"}`}
+              className={`w-full h-auto max-h-[70vh] object-contain ${transitionClass} ${isTransitioning ? "opacity-75" : "opacity-100"}`}
             />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
+            <div className="w-full aspect-video bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
               <div className="text-center">
                 <div className="w-16 h-16 bg-white/30 rounded-full mx-auto mb-4 flex items-center justify-center">
                   <div className="w-12 h-12 border-3 border-white/50 border-t-white rounded-full animate-spin" />
@@ -104,8 +104,8 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
           )}
         </div>
 
-        {/* Caption Area (Comic-style text) */}
-        <div className="bg-white border-t-2 border-gray-200 px-6 py-4 min-h-20">
+        {/* Caption Area (Comic-style text) — directly under the image */}
+        <div className="bg-white border-t-2 border-gray-200 px-6 py-4">
           <div className="space-y-2">
             <h3 className="text-sm font-bold text-gray-900">{currentScene.title}</h3>
             <p className="text-[15px] leading-relaxed text-gray-700">{currentScene.caption}</p>
