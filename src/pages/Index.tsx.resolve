@@ -1,0 +1,15 @@
+    // Estimate credits based on learning type and requirement text
+    // (Shown to everyone — admins still see the estimate, but deduction is skipped on confirm.)
+    try {
+      const estimate = estimateCredits(inputText, params.learningType);
+      console.log("Credit estimate calculated:", estimate);
+
+      // Show confirmation modal
+      setCreditEstimate(estimate);
+      setPendingParams(params);
+      setShowCreditConfirmation(true);
+      console.log("Credit confirmation modal opened");
+    } catch (err) {
+      console.error("Credit estimation failed:", err);
+      toast.error(`Credit estimation failed: ${err instanceof Error ? err.message : "Unknown error"}`);
+    }

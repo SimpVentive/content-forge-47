@@ -8,6 +8,7 @@ import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { logApiUsage } from "@/lib/edgeFunctions";
 import { generateNarrationAudio, getVoiceIdForLanguage } from "@/lib/narrationAudioService";
 import { runFinalQACheck, storeQAAuditLog, type QAResult } from "@/lib/qaService";
+import { enhanceScriptGenerationPrompt, enhanceAssessmentGenerationPrompt, type AuditLogEntry } from "@/lib/feedbackIntegrationService";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -570,6 +571,34 @@ async function callClaudeWithRetry(systemPrompt: string, userMessage: string, ad
   }
 }
 
+/**
+ * Fetch QA audit logs from Supabase to drive learning feedback
+ */
+async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
+  try {
+    const { data, error } = await supabase
+      .from("audit_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error) {
+      console.warn("Failed to fetch audit logs:", error);
+      return [];
+    }
+
+    return (data || []).map((log: any) => ({
+      domain: log.domain || "general",
+      issuesFound: log.issues_found || [],
+      correctionsApplied: log.corrections_applied || [],
+      wasAccepted: log.was_accepted || false,
+    }));
+  } catch (err) {
+    console.warn("Error fetching audit logs:", err);
+    return [];
+  }
+}
+
 export function useAgentPipeline() {
   const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>(initialStatuses());
   const [outputData, setOutputData] = useState<OutputData>(initialOutput());
@@ -681,6 +710,14 @@ export function useAgentPipeline() {
     const languageDirective = buildLanguageDirective(textLanguage, narratorLanguage);
     const languageDirectiveTail = buildLanguageDirectiveTail(textLanguage, narratorLanguage);
     const userLanguageReminder = buildUserLanguageReminder(textLanguage, narratorLanguage);
+
+    // Fetch audit logs for learning feedback integration
+    let auditLogs: AuditLogEntry[] = [];
+    try {
+      auditLogs = await fetchAuditLogs();
+    } catch (err) {
+      console.warn("Warning: Could not fetch audit logs for learning feedback", err);
+    }
 
     // Wrapper that sandwiches language instructions around every agent call.
     // Head directive is already baked into each systemPrompt template (${languageDirective});
@@ -810,8 +847,11 @@ export function useAgentPipeline() {
         addLog("Content Architect: Receiving research output...");
         try {
           const modeInstructions = getAgentModeInstructions("architect", learningMode);
+          const baseArchitectPrompt = `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. LANGUAGE REQUIREMENT: Write ALL module_title, topic_title, module_promise, why_it_matters, outcome_statement, course_promise, and every other text field in ${textLanguage}. Do NOT use English if ${textLanguage} is not English. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. The sum of all module estimated_minutes must land within +/- ${durationToleranceMinutes} minutes of ${durationMinutes}. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`;
+          const enhancedArchitectPrompt = enhanceScriptGenerationPrompt(baseArchitectPrompt, courseTitle, auditLogs).enhancedPrompt;
+
           archResult = await runAgentWithLanguage(
-            `${languageDirective}You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. LANGUAGE REQUIREMENT: Write ALL module_title, topic_title, module_promise, why_it_matters, outcome_statement, course_promise, and every other text field in ${textLanguage}. Do NOT use English if ${textLanguage} is not English. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. The sum of all module estimated_minutes must land within +/- ${durationToleranceMinutes} minutes of ${durationMinutes}. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`,
+            `${languageDirective}${enhancedArchitectPrompt}`,
             `Research Output:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nCourse Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nRecommended Structure: ${structureGuidance}\nSophistication Requirement: ${sophisticationGuidance}\nInstructional Pattern Guidance: ${instructionalPatternGuidance}\n\nBuild the course structure strictly from the above content, scaled to fit the target duration. Make modules feel like meaningful chapters with different jobs to do, and make topics feel teachable, scenario-ready, and presentation-worthy.`,
             addLog, "Content Architect", 45000
           );
@@ -857,7 +897,7 @@ export function useAgentPipeline() {
         const targetWordsPerTopic = Math.max(110, Math.ceil(targetNarrationWords / totalTopics));
         const wordsPerTopicRange = `${Math.max(110, Math.floor(targetWordsPerTopic * 0.9))}-${Math.ceil(targetWordsPerTopic * 1.15)}`;
 
-        const writerSystemPrompt = `${languageDirective}You are an elite instructional writer who specialises in premium corporate eLearning that people actually enjoy. Your writing style is conversational, direct, vivid, and smart — like a brilliant colleague explaining something important over coffee, not a textbook.
+        const baseWriterSystemPrompt = `You are an elite instructional writer who specialises in premium corporate eLearning that people actually enjoy. Your writing style is conversational, direct, vivid, and smart — like a brilliant colleague explaining something important over coffee, not a textbook.
 
 LANGUAGE REQUIREMENT — THIS OVERRIDES EVERYTHING ELSE:
 - Write ALL on-screen text (topic titles, headings, body copy, examples, scenarios, takeaways, challenges, labels, bullet points) in ${textLanguage}.
@@ -865,7 +905,7 @@ LANGUAGE REQUIREMENT — THIS OVERRIDES EVERYTHING ELSE:
 - Do NOT mix languages within a single field. Every single word of on-screen content must be in ${textLanguage}.
 - If ${textLanguage} is not English, do not include any English fallback text.
 
-CRITICAL: You are writing ONE MODULE of a ${params?.duration || "15min"} course. You MUST write substantial, detailed content.
+CRITICAL: You are writing ONE MODULE of a ${params?.duration || '15min'} course. You MUST write substantial, detailed content.
 - Total narration/script budget for the whole course: about ${targetNarrationWords} words.
 - Total topic count planned: ${totalTopics}.
 - Target word count per topic: ${wordsPerTopicRange} words. This is MINIMUM — write MORE if the topic warrants it.
@@ -900,16 +940,19 @@ Rules you NEVER break:
 OUTPUT FORMAT — ABSOLUTE:
 - Output ONLY markdown prose. NEVER output JSON, code blocks, key/value pairs, or any structured data.
 - Do NOT echo the blueprint. Do NOT wrap output in \`\`\`json or any code fence.
-- Do NOT output keys like "course_title", "module_title", "topics", "on_screen_text", "topic_name". The blueprint is INPUT only — your output is human-readable narration.
-- The very first character of your response must be "#" (a markdown heading), never "{" or "[" or "\`".
+- Do NOT output keys like “course_title”, “module_title”, “topics”, “on_screen_text”, “topic_name”. The blueprint is INPUT only — your output is human-readable narration.
+- The very first character of your response must be “#” (a markdown heading), never “{“ or “[“ or “\`”.
 - You MUST use content from the source material provided. Do NOT invent unrelated examples.
 - You MUST respect the supplied runtime plan. Hit the requested word budgets closely so the narration lands within ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target.
 
       Write content that feels expensive, practical, and memorable — something a learner would actually respect, not skim out of obligation.`;
 
+        const enhancedWriterPrompt = enhanceScriptGenerationPrompt(baseWriterSystemPrompt, courseTitle, auditLogs).enhancedPrompt;
+        const writerSystemPrompt = `${languageDirective}${enhancedWriterPrompt}`;
+
         // Append video mode instructions if needed
         const writerSystemPromptWithMode = isVideoMode
-          ? `${writerSystemPrompt}\n\n[EXECUTION MODE: ${learningMode}]\n${getAgentModeInstructions("writer", learningMode as any)}`
+          ? `${writerSystemPrompt}\n\n[EXECUTION MODE: ${learningMode}]\n${getAgentModeInstructions('writer', learningMode as any)}`
           : writerSystemPrompt;
 
         if (parsedModules.length === 0) {
@@ -1433,8 +1476,11 @@ OUTPUT FORMAT — ABSOLUTE:
 
         addLog(`Assessment Agent: Generating ${assessmentTargets.mcqCount} MCQs + ${assessmentTargets.scenarioCount} scenarios (${assessmentIntensity} intensity)...`);
         const modeInstructions = getAgentModeInstructions("assessment", learningMode);
+        const baseAssessmentPrompt = `You are an Assessment Design Agent. Given course script, architecture, and learning objectives, create a comprehensive assessment bank sized to the requested runtime and module complexity. LANGUAGE REQUIREMENT: Write ALL question text, options, rationale, situation descriptions, prompts, and every text field in ${textLanguage}. Do not use English if ${textLanguage} is not English. Rules: (1) Question volume must scale with module/topic size; avoid token quizzes. (2) Spread MCQs across modules proportionally. (3) Include module_title and topic_title on every MCQ and scenario so the renderer can map items correctly. LEVEL CALIBRATION (${levelCalibration.label}): ${assessmentLevelGuidance} Bloom's target for questions: ${levelCalibration.bloomsTarget} \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nGenerate: (1) requested number of multiple choice questions with 4 options each, correct answer marked, rationale, and common wrong-answer trap, (2) requested number of scenario-based questions with a situation description, 3 response options, best_response, and coaching rationale, (3) 1 reflection exercise with an open-ended prompt, and (4) embedded_interactions list in requested range aligned to specific topics. Tag each question with Bloom's taxonomy level. Return JSON: { mcq: [{ module_title, topic_title, question, options: [], correct_answer, rationale, wrong_answer_trap, blooms_level }], scenarios: [{ module_title, topic_title, situation, options: [], best_response, rationale, blooms_level }], reflection: { prompt, guidance }, embedded_interactions: [{ module_title, topic_title, interaction_type, prompt, expected_response, feedback_focus }], metadata: { target_mcq_count, target_scenario_count, module_count, topic_count, assessment_intensity } }`;
+        const enhancedAssessmentPrompt = enhanceAssessmentGenerationPrompt(baseAssessmentPrompt, courseTitle, auditLogs).enhancedPrompt;
+
         assessmentResult = await runAgentWithLanguage(
-          `${languageDirective}You are an Assessment Design Agent. Given course script, architecture, and learning objectives, create a comprehensive assessment bank sized to the requested runtime and module complexity. LANGUAGE REQUIREMENT: Write ALL question text, options, rationale, situation descriptions, prompts, and every text field in ${textLanguage}. Do not use English if ${textLanguage} is not English. Rules: (1) Question volume must scale with module/topic size; avoid token quizzes. (2) Spread MCQs across modules proportionally. (3) Include module_title and topic_title on every MCQ and scenario so the renderer can map items correctly. LEVEL CALIBRATION (${levelCalibration.label}): ${assessmentLevelGuidance} Bloom's target for questions: ${levelCalibration.bloomsTarget} \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nGenerate: (1) requested number of multiple choice questions with 4 options each, correct answer marked, rationale, and common wrong-answer trap, (2) requested number of scenario-based questions with a situation description, 3 response options, best_response, and coaching rationale, (3) 1 reflection exercise with an open-ended prompt, and (4) embedded_interactions list in requested range aligned to specific topics. Tag each question with Bloom's taxonomy level. Return JSON: { mcq: [{ module_title, topic_title, question, options: [], correct_answer, rationale, wrong_answer_trap, blooms_level }], scenarios: [{ module_title, topic_title, situation, options: [], best_response, rationale, blooms_level }], reflection: { prompt, guidance }, embedded_interactions: [{ module_title, topic_title, interaction_type, prompt, expected_response, feedback_focus }], metadata: { target_mcq_count, target_scenario_count, module_count, topic_count, assessment_intensity } }`,
+          `${languageDirective}${enhancedAssessmentPrompt}`,
           `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nLearning Objectives:\n${researchResult}\n\nTarget Duration Minutes: ${durationMinutes}\nAssessment Intensity: ${assessmentIntensity}\nModule Count: ${moduleCount}\nTopic Count: ${topicCount}\nTarget MCQ Count: ${assessmentTargets.mcqCount}\nTarget Scenario Count: ${assessmentTargets.scenarioCount}\nTarget Embedded Interactions Range: ${assessmentTargets.interactionMin}-${assessmentTargets.interactionMax}`,
           addLog, "Assessment Agent"
         );
