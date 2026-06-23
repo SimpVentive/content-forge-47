@@ -967,23 +967,35 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       {showScriptConfirm && (
         <div className="fixed inset-0 z-[9998] flex items-center justify-center">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowScriptConfirm(false)} />
-          <div className="relative w-[440px] max-w-[92vw] rounded-2xl bg-card shadow-2xl overflow-hidden animate-fade-in">
-            <div className="h-1.5 w-full bg-primary" />
-            <div className="px-7 pt-6 pb-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                  <FileText className="w-5 h-5 text-primary" />
+          <div className="relative w-[500px] max-w-[92vw] rounded-2xl bg-gradient-to-br from-white to-blue-50 shadow-2xl overflow-hidden animate-fade-in border border-blue-200">
+            <div className="h-2 w-full bg-gradient-to-r from-primary via-blue-500 to-primary" />
+            <div className="px-8 pt-7 pb-6">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-primary to-blue-500 flex items-center justify-center shrink-0 shadow-lg">
+                  <FileText className="w-6 h-6 text-white" />
                 </div>
-                <h3 className="text-[17px] font-extrabold text-foreground leading-tight">View and Edit the Script</h3>
+                <h3 className="text-[20px] font-extrabold text-foreground leading-tight">View and Edit the Script</h3>
               </div>
-              <p className="text-[13px] text-muted-foreground leading-relaxed mb-5">
-                The script has been generated. Would you like to review it now? You can make edits before it's used in the course.
+              <p className="text-[14px] text-foreground font-semibold mb-4 leading-relaxed">
+                The script has been generated. Would you like to review it now?
               </p>
-              <div className="flex justify-end gap-2">
+              <p className="text-[13px] text-foreground mb-4 leading-relaxed">
+                You can make edits before it's used in the course.
+              </p>
+
+              {/* Duration Note */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3.5 mb-5">
+                <p className="text-[12px] font-bold text-amber-900 mb-1.5">📝 NOTE:</p>
+                <p className="text-[12px] text-amber-800 leading-relaxed">
+                  If you changed the duration, the AI engine has condensed the content to meet your duration requirement. Please review carefully to ensure it meets your expectations.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-3">
                 <button
                   type="button"
                   onClick={() => setShowScriptConfirm(false)}
-                  className="h-10 px-4 rounded-lg text-[13px] font-bold border border-border text-foreground hover:bg-secondary transition-colors"
+                  className="h-11 px-5 rounded-lg text-[13px] font-bold border-2 border-border text-foreground hover:bg-secondary transition-colors hover:border-primary/30"
                 >
                   Cancel
                 </button>
@@ -993,7 +1005,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                     setShowScriptConfirm(false);
                     openScriptDialog();
                   }}
-                  className="h-10 px-5 rounded-lg text-[13px] font-bold bg-primary text-primary-foreground hover:brightness-110 transition-all"
+                  className="h-11 px-6 rounded-lg text-[13px] font-bold bg-gradient-to-r from-primary to-blue-600 text-white hover:brightness-110 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
                 >
                   OK
                 </button>
