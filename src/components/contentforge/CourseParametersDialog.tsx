@@ -13,6 +13,7 @@ export interface CourseParameters {
   duration: string;
   videoDurationHandling: "within-course" | "additional-to-course";
   assessmentRequired: boolean;
+  assessmentTypes?: ("mcq" | "match-the-following" | "true-false" | "scenario" | "fill-blanks")[];
   learnerNotesEnabled: boolean;
   resourcesPanelEnabled: boolean;
   glossaryEnabled: boolean;
@@ -66,6 +67,14 @@ const LEVELS = [
   { value: "basic", label: "Basic", desc: "Foundational concepts, no prior knowledge needed" },
   { value: "intermediate", label: "Intermediate", desc: "Builds on basic understanding" },
   { value: "advanced", label: "Advanced", desc: "Deep-dive for experienced learners" },
+] as const;
+
+const ASSESSMENT_TYPES = [
+  { value: "mcq", label: "MCQ", desc: "Multiple Choice Questions" },
+  { value: "true-false", label: "True/False", desc: "Simple binary questions" },
+  { value: "match-the-following", label: "Match The Following", desc: "Pairing/matching exercises" },
+  { value: "scenario", label: "Scenario Based", desc: "Real-world situation analysis" },
+  { value: "fill-blanks", label: "Fill the Blanks", desc: "Short answer completion" },
 ] as const;
 
 const LANGUAGES = [
@@ -234,6 +243,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [duration, setDuration] = useState("15min");
   const [videoDurationHandling, setVideoDurationHandling] = useState<CourseParameters["videoDurationHandling"]>("within-course");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
+  const [assessmentTypes, setAssessmentTypes] = useState<CourseParameters["assessmentTypes"]>(["mcq"]);
+  const [showAssessmentTypeSelector, setShowAssessmentTypeSelector] = useState(false);
   const [learnerNotesEnabled, setLearnerNotesEnabled] = useState(false);
   const [resourcesPanelEnabled, setResourcesPanelEnabled] = useState(true);
   const [glossaryEnabled, setGlossaryEnabled] = useState(true);
@@ -318,6 +329,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       duration,
       videoDurationHandling,
       assessmentRequired,
+      assessmentTypes,
       learnerNotesEnabled,
       resourcesPanelEnabled,
       glossaryEnabled,
@@ -361,6 +373,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       duration: closest.value,
       videoDurationHandling,
       assessmentRequired,
+      assessmentTypes,
       learnerNotesEnabled,
       resourcesPanelEnabled,
       glossaryEnabled,
@@ -399,6 +412,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       duration,
       videoDurationHandling,
       assessmentRequired,
+      assessmentTypes,
       learnerNotesEnabled,
       resourcesPanelEnabled,
       glossaryEnabled,
@@ -1473,22 +1487,88 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </div>
               <p className="text-[11px] text-muted-foreground">Generate quizzes and scenario-based questions</p>
               {assessmentRequired ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {ASSESSMENT_INTENSITY_OPTIONS.map((option) => (
-                    <button
-                      key={option.value}
-                      onClick={() => setAssessmentIntensity(option.value)}
-                      className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all ${
-                        assessmentIntensity === option.value
-                          ? "border-primary bg-primary/10 text-primary"
-                          : "border-border text-muted-foreground hover:border-primary/30"
-                      }`}
-                      type="button"
-                    >
-                      {option.label} - {option.desc}
-                    </button>
-                  ))}
-                </div>
+                <>
+                  {/* Intensity Selection */}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {ASSESSMENT_INTENSITY_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => setAssessmentIntensity(option.value)}
+                        className={`rounded-full border px-3 py-1.5 text-[11px] font-bold transition-all ${
+                          assessmentIntensity === option.value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border text-muted-foreground hover:border-primary/30"
+                        }`}
+                        type="button"
+                      >
+                        {option.label} - {option.desc}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Assessment Type Summary or Selector */}
+                  {!showAssessmentTypeSelector ? (
+                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="text-[11px] font-bold text-blue-900 mb-1">Assessment Types Selected:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {(assessmentTypes || []).map((type) => {
+                              const typeLabel = ASSESSMENT_TYPES.find(t => t.value === type)?.label;
+                              return (
+                                <span key={type} className="inline-block bg-blue-100 text-blue-800 text-[10px] font-semibold px-2.5 py-1 rounded-full">
+                                  {typeLabel}
+                                </span>
+                              );
+                            })}
+                          </div>
+                          <p className="text-[10px] text-blue-700 mt-2">
+                            {localLearningType === "image"
+                              ? `Estimated questions: ~${Math.ceil((imageNarrativeSceneCount || 4) / 2)} questions (1 per 2 images)`
+                              : "Questions will be distributed throughout the course"}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setShowAssessmentTypeSelector(true)}
+                          className="ml-2 px-2 py-1 text-[10px] font-bold text-blue-600 hover:text-blue-800 underline flex-shrink-0"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Assessment Type Selector */
+                    <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg space-y-3">
+                      <p className="text-[11px] font-bold text-foreground mb-3">Select Assessment Types:</p>
+                      {ASSESSMENT_TYPES.map((type) => (
+                        <label key={type.value} className="flex items-center gap-3 p-2.5 bg-white rounded border border-gray-200 cursor-pointer hover:border-primary hover:bg-primary/5 transition-all">
+                          <input
+                            type="checkbox"
+                            checked={(assessmentTypes || []).includes(type.value)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setAssessmentTypes([...(assessmentTypes || []), type.value]);
+                              } else {
+                                setAssessmentTypes((assessmentTypes || []).filter(t => t !== type.value));
+                              }
+                            }}
+                            className="w-4 h-4 rounded cursor-pointer"
+                          />
+                          <div className="flex-1">
+                            <p className="text-[11px] font-bold text-foreground">{type.label}</p>
+                            <p className="text-[10px] text-muted-foreground">{type.desc}</p>
+                          </div>
+                        </label>
+                      ))}
+                      <button
+                        onClick={() => setShowAssessmentTypeSelector(false)}
+                        className="w-full mt-2 px-3 py-2 bg-primary text-white text-[11px] font-bold rounded hover:brightness-110 transition-all"
+                      >
+                        Done
+                      </button>
+                    </div>
+                  )}
+                </>
               ) : null}
             </div>
             <button
