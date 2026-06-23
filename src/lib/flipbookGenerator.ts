@@ -1,6 +1,6 @@
 /**
- * Professional Flipbook Generator with turn.js
- * Generates high-quality interactive flipbooks with realistic page-turn animations
+ * Professional Flipbook Generator with StPageFlip
+ * Generates high-quality interactive flipbooks with realistic 3D page-turn animations
  */
 
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
@@ -10,13 +10,16 @@ export interface FlipbookPage {
   content: string;
   images?: string[];
   speaker?: string;
+  audioDataUrl?: string;
   pageNumber: number;
 }
 
 export function generateFlipbookHTML(
   narratives: TopicNarrative[],
   courseTitle: string,
-  displayStyle: "page-flip" | "smooth-slide" | "step-reveal" = "page-flip"
+  displayStyle: "page-flip" | "smooth-slide" | "step-reveal" = "page-flip",
+  voiceoverEnabled: boolean = false,
+  voiceoverPace?: "slow" | "normal" | "fast"
 ): string {
   // Add a title page at the beginning
   const pages: FlipbookPage[] = [
@@ -29,13 +32,14 @@ export function generateFlipbookHTML(
     },
   ];
 
-  // Convert narratives to flipbook pages
+  // Convert narratives to flipbook pages with narration support
   const contentPages = narratives.flatMap((narrative, topicIdx) =>
     narrative.scenes.map((scene, sceneIdx) => ({
       title: scene.title,
       content: scene.caption || "",
       images: scene.imageDataUrl ? [scene.imageDataUrl] : [],
-      speaker: "",
+      speaker: voiceoverEnabled && scene.narration ? scene.narration : "",
+      audioDataUrl: voiceoverEnabled && scene.audioDataUrl ? scene.audioDataUrl : undefined,
       pageNumber: topicIdx * 10 + sceneIdx + 1,
     }))
   );
@@ -52,6 +56,20 @@ export function generateFlipbookHTML(
           ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
           ${page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : ""}
         </div>
+        ${voiceoverEnabled && page.speaker ? `
+        <div class="page-narration-section">
+          ${page.audioDataUrl ? `
+            <div class="audio-player-container">
+              <audio class="audio-player" controls>
+                <source src="${page.audioDataUrl}" type="audio/mpeg">
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+          ` : ""}
+          <div class="narration-label">Narrator:</div>
+          <div class="narration-text">${escapeHtml(page.speaker)}</div>
+        </div>
+        ` : ""}
         <div class="page-number">Page ${page.pageNumber}</div>
       </div>
     </div>
@@ -115,29 +133,26 @@ export function generateFlipbookHTML(
       flex: 1;
       background: #f5f5f5;
       overflow: hidden;
+      padding: 20px;
     }
 
     #flipbook {
-      position: relative;
-      width: 90%;
+      width: 100%;
+      height: 100%;
       max-width: 1200px;
-      height: 90%;
       max-height: 800px;
       background: white;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+      border-radius: 8px;
     }
 
-    #flipbook .page {
+    .page {
       width: 100%;
       height: 100%;
       background: white;
-      display: none;
+      display: flex;
       flex-direction: column;
       overflow: hidden;
-    }
-
-    #flipbook .page:first-child {
-      display: flex;
     }
 
     .page-inner {
@@ -198,6 +213,45 @@ export function generateFlipbookHTML(
       text-align: center;
       margin-top: 10px;
       flex-shrink: 0;
+    }
+
+    .page-narration-section {
+      margin-top: 15px;
+      padding: 12px;
+      background: #f0f4ff;
+      border-left: 4px solid #667eea;
+      border-radius: 4px;
+      flex-shrink: 0;
+      width: 100%;
+    }
+
+    .audio-player-container {
+      margin-bottom: 10px;
+      width: 100%;
+    }
+
+    .audio-player {
+      width: 100%;
+      height: 32px;
+      border-radius: 4px;
+      background: white;
+    }
+
+    .narration-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #667eea;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+      margin-top: 8px;
+    }
+
+    .narration-text {
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+      font-style: italic;
     }
 
     .flipbook-controls {
@@ -261,8 +315,8 @@ export function generateFlipbookHTML(
 
     @media (max-width: 768px) {
       #flipbook {
-        width: 95%;
-        height: 95%;
+        max-width: 95%;
+        max-height: 95%;
       }
 
       .page-inner {
@@ -335,74 +389,137 @@ export function generateFlipbookHTML(
     </div>
   </div>
 
+  <!-- StPageFlip Library -->
+  <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>
+
   <script>
-    let currentPage = 1;
+    let pageFlip = null;
     const totalPages = ${pages.length};
 
-    function showPage(pageNum) {
-      // Hide all pages
-      document.querySelectorAll('#flipbook .page').forEach(p => p.style.display = 'none');
-
-      // Show current page
-      const pages = document.querySelectorAll('#flipbook .page');
-      if (pages[pageNum - 1]) {
-        pages[pageNum - 1].style.display = 'flex';
-      }
-
-      // Update page counter
-      document.getElementById('currentPage').textContent = pageNum;
-
-      // Update button states
-      document.getElementById('prevBtn').disabled = pageNum <= 1;
-      document.getElementById('nextBtn').disabled = pageNum >= totalPages;
-    }
-
-    function nextPage() {
-      if (currentPage < totalPages) {
-        currentPage++;
-        showPage(currentPage);
-      }
-    }
-
-    function prevPage() {
-      if (currentPage > 1) {
-        currentPage--;
-        showPage(currentPage);
-      }
-    }
-
-    // Initialize on load
+    // Initialize StPageFlip after DOM and library are ready
     window.addEventListener('DOMContentLoaded', () => {
-      showPage(1);
+      try {
+        pageFlip = new pageFlip.PageFlip(
+          document.getElementById('flipbook'),
+          {
+            width: 600,
+            height: 800,
+            size: 'fixed',
+            minWidth: 300,
+            maxWidth: 1000,
+            minHeight: 400,
+            maxHeight: 1200,
+            showCover: true,
+            mobileScrollSupport: true,
+            useMouseEvents: true,
+            swipeDistance: 10,
+            clickEventshadow: [
+              -0.5, -0.5,
+              0.5, -0.5,
+              0.5, 0.5,
+              -0.5, 0.5
+            ],
+            backgroundColor: '#f5f5f5',
+            maxShadowBlur: 20,
+            darkMode: false,
+            disableFlip: false,
+            disableZoom: false,
+            autoSize: true
+          }
+        );
 
-      // Button events
-      document.getElementById('prevBtn').addEventListener('click', prevPage);
-      document.getElementById('nextBtn').addEventListener('click', nextPage);
+        // Add pages to the flipbook
+        const pageElements = document.querySelectorAll('#flipbook .page');
+        pageFlip.loadFromElements(Array.from(pageElements));
 
-      // Keyboard navigation
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'ArrowLeft') prevPage();
-        if (e.key === 'ArrowRight') nextPage();
-      });
-
-      // Fullscreen
-      document.getElementById('fullscreenBtn').addEventListener('click', () => {
-        const elem = document.getElementById('flipbook');
-        if (elem.requestFullscreen) {
-          elem.requestFullscreen().catch(err => console.log('Fullscreen error:', err));
-        } else if (elem.mozRequestFullScreen) {
-          elem.mozRequestFullScreen();
-        } else if (elem.webkitRequestFullscreen) {
-          elem.webkitRequestFullscreen();
-        } else if (elem.msRequestFullscreen) {
-          elem.msRequestFullscreen();
+        // Update page counter
+        function updatePageInfo() {
+          const currentPageNum = pageFlip.getCurrentPageIndex() + 1;
+          document.getElementById('currentPage').textContent = currentPageNum;
+          document.getElementById('prevBtn').disabled = currentPageNum <= 1;
+          document.getElementById('nextBtn').disabled = currentPageNum >= totalPages;
         }
-      });
 
-      // Print
-      document.getElementById('printBtn').addEventListener('click', () => {
-        window.print();
-      });
+        // Button events
+        document.getElementById('prevBtn').addEventListener('click', () => {
+          if (pageFlip.getCurrentPageIndex() > 0) {
+            pageFlip.flipPrev('top');
+          }
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+          if (pageFlip.getCurrentPageIndex() < totalPages - 1) {
+            pageFlip.flipNext('top');
+          }
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowLeft') {
+            document.getElementById('prevBtn').click();
+          } else if (e.key === 'ArrowRight') {
+            document.getElementById('nextBtn').click();
+          }
+        });
+
+        // Update page info on flip
+        pageFlip.on('flip', updatePageInfo);
+
+        // Fullscreen
+        document.getElementById('fullscreenBtn').addEventListener('click', () => {
+          const elem = document.getElementById('flipbook');
+          if (elem.requestFullscreen) {
+            elem.requestFullscreen().catch(err => console.log('Fullscreen error:', err));
+          } else if (elem.mozRequestFullScreen) {
+            elem.mozRequestFullScreen();
+          } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+          } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+          }
+        });
+
+        // Print
+        document.getElementById('printBtn').addEventListener('click', () => {
+          window.print();
+        });
+
+        // Initialize page info
+        updatePageInfo();
+
+      } catch (err) {
+        console.error('StPageFlip initialization error:', err);
+        console.log('Falling back to basic navigation...');
+
+        // Fallback if StPageFlip fails to load
+        let currentPage = 0;
+        const pages = document.querySelectorAll('#flipbook .page');
+
+        function showPage(idx) {
+          pages.forEach(p => p.style.display = 'none');
+          if (pages[idx]) {
+            pages[idx].style.display = 'flex';
+            document.getElementById('currentPage').textContent = idx + 1;
+            document.getElementById('prevBtn').disabled = idx <= 0;
+            document.getElementById('nextBtn').disabled = idx >= pages.length - 1;
+          }
+        }
+
+        document.getElementById('prevBtn').addEventListener('click', () => {
+          if (currentPage > 0) showPage(--currentPage);
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+          if (currentPage < pages.length - 1) showPage(++currentPage);
+        });
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowLeft' && currentPage > 0) showPage(--currentPage);
+          if (e.key === 'ArrowRight' && currentPage < pages.length - 1) showPage(++currentPage);
+        });
+
+        showPage(0);
+      }
     });
   </script>
 </body>
