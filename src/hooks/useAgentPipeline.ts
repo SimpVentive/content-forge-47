@@ -6,6 +6,8 @@ import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService
 import { buildNarrativeScenePrompt, buildImageGenerationPrompts, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { logApiUsage } from "@/lib/edgeFunctions";
+import { generateNarrationAudio, getVoiceIdForLanguage } from "@/lib/narrationAudioService";
+import { runFinalQACheck, storeQAAuditLog, type QAResult } from "@/lib/qaService";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -460,7 +462,7 @@ const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
-const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", quality: "", voice: "", assembly: "" });
+const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", quality: "", voice: "", assembly: "", "final-qa": "" });
 
 /**
  * Strip JSON / code-fence leakage from Writer output.
@@ -574,7 +576,15 @@ export function useAgentPipeline() {
   const [rawOutputs, setRawOutputs] = useState<RawAgentOutputs>(initialRaw());
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [showQADialog, setShowQADialog] = useState(false);
+  const [qaResult, setQAResult] = useState<QAResult | null>(null);
+  const [isApplyingQAFixes, setIsApplyingQAFixes] = useState(false);
   const cancelledRef = useRef(false);
+  const pipelineContextRef = useRef<{
+    courseTitle: string;
+    inputText: string;
+    params?: any;
+  } | null>(null);
 
   const addLog = useCallback((msg: string) => {
     setLogs((prev) => [...prev, `${timestamp()} ${msg}`]);
@@ -663,7 +673,7 @@ export function useAgentPipeline() {
     setLogs([]);
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string }) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast" }) => {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const languageDirective = buildLanguageDirective(textLanguage, narratorLanguage);
@@ -1013,7 +1023,9 @@ OUTPUT FORMAT — ABSOLUTE:
                 objective,
                 writerResult.slice(0, 1500),
                 sceneCount,
-                params?.level || "intermediate"
+                params?.level || "intermediate",
+                params?.flipbookVoiceoverEnabled || false,
+                params?.voiceoverPace || "normal"
               );
 
               const narrativeResult = await runAgentWithLanguage(
@@ -1058,6 +1070,43 @@ OUTPUT FORMAT — ABSOLUTE:
           setStatus("visual", "complete");
           setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
           addLog(`Visual Narrative Agent: Complete. ${narrativeScenes.length} topic narratives generated.`);
+
+          // Generate narration audio if voiceover is enabled
+          if (params?.flipbookVoiceoverEnabled) {
+            addLog("Audio Narration: Generating audio for scene narrations...");
+            const narrationLanguage = params?.flipbookNarrationLanguage || params?.narratorLanguage || "English";
+            const voiceId = getVoiceIdForLanguage(narrationLanguage);
+            let audioGeneratedCount = 0;
+
+            for (let ni = 0; ni < narrativeScenes.length; ni++) {
+              if (isCancelled()) break;
+              const narrative = narrativeScenes[ni];
+
+              for (let si = 0; si < narrative.scenes.length; si++) {
+                if (isCancelled()) break;
+                const scene = narrative.scenes[si];
+
+                if (scene.narration && scene.narration.trim().length > 0) {
+                  try {
+                    addLog(`Audio Narration: Generating audio for Scene ${scene.sceneNumber}...`);
+                    const audioResult = await generateNarrationAudio(scene.narration, voiceId);
+
+                    if (audioResult.success && audioResult.audioDataUrl) {
+                      scene.audioDataUrl = audioResult.audioDataUrl;
+                      audioGeneratedCount++;
+                    } else {
+                      addLog(`Audio Narration: Failed for Scene ${scene.sceneNumber} — ${audioResult.error}. Continuing...`);
+                    }
+                  } catch (audioErr) {
+                    addLog(`Audio Narration: Error for Scene ${scene.sceneNumber} — ${(audioErr as Error).message}`);
+                  }
+                }
+              }
+            }
+
+            addLog(`Audio Narration: Complete. Generated audio for ${audioGeneratedCount} scenes.`);
+            setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
+          }
         } catch (err) {
           addLog(`Visual Narrative Agent: Error — ${(err as Error).message}. Continuing...`);
           setStatus("visual", "error");
@@ -1604,7 +1653,13 @@ OUTPUT FORMAT — ABSOLUTE:
           let flipbookHtml = "";
           try {
             const displayStyle = params?.flipbookDisplayStyle || "smooth-slide";
-            flipbookHtml = generateFlipbookHTML(narrativeScenes, courseTitle, displayStyle);
+            flipbookHtml = generateFlipbookHTML(
+              narrativeScenes,
+              courseTitle,
+              displayStyle,
+              params?.flipbookVoiceoverEnabled || false,
+              params?.voiceoverPace
+            );
             addLog(`Final Assembly: Generated flipbook HTML (${flipbookHtml.length} bytes)`);
           } catch (htmlErr) {
             addLog(`Final Assembly: Could not generate flipbook HTML — ${(htmlErr as Error).message}`);
@@ -1670,6 +1725,45 @@ ${modeInstructions}`;
         setRawOutputs((prev) => ({ ...prev, assembly: assemblyResult }));
         setOutputData((prev) => ({ ...prev, package: assemblyResult }));
         addLog("Final Assembly: Complete. Course package ready for deployment.");
+
+        // Run final QA check if enabled
+        if (toggles["final-qa"] !== false) {
+          addLog("Final QA Agent: Running end-to-end quality validation...");
+          try {
+            const qaWrapper = (sys: string, user: string) => callClaudeWithRetry(sys, user, addLog, "Final QA Agent");
+            const qaCheckResult = await runFinalQACheck(
+              {
+                courseTitle,
+                inputText,
+                domain: params?.domain,
+                topic: courseTitle,
+                domainSpecificRequirements: params?.domainSpecificRequirements,
+              },
+              { research: archResult, architect: archResult, writer: writerResult, visual: visualResult, animation: animResult, youtube: youtubeResult, compliance: complianceResult, assessment: assessmentResult, quality: qualityResult, voice: voiceResult, assembly: assemblyResult },
+              outputData,
+              qaWrapper
+            );
+
+            setStatus("final-qa", "complete");
+            setQAResult(qaCheckResult);
+            setRawOutputs((prev) => ({ ...prev, "final-qa": JSON.stringify(qaCheckResult) }));
+            addLog(`Final QA Agent: Found ${qaCheckResult.issuesFound.length} issue(s). Showing results dialog...`);
+
+            // Store context for QA handlers
+            pipelineContextRef.current = { courseTitle, inputText, params };
+
+            setShowQADialog(true);
+
+            // Don't mark pipeline as complete yet; wait for user to accept/skip QA fixes
+            return;
+          } catch (qaErr) {
+            addLog(`Final QA Agent: Error — ${(qaErr as Error).message}`);
+            setStatus("final-qa", "error");
+          }
+        } else {
+          setStatus("final-qa", "idle");
+        }
+
         addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
         }
       } else {
@@ -1694,6 +1788,72 @@ ${modeInstructions}`;
     addLog("Orchestrator: Stop requested — finishing current agent...");
   }, [addLog]);
 
+  const applyQAFixes = useCallback(async () => {
+    if (!qaResult?.wasAutoFixed || !qaResult.revisedOutputs) {
+      skipQAFixes();
+      return;
+    }
+
+    setIsApplyingQAFixes(true);
+    try {
+      addLog("Final QA Agent: Applying fixes to course output...");
+
+      // Apply revised outputs
+      setRawOutputs((prev) => ({
+        ...prev,
+        ...(qaResult.revisedOutputs?.writer && { writer: qaResult.revisedOutputs.writer }),
+        ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
+      }));
+
+      // Update output data
+      setOutputData((prev) => ({
+        ...prev,
+        ...(qaResult.revisedOutputs?.script && { script: qaResult.revisedOutputs.script }),
+        ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
+      }));
+
+      // Store audit log for learning feedback
+      try {
+        const { data: authData } = await supabase.auth.getUser();
+        const context = pipelineContextRef.current;
+        if (authData.user && context) {
+          await storeQAAuditLog(
+            "current-draft", // This would be the actual draft ID in a real scenario
+            authData.user.id,
+            qaResult,
+            {
+              courseTitle: context.courseTitle,
+              inputText: context.inputText,
+              domain: (context.params as any)?.domain,
+              topic: context.courseTitle,
+            },
+            rawOutputs,
+            { ...rawOutputs, ...qaResult.revisedOutputs },
+            supabase
+          );
+        }
+      } catch (auditErr) {
+        console.error("Failed to store QA audit log:", auditErr);
+      }
+
+      addLog("Final QA Agent: Fixes applied successfully.");
+      setShowQADialog(false);
+      addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
+    } finally {
+      setIsApplyingQAFixes(false);
+      setIsRunning(false);
+      pipelineContextRef.current = null;
+    }
+  }, [qaResult, rawOutputs, addLog]);
+
+  const skipQAFixes = useCallback(() => {
+    addLog("Final QA Agent: Skipping fixes — proceeding with original output.");
+    setShowQADialog(false);
+    addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
+    setIsRunning(false);
+    pipelineContextRef.current = null;
+  }, [addLog]);
+
   const agents: AgentInfo[] = AGENTS.map((a) => ({
     ...a,
     status: agentStatuses[a.id] || "idle",
@@ -1711,5 +1871,10 @@ ${modeInstructions}`;
     updateCourseContent,
     loadPersistedState,
     clearPipelineState,
+    showQADialog,
+    qaResult,
+    applyQAFixes,
+    skipQAFixes,
+    isApplyingQAFixes,
   };
 }

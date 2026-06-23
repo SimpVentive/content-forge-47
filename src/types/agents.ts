@@ -26,6 +26,7 @@ export interface RawAgentOutputs {
   quality: string;
   voice: string;
   assembly: string;
+  "final-qa"?: string;
   heygenVideos?: string;
   narrativeScenes?: string; // JSON string of TopicNarrative[] for image-based learning
   flipbookHTML?: string; // Generated interactive HTML flipbook
@@ -45,6 +46,7 @@ export const AGENTS: Omit<AgentInfo, "status">[] = [
   { id: "voice", name: "Voice & Narration Agent", description: "Generates voice scripts and audio narration" },
   { id: "heygen", name: "HeyGen Avatar Video Agent", description: "Renders avatar-led talking-head videos per module (video mode only)" },
   { id: "assembly", name: "Final Assembly Agent", description: "Packages SCORM/xAPI-compliant course output" },
+  { id: "final-qa", name: "Final QA Agent", description: "Validates output against input, identifies issues, and auto-fixes problems" },
 ];
 
 export const SAMPLE_TITLE = "";

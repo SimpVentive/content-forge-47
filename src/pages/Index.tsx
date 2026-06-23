@@ -25,6 +25,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal";
 import { CreditConfirmationModal } from "@/components/CreditConfirmationModal";
+import { QAResultsDialog } from "@/components/contentforge/QAResultsDialog";
 import { spendCredits } from "@/lib/edgeFunctions";
 import { estimateCredits, type CreditEstimate } from "@/lib/creditEstimator";
 
@@ -105,6 +106,11 @@ const Index = () => {
     updateCourseContent,
     loadPersistedState,
     clearPipelineState,
+    showQADialog,
+    qaResult,
+    applyQAFixes,
+    skipQAFixes,
+    isApplyingQAFixes,
   } = useAgentPipeline();
 
   const refreshDrafts = async () => {
@@ -326,9 +332,10 @@ const Index = () => {
       }
     }
 
-    // Estimate credits based on learning type and requirement text
+    // Estimate credits based on learning type, duration, and requirement text
     // (Shown to everyone — admins still see the estimate, but deduction is skipped on confirm.)
-    const estimate = estimateCredits(inputText, params.learningType);
+    const durationMinutes = parseInt(params.duration.match(/\d+/)?.[0] || "15", 10);
+    const estimate = estimateCredits(inputText, params.learningType, durationMinutes);
     setCreditEstimate(estimate);
     setPendingParams(params);
     setShowCreditConfirmation(true);
@@ -435,6 +442,15 @@ const Index = () => {
         requiredCredits={requiredCredits}
         onClose={() => setShowInsufficientCredits(false)}
       />
+      {qaResult && (
+        <QAResultsDialog
+          open={showQADialog}
+          qaResult={qaResult}
+          onApply={applyQAFixes}
+          onSkip={skipQAFixes}
+          isApplying={isApplyingQAFixes}
+        />
+      )}
       <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6 gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <img src={contentForgeLogo} alt="ContentForge" className="w-12 h-12 object-contain drop-shadow-lg shrink-0" />
