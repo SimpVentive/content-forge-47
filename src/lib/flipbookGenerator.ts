@@ -179,8 +179,8 @@ export function generateFlipbookHTML(
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      gap: 15px;
+      justify-content: flex-start;
+      gap: 0px;
       width: 100%;
     }
 
@@ -200,9 +200,9 @@ export function generateFlipbookHTML(
       color: #333;
       text-align: center;
       flex-shrink: 0;
-      margin-top: auto;
-      padding-top: 15px;
-      border-top: 2px solid #e0e0e0;
+      margin-top: 8px;
+      padding-top: 0px;
+      border-top: none;
       width: 100%;
       font-weight: 500;
     }
