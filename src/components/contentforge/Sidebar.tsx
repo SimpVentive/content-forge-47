@@ -123,10 +123,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isStartingGeneration = false,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string>("");
   const [isExtracting, setIsExtracting] = useState(false);
   const [showTitleConfirm, setShowTitleConfirm] = useState(false);
   const [suggestedTitle, setSuggestedTitle] = useState("");
+  const [isTitleFocused, setIsTitleFocused] = useState(false);
 
   const handleFile = async (file: File) => {
     setUploadedFileName(file.name);
@@ -214,12 +216,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <div>
           <label className="text-[14px] font-semibold text-foreground mb-1.5 block">Course Title</label>
-          <input
+          <textarea
+            ref={titleInputRef}
             value={courseTitle}
             onChange={(e) => setCourseTitle(e.target.value)}
-            className="w-full h-11 border-[1.5px] border-border rounded-xl px-3.5 text-[14px] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-all duration-200"
-            style={{ boxShadow: "inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.7)" }}
+            onFocus={() => setIsTitleFocused(true)}
+            onBlur={() => setIsTitleFocused(false)}
             placeholder="Enter course title..."
+            className={`w-full border-[1.5px] border-border rounded-xl px-3.5 py-2.5 text-[14px] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-all duration-200 resize-none font-medium ${
+              isTitleFocused ? "min-h-24 shadow-md" : "min-h-11"
+            }`}
+            style={{ boxShadow: isTitleFocused ? "inset 0 2px 4px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.12)" : "inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.7)" }}
           />
         </div>
 
