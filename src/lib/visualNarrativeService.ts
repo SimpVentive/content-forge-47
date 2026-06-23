@@ -10,6 +10,7 @@ export interface NarrativeScene {
   narration: string; // Optional voiceover text
   imagePrompt: string; // Prompt for Flux 2 image generation
   imageDataUrl?: string; // Generated image as base64 data URL
+  audioDataUrl?: string; // Audio narration as data URL for HTML5 audio player
   timelinePosition?: number; // Position in overall narrative (0-100%)
 }
 
@@ -31,8 +32,19 @@ export function buildNarrativeScenePrompt(
   topicObjective: string,
   mainContent: string,
   sceneCount: number,
-  learningLevel: string
+  learningLevel: string,
+  voiceoverEnabled: boolean = false,
+  voiceoverPace: "slow" | "normal" | "fast" = "normal"
 ): string {
+  const narrationGuidance = voiceoverEnabled
+    ? `\n\nNARRATION REQUIREMENTS (for voiceover):
+For each scene, provide a "narration" field with voiceover script.
+${voiceoverPace === "slow" ? "Pace: SLOW - Use short sentences (5-8 words max), include pauses for emphasis. Aim for ~80-100 words per minute." : ""}
+${voiceoverPace === "normal" ? "Pace: NORMAL - Conversational speed. Aim for ~120-140 words per minute." : ""}
+${voiceoverPace === "fast" ? "Pace: FAST - Energetic and concise. Aim for ~160-180 words per minute." : ""}
+The narration should complement but not simply repeat the caption. Include context, emphasis, or additional insight.`
+    : "";
+
   return `You are a visual storyboarding expert creating a narrative sequence for corporate training.
 
 Topic: ${topicTitle}
@@ -47,7 +59,7 @@ For each scene, provide:
 1. Scene title (short, 3-4 words)
 2. Visual caption/text that appears with the image (like a comic book panel - 1-2 sentences, conversational, action-oriented)
 3. Detailed image prompt for AI generation (specific scene, action, people, setting, mood)
-4. Optional narration text (if different from caption)
+4. Optional narration text (if different from caption)${narrationGuidance}
 
 Format as JSON:
 {
@@ -99,6 +111,52 @@ export function buildImageGenerationPrompts(
       "Realistic emotions, contemporary setting, professional composition.",
     ].join(" "),
   }));
+}
+
+/**
+ * Create a title slide/scene as the first scene of the narrative
+ * This ensures the course title is displayed prominently at the beginning
+ */
+export function createTitleSlide(courseTitle: string, courseObjective?: string): NarrativeScene {
+  return {
+    sceneNumber: 0,
+    title: "Course Title",
+    caption: courseTitle,
+    narration: courseObjective || `Welcome to ${courseTitle}. This course will help you master the key concepts and skills you need to succeed.`,
+    imagePrompt: `Create a professional, welcoming title slide image for corporate training.
+      Title: "${courseTitle}"
+      Style: Modern, clean, professional aesthetic with a gradient or subtle background.
+      Include warm, inviting imagery that represents learning and growth.
+      Professional composition, contemporary design, diverse representation.
+      No text overlays - the title will be added separately.
+      High quality, inspiring, corporate training material.`,
+    imageDataUrl: undefined,
+    audioDataUrl: undefined,
+    timelinePosition: 0,
+  };
+}
+
+/**
+ * Prepend title slide to narrative scenes
+ */
+export function prependTitleSlideToNarratives(
+  narratives: TopicNarrative[],
+  courseTitle: string,
+  courseObjective?: string
+): TopicNarrative[] {
+  if (!narratives || narratives.length === 0) return narratives;
+
+  const titleScene = createTitleSlide(courseTitle, courseObjective);
+
+  // Add title as the first scene of the first narrative
+  const updatedNarratives = [...narratives];
+  updatedNarratives[0] = {
+    ...updatedNarratives[0],
+    scenes: [titleScene, ...updatedNarratives[0].scenes],
+    sceneCount: updatedNarratives[0].sceneCount + 1,
+  };
+
+  return updatedNarratives;
 }
 
 /**

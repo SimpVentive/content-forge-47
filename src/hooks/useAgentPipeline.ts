@@ -3,7 +3,7 @@ import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/t
 import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
-import { buildNarrativeScenePrompt, buildImageGenerationPrompts, type TopicNarrative } from "@/lib/visualNarrativeService";
+import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { logApiUsage } from "@/lib/edgeFunctions";
 import { generateNarrationAudio, getVoiceIdForLanguage } from "@/lib/narrationAudioService";
@@ -1068,8 +1068,12 @@ OUTPUT FORMAT — ABSOLUTE:
           }
 
           setStatus("visual", "complete");
+
+          // Prepend title slide to the first narrative
+          narrativeScenes = prependTitleSlideToNarratives(narrativeScenes, courseTitle, params?.level);
+          addLog(`Visual Narrative Agent: Added title slide. ${narrativeScenes.length} topic narratives with ${narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0)} total scenes.`);
+
           setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
-          addLog(`Visual Narrative Agent: Complete. ${narrativeScenes.length} topic narratives generated.`);
 
           // Generate narration audio if voiceover is enabled
           if (params?.flipbookVoiceoverEnabled) {
