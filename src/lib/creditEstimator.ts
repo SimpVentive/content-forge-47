@@ -171,8 +171,33 @@ export function estimateVideoCredits(text: string): CreditEstimate {
  */
 export function estimateCredits(
   text: string,
-  learningType: "image" | "video" | "static"
+  learningType: "image" | "video" | "static",
+  durationMinutes?: number
 ): CreditEstimate {
+  if (durationMinutes !== undefined && (learningType === "video" || learningType === "static")) {
+    // Use explicit duration if provided for video and static learning
+    const rate = learningType === "video" ? CREDITS_PER_VIDEO_MINUTE : CREDITS_PER_ELEARNING_MINUTE;
+    const totalCredits = durationMinutes * rate;
+    const summary = learningType === "video"
+      ? `~${durationMinutes} minutes of AI avatar video`
+      : `~${durationMinutes} minutes of learning content`;
+
+    return {
+      learningType,
+      totalCredits,
+      breakdown: [
+        {
+          component: learningType === "video" ? "HeyGen Video Generation" : "E-Learning Content",
+          quantity: durationMinutes,
+          rate,
+          subtotal: totalCredits,
+        },
+      ],
+      summary,
+      estimatedMinutes: durationMinutes,
+    };
+  }
+
   switch (learningType) {
     case "image":
       return estimateImageCredits(text);
