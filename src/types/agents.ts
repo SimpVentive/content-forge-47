@@ -44,7 +44,7 @@ export const AGENTS: Omit<AgentInfo, "status">[] = [
   { id: "assessment", name: "Assessment Agent", description: "Builds quizzes, scenarios, and rubrics" },
   { id: "quality", name: "Quality Reviewer Agent", description: "Scores instructional quality and revises weak content before packaging" },
   { id: "voice", name: "Voice & Narration Agent", description: "Generates voice scripts and audio narration" },
-  { id: "heygen", name: "HeyGen Avatar Video Agent", description: "Renders avatar-led talking-head videos per module (video mode only)" },
+  { id: "heygen", name: "Avatar Video Agent", description: "Renders avatar-led talking-head videos per module (video mode only)" },
   { id: "assembly", name: "Final Assembly Agent", description: "Packages SCORM/xAPI-compliant course output" },
   { id: "final-qa", name: "Final QA Agent", description: "Validates output against input, identifies issues, and auto-fixes problems" },
 ];
