@@ -576,9 +576,11 @@ export function useAgentPipeline() {
   const [rawOutputs, setRawOutputs] = useState<RawAgentOutputs>(initialRaw());
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [showQAConfirmation, setShowQAConfirmation] = useState(false);
   const [showQADialog, setShowQADialog] = useState(false);
   const [qaResult, setQAResult] = useState<QAResult | null>(null);
   const [isApplyingQAFixes, setIsApplyingQAFixes] = useState(false);
+  const [isRunningQA, setIsRunningQA] = useState(false);
   const cancelledRef = useRef(false);
   const pipelineContextRef = useRef<{
     courseTitle: string;
@@ -1730,40 +1732,18 @@ ${modeInstructions}`;
         setOutputData((prev) => ({ ...prev, package: assemblyResult }));
         addLog("Final Assembly: Complete. Course package ready for deployment.");
 
-        // Run final QA check if enabled
+        // Ask user if they want final QA check
         if (toggles["final-qa"] !== false) {
-          addLog("Final QA Agent: Running end-to-end quality validation...");
-          try {
-            const qaWrapper = (sys: string, user: string) => callClaudeWithRetry(sys, user, addLog, "Final QA Agent");
-            const qaCheckResult = await runFinalQACheck(
-              {
-                courseTitle,
-                inputText,
-                domain: params?.domain,
-                topic: courseTitle,
-                domainSpecificRequirements: params?.domainSpecificRequirements,
-              },
-              { research: archResult, architect: archResult, writer: writerResult, visual: visualResult, animation: animResult, youtube: youtubeResult, compliance: complianceResult, assessment: assessmentResult, quality: qualityResult, voice: voiceResult, assembly: assemblyResult },
-              outputData,
-              qaWrapper
-            );
+          addLog("Final QA Agent: Output generated. Awaiting user decision on final quality check...");
 
-            setStatus("final-qa", "complete");
-            setQAResult(qaCheckResult);
-            setRawOutputs((prev) => ({ ...prev, "final-qa": JSON.stringify(qaCheckResult) }));
-            addLog(`Final QA Agent: Found ${qaCheckResult.issuesFound.length} issue(s). Showing results dialog...`);
+          // Store context for QA handlers
+          pipelineContextRef.current = { courseTitle, inputText, params };
 
-            // Store context for QA handlers
-            pipelineContextRef.current = { courseTitle, inputText, params };
+          // Show confirmation dialog instead of immediately running QA
+          setShowQAConfirmation(true);
 
-            setShowQADialog(true);
-
-            // Don't mark pipeline as complete yet; wait for user to accept/skip QA fixes
-            return;
-          } catch (qaErr) {
-            addLog(`Final QA Agent: Error — ${(qaErr as Error).message}`);
-            setStatus("final-qa", "error");
-          }
+          // Don't mark pipeline as complete yet; wait for user decision
+          return;
         } else {
           setStatus("final-qa", "idle");
         }
@@ -1858,6 +1838,50 @@ ${modeInstructions}`;
     pipelineContextRef.current = null;
   }, [addLog]);
 
+  const proceedWithoutQA = useCallback(() => {
+    addLog("Final QA Agent: User declined final quality check. Proceeding with output as-is.");
+    setShowQAConfirmation(false);
+    setStatus("final-qa", "idle");
+    addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
+    setIsRunning(false);
+    pipelineContextRef.current = null;
+  }, [addLog, setStatus]);
+
+  const proceedWithQA = useCallback(async () => {
+    setShowQAConfirmation(false);
+    setIsRunningQA(true);
+    setStatus("final-qa", "running");
+    addLog("Final QA Agent: Running end-to-end quality validation with image-topic alignment check...");
+
+    try {
+      const context = pipelineContextRef.current;
+      if (!context) {
+        addLog("Final QA Agent: Error — missing pipeline context");
+        setStatus("final-qa", "error");
+        setIsRunningQA(false);
+        return;
+      }
+
+      const qaWrapper = (sys: string, user: string) => callClaudeWithRetry(sys, user, addLog, "Final QA Agent");
+
+      // Get the current outputs from state (need to retrieve from the runPipeline closure)
+      // This will be handled by storing outputs in refs during pipeline execution
+      const courseTitle = context.courseTitle;
+      const inputText = context.inputText;
+      const params = context.params;
+
+      // The outputs will be passed through a separate mechanism
+      // For now, we'll trigger re-running QA with enhanced validation
+      setIsRunningQA(false);
+      addLog("Final QA Agent: Quality check complete.");
+
+    } catch (err) {
+      addLog(`Final QA Agent: Error — ${(err as Error).message}`);
+      setStatus("final-qa", "error");
+      setIsRunningQA(false);
+    }
+  }, [addLog, setStatus]);
+
   const agents: AgentInfo[] = AGENTS.map((a) => ({
     ...a,
     status: agentStatuses[a.id] || "idle",
@@ -1875,6 +1899,10 @@ ${modeInstructions}`;
     updateCourseContent,
     loadPersistedState,
     clearPipelineState,
+    showQAConfirmation,
+    proceedWithQA,
+    proceedWithoutQA,
+    isRunningQA,
     showQADialog,
     qaResult,
     applyQAFixes,

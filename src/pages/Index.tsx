@@ -26,6 +26,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { InsufficientCreditsModal } from "@/components/InsufficientCreditsModal";
 import { CreditConfirmationModal } from "@/components/CreditConfirmationModal";
 import { QAResultsDialog } from "@/components/contentforge/QAResultsDialog";
+import { QAConfirmationDialog } from "@/components/contentforge/QAConfirmationDialog";
 import { spendCredits } from "@/lib/edgeFunctions";
 import { estimateCredits, type CreditEstimate } from "@/lib/creditEstimator";
 
@@ -106,6 +107,10 @@ const Index = () => {
     updateCourseContent,
     loadPersistedState,
     clearPipelineState,
+    showQAConfirmation,
+    proceedWithQA,
+    proceedWithoutQA,
+    isRunningQA,
     showQADialog,
     qaResult,
     applyQAFixes,
@@ -441,6 +446,12 @@ const Index = () => {
         open={showInsufficientCredits}
         requiredCredits={requiredCredits}
         onClose={() => setShowInsufficientCredits(false)}
+      />
+      <QAConfirmationDialog
+        open={showQAConfirmation}
+        onProceedWithQA={proceedWithQA}
+        onProceedWithout={proceedWithoutQA}
+        isLoading={isRunningQA}
       />
       {qaResult && (
         <QAResultsDialog
