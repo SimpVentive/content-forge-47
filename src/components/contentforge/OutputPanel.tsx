@@ -429,7 +429,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           <div className="bg-secondary/50 rounded-xl p-3 space-y-3">
             {data.flipbook_assets.images && data.flipbook_assets.images.length > 0 && (
               <div>
-                <p className="text-[12px] font-semibold text-foreground/70 mb-1">Images</p>
+                <p className="text-[12px] font-semibold text-foreground/70 mb-1">Flipbook</p>
                 <div className="space-y-0.5">
                   {data.flipbook_assets.images.map((img: string, i: number) => (
                     <div key={i} className="text-[12px] text-foreground/80 pl-2">• {img}</div>
@@ -592,7 +592,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
             ) : (
               <>
                 {isImageSeries ? <Images className="w-5 h-5" /> : <Download className="w-5 h-5" />}
-                {isImageSeries ? "Download Images" : "Export Package"}
+                {isImageSeries ? "Download Flipbook" : "Export Package"}
               </>
 
             )}
@@ -607,7 +607,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               <>
                 <li>Flip through the storyboard above using ← → arrows or A/D keys</li>
                 <li>Each scene shows an image with a caption — like a training comic strip</li>
-                <li>Click "Download Images" to save all scenes as individual files</li>
+                <li>Click "Download Flipbook" to save all scenes as individual files</li>
                 <li>If voice narration was selected, audio for each scene is included in the export</li>
               </>
             ) : (
@@ -796,7 +796,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
             <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mb-4">
               {isImageSeriesOutput ? <Images className="w-8 h-8 text-amber-600" /> : <Package className="w-8 h-8 text-amber-600" />}
             </div>
-            <h3 className="text-[16px] font-extrabold text-foreground mb-2">{isImageSeriesOutput ? "Images Not Ready Yet" : "Package Not Ready Yet"}</h3>
+            <h3 className="text-[16px] font-extrabold text-foreground mb-2">{isImageSeriesOutput ? "Flipbook Not Ready Yet" : "Package Not Ready Yet"}</h3>
             <p className="text-[13px] text-muted-foreground leading-relaxed max-w-[320px]">
               {isImageSeriesOutput ? "Run the image course pipeline to generate the visual sequence." : "You haven't inserted videos into your course yet. Once you complete the video placement, you can generate and export the SCORM package."}
             </p>
@@ -938,7 +938,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
           <div className="relative w-[420px] max-w-[92vw] rounded-2xl bg-card shadow-2xl overflow-hidden animate-fade-in">
             <div className="h-1.5 w-full bg-primary" />
             <div className="px-7 pt-7 pb-6">
-              <h2 className="text-[18px] font-bold text-foreground mb-2">{isImageSeriesOutput ? "Images Ready" : "Package Ready"}</h2>
+              <h2 className="text-[18px] font-bold text-foreground mb-2">{isImageSeriesOutput ? "Flipbook Ready" : "Package Ready"}</h2>
               <p className="text-[14px] text-foreground/80 mb-6">
                 {isImageSeriesOutput ? "Would you like to view the generated image series now?" : "Would you like to generate the downloadable package now?"}
               </p>
@@ -956,7 +956,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                   }}
                   className="px-5 h-10 rounded-xl text-[13px] font-semibold bg-primary text-primary-foreground hover:brightness-110 transition-all"
                 >
-                  {isImageSeriesOutput ? "Yes, View Images" : "Yes, Generate Package"}
+                  {isImageSeriesOutput ? "Yes, View Flipbook" : "Yes, Generate Package"}
                 </button>
               </div>
             </div>
@@ -1157,7 +1157,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                 }}
               >
                 {isImageSeriesOutput && tab.key === "package" ? <Images className="w-3 h-3" /> : <tab.icon className="w-3 h-3" />}
-                {isImageSeriesOutput && tab.key === "package" ? "Images" : tab.label}
+                {isImageSeriesOutput && tab.key === "package" ? "Flipbook" : tab.label}
               </button>
             );
           })}
