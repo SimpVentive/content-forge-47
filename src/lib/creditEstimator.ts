@@ -69,18 +69,33 @@ function estimateImagesPerTopic(): number {
 }
 
 /**
+ * Calculate images needed based on duration
+ * Assumes ~4 images per minute of content
+ */
+function estimateImagesByDuration(durationMinutes: number): number {
+  return Math.max(1, Math.ceil(durationMinutes * 4));
+}
+
+/**
  * Estimate credits for IMAGE-BASED learning
  */
-export function estimateImageCredits(text: string): CreditEstimate {
-  const topics = estimateTopicCount(text);
-  const imagesPerTopic = estimateImagesPerTopic();
-  const totalImages = topics * imagesPerTopic;
+export function estimateImageCredits(text: string, durationMinutes?: number): CreditEstimate {
+  let totalImages: number;
+  let summary: string;
 
-  const claudeTokens = totalImages * 500; // 500 tokens per image for script
+  if (durationMinutes !== undefined) {
+    // Use duration-based calculation if provided
+    totalImages = estimateImagesByDuration(durationMinutes);
+    summary = `~${durationMinutes} min course = ${totalImages} images`;
+  } else {
+    // Fall back to text-based calculation
+    const topics = estimateTopicCount(text);
+    const imagesPerTopic = estimateImagesPerTopic();
+    totalImages = topics * imagesPerTopic;
+    summary = `${topics} topics × ${imagesPerTopic} images = ${totalImages} images`;
+  }
+
   const imageGenerationCredits = totalImages * CREDITS_PER_IMAGE;
-
-  // Rough conversion: 1 token ≈ ₹0.083 / 1000, but we'll account in main credits
-  // Each image also has narration which we include in the image cost
 
   return {
     learningType: "image",
@@ -93,8 +108,8 @@ export function estimateImageCredits(text: string): CreditEstimate {
         subtotal: imageGenerationCredits,
       },
     ],
-    summary: `${topics} topics × ${imagesPerTopic} images = ${totalImages} images`,
-    estimatedTopics: topics,
+    summary,
+    estimatedTopics: durationMinutes ? undefined : estimateTopicCount(text),
   };
 }
 
@@ -174,9 +189,20 @@ export function estimateCredits(
   learningType: "image" | "video" | "static",
   durationMinutes?: number
 ): CreditEstimate {
-  if (durationMinutes !== undefined && (learningType === "video" || learningType === "static")) {
-    // Use explicit duration if provided for video and static learning
-    const rate = learningType === "video" ? CREDITS_PER_VIDEO_MINUTE : CREDITS_PER_ELEARNING_MINUTE;
+  // Use explicit duration if provided for all learning types
+  if (durationMinutes !== undefined) {
+    const rate = learningType === "video"
+      ? CREDITS_PER_VIDEO_MINUTE
+      : learningType === "static"
+      ? CREDITS_PER_ELEARNING_MINUTE
+      : CREDITS_PER_IMAGE; // For image, this is the rate; we calculate quantity differently
+
+    if (learningType === "image") {
+      // For images, duration maps to number of images
+      return estimateImageCredits(text, durationMinutes);
+    }
+
+    // For video and static, use direct per-minute calculation
     const totalCredits = durationMinutes * rate;
     const summary = learningType === "video"
       ? `~${durationMinutes} minutes of AI avatar video`
@@ -198,6 +224,7 @@ export function estimateCredits(
     };
   }
 
+  // Fall back to text-based estimation if no duration provided
   switch (learningType) {
     case "image":
       return estimateImageCredits(text);
