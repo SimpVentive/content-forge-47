@@ -143,9 +143,12 @@ export const PricingSection = () => {
                     <span className="text-4xl font-semibold tracking-tight text-slate-900">
                       ₹{pack.priceInr.toLocaleString("en-IN")}
                     </span>
+                    <span className="text-sm font-medium text-slate-500">
+                      / ${(pack.priceInr / 95).toFixed(2)}
+                    </span>
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
-                    ₹{pack.perCredit.toFixed(2)} / credit
+                    ₹{pack.perCredit.toFixed(2)} (${(pack.perCredit / 95).toFixed(3)}) / credit
                   </div>
                 </div>
 
