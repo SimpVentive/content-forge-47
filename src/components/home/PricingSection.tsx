@@ -10,6 +10,7 @@ type Pack = {
   name: string;
   credits: number;
   priceInr: number;
+  priceUsd: number;
   perCredit: number;
   tag: string | null;
   blurb: string;
