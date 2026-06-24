@@ -148,7 +148,7 @@ export const PricingSection = () => {
                       ₹{pack.priceInr.toLocaleString("en-IN")}
                     </span>
                     <span className="text-sm font-medium text-slate-500">
-                      / ${(pack.priceInr / 95).toFixed(2)}
+                      / ${pack.priceUsd.toFixed(2)}
                     </span>
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
