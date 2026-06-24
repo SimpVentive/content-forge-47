@@ -1126,6 +1126,7 @@ OUTPUT FORMAT — ABSOLUTE:
             const narrationLanguage = params?.flipbookNarrationLanguage || params?.narratorLanguage || "English";
             const voiceId = getVoiceIdForLanguage(narrationLanguage);
             let audioGeneratedCount = 0;
+            let audioFailedCount = 0;
 
             for (let ni = 0; ni < narrativeScenes.length; ni++) {
               if (isCancelled()) break;
@@ -1137,24 +1138,29 @@ OUTPUT FORMAT — ABSOLUTE:
 
                 if (scene.narration && scene.narration.trim().length > 0) {
                   try {
-                    addLog(`Audio Narration: Generating audio for Scene ${scene.sceneNumber}...`);
+                    addLog(`Audio Narration: Generating audio for Scene ${si + 1} in "${narrative.topicTitle}"...`);
                     const audioResult = await generateNarrationAudio(scene.narration, voiceId);
 
                     if (audioResult.success && audioResult.audioDataUrl) {
                       scene.audioDataUrl = audioResult.audioDataUrl;
                       audioGeneratedCount++;
+                      addLog(`Audio Narration: ✓ Scene ${si + 1} complete`);
                     } else {
-                      addLog(`Audio Narration: Failed for Scene ${scene.sceneNumber} — ${audioResult.error}. Continuing...`);
+                      audioFailedCount++;
+                      addLog(`Audio Narration: ✗ Failed for Scene ${si + 1} — ${audioResult.error}. Continuing...`);
                     }
                   } catch (audioErr) {
-                    addLog(`Audio Narration: Error for Scene ${scene.sceneNumber} — ${(audioErr as Error).message}`);
+                    audioFailedCount++;
+                    addLog(`Audio Narration: ✗ Error for Scene ${si + 1} — ${(audioErr as Error).message}`);
                   }
                 }
               }
             }
 
-            addLog(`Audio Narration: Complete. Generated audio for ${audioGeneratedCount} scenes.`);
+            addLog(`Audio Narration: Complete. Generated ${audioGeneratedCount} scenes, ${audioFailedCount} failed.`);
             setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
+          } else {
+            addLog("Audio Narration: Skipped (voiceover disabled)");
           }
         } catch (err) {
           addLog(`Visual Narrative Agent: Error — ${(err as Error).message}. Continuing...`);
