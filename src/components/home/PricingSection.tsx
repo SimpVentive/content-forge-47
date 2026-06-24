@@ -10,6 +10,7 @@ type Pack = {
   name: string;
   credits: number;
   priceInr: number;
+  priceUsd: number;
   perCredit: number;
   tag: string | null;
   blurb: string;
@@ -22,6 +23,7 @@ const PACKS: Pack[] = [
     name: "Starter",
     credits: 200,
     priceInr: 998,
+    priceUsd: 10.99,
     perCredit: 4.99,
     tag: null,
     blurb: "Kick the tyres and ship your first course.",
@@ -32,6 +34,7 @@ const PACKS: Pack[] = [
     name: "Growth",
     credits: 500,
     priceInr: 2250,
+    priceUsd: 23.99,
     perCredit: 4.5,
     tag: "Best value",
     blurb: "For teams shipping courses every month.",
@@ -42,6 +45,7 @@ const PACKS: Pack[] = [
     name: "Studio",
     credits: 1000,
     priceInr: 4000,
+    priceUsd: 42.99,
     perCredit: 4.0,
     tag: null,
     blurb: "For studios producing at scale across formats.",
@@ -144,7 +148,7 @@ export const PricingSection = () => {
                       ₹{pack.priceInr.toLocaleString("en-IN")}
                     </span>
                     <span className="text-sm font-medium text-slate-500">
-                      / ${(pack.priceInr / 95).toFixed(2)}
+                      / ${pack.priceUsd.toFixed(2)}
                     </span>
                   </div>
                   <div className="mt-1 text-xs text-slate-500">
