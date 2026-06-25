@@ -577,7 +577,7 @@ async function callClaudeWithRetry(systemPrompt: string, userMessage: string, ad
  */
 async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await (supabase as any)
       .from("audit_logs")
       .select("*")
       .order("created_at", { ascending: false })

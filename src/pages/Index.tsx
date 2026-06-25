@@ -771,10 +771,37 @@ const Index = () => {
                     Modify Settings
                   </button>
                   <button
-                    onClick={() => setActiveTab("creation")}
-                    className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
+                    onClick={() => {
+                      setActiveTab("creation");
+                      if (!isRunning && courseParams) {
+                        const pipelineLearningMode =
+                          courseParams.learningType === "video"
+                            ? "video_learning"
+                            : courseParams.learningType === "image"
+                              ? "image_based_learning"
+                              : "static_elearning";
+                        const effectiveVideoSettings =
+                          courseParams.learningType === "video"
+                            ? {
+                                selectedAvatar: courseParams.avatarTrainerId || "rachel",
+                                videoQuality: courseParams.videoQuality,
+                                backgroundStyle: courseParams.backgroundStyle,
+                              }
+                            : undefined;
+                        runPipeline(courseTitle, inputText, agentToggles, {
+                          ...courseParams,
+                          contentType,
+                          titleSpans,
+                          companyLogo,
+                          learningMode: pipelineLearningMode,
+                          videoSettings: effectiveVideoSettings,
+                        });
+                      }
+                    }}
+                    disabled={isRunning}
+                    className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    Proceed to Generation
+                    {isRunning ? "Generating..." : "Proceed to Generation"}
                   </button>
                 </div>
               </div>
