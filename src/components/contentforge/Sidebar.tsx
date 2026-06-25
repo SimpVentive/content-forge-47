@@ -1,6 +1,7 @@
 ﻿import React, { useRef, useState } from "react";
 import { Zap, Upload, Square, FileText, X, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { TitleFormatter } from "./TitleFormatter";
 
 /** Estimate e-learning minutes from word count (~150 words/min narrated) */
 export function estimateMinutesFromText(text: string): number {
@@ -227,6 +228,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               isTitleFocused ? "min-h-24 shadow-md" : "min-h-11"
             }`}
             style={{ boxShadow: isTitleFocused ? "inset 0 2px 4px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.12)" : "inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.7)" }}
+          />
+
+          {/* Title Formatting Panel */}
+          <TitleFormatter
+            title={courseTitle}
+            setTitle={setCourseTitle}
+            isOpen={isTitleFocused}
           />
         </div>
 
