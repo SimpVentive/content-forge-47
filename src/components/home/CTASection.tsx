@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 export const CTASection = () => {
   const { isAuthenticated } = useAuth();
   const primaryCta = isAuthenticated
-    ? { to: "/new-course", label: "Go to Dashboard" }
+    ? { to: "/dashboard", label: "Go to My Courses" }
     : { to: "/signup", label: "Get started" };
 
   return (
