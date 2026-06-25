@@ -17,7 +17,8 @@ export interface PDFExportResult {
  */
 export async function exportNarrativeToPDF(
   narratives: TopicNarrative[],
-  courseTitle: string
+  courseTitle: string,
+  assessmentRaw?: string
 ): Promise<PDFExportResult> {
   try {
     // Dynamically import jsPDF (to avoid bundling if not used)
@@ -116,6 +117,130 @@ export async function exportNarrativeToPDF(
         if (narrative !== narratives[narratives.length - 1] || scene !== narrative.scenes[narrative.scenes.length - 1]) {
           pdf.addPage();
         }
+      }
+    }
+
+    // Add assessment pages if provided
+    if (assessmentRaw) {
+      try {
+        let assessmentData = JSON.parse(assessmentRaw);
+        const match = assessmentRaw.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (!assessmentData && match) {
+          assessmentData = JSON.parse(match[1].trim());
+        }
+
+        if (assessmentData) {
+          // Add assessment section title page
+          pdf.addPage();
+          pdf.setFontSize(24);
+          pdf.setFont(undefined, "bold");
+          pdf.setTextColor(0);
+          pdf.text("Assessment", margin, pageHeight / 2 - 20, { align: "center" });
+          pdf.setFontSize(12);
+          pdf.setTextColor(100);
+          pdf.text("Review your knowledge with these questions", margin, pageHeight / 2 + 10, { align: "center" });
+
+          // Add MCQ questions
+          if (Array.isArray(assessmentData.mcq)) {
+            assessmentData.mcq.slice(0, 10).forEach((q: any, qIdx: number) => {
+              pdf.addPage();
+              let qY = margin;
+
+              // Question number and text
+              pdf.setFontSize(12);
+              pdf.setFont(undefined, "bold");
+              pdf.setTextColor(0);
+              const qText = `${qIdx + 1}. ${q.question || "Question"}`;
+              const qLines = pdf.splitTextToSize(qText, contentWidth);
+              pdf.text(qLines, margin, qY);
+              qY += qLines.length * 5 + 5;
+
+              // Options
+              pdf.setFontSize(11);
+              pdf.setFont(undefined, "normal");
+              (q.options || []).forEach((opt: string) => {
+                const optLines = pdf.splitTextToSize(`• ${opt}`, contentWidth);
+                pdf.text(optLines, margin + 5, qY);
+                qY += optLines.length * 4 + 2;
+              });
+
+              // Correct answer
+              qY += 3;
+              pdf.setFontSize(10);
+              pdf.setTextColor(22, 163, 74); // Green
+              pdf.setFont(undefined, "bold");
+              pdf.text(`Answer: ${q.correct_answer || ""}`, margin, qY);
+
+              // Page number
+              pdf.setFontSize(9);
+              pdf.setTextColor(150);
+              pdf.text(`Assessment Q${qIdx + 1}`, margin, pageHeight - margin);
+            });
+          }
+
+          // Add scenario questions
+          if (Array.isArray(assessmentData.scenarios)) {
+            assessmentData.scenarios.slice(0, 5).forEach((s: any, sIdx: number) => {
+              pdf.addPage();
+              let sY = margin;
+
+              pdf.setFontSize(12);
+              pdf.setFont(undefined, "bold");
+              pdf.setTextColor(0);
+              pdf.text(`Scenario ${sIdx + 1}`, margin, sY);
+              sY += 7;
+
+              pdf.setFontSize(11);
+              pdf.setFont(undefined, "normal");
+              const situationLines = pdf.splitTextToSize(s.situation || "Scenario", contentWidth);
+              pdf.text(situationLines, margin, sY);
+              sY += situationLines.length * 5 + 5;
+
+              (s.options || []).forEach((opt: string) => {
+                const optLines = pdf.splitTextToSize(`• ${opt}`, contentWidth);
+                pdf.text(optLines, margin + 5, sY);
+                sY += optLines.length * 4 + 2;
+              });
+
+              sY += 3;
+              pdf.setFontSize(10);
+              pdf.setTextColor(22, 163, 74);
+              pdf.setFont(undefined, "bold");
+              pdf.text(`Best Response: ${s.best_response || ""}`, margin, sY);
+
+              pdf.setFontSize(9);
+              pdf.setTextColor(150);
+              pdf.text(`Assessment Scenario ${sIdx + 1}`, margin, pageHeight - margin);
+            });
+          }
+
+          // Add reflection exercise
+          if (assessmentData.reflection) {
+            pdf.addPage();
+            let rY = margin;
+
+            pdf.setFontSize(12);
+            pdf.setFont(undefined, "bold");
+            pdf.setTextColor(0);
+            pdf.text("Reflection Exercise", margin, rY);
+            rY += 10;
+
+            pdf.setFontSize(11);
+            pdf.setFont(undefined, "normal");
+            const promptLines = pdf.splitTextToSize(`Prompt: ${assessmentData.reflection.prompt || ""}`, contentWidth);
+            pdf.text(promptLines, margin, rY);
+            rY += promptLines.length * 5 + 5;
+
+            const guidanceLines = pdf.splitTextToSize(`Guidance: ${assessmentData.reflection.guidance || ""}`, contentWidth);
+            pdf.text(guidanceLines, margin, rY);
+
+            pdf.setFontSize(9);
+            pdf.setTextColor(150);
+            pdf.text("Reflection", margin, pageHeight - margin);
+          }
+        }
+      } catch (err) {
+        console.warn("Could not add assessment to PDF:", err);
       }
     }
 

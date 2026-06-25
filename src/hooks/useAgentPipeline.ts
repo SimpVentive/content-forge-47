@@ -1721,14 +1721,15 @@ OUTPUT FORMAT — ABSOLUTE:
               courseTitle,
               displayStyle,
               params?.flipbookVoiceoverEnabled || false,
-              params?.voiceoverPace
+              params?.voiceoverPace,
+              assessmentResult
             );
             addLog(`Final Assembly: Generated interactive HTML (${flipbookHtml.length} bytes)`);
 
             // Generate additional formats if requested
             if (outputFormat === "pdf") {
               addLog("Final Assembly: Generating PDF export...");
-              const pdfResult = await exportNarrativeToPDF(narrativeScenes, courseTitle);
+              const pdfResult = await exportNarrativeToPDF(narrativeScenes, courseTitle, assessmentResult);
               if (pdfResult.success && pdfResult.pdfDataUrl) {
                 pdfDataUrl = pdfResult.pdfDataUrl;
                 addLog(`Final Assembly: Generated PDF export (${pdfDataUrl.length} bytes)`);

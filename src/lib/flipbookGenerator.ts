@@ -19,8 +19,27 @@ export function generateFlipbookHTML(
   courseTitle: string,
   displayStyle: "page-flip" | "smooth-slide" | "step-reveal" = "page-flip",
   voiceoverEnabled: boolean = false,
-  voiceoverPace?: "slow" | "normal" | "fast"
+  voiceoverPace?: "slow" | "normal" | "fast",
+  assessmentRaw?: string
 ): string {
+  // Parse assessment if provided
+  let assessmentData: any = null;
+  if (assessmentRaw) {
+    try {
+      assessmentData = JSON.parse(assessmentRaw);
+    } catch (e) {
+      // Try to extract JSON from code fences
+      const match = assessmentRaw.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (match) {
+        try {
+          assessmentData = JSON.parse(match[1].trim());
+        } catch (e2) {
+          console.warn("Could not parse assessment data");
+        }
+      }
+    }
+  }
+
   // Add a title page at the beginning
   const pages: FlipbookPage[] = [
     {
@@ -45,6 +64,50 @@ export function generateFlipbookHTML(
   );
 
   pages.push(...contentPages);
+
+  // Add assessment pages if available
+  if (assessmentData) {
+    let assessmentPageNum = Math.max(...pages.map(p => p.pageNumber || 0)) + 1;
+
+    // Add MCQ questions
+    if (Array.isArray(assessmentData.mcq)) {
+      assessmentData.mcq.slice(0, 10).forEach((q: any) => {
+        const options = (q.options || []).map((opt: string) => `• ${opt}`).join("\n");
+        pages.push({
+          title: `Q${assessmentPageNum - Math.max(...pages.map(p => p.pageNumber || 0))} - ${q.question?.substring(0, 40) || "Question"}`,
+          content: `${q.question || ""}\n\nOptions:\n${options}\n\nCorrect Answer: ${q.correct_answer || ""}`,
+          images: [],
+          speaker: "",
+          pageNumber: assessmentPageNum++,
+        });
+      });
+    }
+
+    // Add scenario questions
+    if (Array.isArray(assessmentData.scenarios)) {
+      assessmentData.scenarios.slice(0, 5).forEach((s: any) => {
+        const options = (s.options || []).map((opt: string) => `• ${opt}`).join("\n");
+        pages.push({
+          title: `Scenario - ${s.situation?.substring(0, 40) || "Scenario Question"}`,
+          content: `${s.situation || ""}\n\nOptions:\n${options}\n\nBest Response: ${s.best_response || ""}`,
+          images: [],
+          speaker: "",
+          pageNumber: assessmentPageNum++,
+        });
+      });
+    }
+
+    // Add reflection exercise
+    if (assessmentData.reflection) {
+      pages.push({
+        title: "Reflection Exercise",
+        content: `Prompt: ${assessmentData.reflection.prompt || ""}\n\nGuidance: ${assessmentData.reflection.guidance || ""}`,
+        images: [],
+        speaker: "",
+        pageNumber: assessmentPageNum++,
+      });
+    }
+  }
 
   const pagesHTML = pages
     .map(
