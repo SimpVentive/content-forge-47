@@ -298,6 +298,13 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     }
   }, [narratorLanguage, voiceAccent]);
 
+  // Auto-enable voiceover if narration language is selected
+  useEffect(() => {
+    if (flipbookNarrationLanguage && flipbookNarrationLanguage.trim()) {
+      setFlipbookVoiceoverEnabled(true);
+    }
+  }, [flipbookNarrationLanguage]);
+
   // Check for mismatch when user tries to generate
   const mismatchInfo = useMemo(() => {
     if (!estimatedMinutes || estimatedMinutes <= 0) return null;
