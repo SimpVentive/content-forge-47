@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { TitleFormatter } from "./TitleFormatter";
 import { RichTitleEditor, type TitleSpan } from "./RichTitleEditor";
 import { LogoUploader } from "./LogoUploader";
+import { SOPFormatDialog } from "./SOPFormatDialog";
 
 /** Estimate e-learning minutes from word count (~150 words/min narrated) */
 export function estimateMinutesFromText(text: string): number {
@@ -333,41 +334,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Format Selection Dialog for SOP */}
-        {showFormatSelection && detectedSOP && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 animate-fade-in">
-            <p className="text-[13px] font-semibold text-foreground mb-1">
-              We detected a Standard Operating Procedure
-            </p>
-            <p className="text-[12px] text-muted-foreground mb-4">
-              How would you like to create content from this SOP?
-            </p>
-            <div className="flex flex-col gap-2">
-              <button
-                onClick={() => handleFormatSelection("learning-course")}
-                type="button"
-                className="flex-1 h-10 rounded-lg text-[13px] font-bold text-white flex items-center justify-center gap-2 bg-blue-600 hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0.5 transition-all text-left px-3"
-                style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.08)" }}
-              >
-                <div>
-                  <div>📚 Learning Course</div>
-                  <div className="text-[11px] font-normal opacity-90">Complete with theory, visuals & assessment</div>
-                </div>
-              </button>
-              <button
-                onClick={() => handleFormatSelection("work-instruction")}
-                type="button"
-                className="flex-1 h-10 rounded-lg text-[13px] font-bold text-foreground flex items-center justify-center gap-2 border border-blue-300 bg-white hover:bg-blue-50 hover:-translate-y-0.5 active:translate-y-0.5 transition-all text-left px-3"
-                style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04)" }}
-              >
-                <div>
-                  <div>⚙️ Work Instruction</div>
-                  <div className="text-[11px] font-normal text-muted-foreground">Bare-bones steps for frontline operators</div>
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
+        {/* SOP Format Dialog - Modal */}
+        <SOPFormatDialog
+          open={showFormatSelection && detectedSOP}
+          onFormatSelect={handleFormatSelection}
+        />
 
         <div>
           <label className="text-[14px] font-semibold text-foreground mb-1 block">Source Material</label>
