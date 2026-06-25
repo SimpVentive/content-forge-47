@@ -111,6 +111,46 @@ export async function exportNarrativeToPDF(
     pdf.setFont(undefined, "bold");
     pdf.setTextColor(40);
     pdf.text(`Duration: Approximately ${estimatedMinutes} minutes`, margin, overviewY);
+    overviewY += 7;
+
+    // Assessment Details
+    let assessmentDetails = "Assessment: This module includes";
+    if (assessmentRaw) {
+      try {
+        let assessmentData = JSON.parse(assessmentRaw);
+        const match = assessmentRaw.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (!assessmentData && match) {
+          assessmentData = JSON.parse(match[1].trim());
+        }
+
+        if (assessmentData) {
+          const mcqCount = (assessmentData.mcq || []).length;
+          const scenarioCount = (assessmentData.scenarios || []).length;
+          const hasReflection = !!assessmentData.reflection;
+
+          const assessmentParts = [];
+          if (mcqCount > 0) assessmentParts.push(`${mcqCount} Multiple Choice Questions`);
+          if (scenarioCount > 0) assessmentParts.push(`${scenarioCount} Scenario-based Questions`);
+          if (hasReflection) assessmentParts.push("1 Reflection Exercise");
+
+          if (assessmentParts.length > 0) {
+            assessmentDetails += ` ${assessmentParts.join(", ")}`;
+          } else {
+            assessmentDetails += " comprehensive assessment questions";
+          }
+        }
+      } catch (err) {
+        assessmentDetails += " comprehensive assessment questions";
+      }
+    } else {
+      assessmentDetails += " comprehensive assessment questions";
+    }
+
+    pdf.setFontSize(12);
+    pdf.setFont(undefined, "bold");
+    pdf.setTextColor(40);
+    const assessmentLines = pdf.splitTextToSize(assessmentDetails, contentWidth);
+    pdf.text(assessmentLines, margin, overviewY);
 
     // Page number
     pdf.setFontSize(9);

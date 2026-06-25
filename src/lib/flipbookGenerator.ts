@@ -60,6 +60,27 @@ export function generateFlipbookHTML(
     const totalScenes = narratives.reduce((sum, n) => sum + n.scenes.length, 0);
     const estimatedMinutes = Math.ceil(totalScenes * 1.5); // ~1.5 min per scene average
 
+    // Build assessment details
+    let assessmentDetails = "Assessment: This module includes";
+    if (assessmentData) {
+      const mcqCount = (assessmentData.mcq || []).length;
+      const scenarioCount = (assessmentData.scenarios || []).length;
+      const hasReflection = !!assessmentData.reflection;
+
+      const assessmentParts = [];
+      if (mcqCount > 0) assessmentParts.push(`${mcqCount} Multiple Choice Questions`);
+      if (scenarioCount > 0) assessmentParts.push(`${scenarioCount} Scenario-based Questions`);
+      if (hasReflection) assessmentParts.push("1 Reflection Exercise");
+
+      if (assessmentParts.length > 0) {
+        assessmentDetails += ` ${assessmentParts.join(", ")}`;
+      } else {
+        assessmentDetails += " comprehensive assessment questions";
+      }
+    } else {
+      assessmentDetails += " comprehensive assessment questions";
+    }
+
     pages.push({
       title: "Course Overview",
       content: `Module Objective:
@@ -68,7 +89,9 @@ ${narratives.map(n => n.topicObjective || "Master key concepts").slice(0, 3).joi
 Course Contents:
 ${topicsList}
 
-Duration: Approximately ${estimatedMinutes} minutes`,
+Duration: Approximately ${estimatedMinutes} minutes
+
+${assessmentDetails}`,
       images: [],
       speaker: "",
       pageNumber: 1,
