@@ -465,6 +465,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     setPendingLearningType(null);
   };
 
+  if (!open) return null;
+
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center" onClick={onCancel}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />

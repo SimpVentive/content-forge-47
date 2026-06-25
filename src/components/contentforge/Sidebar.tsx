@@ -264,17 +264,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
     <div className="h-full flex flex-col bg-white">
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0">
         {/* Progress Breadcrumbs */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep1Complete ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"}`}>
-            1
+        <div className="flex items-start gap-3 mb-6">
+          {/* Step 1 */}
+          <div className="flex flex-col items-center">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep1Complete ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"}`}>
+              1
+            </div>
+            <p className="text-[10px] font-semibold text-slate-600 mt-1.5 text-center whitespace-nowrap">Course<br />Title</p>
           </div>
-          <div className={`flex-1 h-1 rounded-full transition-all ${isStep1Complete ? "bg-blue-600" : "bg-slate-200"}`} />
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep2Complete ? "bg-blue-600 text-white" : isStep1Complete ? "bg-blue-100 text-blue-600" : "bg-slate-200 text-slate-400"}`}>
-            2
+
+          {/* Connector Line 1 */}
+          <div className="flex-1 h-1 rounded-full transition-all mt-1 self-start" style={{ marginTop: '4px', height: '2px', background: isStep1Complete ? '#2563eb' : '#e2e8f0' }} />
+
+          {/* Step 2 */}
+          <div className="flex flex-col items-center">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep2Complete ? "bg-blue-600 text-white" : isStep1Complete ? "bg-blue-100 text-blue-600" : "bg-slate-200 text-slate-400"}`}>
+              2
+            </div>
+            <p className="text-[10px] font-semibold text-slate-600 mt-1.5 text-center whitespace-nowrap">Course<br />Content</p>
           </div>
-          <div className={`flex-1 h-1 rounded-full transition-all ${isStep2Complete ? "bg-blue-600" : isStep1Complete ? "bg-blue-100" : "bg-slate-200"}`} />
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep2Complete ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-400"}`}>
-            3
+
+          {/* Connector Line 2 */}
+          <div className="flex-1 h-1 rounded-full transition-all mt-1 self-start" style={{ marginTop: '4px', height: '2px', background: isStep2Complete ? '#2563eb' : isStep1Complete ? '#dbeafe' : '#e2e8f0' }} />
+
+          {/* Step 3 */}
+          <div className="flex flex-col items-center">
+            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep2Complete ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-400"}`}>
+              3
+            </div>
+            <p className="text-[10px] font-semibold text-slate-600 mt-1.5 text-center whitespace-nowrap">Branding</p>
           </div>
         </div>
 

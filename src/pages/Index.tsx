@@ -764,15 +764,15 @@ const Index = () => {
                 <div className="mt-8 flex gap-3">
                   <button
                     onClick={() => setShowParamsDialog(true)}
-                    className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
+                    className="px-6 py-3 rounded-lg bg-slate-200 text-slate-900 font-semibold hover:bg-slate-300 transition-all"
                   >
                     Modify Settings
                   </button>
                   <button
                     onClick={() => setActiveTab("creation")}
-                    className="px-6 py-3 rounded-lg bg-slate-200 text-slate-900 font-semibold hover:bg-slate-300 transition-all"
+                    className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
                   >
-                    Cancel
+                    Proceed to Generation
                   </button>
                 </div>
               </div>
