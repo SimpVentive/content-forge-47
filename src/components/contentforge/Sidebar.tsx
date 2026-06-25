@@ -258,23 +258,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
   return (
     <div className="h-full flex flex-col bg-white">
       <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5 min-h-0">
-        <p className="text-[12px] font-bold text-primary tracking-[0.12em] uppercase">
-          Course Input
+        <p className="text-[11px] font-bold text-blue-600 tracking-[0.15em] uppercase opacity-80 mb-1">
+          Course Configuration
         </p>
 
         <div>
-          <label className="text-[14px] font-semibold text-foreground mb-1.5 block">Course Title</label>
+          <label className="text-[13px] font-bold text-slate-900 mb-2.5 block">Course Title</label>
           <textarea
             ref={titleInputRef}
             value={courseTitle}
             onChange={(e) => setCourseTitle(e.target.value)}
             onFocus={() => setIsTitleFocused(true)}
             onBlur={() => setIsTitleFocused(false)}
-            placeholder="Enter course title..."
-            className={`w-full border-[1.5px] border-border rounded-xl px-3.5 py-2.5 text-[14px] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-all duration-200 resize-none font-medium ${
-              isTitleFocused ? "min-h-24 shadow-md" : "min-h-11"
+            placeholder="Enter an engaging course title..."
+            className={`w-full border-[1.5px] border-slate-300 rounded-lg px-4 py-3 text-[14px] text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 resize-none font-medium ${
+              isTitleFocused ? "min-h-24" : "min-h-11"
             }`}
-            style={{ boxShadow: isTitleFocused ? "inset 0 2px 4px rgba(0,0,0,0.06), 0 4px 12px rgba(0,0,0,0.12)" : "inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.7)" }}
           />
 
           {/* Title Formatting Panel */}
@@ -388,13 +387,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         </div>
 
-        <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-slate-200 pt-4 -mx-6 px-6 pb-6 z-10 shadow-lg">
+        <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-white/80 border-t border-slate-200/50 pt-5 -mx-6 px-6 pb-6 z-10 shadow-2xl backdrop-blur-sm">
           {isRunning ? (
             <button
               onClick={onStop}
               type="button"
-              className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 hover:-translate-y-0.5 active:translate-y-0.5 transition-all duration-200"
-              style={{ boxShadow: "0 3px 0 rgba(0,0,0,0.15), 0 6px 12px rgba(220,38,38,0.25), inset 0 1px 0 rgba(255,255,255,0.2)" }}
+              className="w-full h-12 rounded-lg text-[14px] font-bold text-white flex items-center justify-center gap-2.5 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               <Square className="w-4 h-4" />
               Stop Generating
@@ -404,8 +402,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={onGenerate}
               type="button"
               disabled={isExtracting || isStartingGeneration}
-              className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] hover:-translate-y-0.5 active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-              style={{ background: '#2563EB' }}
+              className="w-full h-12 rounded-lg text-[14px] font-bold text-white flex items-center justify-center gap-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 shadow-lg hover:shadow-xl"
             >
               {isExtracting || isStartingGeneration ? (
                 <>
