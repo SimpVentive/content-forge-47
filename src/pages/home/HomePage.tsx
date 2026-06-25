@@ -12,7 +12,6 @@ import { Footer } from "@/components/home/Footer";
 
 const HomePage = () => {
   const { hash } = useLocation();
-  const navigate = useNavigate();
   const { isLoading } = useAuth();
 
   useEffect(() => {
