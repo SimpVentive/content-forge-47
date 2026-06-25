@@ -51,6 +51,30 @@ export function generateFlipbookHTML(
     },
   ];
 
+  // Add module overview page
+  if (narratives.length > 0) {
+    const topicsList = narratives
+      .flatMap(n => [n.topicTitle, ...n.scenes.map(s => `  • ${s.title}`)])
+      .join("\n");
+
+    const totalScenes = narratives.reduce((sum, n) => sum + n.scenes.length, 0);
+    const estimatedMinutes = Math.ceil(totalScenes * 1.5); // ~1.5 min per scene average
+
+    pages.push({
+      title: "Course Overview",
+      content: `Module Objective:
+${narratives.map(n => n.topicObjective || "Master key concepts").slice(0, 3).join("\n")}
+
+Course Contents:
+${topicsList}
+
+Duration: Approximately ${estimatedMinutes} minutes`,
+      images: [],
+      speaker: "",
+      pageNumber: 1,
+    });
+  }
+
   // Convert narratives to flipbook pages with narration support
   const contentPages = narratives.flatMap((narrative, topicIdx) =>
     narrative.scenes.map((scene, sceneIdx) => ({
@@ -59,7 +83,7 @@ export function generateFlipbookHTML(
       images: scene.imageDataUrl ? [scene.imageDataUrl] : [],
       speaker: voiceoverEnabled && scene.narration ? scene.narration : "",
       audioDataUrl: voiceoverEnabled && scene.audioDataUrl ? scene.audioDataUrl : undefined,
-      pageNumber: topicIdx * 10 + sceneIdx + 1,
+      pageNumber: (topicIdx + 1) * 10 + sceneIdx + 2,
     }))
   );
 
