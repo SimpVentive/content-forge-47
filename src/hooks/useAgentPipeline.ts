@@ -746,6 +746,13 @@ export function useAgentPipeline() {
   };
 
   const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }) => {
+    cancelledRef.current = false;
+    setIsRunning(true);
+    setAgentStatuses(initialStatuses());
+    setOutputData(initialOutput());
+    setRawOutputs(initialRaw());
+    setLogs([]);
+
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const languageDirective = buildLanguageDirective(textLanguage, narratorLanguage);
@@ -813,13 +820,6 @@ export function useAgentPipeline() {
     const escapeRegex = (s: string): string => {
       return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     };
-
-    cancelledRef.current = false;
-    setIsRunning(true);
-    setAgentStatuses(initialStatuses());
-    setOutputData(initialOutput());
-    setRawOutputs(initialRaw());
-    setLogs([]);
 
     const isCancelled = () => cancelledRef.current;
 
