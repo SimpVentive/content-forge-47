@@ -578,13 +578,15 @@ async function callClaudeWithRetry(systemPrompt: string, userMessage: string, ad
 async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
   try {
     const { data, error } = await (supabase as any)
-      .from("audit_logs")
+      .from("qa_audit_logs")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(100);
 
     if (error) {
-      console.warn("Failed to fetch audit logs:", error);
+      if (error.code !== "PGRST205") {
+        console.warn("Failed to fetch QA audit logs:", error);
+      }
       return [];
     }
 
@@ -595,7 +597,7 @@ async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
       wasAccepted: log.was_accepted || false,
     }));
   } catch (err) {
-    console.warn("Error fetching audit logs:", err);
+    console.warn("Error fetching QA audit logs:", err);
     return [];
   }
 }
@@ -706,7 +708,7 @@ export function useAgentPipeline() {
   }, []);
 
   const runWorkInstructionPipeline = async (courseTitle: string, inputText: string, textLanguage: string): Promise<void> => {
-    const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
+    setStatus("research", "running");
     addLog("Work Instruction Generator: Starting...");
     addLog("Extracting procedure steps from SOP...");
 
@@ -724,6 +726,8 @@ export function useAgentPipeline() {
         steps.push({ stepNumber: 1, description: inputText.slice(0, 500) });
       }
 
+      setStatus("research", "complete");
+      setStatus("writer", "running");
       addLog(`Extracted ${steps.length} procedure steps`);
       addLog("Generating simple step-by-step content...");
 
@@ -737,10 +741,17 @@ export function useAgentPipeline() {
       setOutputData((prev) => ({ ...prev, script }));
       setRawOutputs((prev) => ({ ...prev, writer: script }));
 
+      setStatus("writer", "complete");
+      setStatus("assembly", "running");
+      setOutputData((prev) => ({ ...prev, package: `# ${courseTitle} - Work Instruction Package\n\n${steps.length} procedure steps prepared for review.` }));
+      setRawOutputs((prev) => ({ ...prev, assembly: JSON.stringify({ type: "work-instruction", steps: steps.length }, null, 2) }));
+      setStatus("assembly", "complete");
       addLog("Work Instruction Generator: Complete");
+      addLog("Orchestrator: Pipeline finished successfully.");
       setIsRunning(false);
     } catch (err) {
       addLog(`Work Instruction Generator: Error — ${(err as Error).message}`);
+      setStatus("research", "error");
       setIsRunning(false);
     }
   };
@@ -751,7 +762,14 @@ export function useAgentPipeline() {
     setAgentStatuses(initialStatuses());
     setOutputData(initialOutput());
     setRawOutputs(initialRaw());
-    setLogs([]);
+    setLogs([`${timestamp()} Orchestrator: Pipeline start requested for '${courseTitle || "Untitled Course"}'.`]);
+
+    // Put the UI into an active orchestration state before any network reads.
+    // Optional feedback/audit reads can be slow or absent, but the user should
+    // immediately see the creation pipeline has actually started.
+    AGENTS.forEach(({ id }) => {
+      setAgentStatuses((prev) => ({ ...prev, [id]: toggles[id] === false ? "idle" : "queued" as AgentStatus }));
+    });
 
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
@@ -827,11 +845,6 @@ export function useAgentPipeline() {
     if (params?.contentType === "work-instruction") {
       return runWorkInstructionPipeline(courseTitle, inputText, textLanguage);
     }
-
-    // Set all agents to queued initially
-    AGENTS.forEach(({ id }) => {
-      setAgentStatuses((prev) => ({ ...prev, [id]: "queued" as AgentStatus }));
-    });
 
     addLog(`Orchestrator: Pipeline initiated for '${courseTitle}' (${params?.level || "intermediate"}, text: ${textLanguage}, voice: ${narratorLanguage}, ${params?.duration || "15min"})`);
 
