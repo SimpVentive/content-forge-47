@@ -1183,9 +1183,15 @@ OUTPUT FORMAT — ABSOLUTE:
 
           setStatus("visual", "complete");
 
-          // Prepend title slide to the first narrative
-          narrativeScenes = prependTitleSlideToNarratives(narrativeScenes, courseTitle, params?.level);
-          addLog(`Visual Narrative Agent: Added title slide. ${narrativeScenes.length} topic narratives with ${narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0)} total scenes.`);
+          // Learning courses can start with a title slide, but work-instruction
+          // storyboards should begin with the first procedure step. Otherwise
+          // the title art can look like the only generated image when previewed.
+          if (params?.contentType !== "work-instruction") {
+            narrativeScenes = prependTitleSlideToNarratives(narrativeScenes, courseTitle, params?.level);
+            addLog(`Visual Narrative Agent: Added title slide. ${narrativeScenes.length} topic narratives with ${narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0)} total scenes.`);
+          } else {
+            addLog(`Visual Narrative Agent: Work Instruction storyboard ready with ${narrativeScenes.length} topics and ${narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0)} step scenes.`);
+          }
 
           setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
 
