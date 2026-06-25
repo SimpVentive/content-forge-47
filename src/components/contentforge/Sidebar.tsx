@@ -156,6 +156,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showFormatSelection, setShowFormatSelection] = useState(false);
   const [detectedSOP, setDetectedSOP] = useState(false);
   const [showCourseOutline, setShowCourseOutline] = useState(false);
+  const [contentMode, setContentMode] = useState<"upload" | "paste" | null>(null);
+
+  const isStep1Complete = courseTitle.trim().length > 0;
+  const isStep2Complete = contentMode !== null && inputText.trim().length > 0;
 
   const handleFile = async (file: File) => {
     setUploadedFileName(file.name);
@@ -258,9 +262,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-white">
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 min-h-0">
-        <p className="text-[11px] font-bold text-blue-600 tracking-[0.15em] uppercase opacity-80 mb-2">
-          Course Configuration
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0">
+        {/* Progress Breadcrumbs */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep1Complete ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-600"}`}>
+            1
+          </div>
+          <div className={`flex-1 h-1 rounded-full transition-all ${isStep1Complete ? "bg-blue-600" : "bg-slate-200"}`} />
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep2Complete ? "bg-blue-600 text-white" : isStep1Complete ? "bg-blue-100 text-blue-600" : "bg-slate-200 text-slate-400"}`}>
+            2
+          </div>
+          <div className={`flex-1 h-1 rounded-full transition-all ${isStep2Complete ? "bg-blue-600" : isStep1Complete ? "bg-blue-100" : "bg-slate-200"}`} />
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep2Complete ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-400"}`}>
+            3
+          </div>
+        </div>
+
+        <p className="text-[11px] font-bold text-blue-600 tracking-[0.15em] uppercase opacity-80">
+          Step 1: Course Title
         </p>
 
         <div>
@@ -298,15 +317,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
+        {/* Step 2: Course Content */}
+        <div className={`pt-2 ${!isStep1Complete ? "opacity-50 pointer-events-none" : ""}`}>
+          <p className="text-[11px] font-bold text-blue-600 tracking-[0.15em] uppercase opacity-80 mb-3">
+            Step 2: Course Content
+          </p>
+          <p className="text-[13px] text-slate-700 font-medium mb-3">How would you like to provide the course content?</p>
+
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <button
+              onClick={() => {
+                setContentMode("upload");
+                setShowCourseOutline(false);
+              }}
+              className={`p-3 rounded-lg border-2 transition-all font-semibold text-[12px] ${
+                contentMode === "upload"
+                  ? "border-blue-600 bg-blue-50 text-blue-700"
+                  : "border-slate-300 bg-white text-slate-700 hover:border-blue-300"
+              }`}
+            >
+              📤 Upload File
+            </button>
+            <button
+              onClick={() => {
+                setContentMode("paste");
+                setShowCourseOutline(true);
+              }}
+              className={`p-3 rounded-lg border-2 transition-all font-semibold text-[12px] ${
+                contentMode === "paste"
+                  ? "border-blue-600 bg-blue-50 text-blue-700"
+                  : "border-slate-300 bg-white text-slate-700 hover:border-blue-300"
+              }`}
+            >
+              ✏️ Enter Outline
+            </button>
+          </div>
+        </div>
+
         {/* SOP Format Dialog - Modal */}
         <SOPFormatDialog
           open={showFormatSelection && detectedSOP}
           onFormatSelect={handleFormatSelection}
         />
 
-        <div>
-          <label className="text-[13px] font-bold text-slate-900 mb-1.5 block">Source Material</label>
-          <p className="text-[12px] text-slate-500 mb-2">Upload or paste SME notes</p>
+        {/* Upload/Paste Section */}
+        {isStep1Complete && contentMode && (
+          <div>
+            {contentMode === "upload" && (
+              <>
+                <p className="text-[12px] text-slate-500 mb-2">Upload your course materials</p>
 
           <input
             ref={fileInputRef}
@@ -328,47 +387,65 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="text-primary text-[12px] font-semibold underline underline-offset-2">Browse files</span>
           </div>
 
-          {/* Uploaded file indicator */}
-          {uploadedFileName && (
-            <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
-              <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-              <span className="text-[12px] text-slate-900 truncate flex-1 font-medium">{uploadedFileName}</span>
-              {isExtracting && (
-                <span className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin shrink-0" />
-              )}
-              {!isExtracting && (
-                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              )}
-            </div>
-          )}
+              </>
+            )}
 
-          {/* View Course Outline Toggle */}
-          <button
-            onClick={() => setShowCourseOutline(!showCourseOutline)}
-            className="w-full p-3 rounded-lg border border-slate-300 text-slate-900 font-semibold text-[13px] hover:bg-slate-50 transition-all flex items-center justify-between mb-2"
-          >
-            <span>{showCourseOutline ? "Hide Course Outline" : "View Course Outline"}</span>
-            <span className="text-[16px]">{showCourseOutline ? "▼" : "▶"}</span>
-          </button>
+            {contentMode === "paste" && (
+              <>
+                <p className="text-[12px] text-slate-500 mb-2">Enter your course outline</p>
+              </>
+            )}
 
-          {/* Course Outline Textarea */}
-          {showCourseOutline && (
-            <textarea
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              rows={6}
-              className="w-full border-[1.5px] border-slate-300 rounded-lg px-4 py-3 text-[13px] leading-[1.6] text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none transition-all duration-200"
-              placeholder="Paste subject matter notes..."
+            {/* Uploaded file indicator */}
+            {uploadedFileName && (
+              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
+                <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="text-[12px] text-slate-900 truncate flex-1 font-medium">{uploadedFileName}</span>
+                {isExtracting && (
+                  <span className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin shrink-0" />
+                )}
+                {!isExtracting && (
+                  <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                )}
+              </div>
+            )}
+
+            {contentMode === "upload" && (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+                className="border-2 border-dashed border-blue-300 rounded-lg p-4 text-center cursor-pointer hover:bg-blue-50 hover:border-blue-400 transition-all mb-3"
+              >
+                <Upload className="w-6 h-6 mx-auto mb-2 text-blue-600" />
+                <p className="text-[13px] font-semibold text-slate-900">Drop PPT, PDF or DOCX</p>
+                <span className="text-blue-600 text-[12px] font-semibold underline underline-offset-2">Browse files</span>
+              </div>
+            )}
+
+            {contentMode === "paste" && (
+              <textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                rows={6}
+                className="w-full border-[1.5px] border-slate-300 rounded-lg px-4 py-3 text-[13px] leading-[1.6] text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none transition-all duration-200"
+                placeholder="Paste subject matter notes..."
+              />
+            )}
+          </div>
+        )}
+
+        {/* Step 3: Logo Upload */}
+        {isStep2Complete && setCompanyLogo && (
+          <div className="pt-2">
+            <p className="text-[11px] font-bold text-blue-600 tracking-[0.15em] uppercase opacity-80 mb-3">
+              Step 3: Brand Customization
+            </p>
+            <LogoUploader
+              logoDataUrl={companyLogo || undefined}
+              onLogoChange={setCompanyLogo}
             />
-          )}
-        </div>
-
-        {/* Company Logo Upload */}
-        {setCompanyLogo && (
-          <LogoUploader
-            logoDataUrl={companyLogo || undefined}
-            onLogoChange={setCompanyLogo}
-          />
+          </div>
         )}
 
         <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-white/80 border-t border-slate-200/50 pt-5 -mx-6 px-6 pb-6 z-10 shadow-2xl backdrop-blur-sm">
