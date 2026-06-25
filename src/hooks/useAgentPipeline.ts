@@ -520,7 +520,19 @@ async function callClaude(systemPrompt: string, userMessage: string): Promise<st
     body: { systemPrompt, userMessage },
   });
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    let message = error.message;
+    try {
+      const context = (error as any).context;
+      if (context?.json) {
+        const body = await context.json();
+        message = body?.error || body?.message || message;
+      }
+    } catch {
+      // Keep the original invoke error message.
+    }
+    throw new Error(message);
+  }
   if (data?.error) throw new Error(data.error);
 
   // Log API usage for Claude (estimated tokens and cost)
@@ -777,13 +789,9 @@ export function useAgentPipeline() {
     const languageDirectiveTail = buildLanguageDirectiveTail(textLanguage, narratorLanguage);
     const userLanguageReminder = buildUserLanguageReminder(textLanguage, narratorLanguage);
 
-    // Fetch audit logs for learning feedback integration
-    let auditLogs: AuditLogEntry[] = [];
-    try {
-      auditLogs = await fetchAuditLogs();
-    } catch (err) {
-      console.warn("Warning: Could not fetch audit logs for learning feedback", err);
-    }
+    // Historical QA feedback is optional. Do not block generation on a missing
+    // audit table; the user's orchestration run must start immediately.
+    const auditLogs: AuditLogEntry[] = [];
 
     // Wrapper that sandwiches language instructions around every agent call.
     // Head directive is already baked into each systemPrompt template (${languageDirective});
@@ -841,9 +849,11 @@ export function useAgentPipeline() {
 
     const isCancelled = () => cancelledRef.current;
 
-    // Handle Work Instruction mode
+    // Work Instruction mode still uses the orchestration pipeline. Previously
+    // this short-circuited into a tiny local formatter, so the Creation tab
+    // appeared active but the AI agent pipeline never actually ran.
     if (params?.contentType === "work-instruction") {
-      return runWorkInstructionPipeline(courseTitle, inputText, textLanguage);
+      addLog("Work Instruction mode: SOP-focused orchestration enabled.");
     }
 
     addLog(`Orchestrator: Pipeline initiated for '${courseTitle}' (${params?.level || "intermediate"}, text: ${textLanguage}, voice: ${narratorLanguage}, ${params?.duration || "15min"})`);
