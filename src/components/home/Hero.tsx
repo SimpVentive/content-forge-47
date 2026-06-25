@@ -23,7 +23,7 @@ const MODULES = [
 export const Hero = () => {
   const { isAuthenticated } = useAuth();
   const primaryCta = isAuthenticated
-    ? { to: "/new-course", label: "Go to Dashboard" }
+    ? { to: "/dashboard", label: "Go to My Courses" }
     : { to: "/signup", label: "Start Creating" };
 
   return (
