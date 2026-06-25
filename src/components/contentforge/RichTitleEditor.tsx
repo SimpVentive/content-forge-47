@@ -161,11 +161,16 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
         ))}
       </div>
 
-      {showToolbar && selectionStart !== selectionEnd && (
+      {showToolbar && (
         <div className="border-t border-blue-200 pt-3">
-          <p className="text-[11px] font-semibold text-muted-foreground mb-2">
-            Selected: "{title.slice(Math.min(selectionStart, selectionEnd), Math.max(selectionStart, selectionEnd))}"
-          </p>
+          {selectionStart !== selectionEnd && (
+            <p className="text-[11px] font-semibold text-muted-foreground mb-2">
+              Selected: "{title.slice(Math.min(selectionStart, selectionEnd), Math.max(selectionStart, selectionEnd))}"
+            </p>
+          )}
+          {selectionStart === selectionEnd && (
+            <p className="text-[11px] text-muted-foreground mb-2 italic">👆 Select text to apply formatting</p>
+          )}
 
           <div className="space-y-2">
             {/* Font Size */}
