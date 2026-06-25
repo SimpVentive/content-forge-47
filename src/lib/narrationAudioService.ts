@@ -130,6 +130,10 @@ export function getVoiceIdForLanguage(language: string): string {
     "Tamil": "21m00Tcm4TlvDq8ikWAM", // Rachel works for Tamil
     "ta": "21m00Tcm4TlvDq8ikWAM",
 
+    // Telugu
+    "Telugu": "21m00Tcm4TlvDq8ikWAM", // Rachel works for Telugu
+    "te": "21m00Tcm4TlvDq8ikWAM",
+
     // Default
   };
 

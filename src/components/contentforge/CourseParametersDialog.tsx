@@ -48,7 +48,7 @@ export const ELEVENLABS_LANGUAGES = [
   "English","Hindi","Spanish","French","German","Italian","Portuguese","Polish",
   "Turkish","Russian","Dutch","Czech","Arabic","Chinese","Japanese","Korean",
   "Hungarian","Norwegian","Finnish","Swedish","Danish","Bulgarian","Romanian",
-  "Greek","Filipino","Indonesian","Malay","Slovak","Ukrainian","Croatian","Tamil",
+  "Greek","Filipino","Indonesian","Malay","Slovak","Ukrainian","Croatian","Tamil","Telugu",
 ];
 
 interface CourseParametersDialogProps {
