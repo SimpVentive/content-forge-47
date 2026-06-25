@@ -258,7 +258,7 @@ const Welcome = () => {
           </p>
           <div className="flex items-center justify-center gap-4">
             <button
-              onClick={() => handleNavigate("/studio")}
+              onClick={() => handleNavigate("/dashboard")}
               className="h-14 rounded-xl bg-primary px-8 text-[16px] font-extrabold text-primary-foreground shadow-lg transition-all hover:brightness-110 flex items-center gap-2"
               style={{ fontFamily: displayFont }}
               disabled={isLeavingPage}
