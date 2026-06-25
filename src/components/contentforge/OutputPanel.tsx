@@ -119,7 +119,7 @@ async function downloadNarrativeImages(courseTitle: string, rawOutputs: RawAgent
 }
 
 function exportFlipbookHTML(courseTitle: string, rawOutputs: RawAgentOutputs) {
-  let html = rawOutputs.flipbookHTML;
+  const html = rawOutputs.flipbookHTML;
   if (!html) {
     throw new Error("No flipbook HTML generated. Make sure image-based course completed successfully.");
   }
@@ -133,6 +133,20 @@ function exportFlipbookHTML(courseTitle: string, rawOutputs: RawAgentOutputs) {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+}
+
+function exportFlipbookPDF(courseTitle: string, rawOutputs: RawAgentOutputs) {
+  const pdfDataUrl = (rawOutputs as any).pdfDataUrl;
+  if (!pdfDataUrl) {
+    throw new Error("No PDF generated. PDF export may not be available for this course.");
+  }
+
+  const link = document.createElement("a");
+  link.href = pdfDataUrl;
+  link.download = `${safeFilename(courseTitle)}_Flipbook.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
 }
 
 /* Assessment Renderer */
@@ -557,13 +571,33 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
               setExporting(true);
               try {
                 if (isImageSeries) {
-                  // Try HTML flipbook first if available, otherwise download individual images
-                  if (rawOutputs.flipbookHTML) {
+                  const outputFormat = (data as any)?.outputFormat || "interactive-html";
+
+                  if (outputFormat === "pdf") {
+                    // Export as PDF
+                    try {
+                      exportFlipbookPDF(courseTitle, rawOutputs);
+                      toast.success("PDF flipbook exported successfully!");
+                    } catch (pdfErr: any) {
+                      // Fallback to HTML if PDF export fails
+                      toast.info("PDF export unavailable, downloading HTML instead...");
+                      exportFlipbookHTML(courseTitle, rawOutputs);
+                      toast.success("Interactive HTML flipbook exported successfully!");
+                    }
+                  } else if (outputFormat === "video") {
+                    // Video export message
+                    toast.info("Video export requires server processing. Downloading HTML flipbook instead.");
                     exportFlipbookHTML(courseTitle, rawOutputs);
-                    toast.success("Flipbook HTML exported successfully!");
+                    toast.success("Interactive HTML flipbook exported successfully!");
                   } else {
-                    const count = await downloadNarrativeImages(courseTitle, rawOutputs);
-                    toast.success(`${count} image${count === 1 ? "" : "s"} downloaded`);
+                    // Default: HTML flipbook
+                    if (rawOutputs.flipbookHTML) {
+                      exportFlipbookHTML(courseTitle, rawOutputs);
+                      toast.success("Interactive HTML flipbook exported successfully!");
+                    } else {
+                      const count = await downloadNarrativeImages(courseTitle, rawOutputs);
+                      toast.success(`${count} image${count === 1 ? "" : "s"} downloaded`);
+                    }
                   }
                 } else {
                   const hasVoice = !!rawOutputs.voice;

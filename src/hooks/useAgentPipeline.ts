@@ -5,6 +5,7 @@ import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
 import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
+import { exportNarrativeToPDF, downloadPDF } from "@/lib/pdfExportService";
 import { logApiUsage } from "@/lib/edgeFunctions";
 import { generateNarrationAudio, getVoiceIdForLanguage } from "@/lib/narrationAudioService";
 import { runFinalQACheck, storeQAAuditLog, type QAResult } from "@/lib/qaService";
@@ -1707,9 +1708,13 @@ OUTPUT FORMAT — ABSOLUTE:
             },
           }, null, 2);
 
-          // Generate flipbook HTML
+          // Generate output based on format
           let flipbookHtml = "";
+          let pdfDataUrl = "";
+          let outputFormat = params?.imageOutputFormat || "interactive-html";
+
           try {
+            // Always generate HTML as base
             const displayStyle = params?.flipbookDisplayStyle || "smooth-slide";
             flipbookHtml = generateFlipbookHTML(
               narrativeScenes,
@@ -1718,15 +1723,36 @@ OUTPUT FORMAT — ABSOLUTE:
               params?.flipbookVoiceoverEnabled || false,
               params?.voiceoverPace
             );
-            addLog(`Final Assembly: Generated flipbook HTML (${flipbookHtml.length} bytes)`);
+            addLog(`Final Assembly: Generated interactive HTML (${flipbookHtml.length} bytes)`);
+
+            // Generate additional formats if requested
+            if (outputFormat === "pdf") {
+              addLog("Final Assembly: Generating PDF export...");
+              const pdfResult = await exportNarrativeToPDF(narrativeScenes, courseTitle);
+              if (pdfResult.success && pdfResult.pdfDataUrl) {
+                pdfDataUrl = pdfResult.pdfDataUrl;
+                addLog(`Final Assembly: Generated PDF export (${pdfDataUrl.length} bytes)`);
+              } else {
+                addLog(`Final Assembly: PDF export failed — ${pdfResult.error}. Using HTML instead.`);
+              }
+            } else if (outputFormat === "video") {
+              addLog("Final Assembly: Video export requires server-side processing. Using Interactive HTML instead.");
+              addLog("Final Assembly: Tip: Download HTML and use video editor to add narration, or schedule async video generation.");
+            }
           } catch (htmlErr) {
-            addLog(`Final Assembly: Could not generate flipbook HTML — ${(htmlErr as Error).message}`);
+            addLog(`Final Assembly: Could not generate output — ${(htmlErr as Error).message}`);
           }
 
           setStatus("assembly", "complete");
-          setRawOutputs((prev) => ({ ...prev, assembly: assemblyResult, narrativeScenes: JSON.stringify(narrativeScenes), flipbookHTML: flipbookHtml }));
-          setOutputData((prev) => ({ ...prev, package: assemblyResult }));
-          addLog("Final Assembly: Complete. Image series ready.");
+          setRawOutputs((prev) => ({
+            ...prev,
+            assembly: assemblyResult,
+            narrativeScenes: JSON.stringify(narrativeScenes),
+            flipbookHTML: flipbookHtml,
+            pdfDataUrl: pdfDataUrl,
+          }));
+          setOutputData((prev) => ({ ...prev, package: assemblyResult, outputFormat: outputFormat }));
+          addLog(`Final Assembly: Complete. Output format: ${outputFormat.toUpperCase()}`);
           addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
         } else {
         const modeInstructions = getAgentModeInstructions("assembly", learningMode);
