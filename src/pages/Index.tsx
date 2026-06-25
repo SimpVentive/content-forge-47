@@ -15,7 +15,6 @@ import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
 import { Plus, Play, Clock3, Loader2, Save, FolderOpen, Trash2, FileText, Zap, BarChart3, Settings } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { TabContainer } from "@/components/contentforge/TabContainer";
-import { Breadcrumbs } from "@/components/contentforge/Breadcrumbs";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import {
   createDraftId,
@@ -647,18 +646,6 @@ const Index = () => {
           />
         </Suspense>
       )}
-
-      {/* Breadcrumbs */}
-      <Breadcrumbs
-        items={[
-          { id: "input", label: "Input", icon: "📝" },
-          { id: "setup", label: "Setup", icon: "⚙️" },
-          { id: "creation", label: "Creation", icon: "⚡" },
-          { id: "output", label: "Output", icon: "📊" },
-        ]}
-        activeId={activeTab}
-        onNavigate={setActiveTab}
-      />
 
       <TabContainer
         tabs={[
