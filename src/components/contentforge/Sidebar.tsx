@@ -257,13 +257,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-white">
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5 min-h-0">
-        <p className="text-[11px] font-bold text-blue-600 tracking-[0.15em] uppercase opacity-80 mb-1">
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 min-h-0">
+        <p className="text-[11px] font-bold text-blue-600 tracking-[0.15em] uppercase opacity-80 mb-2">
           Course Configuration
         </p>
 
         <div>
-          <label className="text-[13px] font-bold text-slate-900 mb-2.5 block">Course Title</label>
+          <label className="text-[13px] font-bold text-slate-900 mb-1.5 block">Course Title</label>
           <textarea
             ref={titleInputRef}
             value={courseTitle}
