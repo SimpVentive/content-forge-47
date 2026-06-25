@@ -155,6 +155,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [showFormatSelection, setShowFormatSelection] = useState(false);
   const [detectedSOP, setDetectedSOP] = useState(false);
+  const [showCourseOutline, setShowCourseOutline] = useState(false);
 
   const handleFile = async (file: File) => {
     setUploadedFileName(file.name);
@@ -297,42 +298,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-        {/* Company Logo Upload */}
-        {setCompanyLogo && (
-          <LogoUploader
-            logoDataUrl={companyLogo || undefined}
-            onLogoChange={setCompanyLogo}
-          />
-        )}
-
-        {/* Title Confirmation Dialog */}
-        {showTitleConfirm && (
-          <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 animate-fade-in">
-            <p className="text-[13px] font-semibold text-foreground mb-2">
-              Is this the course you are creating?
-            </p>
-            <p className="text-[15px] font-bold text-primary mb-3">"{suggestedTitle}"</p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleConfirmTitle(true)}
-                type="button"
-                className="flex-1 h-9 rounded-lg text-[13px] font-bold text-white flex items-center justify-center gap-1.5 bg-primary hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0.5 transition-all"
-                style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.2)" }}
-              >
-                <Check className="w-3.5 h-3.5" /> Yes, use this title
-              </button>
-              <button
-                onClick={() => handleConfirmTitle(false)}
-                type="button"
-                className="flex-1 h-9 rounded-lg text-[13px] font-bold text-foreground flex items-center justify-center gap-1.5 border border-border hover:bg-secondary hover:-translate-y-0.5 active:translate-y-0.5 transition-all"
-                style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5)" }}
-              >
-                <X className="w-3.5 h-3.5" /> No, I'll change it
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* SOP Format Dialog - Modal */}
         <SOPFormatDialog
           open={showFormatSelection && detectedSOP}
@@ -340,8 +305,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         />
 
         <div>
-          <label className="text-[14px] font-semibold text-foreground mb-1 block">Source Material</label>
-          <p className="text-[12px] text-muted-foreground mb-2">Upload or paste SME notes</p>
+          <label className="text-[13px] font-bold text-slate-900 mb-1.5 block">Source Material</label>
+          <p className="text-[12px] text-slate-500 mb-2">Upload or paste SME notes</p>
 
           <input
             ref={fileInputRef}
@@ -365,11 +330,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Uploaded file indicator */}
           {uploadedFileName && (
-            <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-secondary/50 rounded-lg">
-              <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
-              <span className="text-[12px] text-foreground truncate flex-1">{uploadedFileName}</span>
+            <div className="flex items-center gap-2 mb-2 px-2 py-1.5 bg-blue-50 rounded-lg border border-blue-200">
+              <FileText className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+              <span className="text-[12px] text-slate-900 truncate flex-1 font-medium">{uploadedFileName}</span>
               {isExtracting && (
-                <span className="w-3.5 h-3.5 border-2 border-primary/30 border-t-primary rounded-full animate-spin shrink-0" />
+                <span className="w-3.5 h-3.5 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin shrink-0" />
               )}
               {!isExtracting && (
                 <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
@@ -377,15 +342,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           )}
 
-          <textarea
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            rows={8}
-            className="w-full border-[1.5px] border-border rounded-xl px-3.5 py-3 text-[13px] leading-[1.6] text-foreground bg-card placeholder:text-muted-foreground focus:outline-none focus:border-primary resize-none transition-all duration-200"
-            style={{ boxShadow: "inset 0 2px 4px rgba(0,0,0,0.06), 0 1px 0 rgba(255,255,255,0.7)" }}
-            placeholder="Paste subject matter notes..."
-          />
+          {/* View Course Outline Toggle */}
+          <button
+            onClick={() => setShowCourseOutline(!showCourseOutline)}
+            className="w-full p-3 rounded-lg border border-slate-300 text-slate-900 font-semibold text-[13px] hover:bg-slate-50 transition-all flex items-center justify-between mb-2"
+          >
+            <span>{showCourseOutline ? "Hide Course Outline" : "View Course Outline"}</span>
+            <span className="text-[16px]">{showCourseOutline ? "▼" : "▶"}</span>
+          </button>
+
+          {/* Course Outline Textarea */}
+          {showCourseOutline && (
+            <textarea
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              rows={6}
+              className="w-full border-[1.5px] border-slate-300 rounded-lg px-4 py-3 text-[13px] leading-[1.6] text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 resize-none transition-all duration-200"
+              placeholder="Paste subject matter notes..."
+            />
+          )}
         </div>
+
+        {/* Company Logo Upload */}
+        {setCompanyLogo && (
+          <LogoUploader
+            logoDataUrl={companyLogo || undefined}
+            onLogoChange={setCompanyLogo}
+          />
+        )}
 
         <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-white/80 border-t border-slate-200/50 pt-5 -mx-6 px-6 pb-6 z-10 shadow-2xl backdrop-blur-sm">
           {isRunning ? (
