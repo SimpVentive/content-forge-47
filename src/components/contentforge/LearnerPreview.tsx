@@ -660,9 +660,11 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
           normalizeModuleKey(n.topicTitle || "") === normalizedTopic
         );
 
-        // If no exact match, try by index as fallback
-        if (!narrativeForTopic && ti < narratives.length) {
-          const fallback = narratives[ti];
+        // If no exact match, fall back to the global topic order. Using the
+        // per-module topic index here reused narrative[0] for the first topic
+        // of every module, which made the same generated image/story repeat.
+        if (!narrativeForTopic && topicCounter < narratives.length) {
+          const fallback = narratives[topicCounter];
           if (fallback && Array.isArray(fallback.scenes) && fallback.scenes.length > 0) {
             narrativeForTopic = fallback;
           }
