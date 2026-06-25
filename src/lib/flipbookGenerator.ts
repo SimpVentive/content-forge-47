@@ -81,6 +81,7 @@ export function generateFlipbookHTML(
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${escapeHtml(courseTitle)} - Professional Flipbook</title>
   <style>
@@ -379,13 +380,13 @@ export function generateFlipbookHTML(
     </div>
 
     <div class="flipbook-controls">
-      <button class="btn btn-primary" id="prevBtn">← Previous</button>
+      <button class="btn btn-primary" id="prevBtn">&larr; Previous</button>
       <div class="page-info">
         Page <span id="currentPage">1</span> of <span id="totalPages">${pages.length}</span>
       </div>
-      <button class="btn btn-primary" id="nextBtn">Next →</button>
-      <button class="btn btn-secondary" id="fullscreenBtn">⛶ Fullscreen</button>
-      <button class="btn btn-secondary" id="printBtn">🖨 Print</button>
+      <button class="btn btn-primary" id="nextBtn">Next &rarr;</button>
+      <button class="btn btn-secondary" id="fullscreenBtn">Fullscreen</button>
+      <button class="btn btn-secondary" id="printBtn">Print</button>
     </div>
   </div>
 
@@ -466,18 +467,23 @@ export function generateFlipbookHTML(
         pageFlip.on('flip', updatePageInfo);
 
         // Fullscreen
-        document.getElementById('fullscreenBtn').addEventListener('click', () => {
-          const elem = document.getElementById('flipbook');
-          if (elem.requestFullscreen) {
-            elem.requestFullscreen().catch(err => console.log('Fullscreen error:', err));
-          } else if (elem.mozRequestFullScreen) {
-            elem.mozRequestFullScreen();
-          } else if (elem.webkitRequestFullscreen) {
-            elem.webkitRequestFullscreen();
-          } else if (elem.msRequestFullscreen) {
-            elem.msRequestFullscreen();
-          }
-        });
+        const fullscreenBtn = document.getElementById('fullscreenBtn');
+        if (fullscreenBtn) {
+          fullscreenBtn.addEventListener('click', () => {
+            const elem = document.getElementById('flipbook-container') || document.getElementById('flipbook');
+            if (!elem) return;
+
+            const requestFullscreen = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
+            if (requestFullscreen) {
+              requestFullscreen.call(elem).catch((err) => {
+                console.warn('Fullscreen unavailable:', err.message);
+                alert('Fullscreen is not available in your browser.');
+              });
+            } else {
+              alert('Fullscreen is not supported by your browser.');
+            }
+          });
+        }
 
         // Print
         document.getElementById('printBtn').addEventListener('click', () => {
