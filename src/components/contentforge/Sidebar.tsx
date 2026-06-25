@@ -366,27 +366,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {contentMode === "upload" && (
               <>
                 <p className="text-[12px] text-slate-500 mb-2">Upload your course materials</p>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".txt,.md,.csv,.json,.xml,.html,.htm,.doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx"
-            className="hidden"
-            onChange={handleFileSelect}
-          />
-
-          <div
-            onClick={() => fileInputRef.current?.click()}
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            className="border-2 border-dashed border-primary/25 rounded-xl p-4 text-center cursor-pointer hover:bg-primary/[0.04] hover:border-primary hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 mb-3"
-            style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.04), 0 4px 10px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.6)" }}
-          >
-            <Upload className="w-7 h-7 mx-auto mb-2 text-primary" />
-            <p className="text-[13px] font-semibold text-foreground">Drop PPT, PDF or DOCX</p>
-            <span className="text-primary text-[12px] font-semibold underline underline-offset-2">Browse files</span>
-          </div>
-
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.md,.csv,.json,.xml,.html,.htm,.doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
               </>
             )}
 
