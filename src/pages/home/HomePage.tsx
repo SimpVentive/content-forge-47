@@ -14,14 +14,7 @@ import { Footer } from "@/components/home/Footer";
 const HomePage = () => {
   const { hash } = useLocation();
   const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
-
-  // Redirect authenticated users to dashboard
-  useEffect(() => {
-    if (!isLoading && user) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [user, isLoading, navigate]);
+  const { isLoading } = useAuth();
 
   useEffect(() => {
     if (!hash) return;
