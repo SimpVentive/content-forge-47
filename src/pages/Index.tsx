@@ -12,8 +12,9 @@ import type { InsertedVideo } from "@/components/contentforge/VideosTab";
 import { useAgentPipeline } from "@/hooks/useAgentPipeline";
 import type { OutputData, RawAgentOutputs } from "@/types/agents";
 import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
-import { Plus, Play, Clock3, Loader2, Save, FolderOpen, Trash2 } from "lucide-react";
+import { Plus, Play, Clock3, Loader2, Save, FolderOpen, Trash2, FileText, Zap, BarChart3 } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { TabContainer } from "@/components/contentforge/TabContainer";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import {
   createDraftId,
@@ -97,6 +98,7 @@ const Index = () => {
   const [contentType, setContentType] = useState<"learning-course" | "work-instruction">("learning-course");
   const [titleSpans, setTitleSpans] = useState<TitleSpan[]>([]);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("input");
   const prevIsRunning = useRef(false);
 
   const {
@@ -659,30 +661,40 @@ const Index = () => {
         </Suspense>
       )}
 
-      <ResizablePanelGroup direction="horizontal" className="flex-1 min-h-0">
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={30}>
-          <Sidebar
-            courseTitle={courseTitle}
-            setCourseTitle={setCourseTitle}
-            inputText={inputText}
-            setInputText={setInputText}
-            onGenerate={handleGenerateClick}
-            onStop={stopPipeline}
-            isRunning={isRunning}
-            agentToggles={agentToggles}
-            setAgentToggles={setAgentToggles}
-            contentType={contentType}
-            setContentType={setContentType}
-            titleSpans={titleSpans}
-            setTitleSpans={setTitleSpans}
-            companyLogo={companyLogo}
-            setCompanyLogo={setCompanyLogo}
-          />
-        </ResizablePanel>
+      <TabContainer
+        tabs={[
+          { id: "input", label: "Course Input", icon: <FileText className="w-4 h-4" /> },
+          { id: "creation", label: "Course Creation", icon: <Zap className="w-4 h-4" /> },
+          { id: "output", label: "Course Output", icon: <BarChart3 className="w-4 h-4" /> },
+        ]}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      >
+        {/* Tab 1: Course Input */}
+        {activeTab === "input" && (
+          <div className="h-full overflow-y-auto">
+            <Sidebar
+              courseTitle={courseTitle}
+              setCourseTitle={setCourseTitle}
+              inputText={inputText}
+              setInputText={setInputText}
+              onGenerate={handleGenerateClick}
+              onStop={stopPipeline}
+              isRunning={isRunning}
+              agentToggles={agentToggles}
+              setAgentToggles={setAgentToggles}
+              contentType={contentType}
+              setContentType={setContentType}
+              titleSpans={titleSpans}
+              setTitleSpans={setTitleSpans}
+              companyLogo={companyLogo}
+              setCompanyLogo={setCompanyLogo}
+            />
+          </div>
+        )}
 
-        <ResizableHandle withHandle />
-
-        <ResizablePanel defaultSize={50} minSize={30}>
+        {/* Tab 2: Course Creation */}
+        {activeTab === "creation" && (
           <div className="h-full overflow-y-auto p-6" style={{ background: '#f0f2f7' }}>
             {isRunning && (
               <div className="sticky top-4 z-20 mb-5 rounded-2xl border px-5 py-4 shadow-2xl"
@@ -721,11 +733,10 @@ const Index = () => {
               </div>
             )}
           </div>
-        </ResizablePanel>
+        )}
 
-        <ResizableHandle withHandle />
-
-        <ResizablePanel defaultSize={30} minSize={15} maxSize={45}>
+        {/* Tab 3: Course Output */}
+        {activeTab === "output" && (
           <OutputPanel
             outputData={outputData}
             rawOutputs={rawOutputs}
@@ -748,8 +759,8 @@ const Index = () => {
             onUpdateCourseContent={updateCourseContent}
             onOpenLearnerPreview={() => setShowLearnerPreview(true)}
           />
-        </ResizablePanel>
-      </ResizablePanelGroup>
+        )}
+      </TabContainer>
     </div>
   );
 };
