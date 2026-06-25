@@ -31,7 +31,7 @@ export const Dashboard = () => {
   }, []);
 
   const handleNewCourse = () => {
-    navigate("/");
+    navigate("/new-course");
   };
 
   const handleEditCourse = (courseId: string) => {
