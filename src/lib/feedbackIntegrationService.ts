@@ -11,6 +11,8 @@ import {
   type AuditLogEntry,
 } from "@/lib/learningAnalyticsService";
 
+export type { AuditLogEntry };
+
 import {
   getDomainTemplate,
   enhanceImagePromptWithDomainRules,
