@@ -381,6 +381,7 @@ const Index = () => {
       setShowCreditConfirmation(false);
       setCreditEstimate(null);
       setPendingParams(null);
+      setActiveTab("creation");
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
         contentType,
@@ -406,6 +407,7 @@ const Index = () => {
       setShowCreditConfirmation(false);
       setCreditEstimate(null);
       setPendingParams(null);
+      setActiveTab("creation");
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
         contentType,
