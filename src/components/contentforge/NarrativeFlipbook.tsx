@@ -106,9 +106,24 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
 
         {/* Caption Area (Comic-style text) — directly under the image */}
         <div className="bg-white border-t-2 border-gray-200 px-6 py-4">
-          <div className="space-y-2">
+          <div className="space-y-3">
             <h3 className="text-sm font-bold text-gray-900">{currentScene.title}</h3>
             <p className="text-[15px] leading-relaxed text-gray-700">{currentScene.caption}</p>
+
+            {/* Audio Player */}
+            {currentScene.audioDataUrl && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <label className="text-xs font-semibold text-gray-600 block mb-2">Narration</label>
+                <audio
+                  controls
+                  src={currentScene.audioDataUrl}
+                  className="w-full h-8 bg-gray-100 rounded"
+                  style={{
+                    accentColor: "#3b82f6",
+                  }}
+                />
+              </div>
+            )}
           </div>
         </div>
       </div>
