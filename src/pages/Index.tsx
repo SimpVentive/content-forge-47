@@ -95,6 +95,7 @@ const Index = () => {
   const [showCreditConfirmation, setShowCreditConfirmation] = useState(false);
   const [creditEstimate, setCreditEstimate] = useState<CreditEstimate | null>(null);
   const [pendingParams, setPendingParams] = useState<CourseParameters | null>(null);
+  const [isStartingGeneration, setIsStartingGeneration] = useState(false);
   const [contentType, setContentType] = useState<"learning-course" | "work-instruction">("learning-course");
   const [titleSpans, setTitleSpans] = useState<TitleSpan[]>([]);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
@@ -314,25 +315,78 @@ const Index = () => {
     toast.success("Started a new course");
   };
 
+  const getEffectiveAgentToggles = (params: CourseParameters, baseToggles = agentToggles) => {
+    const updated = { ...baseToggles };
+
+    updated.assessment = params.assessmentRequired;
+
+    if (params.learningType === "video") {
+      updated.animation = false;
+      updated.youtube = false;
+      updated.compliance = false;
+      updated.heygen = true;
+      updated["visual-narrative"] = false;
+    } else if (params.learningType === "image") {
+      updated.animation = false;
+      updated.youtube = false;
+      updated.compliance = false;
+      updated.heygen = false;
+      updated["visual-narrative"] = true;
+    } else {
+      updated.animation = true;
+      updated.youtube = true;
+      updated.compliance = true;
+      updated.heygen = false;
+      updated["visual-narrative"] = false;
+    }
+
+    return updated;
+  };
+
+  const startGeneration = (params: CourseParameters, baseToggles = agentToggles) => {
+    if (isRunning || isStartingGeneration) return;
+
+    const effectiveToggles = getEffectiveAgentToggles(params, baseToggles);
+    const pipelineLearningMode = params.learningType === "video"
+      ? "video_learning"
+      : params.learningType === "image"
+        ? "image_based_learning"
+        : "static_elearning";
+    const effectiveVideoSettings =
+      params.learningType === "video"
+        ? {
+            selectedAvatar: params.avatarTrainerId || "rachel",
+            videoQuality: params.videoQuality,
+            backgroundStyle: params.backgroundStyle,
+          }
+        : undefined;
+
+    setAgentToggles(effectiveToggles);
+    setIsStartingGeneration(true);
+    setActiveTab("creation");
+
+    window.setTimeout(() => {
+      try {
+        void runPipeline(courseTitle, inputText, effectiveToggles, {
+          ...params,
+          contentType,
+          titleSpans,
+          companyLogo,
+          learningMode: pipelineLearningMode,
+          videoSettings: effectiveVideoSettings,
+        }).catch((err) => {
+          toast.error(err instanceof Error ? err.message : "Generation failed to start");
+        });
+      } finally {
+        window.setTimeout(() => setIsStartingGeneration(false), 400);
+      }
+    }, 0);
+  };
+
   const handleParamsConfirm = async (params: CourseParameters) => {
     setCourseParams(params);
     setShowParamsDialog(false);
-
-    // Update agent toggles based on assessment requirement and learning type
-    if (!params.assessmentRequired) {
-      setAgentToggles((prev) => ({ ...prev, assessment: false }));
-    } else {
-      setAgentToggles((prev) => ({ ...prev, assessment: true }));
-    }
-
-    // Re-sync agent toggles based on confirmed learning type
-    if (params.learningType === "video") {
-      setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: true, "visual-narrative": false }));
-    } else if (params.learningType === "image") {
-      setAgentToggles((prev) => ({ ...prev, animation: false, youtube: false, compliance: false, heygen: false, "visual-narrative": true }));
-    } else {
-      setAgentToggles((prev) => ({ ...prev, animation: true, youtube: true, compliance: true, heygen: false, "visual-narrative": false }));
-    }
+    setAgentToggles((prev) => getEffectiveAgentToggles(params, prev));
 
     // For video mode: verify HeyGen is configured (auto-seeded on app boot)
     if (params.learningType === "video") {
@@ -359,21 +413,6 @@ const Index = () => {
     const params = pendingParams;
     const estimated = creditEstimate.totalCredits;
 
-    const pipelineLearningMode = params.learningType === "video"
-      ? "video_learning"
-      : params.learningType === "image"
-        ? "image_based_learning"
-        : "static_elearning";
-
-    const effectiveVideoSettings =
-      params.learningType === "video"
-        ? {
-            selectedAvatar: params.avatarTrainerId || "rachel",
-            videoQuality: params.videoQuality,
-            backgroundStyle: params.backgroundStyle,
-          }
-        : undefined;
-
     const availableCredits = (profile?.credits_total ?? 0) - (profile?.credits_used ?? 0);
 
     // Admins skip the deduction but still see the estimate first.
@@ -381,15 +420,7 @@ const Index = () => {
       setShowCreditConfirmation(false);
       setCreditEstimate(null);
       setPendingParams(null);
-      setActiveTab("creation");
-      runPipeline(courseTitle, inputText, agentToggles, {
-        ...params,
-        contentType,
-        titleSpans,
-        companyLogo,
-        learningMode: pipelineLearningMode,
-        videoSettings: effectiveVideoSettings,
-      });
+      startGeneration(params);
       toast.success("Admin run — credits not deducted");
       return;
     }
@@ -407,15 +438,7 @@ const Index = () => {
       setShowCreditConfirmation(false);
       setCreditEstimate(null);
       setPendingParams(null);
-      setActiveTab("creation");
-      runPipeline(courseTitle, inputText, agentToggles, {
-        ...params,
-        contentType,
-        titleSpans,
-        companyLogo,
-        learningMode: pipelineLearningMode,
-        videoSettings: effectiveVideoSettings,
-      });
+      startGeneration(params);
       toast.success(`${estimated} credits deducted`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to deduct credits");
@@ -670,6 +693,7 @@ const Index = () => {
               onGenerate={handleGenerateClick}
               onStop={stopPipeline}
               isRunning={isRunning}
+              isStartingGeneration={isStartingGeneration}
               agentToggles={agentToggles}
               setAgentToggles={setAgentToggles}
               contentType={contentType}
@@ -710,6 +734,24 @@ const Index = () => {
                     <Clock3 className="h-4 w-4" />
                     <span>{elapsedLabel}</span>
                   </div>
+                </div>
+              </div>
+            )}
+            {!isRunning && !hasRun && courseParams && (
+              <div className="mx-auto mb-5 max-w-[720px] rounded-xl border border-border bg-card px-5 py-4 shadow-card">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[15px] font-extrabold text-foreground">Course is configured</p>
+                    <p className="mt-1 text-[13px] font-semibold text-muted-foreground">Start the orchestration pipeline when you are ready.</p>
+                  </div>
+                  <button
+                    onClick={() => startGeneration(courseParams)}
+                    disabled={isStartingGeneration}
+                    className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-[13px] font-bold text-primary-foreground shadow-btn-primary transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                    type="button"
+                  >
+                    {isStartingGeneration ? "Starting..." : "Start Generation"}
+                  </button>
                 </div>
               </div>
             )}
@@ -772,36 +814,12 @@ const Index = () => {
                   </button>
                   <button
                     onClick={() => {
-                      setActiveTab("creation");
-                      if (!isRunning && courseParams) {
-                        const pipelineLearningMode =
-                          courseParams.learningType === "video"
-                            ? "video_learning"
-                            : courseParams.learningType === "image"
-                              ? "image_based_learning"
-                              : "static_elearning";
-                        const effectiveVideoSettings =
-                          courseParams.learningType === "video"
-                            ? {
-                                selectedAvatar: courseParams.avatarTrainerId || "rachel",
-                                videoQuality: courseParams.videoQuality,
-                                backgroundStyle: courseParams.backgroundStyle,
-                              }
-                            : undefined;
-                        runPipeline(courseTitle, inputText, agentToggles, {
-                          ...courseParams,
-                          contentType,
-                          titleSpans,
-                          companyLogo,
-                          learningMode: pipelineLearningMode,
-                          videoSettings: effectiveVideoSettings,
-                        });
-                      }
+                      if (!isRunning && courseParams) startGeneration(courseParams);
                     }}
-                    disabled={isRunning}
+                    disabled={isRunning || isStartingGeneration}
                     className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                   >
-                    {isRunning ? "Generating..." : "Proceed to Generation"}
+                    {isRunning ? "Generating..." : isStartingGeneration ? "Starting..." : "Proceed to Generation"}
                   </button>
                 </div>
               </div>
