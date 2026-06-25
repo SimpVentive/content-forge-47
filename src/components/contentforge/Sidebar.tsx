@@ -256,8 +256,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <div className="h-full flex flex-col bg-card border-r border-border">
-      <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5 min-h-0">
+    <div className="h-full flex flex-col bg-white">
+      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5 min-h-0">
         <p className="text-[12px] font-bold text-primary tracking-[0.12em] uppercase">
           Course Input
         </p>
@@ -388,7 +388,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         </div>
 
-        <div className="sticky bottom-0 left-0 right-0 bg-card border-t border-border pt-4 -mx-5 px-5 pb-5">
+        <div className="sticky bottom-0 left-0 right-0 bg-white border-t border-slate-200 pt-4 -mx-6 px-6 pb-6 z-10 shadow-lg">
           {isRunning ? (
             <button
               onClick={onStop}
