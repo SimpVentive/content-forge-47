@@ -1,5 +1,5 @@
-import React, { useState, useCallback, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import { ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
 
 interface NarrativeFlipbookProps {
@@ -16,6 +16,8 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
   const [currentTopicIndex, setCurrentTopicIndex] = useState(0);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [autoplayAudio, setAutoplayAudio] = useState(false);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   const currentTopic = narratives[currentTopicIndex];
   const currentScene = currentTopic?.scenes[currentSceneIndex];
@@ -66,6 +68,17 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNext, handlePrevious]);
 
+  // Auto-play audio when scene changes
+  useEffect(() => {
+    if (autoplayAudio && currentScene?.audioDataUrl && audioRef.current) {
+      // Reset and play audio
+      audioRef.current.currentTime = 0;
+      audioRef.current.play().catch((err) => {
+        console.warn("Could not autoplay audio:", err);
+      });
+    }
+  }, [currentSceneIndex, currentTopicIndex, autoplayAudio, currentScene?.audioDataUrl]);
+
   if (!currentScene) {
     return (
       <div className="flex items-center justify-center w-full h-96 bg-gray-100 rounded-lg">
@@ -113,8 +126,32 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
             {/* Audio Player */}
             {currentScene.audioDataUrl && (
               <div className="mt-4 pt-4 border-t border-gray-200">
-                <label className="text-xs font-semibold text-gray-600 block mb-2">Narration</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-600">Narration</label>
+                  <button
+                    onClick={() => setAutoplayAudio(!autoplayAudio)}
+                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                      autoplayAudio
+                        ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                    title={autoplayAudio ? "Audio autoplay ON" : "Audio autoplay OFF"}
+                  >
+                    {autoplayAudio ? (
+                      <>
+                        <Volume2 className="w-3 h-3" />
+                        <span>Autoplay</span>
+                      </>
+                    ) : (
+                      <>
+                        <VolumeX className="w-3 h-3" />
+                        <span>Manual</span>
+                      </>
+                    )}
+                  </button>
+                </div>
                 <audio
+                  ref={audioRef}
                   controls
                   src={currentScene.audioDataUrl}
                   className="w-full h-8 bg-gray-100 rounded"
