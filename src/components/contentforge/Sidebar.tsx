@@ -273,27 +273,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <p className="text-[10px] font-semibold text-slate-600 mt-1.5 text-center whitespace-nowrap">Course<br />Title</p>
           </div>
 
-          {/* Connector Line 1 */}
-          <div className="flex-1 h-1 rounded-full transition-all mt-1 self-start" style={{ marginTop: '4px', height: '2px', background: isStep1Complete ? '#2563eb' : '#e2e8f0' }} />
+          {isStep1Complete && (
+            <>
+              {/* Connector Line 1 */}
+              <div className="flex-1 h-1 rounded-full transition-all mt-1 self-start" style={{ marginTop: '4px', height: '2px', background: isStep2Complete ? '#2563eb' : '#dbeafe' }} />
 
-          {/* Step 2 */}
-          <div className="flex flex-col items-center">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep2Complete ? "bg-blue-600 text-white" : isStep1Complete ? "bg-blue-100 text-blue-600" : "bg-slate-200 text-slate-400"}`}>
-              2
-            </div>
-            <p className={`text-[10px] font-semibold mt-1.5 text-center whitespace-nowrap ${isStep1Complete ? "text-slate-600" : "text-slate-400"}`}>Course<br />Content</p>
-          </div>
+              {/* Step 2 */}
+              <div className="flex flex-col items-center">
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep2Complete ? "bg-blue-600 text-white" : "bg-blue-100 text-blue-600"}`}>
+                  2
+                </div>
+                <p className="text-[10px] font-semibold text-slate-600 mt-1.5 text-center whitespace-nowrap">Course<br />Content</p>
+              </div>
 
-          {/* Connector Line 2 */}
-          <div className="flex-1 h-1 rounded-full transition-all mt-1 self-start" style={{ marginTop: '4px', height: '2px', background: isStep2Complete ? '#2563eb' : isStep1Complete ? '#dbeafe' : '#e2e8f0' }} />
+              {isStep2Complete && (
+                <>
+                  {/* Connector Line 2 */}
+                  <div className="flex-1 h-1 rounded-full transition-all mt-1 self-start" style={{ marginTop: '4px', height: '2px', background: '#2563eb' }} />
 
-          {/* Step 3 */}
-          <div className="flex flex-col items-center">
-            <div className={`flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all ${isStep2Complete ? "bg-blue-600 text-white" : "bg-slate-200 text-slate-400"}`}>
-              3
-            </div>
-            <p className={`text-[10px] font-semibold mt-1.5 text-center whitespace-nowrap ${isStep2Complete ? "text-slate-600" : "text-slate-400"}`}>Branding</p>
-          </div>
+                  {/* Step 3 */}
+                  <div className="flex flex-col items-center">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full text-[12px] font-bold transition-all bg-blue-600 text-white">
+                      3
+                    </div>
+                    <p className="text-[10px] font-semibold text-slate-600 mt-1.5 text-center whitespace-nowrap">Branding</p>
+                  </div>
+                </>
+              )}
+            </>
+          )}
         </div>
 
         <p className="text-[11px] font-bold text-blue-600 tracking-[0.15em] uppercase opacity-80">
