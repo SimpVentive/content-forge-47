@@ -16,17 +16,17 @@ interface TabContainerProps {
 
 export const TabContainer: React.FC<TabContainerProps> = ({ tabs, activeTab, onTabChange, children }) => {
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="h-full flex flex-col bg-slate-50">
       {/* Tab Navigation */}
-      <div className="border-b border-border bg-card px-6 py-0 flex items-center gap-6">
+      <div className="bg-white border-b border-slate-200 px-6 py-0 flex items-center gap-1 shadow-sm">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-2 px-0 py-4 text-[14px] font-semibold border-b-2 transition-all ${
+            className={`flex items-center gap-2.5 px-4 py-3.5 text-[13px] font-semibold border-b-2 transition-all ${
               activeTab === tab.id
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
+                ? "border-blue-600 text-blue-600 bg-blue-50/30"
+                : "border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50"
             }`}
           >
             {tab.icon}
@@ -36,7 +36,7 @@ export const TabContainer: React.FC<TabContainerProps> = ({ tabs, activeTab, onT
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden bg-white">
         {children}
       </div>
     </div>

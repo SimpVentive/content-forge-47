@@ -12,9 +12,10 @@ import type { InsertedVideo } from "@/components/contentforge/VideosTab";
 import { useAgentPipeline } from "@/hooks/useAgentPipeline";
 import type { OutputData, RawAgentOutputs } from "@/types/agents";
 import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
-import { Plus, Play, Clock3, Loader2, Save, FolderOpen, Trash2, FileText, Zap, BarChart3 } from "lucide-react";
+import { Plus, Play, Clock3, Loader2, Save, FolderOpen, Trash2, FileText, Zap, BarChart3, Settings } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { TabContainer } from "@/components/contentforge/TabContainer";
+import { Breadcrumbs } from "@/components/contentforge/Breadcrumbs";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import {
   createDraftId,
@@ -260,6 +261,7 @@ const Index = () => {
 
   const handleGenerateClick = () => {
     setShowParamsDialog(true);
+    setActiveTab("setup");
   };
 
   const handleSaveDraft = async () => {
@@ -626,21 +628,6 @@ const Index = () => {
         </Suspense>
       )}
 
-      {showParamsDialog && (
-        <Suspense fallback={null}>
-          <CourseParametersDialog
-            open={showParamsDialog}
-            courseTitle={courseTitle}
-            estimatedMinutes={estimateMinutesFromText(inputText)}
-            youtubeAgentEnabled={agentToggles.youtube}
-            initialLearningType={learningType as "static" | "video" | "image"}
-            contentType={contentType}
-            onConfirm={handleParamsConfirm}
-            onCancel={() => setShowParamsDialog(false)}
-          />
-        </Suspense>
-      )}
-
       {showVideoWorkflow && rawOutputs.youtube && (
         <Suspense fallback={null}>
           <VideoClipWorkflow
@@ -661,9 +648,22 @@ const Index = () => {
         </Suspense>
       )}
 
+      {/* Breadcrumbs */}
+      <Breadcrumbs
+        items={[
+          { id: "input", label: "Input", icon: "📝" },
+          { id: "setup", label: "Setup", icon: "⚙️" },
+          { id: "creation", label: "Creation", icon: "⚡" },
+          { id: "output", label: "Output", icon: "📊" },
+        ]}
+        activeId={activeTab}
+        onNavigate={setActiveTab}
+      />
+
       <TabContainer
         tabs={[
           { id: "input", label: "Course Input", icon: <FileText className="w-4 h-4" /> },
+          { id: "setup", label: "Course Setup", icon: <Settings className="w-4 h-4" /> },
           { id: "creation", label: "Course Creation", icon: <Zap className="w-4 h-4" /> },
           { id: "output", label: "Course Output", icon: <BarChart3 className="w-4 h-4" /> },
         ]}
@@ -735,7 +735,75 @@ const Index = () => {
           </div>
         )}
 
-        {/* Tab 3: Course Output */}
+        {/* Tab 3: Course Setup */}
+        {activeTab === "setup" && (
+          <div className="h-full overflow-y-auto p-8">
+            {showParamsDialog && (
+              <Suspense fallback={null}>
+                <CourseParametersDialog
+                  open={showParamsDialog}
+                  courseTitle={courseTitle}
+                  estimatedMinutes={estimateMinutesFromText(inputText)}
+                  youtubeAgentEnabled={agentToggles.youtube}
+                  initialLearningType={learningType as "static" | "video" | "image"}
+                  contentType={contentType}
+                  onConfirm={handleParamsConfirm}
+                  onCancel={() => setShowParamsDialog(false)}
+                />
+              </Suspense>
+            )}
+            {courseParams ? (
+              <div className="max-w-2xl">
+                <h2 className="text-[24px] font-bold text-slate-900 mb-2">Course Configuration</h2>
+                <p className="text-[14px] text-slate-600 mb-8">Your course is ready to generate. Review settings below.</p>
+
+                <div className="grid gap-6">
+                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                    <p className="text-[12px] font-semibold text-slate-600 uppercase tracking-wide mb-1">Learning Type</p>
+                    <p className="text-[16px] font-semibold text-slate-900">{courseParams.learningType}</p>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                    <p className="text-[12px] font-semibold text-slate-600 uppercase tracking-wide mb-1">Level</p>
+                    <p className="text-[16px] font-semibold text-slate-900">{courseParams.level}</p>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                    <p className="text-[12px] font-semibold text-slate-600 uppercase tracking-wide mb-1">Duration</p>
+                    <p className="text-[16px] font-semibold text-slate-900">{courseParams.duration}</p>
+                  </div>
+                </div>
+
+                <div className="mt-8 flex gap-3">
+                  <button
+                    onClick={() => setShowParamsDialog(true)}
+                    className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
+                  >
+                    Modify Settings
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("creation")}
+                    className="px-6 py-3 rounded-lg bg-slate-200 text-slate-900 font-semibold hover:bg-slate-300 transition-all"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-[16px] text-slate-600 mb-4">Click "Generate" in the Input tab to configure your course</p>
+                <button
+                  onClick={() => setActiveTab("input")}
+                  className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
+                >
+                  Go to Input
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Tab 4: Course Output */}
         {activeTab === "output" && (
           <OutputPanel
             outputData={outputData}
