@@ -1,17 +1,26 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Trash2, Edit3, Zap, Calendar, Tag, Sparkles } from "lucide-react";
+import { Plus, Search, Trash2, Edit3, Zap, Calendar, BookOpen, BarChart3, HelpCircle, LogOut, Bell, User, Settings } from "lucide-react";
 import { listCourseDraftsCloudFirst, deleteCourseDraftCloudFirst, type CourseDraft } from "@/lib/courseDrafts";
 import { useAuth } from "@/hooks/useAuth";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { toast } from "sonner";
 
+const SIDEBAR_ITEMS = [
+  { id: "courses", label: "My Courses", icon: BookOpen },
+  { id: "templates", label: "Templates", icon: BarChart3, disabled: true },
+  { id: "assets", label: "Asset Library", icon: BookOpen, disabled: true },
+  { id: "analytics", label: "Analytics", icon: BarChart3, disabled: true },
+  { id: "help", label: "Help", icon: HelpCircle, disabled: true },
+];
+
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, logout } = useAuth();
   const [courses, setCourses] = useState<CourseDraft[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("dashboard");
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -58,97 +67,217 @@ export const Dashboard = () => {
   const totalCreditsUsed = profile?.credits_used ?? 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
-      {/* Header */}
-      <div className="bg-slate-900/80 backdrop-blur border-b border-slate-800">
-        <div className="px-8 py-8 max-w-7xl mx-auto">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <Sparkles className="w-7 h-7 text-white" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-black text-white">ContentForge</h1>
-                <p className="text-sm text-slate-400 mt-1">AI-Powered Course Creator</p>
-              </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex">
+      {/* Left Sidebar */}
+      <div className="w-64 bg-white border-r border-slate-200 flex flex-col">
+        {/* Logo */}
+        <div className="px-6 py-8 border-b border-slate-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg flex items-center justify-center">
+              <Zap className="w-6 h-6 text-white" />
             </div>
-            <button
-              onClick={handleNewCourse}
-              className="px-6 py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 text-white font-bold hover:from-blue-700 hover:to-blue-600 transition-all flex items-center gap-2 shadow-lg hover:shadow-blue-500/50"
-            >
-              <Plus className="w-5 h-5" />
-              Create New Course
-            </button>
+            <div>
+              <p className="font-bold text-slate-900">ContentForge</p>
+              <p className="text-xs text-slate-500">Professional Creator</p>
+            </div>
           </div>
+        </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4">
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-              <p className="text-slate-400 text-sm mb-1">Total Courses</p>
-              <p className="text-2xl font-bold text-white">{courses.length}</p>
-            </div>
-            <div className="bg-slate-800/50 border border-slate-700 rounded-lg p-4">
-              <p className="text-slate-400 text-sm mb-1">Credits Used</p>
-              <p className="text-2xl font-bold text-amber-400">{totalCreditsUsed.toLocaleString()}</p>
-            </div>
-            <div className="bg-gradient-to-br from-blue-900/50 to-blue-800/50 border border-blue-700 rounded-lg p-4">
-              <p className="text-slate-400 text-sm mb-1">Available Credits</p>
-              <p className="text-2xl font-bold text-blue-300">{availableCredits.toLocaleString()}</p>
-            </div>
-          </div>
+        {/* Navigation */}
+        <nav className="flex-1 px-4 py-6 space-y-2">
+          {SIDEBAR_ITEMS.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.id === "courses";
+            return (
+              <button
+                key={item.id}
+                disabled={item.disabled}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${
+                  isActive
+                    ? "bg-teal-50 text-teal-700 border border-teal-200"
+                    : item.disabled
+                      ? "text-slate-400 cursor-not-allowed"
+                      : "text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                <Icon className="w-5 h-5" />
+                {item.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Bottom Actions */}
+        <div className="px-4 py-6 border-t border-slate-200 space-y-2">
+          <button
+            onClick={handleNewCourse}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-all"
+          >
+            <Plus className="w-5 h-5" />
+            New Course
+          </button>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="px-8 py-12 max-w-7xl mx-auto">
-        {/* Search */}
-        <div className="mb-10">
-          <div className="relative">
-            <Search className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search courses by name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all"
-            />
+      <div className="flex-1 flex flex-col">
+        {/* Top Bar */}
+        <div className="bg-white border-b border-slate-200 px-8 py-4">
+          <div className="flex items-center justify-between gap-6">
+            {/* Search */}
+            <div className="flex-1 max-w-2xl">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 w-5 h-5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search courses by name..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-50"
+                />
+              </div>
+            </div>
+
+            {/* Right Section */}
+            <div className="flex items-center gap-4">
+              {/* Tabs */}
+              <div className="flex gap-0 border border-slate-200 rounded-lg">
+                <button
+                  onClick={() => setActiveTab("dashboard")}
+                  className={`px-4 py-2 text-sm font-medium transition-all ${
+                    activeTab === "dashboard"
+                      ? "bg-slate-100 text-slate-900 border-r border-slate-200"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Dashboard
+                </button>
+                <button
+                  onClick={() => setActiveTab("settings")}
+                  className={`px-4 py-2 text-sm font-medium transition-all ${
+                    activeTab === "settings"
+                      ? "bg-slate-100 text-slate-900"
+                      : "text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  Settings
+                </button>
+              </div>
+
+              {/* Credits */}
+              <div className="flex items-center gap-2 bg-teal-50 px-4 py-2 rounded-lg border border-teal-200">
+                <Zap className="w-4 h-4 text-teal-600" />
+                <span className="text-sm font-semibold text-teal-700">{availableCredits.toLocaleString()} Credits</span>
+              </div>
+
+              {/* Upgrade Button */}
+              <button className="px-4 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-all">
+                Upgrade
+              </button>
+
+              {/* Icons */}
+              <button className="p-2 hover:bg-slate-100 rounded-lg transition-all">
+                <Bell className="w-5 h-5 text-slate-600" />
+              </button>
+              <button className="p-2 hover:bg-slate-100 rounded-lg transition-all">
+                <User className="w-5 h-5 text-slate-600" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Courses Section */}
-        <div>
-          <h2 className="text-2xl font-bold text-white mb-8">My Courses</h2>
+        {/* Main Area */}
+        <div className="flex-1 overflow-auto px-8 py-8">
+          {activeTab === "dashboard" ? (
+            <>
+              {/* Page Title */}
+              <h1 className="text-3xl font-bold text-slate-900 mb-8">Dashboard</h1>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-24">
-              <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
-            </div>
-          ) : filteredCourses.length === 0 ? (
-            <div className="text-center py-24 bg-slate-800/40 border border-slate-700 rounded-xl">
-              <Sparkles className="w-16 h-16 text-slate-600 mx-auto mb-4" />
-              <p className="text-slate-300 mb-2 text-lg font-semibold">No courses yet</p>
-              <p className="text-slate-500 mb-6">Create your first AI-powered course in minutes</p>
-              <button
-                onClick={handleNewCourse}
-                className="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
-              >
-                Create Your First Course
-              </button>
-            </div>
+              {/* Stats Cards */}
+              <div className="grid grid-cols-3 gap-6 mb-10">
+                <div className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Total Courses</p>
+                  <p className="text-4xl font-bold text-slate-900">{courses.length}</p>
+                </div>
+                <div className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Credits Used</p>
+                  <p className="text-4xl font-bold text-slate-900">{totalCreditsUsed.toLocaleString()}</p>
+                </div>
+                <div className="bg-white rounded-lg p-6 border border-teal-200 bg-gradient-to-br from-teal-50 to-teal-100 shadow-sm">
+                  <p className="text-xs font-semibold text-slate-600 uppercase tracking-wide mb-2">Available Credits</p>
+                  <p className="text-4xl font-bold text-teal-700">{availableCredits.toLocaleString()} PTS</p>
+                </div>
+              </div>
+
+              {/* Courses Section */}
+              <div>
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-slate-900">My Courses</h2>
+                  <div className="flex gap-2">
+                    <button className="p-2 border border-slate-200 rounded-lg hover:bg-slate-100 transition-all">
+                      <BarChart3 className="w-5 h-5 text-slate-600" />
+                    </button>
+                    <button className="p-2 border border-slate-200 rounded-lg hover:bg-slate-100 transition-all">
+                      <Settings className="w-5 h-5 text-slate-600" />
+                    </button>
+                  </div>
+                </div>
+
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-20 bg-white rounded-lg border border-slate-200">
+                    <div className="animate-spin w-8 h-8 border-4 border-teal-200 border-t-teal-600 rounded-full"></div>
+                  </div>
+                ) : filteredCourses.length === 0 ? (
+                  <div className="text-center py-20 bg-white rounded-xl border border-slate-200 shadow-sm">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
+                      <BookOpen className="w-8 h-8 text-blue-600" />
+                    </div>
+                    <p className="text-slate-900 font-semibold text-lg mb-2">No courses yet</p>
+                    <p className="text-slate-600 mb-6">Ready to transform your ideas into world-class learning modules? Create your first AI-powered course in minutes.</p>
+                    <div className="flex gap-3 justify-center">
+                      <button
+                        onClick={handleNewCourse}
+                        className="px-6 py-3 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-all flex items-center gap-2"
+                      >
+                        <Zap className="w-5 h-5" />
+                        Create New Course
+                      </button>
+                      <button className="px-6 py-3 rounded-lg border border-slate-300 text-slate-700 font-semibold hover:bg-slate-50 transition-all flex items-center gap-2">
+                        <BookOpen className="w-5 h-5" />
+                        View Tutorial
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredCourses.map((course) => (
+                      <CourseCard
+                        key={course.id}
+                        course={course}
+                        onEdit={() => handleEditCourse(course.id)}
+                        onDelete={() => handleDeleteCourse(course.id)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCourses.map((course) => (
-                <CourseCard
-                  key={course.id}
-                  course={course}
-                  onEdit={() => handleEditCourse(course.id)}
-                  onDelete={() => handleDeleteCourse(course.id)}
-                />
-              ))}
+            <div className="text-center py-12">
+              <p className="text-slate-600">Settings coming soon...</p>
             </div>
           )}
         </div>
       </div>
+
+      {/* Floating Action Button */}
+      <button
+        onClick={handleNewCourse}
+        className="fixed bottom-8 right-8 w-14 h-14 rounded-full bg-teal-600 text-white shadow-lg hover:bg-teal-700 transition-all flex items-center justify-center"
+        title="Create new course"
+      >
+        <Zap className="w-6 h-6" />
+      </button>
     </div>
   );
 };
@@ -165,24 +294,20 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEdit, onDelete }) => 
   const contentType = course.courseParams?.contentType || "learning-course";
   const level = course.courseParams?.level || "intermediate";
 
-  const getContentTypeColor = (type: string) => {
-    return type === "work-instruction" ? "from-orange-500 to-orange-600" : "from-blue-500 to-blue-600";
-  };
-
   const getLearningTypeLabel = (type: string) => {
     switch (type) {
-      case "video": return "🎬 Video";
-      case "image": return "🖼️ Image-Based";
-      default: return "📚 E-Learning";
+      case "video": return "Video Course";
+      case "image": return "Image-Based";
+      default: return "E-Learning";
     }
   };
 
   const getLevelColor = (level: string) => {
     switch (level) {
-      case "basic": return "bg-emerald-500/20 text-emerald-300";
-      case "intermediate": return "bg-blue-500/20 text-blue-300";
-      case "advanced": return "bg-purple-500/20 text-purple-300";
-      default: return "bg-slate-500/20 text-slate-300";
+      case "basic": return "bg-emerald-100 text-emerald-700";
+      case "intermediate": return "bg-blue-100 text-blue-700";
+      case "advanced": return "bg-purple-100 text-purple-700";
+      default: return "bg-slate-100 text-slate-700";
     }
   };
 
@@ -192,48 +317,47 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEdit, onDelete }) => 
   };
 
   return (
-    <div className="bg-slate-800/50 backdrop-blur border border-slate-700 rounded-xl overflow-hidden hover:border-slate-600 transition-all hover:shadow-2xl hover:shadow-blue-500/10 group">
-      {/* Header Gradient */}
-      <div className={`h-24 bg-gradient-to-r ${getContentTypeColor(contentType)}`}></div>
+    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden hover:border-teal-300 hover:shadow-md transition-all group">
+      {/* Header */}
+      <div className="h-24 bg-gradient-to-r from-blue-400 to-blue-500"></div>
 
       {/* Content */}
       <div className="p-6">
-        {/* Title */}
-        <h3 className="text-lg font-bold text-white mb-4 truncate group-hover:text-blue-300 transition-colors">
+        <h3 className="text-lg font-bold text-slate-900 mb-3 truncate group-hover:text-teal-700 transition-colors">
           {course.title || "Untitled Course"}
         </h3>
 
         {/* Tags */}
         <div className="flex gap-2 mb-4 flex-wrap">
-          <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${getLevelColor(level)} capitalize`}>
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getLevelColor(level)} capitalize`}>
             {level}
           </span>
-          <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-700 text-slate-300">
+          <span className="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
             {getLearningTypeLabel(learningType)}
           </span>
           {hasOutput && (
-            <span className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-green-500/20 text-green-300">
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
               ✓ Generated
             </span>
           )}
         </div>
 
         {/* Metadata */}
-        <div className="space-y-2 mb-6 text-sm border-t border-slate-700 pt-4">
-          <div className="flex items-center justify-between text-slate-400">
+        <div className="space-y-2 mb-6 text-sm border-t border-slate-200 pt-4">
+          <div className="flex items-center justify-between text-slate-600">
             <span className="flex items-center gap-2">
               <Calendar className="w-4 h-4" />
               Created
             </span>
-            <span className="text-slate-300 font-medium">{formatDate(course.savedAt)}</span>
+            <span className="text-slate-900 font-medium">{formatDate(course.savedAt)}</span>
           </div>
           {course.courseParams?.duration && (
-            <div className="flex items-center justify-between text-slate-400">
+            <div className="flex items-center justify-between text-slate-600">
               <span className="flex items-center gap-2">
-                <Tag className="w-4 h-4" />
+                <Zap className="w-4 h-4" />
                 Duration
               </span>
-              <span className="text-slate-300 font-medium">{course.courseParams.duration}</span>
+              <span className="text-slate-900 font-medium">{course.courseParams.duration}</span>
             </div>
           )}
         </div>
@@ -242,17 +366,17 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEdit, onDelete }) => 
         <div className="flex gap-3">
           <button
             onClick={onEdit}
-            className="flex-1 px-4 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all flex items-center justify-center gap-2 text-sm"
+            className="flex-1 px-4 py-2.5 rounded-lg bg-blue-50 text-blue-700 font-semibold hover:bg-blue-100 transition-all flex items-center justify-center gap-2 text-sm border border-blue-200"
           >
             <Edit3 className="w-4 h-4" />
             Edit
           </button>
           <button
             onClick={onDelete}
-            className="px-4 py-2.5 rounded-lg bg-slate-700 text-slate-300 hover:bg-red-600/20 hover:text-red-300 transition-all"
+            className="px-4 py-2.5 rounded-lg hover:bg-red-50 transition-all border border-slate-200 hover:border-red-200"
             title="Delete course"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-4 h-4 text-slate-600 hover:text-red-600" />
           </button>
         </div>
       </div>
