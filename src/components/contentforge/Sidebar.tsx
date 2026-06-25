@@ -21,6 +21,8 @@ interface SidebarProps {
   isStartingGeneration?: boolean;
   agentToggles: Record<string, boolean>;
   setAgentToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  contentType?: "learning-course" | "work-instruction";
+  setContentType?: (v: "learning-course" | "work-instruction") => void;
 }
 
 const BINARY_EXTENSIONS = ['.pptx', '.ppt', '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.zip'];
@@ -28,6 +30,14 @@ const BINARY_EXTENSIONS = ['.pptx', '.ppt', '.pdf', '.docx', '.doc', '.xlsx', '.
 const isBinaryFile = (filename: string): boolean => {
   const ext = filename.toLowerCase().slice(filename.lastIndexOf('.'));
   return BINARY_EXTENSIONS.includes(ext);
+};
+
+const detectSOP = (text: string): boolean => {
+  if (!text) return false;
+  const sopKeywords = /\b(standard operating procedure|SOP|work instruction|procedure|step-by-step|how to|step \d+|procedure:|instructions:|steps:)\b/i;
+  const procedureMarkers = /^\s*step\s+\d+:|^\s*\d+\.\s+/m;
+  const sopScore = (sopKeywords.test(text) ? 1 : 0) + (procedureMarkers.test(text) ? 1 : 0);
+  return sopScore >= 1;
 };
 
 const readFileAsText = (file: File): Promise<string> => {
@@ -122,6 +132,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   courseTitle, setCourseTitle, inputText, setInputText,
   onGenerate, onStop, isRunning,
   isStartingGeneration = false,
+  contentType = "learning-course",
+  setContentType,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
@@ -130,6 +142,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showTitleConfirm, setShowTitleConfirm] = useState(false);
   const [suggestedTitle, setSuggestedTitle] = useState("");
   const [isTitleFocused, setIsTitleFocused] = useState(false);
+  const [showFormatSelection, setShowFormatSelection] = useState(false);
+  const [detectedSOP, setDetectedSOP] = useState(false);
 
   const handleFile = async (file: File) => {
     setUploadedFileName(file.name);
@@ -140,7 +154,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (!courseTitle.trim()) {
       setCourseTitle(detectedTitle);
     }
-    
+
+    let extractedText = "";
+
     if (isBinaryFile(file.name)) {
       // Show extracting state
       setIsExtracting(true);
@@ -163,25 +179,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
         if (data?.error) throw new Error(data.error);
 
         if (data?.unsupported) {
-          setInputText(`[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nWarning: ${data.message || "Please paste the content directly."}`);
+          extractedText = `[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nWarning: ${data.message || "Please paste the content directly."}`;
+          setInputText(extractedText);
         } else if (data?.text && data.text.length > 0) {
-          setInputText(data.text);
+          extractedText = data.text;
+          setInputText(extractedText);
         } else {
-          setInputText(`[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nCould not extract text. You can paste additional notes below.`);
+          extractedText = `[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nCould not extract text. You can paste additional notes below.`;
+          setInputText(extractedText);
         }
       } catch (err) {
         console.error("Document extraction error:", err);
-        setInputText(`[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nWarning: Could not extract content automatically. Please paste the key topics and notes manually below.`);
+        extractedText = `[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nWarning: Could not extract content automatically. Please paste the key topics and notes manually below.`;
+        setInputText(extractedText);
       } finally {
         setIsExtracting(false);
       }
     } else {
       const text = await readFileAsText(file);
       if (text && text.length > 0) {
-        setInputText(isHtmlUpload(file.name, text) ? stripHtmlToReadableText(text) : text);
+        extractedText = isHtmlUpload(file.name, text) ? stripHtmlToReadableText(text) : text;
+        setInputText(extractedText);
       } else {
-        setInputText(`[Document] Uploaded: ${file.name} - Could not extract text. Try pasting content directly.`);
+        extractedText = `[Document] Uploaded: ${file.name} - Could not extract text. Try pasting content directly.`;
+        setInputText(extractedText);
       }
+    }
+
+    // Detect if this is an SOP and show format selection
+    const isSOP = detectSOP(extractedText);
+    if (isSOP) {
+      setDetectedSOP(true);
+      setShowFormatSelection(true);
     }
 
     // Always show title confirmation after file upload
@@ -194,6 +223,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setCourseTitle(suggestedTitle);
     }
     setShowTitleConfirm(false);
+  };
+
+  const handleFormatSelection = (format: "learning-course" | "work-instruction") => {
+    if (setContentType) {
+      setContentType(format);
+    }
+    setShowFormatSelection(false);
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -261,6 +297,42 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5)" }}
               >
                 <X className="w-3.5 h-3.5" /> No, I'll change it
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Format Selection Dialog for SOP */}
+        {showFormatSelection && detectedSOP && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 animate-fade-in">
+            <p className="text-[13px] font-semibold text-foreground mb-1">
+              We detected a Standard Operating Procedure
+            </p>
+            <p className="text-[12px] text-muted-foreground mb-4">
+              How would you like to create content from this SOP?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => handleFormatSelection("learning-course")}
+                type="button"
+                className="flex-1 h-10 rounded-lg text-[13px] font-bold text-white flex items-center justify-center gap-2 bg-blue-600 hover:brightness-110 hover:-translate-y-0.5 active:translate-y-0.5 transition-all text-left px-3"
+                style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.12), 0 4px 8px rgba(0,0,0,0.08)" }}
+              >
+                <div>
+                  <div>📚 Learning Course</div>
+                  <div className="text-[11px] font-normal opacity-90">Complete with theory, visuals & assessment</div>
+                </div>
+              </button>
+              <button
+                onClick={() => handleFormatSelection("work-instruction")}
+                type="button"
+                className="flex-1 h-10 rounded-lg text-[13px] font-bold text-foreground flex items-center justify-center gap-2 border border-blue-300 bg-white hover:bg-blue-50 hover:-translate-y-0.5 active:translate-y-0.5 transition-all text-left px-3"
+                style={{ boxShadow: "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04)" }}
+              >
+                <div>
+                  <div>⚙️ Work Instruction</div>
+                  <div className="text-[11px] font-normal text-muted-foreground">Bare-bones steps for frontline operators</div>
+                </div>
               </button>
             </div>
           </div>

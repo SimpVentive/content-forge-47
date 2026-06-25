@@ -705,7 +705,47 @@ export function useAgentPipeline() {
     setLogs([]);
   }, []);
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast" }) => {
+  const runWorkInstructionPipeline = async (courseTitle: string, inputText: string, textLanguage: string): Promise<void> => {
+    const addLog = (msg: string) => setLogs((prev) => [...prev, msg]);
+    addLog("Work Instruction Generator: Starting...");
+    addLog("Extracting procedure steps from SOP...");
+
+    try {
+      // Simple extraction: split by common step markers
+      const stepRegex = /^(?:step\s+\d+|^\d+\.|^-|^•)\s+(.+?)(?=^(?:step\s+\d+|^\d+\.|^-|^•)|$)/gim;
+      const matches = inputText.match(stepRegex) || [];
+      const steps = matches.slice(0, 10).map((m, i) => ({
+        stepNumber: i + 1,
+        description: m.replace(/^(?:step\s+\d+|^\d+\.|^-|^•)\s+/i, "").trim(),
+      }));
+
+      if (steps.length === 0) {
+        addLog("Could not extract procedure steps. Using input as single step.");
+        steps.push({ stepNumber: 1, description: inputText.slice(0, 500) });
+      }
+
+      addLog(`Extracted ${steps.length} procedure steps`);
+      addLog("Generating simple step-by-step content...");
+
+      // Create a minimal outline for work instructions
+      const outline = `# ${courseTitle} - Work Instruction\n\n${steps.map((s) => `${s.stepNumber}. ${s.description}`).join("\n")}`;
+      setOutputData((prev) => ({ ...prev, outline }));
+      setRawOutputs((prev) => ({ ...prev, architect: outline }));
+
+      // Create a minimal script focused on procedures
+      const script = `# ${courseTitle} - Procedure\n\n${steps.map((s) => `## Step ${s.stepNumber}\n${s.description}`).join("\n\n")}`;
+      setOutputData((prev) => ({ ...prev, script }));
+      setRawOutputs((prev) => ({ ...prev, writer: script }));
+
+      addLog("Work Instruction Generator: Complete");
+      setIsRunning(false);
+    } catch (err) {
+      addLog(`Work Instruction Generator: Error — ${(err as Error).message}`);
+      setIsRunning(false);
+    }
+  };
+
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction" }) => {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const languageDirective = buildLanguageDirective(textLanguage, narratorLanguage);
@@ -782,6 +822,11 @@ export function useAgentPipeline() {
     setLogs([]);
 
     const isCancelled = () => cancelledRef.current;
+
+    // Handle Work Instruction mode
+    if (params?.contentType === "work-instruction") {
+      return runWorkInstructionPipeline(courseTitle, inputText, textLanguage);
+    }
 
     // Set all agents to queued initially
     AGENTS.forEach(({ id }) => {

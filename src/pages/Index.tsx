@@ -93,6 +93,7 @@ const Index = () => {
   const [showCreditConfirmation, setShowCreditConfirmation] = useState(false);
   const [creditEstimate, setCreditEstimate] = useState<CreditEstimate | null>(null);
   const [pendingParams, setPendingParams] = useState<CourseParameters | null>(null);
+  const [contentType, setContentType] = useState<"learning-course" | "work-instruction">("learning-course");
   const prevIsRunning = useRef(false);
 
   const {
@@ -376,6 +377,7 @@ const Index = () => {
       setPendingParams(null);
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
+        contentType,
         learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
@@ -398,6 +400,7 @@ const Index = () => {
       setPendingParams(null);
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
+        contentType,
         learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
@@ -622,6 +625,7 @@ const Index = () => {
             estimatedMinutes={estimateMinutesFromText(inputText)}
             youtubeAgentEnabled={agentToggles.youtube}
             initialLearningType={learningType as "static" | "video" | "image"}
+            contentType={contentType}
             onConfirm={handleParamsConfirm}
             onCancel={() => setShowParamsDialog(false)}
           />
@@ -660,6 +664,8 @@ const Index = () => {
             isRunning={isRunning}
             agentToggles={agentToggles}
             setAgentToggles={setAgentToggles}
+            contentType={contentType}
+            setContentType={setContentType}
           />
         </ResizablePanel>
 

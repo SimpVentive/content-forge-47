@@ -41,6 +41,7 @@ export interface CourseParameters {
   imageOutputFormat?: "interactive-html" | "video" | "pdf";
   flipbookVoiceoverEnabled?: boolean;
   flipbookNarrationLanguage?: string;
+  contentType?: "learning-course" | "work-instruction";
 }
 
 // ElevenLabs multilingual v2 supported languages
@@ -59,6 +60,8 @@ interface CourseParametersDialogProps {
   youtubeAgentEnabled?: boolean;
   /** Pre-selected learning mode (static, video, or image). Defaults to "static". */
   initialLearningType?: "static" | "video" | "image";
+  /** Content type: learning course or work instruction. */
+  contentType?: "learning-course" | "work-instruction";
   onConfirm: (params: CourseParameters) => void;
   onCancel: () => void;
 }
@@ -228,7 +231,7 @@ const InfoHint: React.FC<{ text: string }> = ({ text }) => (
 );
 
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
-  open, courseTitle, estimatedMinutes, youtubeAgentEnabled = true, initialLearningType = "static", onConfirm, onCancel,
+  open, courseTitle, estimatedMinutes, youtubeAgentEnabled = true, initialLearningType = "static", contentType = "learning-course", onConfirm, onCancel,
 }) => {
   const headingFont = '"Poppins", sans-serif';
   const bodyFont = '"Inter", sans-serif';
