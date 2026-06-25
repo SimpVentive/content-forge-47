@@ -1,5 +1,6 @@
 import { useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { Navbar } from "@/components/home/Navbar";
 import { Hero } from "@/components/home/Hero";
 import { FeaturesSection } from "@/components/home/FeaturesSection";
@@ -12,12 +13,26 @@ import { Footer } from "@/components/home/Footer";
 
 const HomePage = () => {
   const { hash } = useLocation();
+  const navigate = useNavigate();
+  const { user, isLoading } = useAuth();
+
+  // Redirect authenticated users to dashboard
+  useEffect(() => {
+    if (!isLoading && user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [user, isLoading, navigate]);
 
   useEffect(() => {
     if (!hash) return;
     const el = document.querySelector(hash);
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   }, [hash]);
+
+  // Show loading state while checking auth
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen bg-background"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" /></div>;
+  }
 
   return (
     <div className="min-h-screen bg-white" data-testid="home-page">
