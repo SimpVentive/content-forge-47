@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useContentForge } from "@/hooks/ContentForgeContext";
 import type { CourseParameters } from "@/components/contentforge/CourseParametersDialog";
 import { estimateMinutesFromText } from "@/components/contentforge/Sidebar";
+import type { TitleSpan } from "@/components/contentforge/RichTitleEditor";
 import { Sidebar } from "@/components/contentforge/Sidebar";
 import { AgentPipeline } from "@/components/contentforge/AgentPipeline";
 import { OutputPanel } from "@/components/contentforge/OutputPanel";
@@ -94,6 +95,8 @@ const Index = () => {
   const [creditEstimate, setCreditEstimate] = useState<CreditEstimate | null>(null);
   const [pendingParams, setPendingParams] = useState<CourseParameters | null>(null);
   const [contentType, setContentType] = useState<"learning-course" | "work-instruction">("learning-course");
+  const [titleSpans, setTitleSpans] = useState<TitleSpan[]>([]);
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const prevIsRunning = useRef(false);
 
   const {
@@ -378,6 +381,8 @@ const Index = () => {
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
         contentType,
+        titleSpans,
+        companyLogo,
         learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
@@ -401,6 +406,8 @@ const Index = () => {
       runPipeline(courseTitle, inputText, agentToggles, {
         ...params,
         contentType,
+        titleSpans,
+        companyLogo,
         learningMode: pipelineLearningMode,
         videoSettings: effectiveVideoSettings,
       });
@@ -666,6 +673,10 @@ const Index = () => {
             setAgentToggles={setAgentToggles}
             contentType={contentType}
             setContentType={setContentType}
+            titleSpans={titleSpans}
+            setTitleSpans={setTitleSpans}
+            companyLogo={companyLogo}
+            setCompanyLogo={setCompanyLogo}
           />
         </ResizablePanel>
 

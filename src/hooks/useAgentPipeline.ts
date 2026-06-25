@@ -745,7 +745,7 @@ export function useAgentPipeline() {
     }
   };
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction" }) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }) => {
     const textLanguage = params?.textLanguage || params?.language || "English";
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const languageDirective = buildLanguageDirective(textLanguage, narratorLanguage);
@@ -1767,14 +1767,15 @@ OUTPUT FORMAT — ABSOLUTE:
               displayStyle,
               params?.flipbookVoiceoverEnabled || false,
               params?.voiceoverPace,
-              assessmentResult
+              assessmentResult,
+              params?.companyLogo
             );
             addLog(`Final Assembly: Generated interactive HTML (${flipbookHtml.length} bytes)`);
 
             // Generate additional formats if requested
             if (outputFormat === "pdf") {
               addLog("Final Assembly: Generating PDF export...");
-              const pdfResult = await exportNarrativeToPDF(narrativeScenes, courseTitle, assessmentResult);
+              const pdfResult = await exportNarrativeToPDF(narrativeScenes, courseTitle, assessmentResult, params?.companyLogo);
               if (pdfResult.success && pdfResult.pdfDataUrl) {
                 pdfDataUrl = pdfResult.pdfDataUrl;
                 addLog(`Final Assembly: Generated PDF export (${pdfDataUrl.length} bytes)`);

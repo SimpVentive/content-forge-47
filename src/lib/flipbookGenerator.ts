@@ -20,7 +20,8 @@ export function generateFlipbookHTML(
   displayStyle: "page-flip" | "smooth-slide" | "step-reveal" = "page-flip",
   voiceoverEnabled: boolean = false,
   voiceoverPace?: "slow" | "normal" | "fast",
-  assessmentRaw?: string
+  assessmentRaw?: string,
+  companyLogoDataUrl?: string | null
 ): string {
   // Parse assessment if provided
   let assessmentData: any = null;
@@ -158,9 +159,10 @@ ${assessmentDetails}`,
 
   const pagesHTML = pages
     .map(
-      (page) => `
+      (page, idx) => `
     <div class="page">
       <div class="page-inner">
+        ${companyLogoDataUrl && idx === 0 ? `<img src="${companyLogoDataUrl}" alt="Company logo" class="logo-first-page" />` : ""}
         ${page.title ? `<h1 class="page-title">${escapeHtml(page.title)}</h1>` : ""}
         <div class="page-content">
           ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
@@ -180,7 +182,10 @@ ${assessmentDetails}`,
           <div class="narration-text">${escapeHtml(page.speaker)}</div>
         </div>
         ` : ""}
-        <div class="page-number">Page ${page.pageNumber}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+          <div class="page-number">Page ${page.pageNumber}</div>
+          ${companyLogoDataUrl && idx > 0 ? `<img src="${companyLogoDataUrl}" alt="Company logo" class="logo-footer" />` : ""}
+        </div>
       </div>
     </div>
   `
@@ -323,6 +328,24 @@ ${assessmentDetails}`,
       color: #aaa;
       text-align: center;
       margin-top: 10px;
+      flex-shrink: 0;
+    }
+
+    .logo-first-page {
+      width: 180px;
+      height: 180px;
+      object-fit: contain;
+      margin: 0 auto 20px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .logo-footer {
+      width: 60px;
+      height: 60px;
+      object-fit: contain;
+      border-radius: 4px;
+      opacity: 0.8;
       flex-shrink: 0;
     }
 

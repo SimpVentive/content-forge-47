@@ -18,7 +18,8 @@ export interface PDFExportResult {
 export async function exportNarrativeToPDF(
   narratives: TopicNarrative[],
   courseTitle: string,
-  assessmentRaw?: string
+  assessmentRaw?: string,
+  companyLogoDataUrl?: string | null
 ): Promise<PDFExportResult> {
   try {
     // Dynamically import jsPDF (to avoid bundling if not used)
@@ -37,11 +38,26 @@ export async function exportNarrativeToPDF(
     const contentWidth = pageWidth - 2 * margin;
 
     // Title page
+    let titlePageY = margin;
+    if (companyLogoDataUrl) {
+      try {
+        const logoImg = new Image();
+        logoImg.src = companyLogoDataUrl;
+        await new Promise<void>((resolve) => {
+          logoImg.onload = () => resolve();
+          logoImg.onerror = () => resolve();
+        });
+        pdf.addImage(companyLogoDataUrl, "JPEG", pageWidth / 2 - 45, titlePageY, 90, 90);
+        titlePageY += 100;
+      } catch (err) {
+        console.warn("Could not add logo to PDF:", err);
+      }
+    }
     pdf.setFontSize(28);
-    pdf.text(courseTitle, pageWidth / 2, pageHeight / 2 - 20, { align: "center" });
+    pdf.text(courseTitle, pageWidth / 2, titlePageY + 20, { align: "center" });
     pdf.setFontSize(14);
     pdf.setTextColor(100);
-    pdf.text("Professional Learning Guide", pageWidth / 2, pageHeight / 2 + 10, { align: "center" });
+    pdf.text("Professional Learning Guide", pageWidth / 2, titlePageY + 40, { align: "center" });
     pdf.addPage();
 
     // Overview page
@@ -152,10 +168,17 @@ export async function exportNarrativeToPDF(
     const assessmentLines = pdf.splitTextToSize(assessmentDetails, contentWidth);
     pdf.text(assessmentLines, margin, overviewY);
 
-    // Page number
+    // Page number and footer logo
     pdf.setFontSize(9);
     pdf.setTextColor(150);
     pdf.text("Overview", margin, pageHeight - margin);
+    if (companyLogoDataUrl) {
+      try {
+        pdf.addImage(companyLogoDataUrl, "JPEG", pageWidth - margin - 25, pageHeight - margin - 22, 20, 20);
+      } catch (err) {
+        console.warn("Could not add logo footer:", err);
+      }
+    }
 
     pdf.addPage();
 
@@ -225,6 +248,15 @@ export async function exportNarrativeToPDF(
         pdf.setFontSize(9);
         pdf.setTextColor(150);
         pdf.text(`Page ${pageNumber} | ${narrative.topicTitle}`, margin, pageHeight - margin);
+
+        // Add logo footer
+        if (companyLogoDataUrl) {
+          try {
+            pdf.addImage(companyLogoDataUrl, "JPEG", pageWidth - margin - 25, pageHeight - margin - 22, 20, 20);
+          } catch (err) {
+            console.warn("Could not add logo footer:", err);
+          }
+        }
 
         pageNumber++;
 

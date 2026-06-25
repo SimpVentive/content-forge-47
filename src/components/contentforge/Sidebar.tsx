@@ -2,6 +2,8 @@
 import { Zap, Upload, Square, FileText, X, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { TitleFormatter } from "./TitleFormatter";
+import { RichTitleEditor, type TitleSpan } from "./RichTitleEditor";
+import { LogoUploader } from "./LogoUploader";
 
 /** Estimate e-learning minutes from word count (~150 words/min narrated) */
 export function estimateMinutesFromText(text: string): number {
@@ -23,6 +25,10 @@ interface SidebarProps {
   setAgentToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   contentType?: "learning-course" | "work-instruction";
   setContentType?: (v: "learning-course" | "work-instruction") => void;
+  titleSpans?: TitleSpan[];
+  setTitleSpans?: (v: TitleSpan[]) => void;
+  companyLogo?: string | null;
+  setCompanyLogo?: (v: string | null) => void;
 }
 
 const BINARY_EXTENSIONS = ['.pptx', '.ppt', '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.zip'];
@@ -134,6 +140,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isStartingGeneration = false,
   contentType = "learning-course",
   setContentType,
+  titleSpans = [],
+  setTitleSpans,
+  companyLogo,
+  setCompanyLogo,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
@@ -272,7 +282,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
             setTitle={setCourseTitle}
             isOpen={isTitleFocused}
           />
+
+          {/* Rich Text Editor for per-section formatting */}
+          {isTitleFocused && setTitleSpans && (
+            <RichTitleEditor
+              title={courseTitle}
+              spans={titleSpans}
+              onTitleChange={(text, spans) => {
+                setCourseTitle(text);
+                setTitleSpans(spans);
+              }}
+              isOpen={isTitleFocused}
+            />
+          )}
         </div>
+
+        {/* Company Logo Upload */}
+        {setCompanyLogo && (
+          <LogoUploader
+            logoDataUrl={companyLogo || undefined}
+            onLogoChange={setCompanyLogo}
+          />
+        )}
 
         {/* Title Confirmation Dialog */}
         {showTitleConfirm && (
