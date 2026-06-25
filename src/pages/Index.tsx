@@ -706,9 +706,17 @@ const Index = () => {
                     </div>
                   </div>
 
-                  <div className="inline-flex items-center gap-2 rounded-full border border-[#bfd3fb] bg-white px-3 py-1.5 text-[13px] font-bold text-[#1e3a8a]">
-                    <Clock3 className="h-4 w-4" />
-                    <span>{elapsedLabel}</span>
+                  <div className="flex items-center gap-2">
+                    <div className="inline-flex items-center gap-2 rounded-full border border-[#bfd3fb] bg-white px-3 py-1.5 text-[13px] font-bold text-[#1e3a8a]">
+                      <Clock3 className="h-4 w-4" />
+                      <span>{elapsedLabel}</span>
+                    </div>
+                    <button
+                      onClick={stopPipeline}
+                      className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all text-[13px]"
+                    >
+                      Stop Generation
+                    </button>
                   </div>
                 </div>
               </div>
