@@ -257,7 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   return (
     <div className="h-full flex flex-col bg-card border-r border-border">
-      <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5">
+      <div className="flex-1 overflow-y-auto px-5 py-6 space-y-5 min-h-0">
         <p className="text-[12px] font-bold text-primary tracking-[0.12em] uppercase">
           Course Input
         </p>
@@ -388,37 +388,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
           />
         </div>
 
-        {isRunning ? (
-          <button
-            onClick={onStop}
-            type="button"
-            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 hover:-translate-y-0.5 active:translate-y-0.5 transition-all duration-200"
-            style={{ boxShadow: "0 3px 0 rgba(0,0,0,0.15), 0 6px 12px rgba(220,38,38,0.25), inset 0 1px 0 rgba(255,255,255,0.2)" }}
-          >
-            <Square className="w-4 h-4" />
-            Stop Generating
-          </button>
-        ) : (
-          <button
-            onClick={onGenerate}
-            type="button"
-            disabled={isExtracting || isStartingGeneration}
-            className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] hover:-translate-y-0.5 active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-            style={{ background: '#2563EB' }}
-          >
-            {isExtracting || isStartingGeneration ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                {isExtracting ? "Extracting..." : "Starting..."}
-              </>
-            ) : (
-              <>
-                <Zap className="w-4 h-4" />
-                Generate Course
-              </>
-            )}
-          </button>
-        )}
+        <div className="sticky bottom-0 left-0 right-0 bg-card border-t border-border pt-4 -mx-5 px-5 pb-5">
+          {isRunning ? (
+            <button
+              onClick={onStop}
+              type="button"
+              className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 bg-destructive hover:bg-destructive/90 hover:-translate-y-0.5 active:translate-y-0.5 transition-all duration-200"
+              style={{ boxShadow: "0 3px 0 rgba(0,0,0,0.15), 0 6px 12px rgba(220,38,38,0.25), inset 0 1px 0 rgba(255,255,255,0.2)" }}
+            >
+              <Square className="w-4 h-4" />
+              Stop Generating
+            </button>
+          ) : (
+            <button
+              onClick={onGenerate}
+              type="button"
+              disabled={isExtracting || isStartingGeneration}
+              className="w-full h-[48px] rounded-xl text-[15px] font-bold text-white flex items-center justify-center gap-2 shadow-btn-primary hover:brightness-[1.08] hover:-translate-y-0.5 active:translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              style={{ background: '#2563EB' }}
+            >
+              {isExtracting || isStartingGeneration ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  {isExtracting ? "Extracting..." : "Starting..."}
+                </>
+              ) : (
+                <>
+                  <Zap className="w-4 h-4" />
+                  Generate Course
+                </>
+              )}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
