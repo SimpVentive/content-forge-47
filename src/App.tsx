@@ -44,6 +44,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 }
 
 const HomePage = lazy(() => import("./pages/home/HomePage"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Index = lazy(() => import("./pages/Index"));
 const Help = lazy(() => import("./pages/Help"));
 const Welcome = lazy(() => import("./pages/Welcome"));
@@ -78,12 +79,13 @@ const App = () => (
             <Suspense fallback={<div className="flex items-center justify-center h-screen bg-background"><div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" /></div>}>
               <Routes>
                 <Route path="/debug" element={<Debug />} />
-                <Route path="/" element={<PublicRoute><HomePage /></PublicRoute>} />
+                <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
                 <Route path="/help" element={<PublicRoute><Help /></PublicRoute>} />
                 <Route path="/welcome" element={<Welcome />} />
+                <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
                 <Route path="/new-course" element={<ProtectedRoute><TypeSelector /></ProtectedRoute>} />
                 <Route path="/preview/videos" element={<ProtectedRoute><VideoPreviewPage /></ProtectedRoute>} />
                 <Route path="/studio" element={<ProtectedRoute><Index /></ProtectedRoute>} />
