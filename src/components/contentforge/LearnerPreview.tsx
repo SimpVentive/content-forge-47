@@ -3237,8 +3237,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
         <div className="relative min-w-0 flex flex-1 flex-col overflow-hidden">
           <div className="shrink-0 border-b border-[#31598d] bg-[#1f4f8a] px-5 py-4 text-white md:px-7">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-[12px] font-semibold text-white/70">
                   <span className="truncate font-[900] text-white">{courseTitle}</span>
                   {currentModule?.title && currentModule.title !== courseTitle ? (
@@ -3247,99 +3247,72 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       <span className="truncate">{currentModule.title}</span>
                     </>
                   ) : null}
-                  {shellPageTitle && shellPageTitle !== currentModule?.title ? (
-                    <>
-                      <span>&gt;</span>
-                      <span className="truncate">{shellPageTitle}</span>
-                    </>
-                  ) : null}
                 </div>
-                <p className="mt-2 text-[24px] font-[900] tracking-tight">{currentModule?.title || shellPageTitle}</p>
-                <p className="mt-1 max-w-[760px] text-[13px] text-white/72">{shellPageSubtitle}</p>
-                {layoutTrimNotice ? (
-                  <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-[#facc15]/55 bg-[#fff7cc] px-3 py-1 text-[11px] font-[900] uppercase tracking-[0.08em] text-[#8a5a00]">
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    Trimmed to fit {slideRules.maxLines}-line layout
-                  </div>
-                ) : null}
+                <p className="mt-1 text-[18px] font-[900] tracking-tight">{currentModule?.title || shellPageTitle}</p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {utilityActions.map((action) => {
-                  const Icon = action.icon;
-                  const isActive = activeUtilityPanel === action.panel;
-                  return (
-                    <button
-                      key={action.label}
-                      type="button"
-                      onClick={() => setActiveUtilityPanel(isActive ? null : action.panel)}
-                      className={`inline-flex h-10 items-center gap-2 rounded-full border px-4 text-[12px] font-[800] transition-all ${isActive ? "border-white/40 bg-white/22 text-white" : "border-white/14 bg-white/8 text-white/90 hover:bg-white/14"}`}
-                    >
-                      <Icon className="h-3.5 w-3.5" />
-                      {action.label}
-                    </button>
-                  );
-                })}
-                <div className="ml-1 flex items-center gap-3 rounded-full bg-white px-2 py-1 pr-3 text-[#143a6f] shadow-sm">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#e7eef8] text-[12px] font-[900]">
-                    {trainerBadgeInitial}
-                  </div>
-                  <div>
-                    <p className="text-[12px] font-[900] leading-none">{trainerName}</p>
-                    <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5d769a]">Instructor</p>
-                  </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Utility menu dropdown */}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setActiveUtilityPanel(activeUtilityPanel ? null : "discussion")}
+                    className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/14 bg-white/8 px-3 text-[12px] font-[800] text-white/90 transition-all hover:bg-white/14"
+                    title="Tools & Resources"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" /></svg>
+                  </button>
                 </div>
+
                 <button
                   onClick={onClose}
-                  className="inline-flex h-10 items-center gap-2 rounded-full border border-white/14 bg-white/8 px-4 text-[12px] font-[800] text-white/90 transition-all hover:bg-white/14"
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/14 bg-white/8 px-3 text-[12px] font-[800] text-white/90 transition-all hover:bg-white/14"
                   type="button"
+                  title="Exit Preview"
                 >
-                  <X className="h-3.5 w-3.5" /> Exit Preview
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
           </div>
 
           {activeUtilityPanel && (
-            <div className="shrink-0 border-b border-[#d7e1ee] bg-[#f0f5fc] px-6 py-4">
-              <div className="mx-auto flex max-w-[900px] items-start gap-4">
-                <div className="flex-1">
-                  <p className="text-[13px] font-[900] uppercase tracking-[0.12em] text-[#3a5a8a]">
+            <div className="shrink-0 border-b border-[#d7e1ee] bg-[#f0f5fc] px-6 py-3">
+              <div className="mx-auto max-w-[900px]">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[12px] font-[900] uppercase tracking-[0.12em] text-[#3a5a8a]">
                     {activeUtilityPanel === "discussion" ? "Discussion" : activeUtilityPanel === "glossary" ? "Glossary" : "Settings"}
                   </p>
-                  <p className="mt-2 text-[13px] leading-relaxed text-[#4a6585]">
-                    {activeUtilityPanel === "discussion"
-                      ? "Discussion threads will be available when the course is published to your LMS. Learners can post questions, reply to peers, and interact with facilitators here."
-                      : activeUtilityPanel === "glossary"
-                        ? "The glossary will be auto-generated from key terms in the course content once published. Learners can search and browse definitions inline."
-                        : "Playback settings such as narration speed, closed captions, font size adjustments, and accessibility preferences will be available in the published course."}
-                  </p>
+                  <button type="button" onClick={() => setActiveUtilityPanel(null)} className="p-1 text-[#5f7b9e] hover:bg-white/40 hover:text-[#123d78] rounded">
+                    <X className="h-4 w-4" />
+                  </button>
                 </div>
-                <button type="button" onClick={() => setActiveUtilityPanel(null)} className="mt-1 rounded-full p-1 text-[#5f7b9e] hover:bg-white/60 hover:text-[#123d78]">
-                  <X className="h-4 w-4" />
-                </button>
+                <p className="text-[12px] leading-relaxed text-[#4a6585]">
+                  {activeUtilityPanel === "discussion"
+                    ? "Discussion threads will be available when the course is published to your LMS. Learners can post questions, reply to peers, and interact with facilitators here."
+                    : activeUtilityPanel === "glossary"
+                      ? "The glossary will be auto-generated from key terms in the course content once published. Learners can search and browse definitions inline."
+                      : "Playback settings such as narration speed, closed captions, font size adjustments, and accessibility preferences will be available in the published course."}
+                </p>
               </div>
             </div>
           )}
 
-          <div className="shrink-0 border-b border-[#d7e1ee] bg-white/80 px-4 py-3 backdrop-blur md:px-6">
-            <div className="grid gap-3">
-              <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-2xl border border-[#d8e2ef] bg-[#f7fbff] px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#5f7b9e]">Module Progress</p>
-                  <p className="mt-2 text-[24px] font-[900] tracking-tight text-[#123d78]">{currentModuleCompletion}%</p>
-                  <p className="text-[12px] text-[#607896]">{currentModuleSlides.filter((moduleSlide) => visited.has(moduleSlide.idx)).length} of {currentModuleSlides.length} screens visited</p>
-                </div>
-                <div className="rounded-2xl border border-[#d8e2ef] bg-[#fdfdfd] px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#5f7b9e]">Learning Focus</p>
-                  <p className="mt-2 text-[24px] font-[900] tracking-tight text-[#123d78]">{currentModuleObjectiveCount}</p>
-                  <p className="text-[12px] text-[#607896]">Core lesson objectives highlighted in this module</p>
-                </div>
-                <div className="rounded-2xl border border-[#d8e2ef] bg-[#fffaf0] px-4 py-3 shadow-sm">
-                  <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Activities</p>
-                  <p className="mt-2 text-[24px] font-[900] tracking-tight text-[#123d78]">{currentModuleVideoCount + (currentModuleAssessment ? 1 : 0)}</p>
-                  <p className="text-[12px] text-[#7c6a52]">{currentModuleAssessment ? "Quiz included" : "No quiz yet"}{currentModuleVideoCount ? ` - ${currentModuleVideoCount} video` : ""}</p>
-                </div>
+          <div className="shrink-0 border-b border-[#d7e1ee] bg-white/80 px-4 py-2 backdrop-blur md:px-6">
+            <div className="flex gap-4 items-center justify-start text-[12px]">
+              <div className="flex items-center gap-1 text-[#5f7b9e]">
+                <span className="font-[900]">{currentModuleCompletion}%</span>
+                <span className="text-[11px]">Progress</span>
+              </div>
+              <div className="h-4 w-px bg-[#d8e2ef]"></div>
+              <div className="flex items-center gap-1 text-[#5f7b9e]">
+                <span className="font-[900]">{currentModuleSlides.filter((moduleSlide) => visited.has(moduleSlide.idx)).length}/{currentModuleSlides.length}</span>
+                <span className="text-[11px]">Screens</span>
+              </div>
+              <div className="h-4 w-px bg-[#d8e2ef]"></div>
+              <div className="flex items-center gap-1 text-[#5f7b9e]">
+                <span className="font-[900]">{currentModuleObjectiveCount}</span>
+                <span className="text-[11px]">Objectives</span>
               </div>
             </div>
           </div>
