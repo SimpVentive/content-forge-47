@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
+import { convertPngToJpeg, isPngImage } from "@/lib/imageConverter";
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
 import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
@@ -1288,7 +1289,18 @@ OUTPUT FORMAT — ABSOLUTE:
                   });
 
                   if (!imageError && imageData?.imageDataUrl) {
-                    scene.imageDataUrl = imageData.imageDataUrl;
+                    // Convert PNG to JPEG for better compression
+                    let finalImageUrl = imageData.imageDataUrl;
+                    if (isPngImage(imageData.mimeType || "image/png")) {
+                      try {
+                        finalImageUrl = await convertPngToJpeg(imageData.imageDataUrl, 85);
+                        addLog(`Visual Design Agent: Converted PNG to JPEG for Scene ${scene.sceneNumber}`);
+                      } catch (convertError) {
+                        addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original — ${convertError}`);
+                      }
+                    }
+
+                    scene.imageDataUrl = finalImageUrl;
                     // Log BFL API usage
                     try {
                       await logApiUsage(
@@ -1369,8 +1381,22 @@ OUTPUT FORMAT — ABSOLUTE:
                   });
 
                   if (!imageError && imageData?.imageDataUrl) {
-                    topicVisual.generated_image_data_url = imageData.imageDataUrl;
-                    topicVisual.generated_image_mime_type = imageData.mimeType || "image/png";
+                    // Convert PNG to JPEG for better compression
+                    let finalImageUrl = imageData.imageDataUrl;
+                    let finalMimeType = imageData.mimeType || "image/png";
+
+                    if (isPngImage(finalMimeType)) {
+                      try {
+                        finalImageUrl = await convertPngToJpeg(imageData.imageDataUrl, 85);
+                        finalMimeType = "image/jpeg";
+                        addLog(`Visual Design Agent: Converted PNG to JPEG for topic "${topicTitle}"`);
+                      } catch (convertError) {
+                        addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original — ${convertError}`);
+                      }
+                    }
+
+                    topicVisual.generated_image_data_url = finalImageUrl;
+                    topicVisual.generated_image_mime_type = finalMimeType;
                     topicVisual.image_approved = false;
                     // Log BFL API usage
                     try {
