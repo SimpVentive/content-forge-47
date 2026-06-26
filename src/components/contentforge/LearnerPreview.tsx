@@ -633,8 +633,10 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     }) || visualModules[mi];
     const infographicDescription = getInfographicDescription(matchedVisualModule, mod);
 
-    // 1. Title slide
-    slides.push({ type: "title", moduleIndex: mi, moduleTitle: mod.title });
+    // 1. Title slide - only for the first module (course opening)
+    if (mi === 0) {
+      slides.push({ type: "title", moduleIndex: mi, moduleTitle: mod.title });
+    }
 
     // 2. Content slides - one per topic
     mod.topics.forEach((topic, ti) => {
