@@ -2395,14 +2395,37 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             <div className="mx-auto max-w-[1320px]" key={currentSlide}>
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
                 <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)] md:p-7">
-                  <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">{moduleLabel}</p>
-                      <h2 className="mt-2 text-[35px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
-                      <p className="mt-2 text-[15px] leading-relaxed text-[#5f7898]">{parts.hook || narratorExcerpt}</p>
-                    </div>
+                  <div className="mb-8">
+                    <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e] mb-3">{moduleLabel}</p>
+                    <h2 className="text-[35px] font-[900] leading-tight text-[#123d78] mb-8">{slide.topicTitle}</h2>
+
+                    {/* Module Objective Section */}
+                    {(parts.hook || narratorExcerpt) && (
+                      <div className="mb-8">
+                        <p className="text-[16px] italic text-[#5f7898] mb-6">
+                          <span className="font-[900] not-italic text-[#123d78]">Objective:</span> {parts.hook || narratorExcerpt}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Course Contents Section */}
+                    {parts.body && parts.body.length > 0 && (
+                      <div>
+                        <p className="text-[14px] font-[900] text-[#123d78] mb-4">Course Contents</p>
+                        <p className="text-[13px] text-[#5f7898] mb-3">Following is the course content of this module:</p>
+                        <div className="space-y-2">
+                          {parts.body.map((item, index) => (
+                            <div key={index} className="flex items-start gap-3 text-[14px] leading-[1.5] text-[#35506f]">
+                              <span className="font-[800] text-[#4f46e5] shrink-0 mt-0.5">•</span>
+                              <span>{item}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {slide.topicPartCount && slide.topicPartCount > 1 ? (
-                      <span className="inline-flex rounded-full bg-[#e8eef9] px-4 py-2 text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592]">
+                      <span className="inline-flex rounded-full bg-[#e8eef9] px-4 py-2 text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592] mt-6">
                         Part {(slide.topicPartIndex || 0) + 1} of {slide.topicPartCount}
                       </span>
                     ) : null}
