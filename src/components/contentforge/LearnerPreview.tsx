@@ -1921,26 +1921,23 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       ~{courseDurationMinutes} minutes
                     </span>
                     {currentNarration && (
-                      <button
-                        onClick={() => setMuted(!muted)}
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-[13px] transition-all ${
-                          muted
-                            ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                            : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                        }`}
-                      >
-                        {muted ? (
-                          <>
-                            <VolumeX className="w-4 h-4" />
-                            Voice Off
-                          </>
-                        ) : (
-                          <>
-                            <Volume2 className="w-4 h-4" />
-                            Voice On
-                          </>
-                        )}
-                      </button>
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200">
+                        <Volume2 className="w-5 h-5 text-blue-600 shrink-0" />
+                        <div className="flex-1">
+                          <p className="text-[13px] font-bold text-blue-900">Voice Over available for this module</p>
+                          <p className="text-[12px] text-blue-700 mt-0.5">Audio narration will help guide your learning</p>
+                        </div>
+                        <button
+                          onClick={() => setMuted(!muted)}
+                          className={`px-4 py-1.5 rounded-full font-bold text-[12px] transition-all shrink-0 ${
+                            muted
+                              ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
+                              : "bg-blue-600 text-white hover:bg-blue-700 border border-blue-600"
+                          }`}
+                        >
+                          {muted ? "Turn On" : "Turn Off"}
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>
