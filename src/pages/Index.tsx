@@ -100,6 +100,7 @@ const Index = () => {
   const [titleSpans, setTitleSpans] = useState<TitleSpan[]>([]);
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("input");
+  const [showGenerationComplete, setShowGenerationComplete] = useState(false);
   const prevIsRunning = useRef(false);
 
   const {
@@ -160,6 +161,9 @@ const Index = () => {
         }
       } else if (rawOutputs.youtube && courseParams?.learningType !== "image") {
         setTimeout(() => setShowVideoWorkflow(true), 800);
+      } else {
+        // Standard elearning completion — show completion dialog
+        setTimeout(() => setShowGenerationComplete(true), 500);
       }
     }
     prevIsRunning.current = isRunning;
@@ -500,6 +504,48 @@ const Index = () => {
           isApplying={isApplyingQAFixes}
         />
       )}
+
+      {/* Generation Complete Modal */}
+      {showGenerationComplete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 animate-in fade-in scale-95 duration-300">
+            <div className="flex justify-center mb-6">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                <svg className="h-8 w-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </div>
+
+            <h2 className="text-2xl font-bold text-center text-slate-900 mb-2">
+              Generation Complete! 🎉
+            </h2>
+
+            <p className="text-center text-slate-600 mb-8">
+              Your course <span className="font-semibold text-slate-900">"{courseTitle}"</span> has been generated successfully and is ready to preview.
+            </p>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => {
+                  setShowGenerationComplete(false);
+                  setShowLearnerPreview(true);
+                }}
+                className="w-full px-6 py-3 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
+              >
+                Proceed to Preview
+              </button>
+              <button
+                onClick={() => setShowGenerationComplete(false)}
+                className="w-full px-6 py-3 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Continue Editing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="h-[68px] shrink-0 bg-card border-b border-border flex items-center justify-between px-6 gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <img src={contentForgeLogo} alt="ContentForge" className="w-12 h-12 object-contain drop-shadow-lg shrink-0" />
