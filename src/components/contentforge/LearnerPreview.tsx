@@ -1742,6 +1742,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const platformNavItems = [
     { id: "home" as const, label: "Home", icon: Home },
     { id: "progress" as const, label: "Progress", icon: BarChart3 },
+    { id: "objectives" as const, label: "Objectives", icon: BookOpenText },
     ...(learnerNotesEnabled ? [{ id: "notes" as const, label: "Notes", icon: NotebookPen }] : []),
     ...(resourcesPanelEnabled ? [{ id: "resources" as const, label: "Resources", icon: FolderOpen }] : []),
   ];
@@ -3156,9 +3157,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     ? "Preview Home"
                     : activeSidebarPanel === "progress"
                       ? "Progress Snapshot"
-                      : activeSidebarPanel === "notes"
-                        ? "Learner Notes"
-                        : "Module Resources"}
+                      : activeSidebarPanel === "objectives"
+                        ? "Learning Objectives"
+                        : activeSidebarPanel === "notes"
+                          ? "Learner Notes"
+                          : "Module Resources"}
                 </p>
                 <HelpCircle className="h-4 w-4 text-white/70" />
               </div>
@@ -3226,6 +3229,25 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     placeholder={`Capture takeaways for ${shellPageTitle}...`}
                     className="min-h-[128px] w-full rounded-xl border border-white/14 bg-white/10 px-3 py-2 text-[12px] text-white placeholder:text-white/35 focus:border-white/30 focus:outline-none"
                   />
+                </div>
+              ) : null}
+              {activeSidebarPanel === "objectives" ? (
+                <div className="space-y-3 text-[12px] leading-relaxed text-white/70">
+                  {lessonObjectives && lessonObjectives.length > 0 ? (
+                    <>
+                      <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-white/52 mb-3">This lesson covers:</p>
+                      <div className="space-y-2">
+                        {lessonObjectives.map((objective, idx) => (
+                          <div key={idx} className="flex items-start gap-2 rounded-xl bg-white/8 p-3">
+                            <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#8ec5ff]" />
+                            <span className="text-white/80">{objective}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-white/60 italic">Learning objectives will appear as you progress through the course.</p>
+                  )}
                 </div>
               ) : null}
               {activeSidebarPanel === "resources" ? (

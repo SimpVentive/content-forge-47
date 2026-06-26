@@ -95,7 +95,7 @@ export const PreviewActionBar: React.FC<PreviewActionBarProps> = ({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const dragOffsetRef = useRef<{ x: number; y: number } | null>(null);
   const [position, setPosition] = useState({ x: 24, y: 150 });
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
 
   useEffect(() => {
     try {
