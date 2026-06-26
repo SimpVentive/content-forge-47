@@ -1891,70 +1891,139 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     switch (slide.type) {
       case "title":
         return (
-          <div className="flex flex-col items-center justify-center h-full gap-6" key={currentSlide}>
-            {/* Avatar character card with speech bubble */}
-            <div className="flex items-end gap-4 anim-fade-in-down" style={{ animationDelay: "0s" }}>
-              {/* Avatar */}
-              <div className="w-16 h-16 rounded-full shrink-0 flex items-center justify-center shadow-lg"
-                style={{ background: "#2563EB" }}>
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                  <circle cx="12" cy="7" r="4"/>
-                </svg>
-              </div>
-              {/* Speech bubble */}
-              <div className="relative bg-white rounded-2xl rounded-bl-md px-5 py-3 shadow-md max-w-[400px]"
-                style={{ animation: "fadeInUp 0.5s ease both", animationDelay: "0.15s" }}>
-                <p className="text-[14px] font-semibold" style={{ color: "#1e293b" }}>
-                  Welcome to <span style={{ color: "#4f46e5" }}>Module {slide.moduleIndex + 1}</span>!
-                </p>
-                <p className="text-[12px] mt-0.5" style={{ color: "#64748b" }}>
-                  Let's explore this topic together.
-                </p>
-                {/* Bubble tail */}
-                <div className="absolute -left-2 bottom-2 w-0 h-0"
-                  style={{ borderTop: "6px solid transparent", borderBottom: "6px solid transparent", borderRight: "8px solid white" }} />
+          <div className="flex flex-col h-full bg-white" key={currentSlide}>
+            {/* Header with Logo and Course Title */}
+            <div className="border-b border-slate-200 px-8 py-6">
+              <div className="max-w-[1200px] mx-auto">
+                {/* Company Logo */}
+                {(slide as any).courseLogoUrl && (
+                  <div className="mb-4">
+                    <img
+                      src={(slide as any).courseLogoUrl}
+                      alt="Company Logo"
+                      className="h-16 object-contain"
+                    />
+                  </div>
+                )}
+
+                {/* Title Section */}
+                <div>
+                  <h1 className="text-[42px] font-[900] text-slate-900 leading-tight mb-2">
+                    {slide.moduleTitle}
+                  </h1>
+                  <p className="text-[18px] text-slate-600 mb-4">{courseTitle}</p>
+
+                  <div className="flex items-center gap-4">
+                    <span className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 text-[13px] font-semibold px-4 py-2 rounded-full">
+                      <Clock className="w-4 h-4" />
+                      ~{courseDurationMinutes} minutes
+                    </span>
+                    {currentNarration && (
+                      <button
+                        onClick={() => setMuted(!muted)}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-full font-semibold text-[13px] transition-all ${
+                          muted
+                            ? "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                            : "bg-blue-100 text-blue-700 hover:bg-blue-200"
+                        }`}
+                      >
+                        {muted ? (
+                          <>
+                            <VolumeX className="w-4 h-4" />
+                            Voice Off
+                          </>
+                        ) : (
+                          <>
+                            <Volume2 className="w-4 h-4" />
+                            Voice On
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div className="w-full max-w-[800px] rounded-2xl p-12 text-center anim-fade-in-down"
-              style={{ background: "#2563EB", animationDelay: "0.1s" }}>
-              <p className="text-[13px] font-bold text-white/60 uppercase tracking-[3px] mb-4">
-                Module {String(slide.moduleIndex + 1).padStart(2, "0")}
-              </p>
-              <h1 className="text-[42px] font-[800] text-white leading-tight mb-4">{slide.moduleTitle}</h1>
-              <p className="text-[15px] text-white/60 mb-8">{courseTitle}</p>
-              <span className="inline-flex items-center gap-2 bg-white/20 text-white text-[13px] font-semibold px-4 py-2 rounded-full">
-                <Clock className="w-4 h-4" />
-                ~{courseDurationMinutes}
-              </span>
+            {/* Content Area - 50% Image, 50% Info */}
+            <div className="flex-1 overflow-hidden">
+              <div className="h-full max-w-[1200px] mx-auto px-8 py-8 flex gap-8">
+                {/* Left: Course Description and Info */}
+                <div className="flex-1 flex flex-col justify-center anim-fade-in-left">
+                  <div className="space-y-6">
+                    <div>
+                      <p className="text-[13px] font-bold uppercase tracking-wider text-blue-600 mb-2">
+                        Module {String(slide.moduleIndex + 1).padStart(2, "0")}
+                      </p>
+                      <p className="text-[16px] leading-relaxed text-slate-700">
+                        Welcome to this learning module. This course is designed to help you master the key concepts and practical skills you need to succeed.
+                      </p>
+                    </div>
 
-              {/* Voice Control Info */}
-              {currentNarration && (
-                <div className="mt-8 space-y-3">
-                  <p className="text-[13px] text-white/70">💡 Audio narration is available for this course</p>
-                  <button
-                    onClick={() => setMuted(!muted)}
-                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-[13px] transition-all ${
-                      muted
-                        ? "bg-white/20 text-white hover:bg-white/30 border border-white/30"
-                        : "bg-white text-[#2563EB] hover:bg-white/90"
-                    }`}
-                  >
-                    {muted ? (
-                      <>
-                        <VolumeX className="w-4 h-4" />
-                        Voice Off - Click to Enable
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 className="w-4 h-4" />
-                        Voice On - Click to Disable
-                      </>
-                    )}
-                  </button>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-[14px] text-slate-700">Interactive learning experience</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-[14px] text-slate-700">Comprehensive assessments</span>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
+                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <span className="text-[14px] text-slate-700">Professional certification ready</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+
+                {/* Right: Representative Image (50%) */}
+                <div className="flex-1 flex items-center justify-center anim-fade-in-right" style={{ animationDelay: "0.1s" }}>
+                  <div className="w-full h-full rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center">
+                    {/* Placeholder representative image */}
+                    <div className="w-full h-full flex items-center justify-center p-8">
+                      <svg
+                        viewBox="0 0 400 400"
+                        className="w-full h-full text-blue-300"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        {/* Book/Learning icon */}
+                        <rect x="80" y="100" width="240" height="200" rx="20" fill="none" />
+                        <line x1="100" y1="120" x2="300" y2="120" />
+                        <line x1="100" y1="150" x2="300" y2="150" />
+                        <line x1="100" y1="180" x2="300" y2="180" />
+                        <line x1="100" y1="210" x2="300" y2="210" />
+                        <line x1="100" y1="240" x2="300" y2="240" />
+                        <circle cx="200" cy="280" r="30" fill="none" strokeWidth="2" />
+                        <path d="M200 270 L200 290 M190 280 L210 280" strokeWidth="2" strokeLinecap="round" />
+                      </svg>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer - Navigation hint */}
+            <div className="border-t border-slate-200 bg-slate-50 px-8 py-4">
+              <div className="max-w-[1200px] mx-auto text-center">
+                <p className="text-[13px] text-slate-600">
+                  Click <span className="font-semibold">Next</span> to begin the learning module
+                </p>
+              </div>
             </div>
           </div>
         );
