@@ -2702,71 +2702,126 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const ans = assessmentAnswers[currentSlide];
         const q = slide.question;
         if (!q) return null;
+
+        // Clean up question text - remove any answer hints or "Correct Answer:" labels
+        let cleanQuestion = q.question || "";
+        cleanQuestion = cleanQuestion.replace(/Correct Answer:.*$/gi, '').replace(/Options:.*$/gi, '').trim();
+
         return (
-          <div className="max-w-[800px] mx-auto" key={currentSlide}>
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-              <div className="h-[6px]" style={{ background: "#F59E0B" }} />
-              <div className="p-8">
-                <p className="text-[13px] font-bold uppercase tracking-wider mb-4 anim-fade-in-down"
-                  style={{ color: "#d97706" }}>
-                  Knowledge Check
-                </p>
-                <h2 className="text-[22px] font-bold mb-6 anim-bounce-in"
-                  style={{ color: "#0f172a", animationDelay: "0.1s" }}>
-                  {q.question}
-                </h2>
-                <div className="space-y-3">
+          <div className="w-full h-full flex flex-col" key={currentSlide}>
+            <div className="flex-1 overflow-y-auto px-6 py-8">
+              <div className="max-w-[900px] mx-auto">
+                {/* Header */}
+                <div className="mb-8">
+                  <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">
+                    Question {currentSlide + 1}
+                  </span>
+                  <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed">
+                    {cleanQuestion}
+                  </h2>
+                </div>
+
+                {/* Options */}
+                <div className="space-y-3 mb-8">
                   {q.options.map((opt: string, oi: number) => {
-                    let style = "border-[#e2e8f0] bg-white hover:bg-[#f0f2f7]";
+                    let style = "border-2 border-slate-200 bg-white hover:border-slate-300 hover:shadow-md";
                     const optClean = stripOptionPrefix(opt);
                     const correctClean = stripOptionPrefix(q.correct_answer || "");
+
                     if (ans?.submitted) {
                       const isCorrect = optClean === correctClean ||
                         opt === q.correct_answer ||
                         String.fromCharCode(65 + oi) === q.correct_answer ||
                         q.correct_answer?.includes(optClean);
-                      if (isCorrect) style = "border-emerald-400 bg-emerald-50 text-emerald-800";
-                      else if (oi === ans.selected) style = "border-red-400 bg-red-50 text-red-800";
+                      if (isCorrect) style = "border-2 border-emerald-500 bg-emerald-50 shadow-md";
+                      else if (oi === ans.selected) style = "border-2 border-red-400 bg-red-50";
                     } else if (ans?.selected === oi) {
-                      style = "border-[#4f46e5] bg-[rgba(79,70,229,0.05)]";
+                      style = "border-2 border-blue-500 bg-blue-50 shadow-md";
                     }
+
                     return (
                       <button
                         key={oi}
-                        onClick={() => handleSelectAnswer(currentSlide, oi)}
-                        className={`w-full h-[52px] rounded-xl border-2 px-4 text-left text-[16px] transition-all anim-fade-in-up ${style}`}
-                        style={{ animationDelay: `${0.2 + oi * 0.08}s` }}
+                        onClick={() => !ans?.submitted && handleSelectAnswer(currentSlide, oi)}
+                        disabled={ans?.submitted}
+                        className={`w-full px-6 py-4 rounded-lg text-left transition-all anim-fade-in-up ${style} ${ans?.submitted ? 'cursor-default' : 'cursor-pointer'}`}
+                        style={{ animationDelay: `${0.1 + oi * 0.08}s` }}
                       >
-                        <span className="font-semibold mr-2">{String.fromCharCode(65 + oi)}.</span>
-                        {stripOptionPrefix(opt)}
+                        <div className="flex items-start gap-4">
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[15px] ${
+                            ans?.submitted && (
+                              optClean === correctClean || opt === q.correct_answer ||
+                              String.fromCharCode(65 + oi) === q.correct_answer ||
+                              q.correct_answer?.includes(optClean)
+                            ) ? 'bg-emerald-500 text-white' :
+                            ans?.submitted && oi === ans.selected ? 'bg-red-400 text-white' :
+                            ans?.selected === oi ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
+                          }`}>
+                            {String.fromCharCode(65 + oi)}
+                          </div>
+                          <div className="flex-1 text-left">
+                            <p className="text-[16px] font-medium text-slate-900">
+                              {stripOptionPrefix(opt)}
+                            </p>
+                          </div>
+                          {ans?.submitted && (
+                            optClean === correctClean || opt === q.correct_answer ||
+                            String.fromCharCode(65 + oi) === q.correct_answer ||
+                            q.correct_answer?.includes(optClean)
+                          ) && (
+                            <div className="flex-shrink-0 text-emerald-600">
+                              <Check className="w-5 h-5" />
+                            </div>
+                          )}
+                          {ans?.submitted && oi === ans.selected && !(
+                            optClean === correctClean || opt === q.correct_answer ||
+                            String.fromCharCode(65 + oi) === q.correct_answer ||
+                            q.correct_answer?.includes(optClean)
+                          ) && (
+                            <div className="flex-shrink-0 text-red-400">
+                              <X className="w-5 h-5" />
+                            </div>
+                          )}
+                        </div>
                       </button>
                     );
                   })}
                 </div>
+
+                {/* Feedback after submission */}
+                {ans?.submitted && q.rationale && (
+                  <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                    <p className="text-[14px] text-slate-700">
+                      <span className="font-semibold text-blue-700">Explanation: </span>
+                      {q.rationale}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Footer with button */}
+            <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-[13px] text-slate-600">
+                <span>Question {currentSlide + 1} of {totalSlides}</span>
+              </div>
+              <div className="flex gap-3">
                 {ans && !ans.submitted && (
                   <button
                     onClick={() => handleSubmitAnswer(currentSlide)}
-                    className="w-full h-12 rounded-xl text-[15px] font-bold text-white mt-6"
-                    style={{ background: "#4f46e5" }}
+                    className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
                   >
                     Submit Answer
                   </button>
                 )}
                 {ans?.submitted && (
-                  <div className="mt-4 space-y-3">
-                    {q.rationale && (
-                      <p className="text-[14px] bg-slate-50 rounded-xl p-4" style={{ color: "#64748b" }}>
-                        Tip: {q.rationale}
-                      </p>
-                    )}
-                    <button
-                      onClick={goNext}
-                      className="w-full h-12 rounded-xl text-[15px] font-bold text-white"
-                      style={{ background: "#4f46e5" }}
-                    >
-                      Next Slide -&gt;
-                    </button>
-                  </div>
+                  <button
+                    onClick={goNext}
+                    disabled={currentSlide === totalSlides - 1}
+                    className="px-6 py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all disabled:opacity-50"
+                  >
+                    {currentSlide === totalSlides - 1 ? "Finish" : "Next Question"}
+                  </button>
                 )}
               </div>
             </div>
