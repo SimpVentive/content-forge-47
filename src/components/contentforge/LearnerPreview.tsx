@@ -1927,6 +1927,33 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 <Clock className="w-4 h-4" />
                 ~{courseDurationMinutes}
               </span>
+
+              {/* Voice Control Info */}
+              {currentNarration && (
+                <div className="mt-8 space-y-3">
+                  <p className="text-[13px] text-white/70">💡 Audio narration is available for this course</p>
+                  <button
+                    onClick={() => setMuted(!muted)}
+                    className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full font-semibold text-[13px] transition-all ${
+                      muted
+                        ? "bg-white/20 text-white hover:bg-white/30 border border-white/30"
+                        : "bg-white text-[#2563EB] hover:bg-white/90"
+                    }`}
+                  >
+                    {muted ? (
+                      <>
+                        <VolumeX className="w-4 h-4" />
+                        Voice Off - Click to Enable
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-4 h-4" />
+                        Voice On - Click to Disable
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         );
@@ -3472,29 +3499,40 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 ) : null}
 
                 {/* Voiceover toggle + language */}
-                <div className="inline-flex items-center gap-2 rounded-xl border border-[#c9d8ea] bg-white px-2 py-1">
-                  <button
-                    onClick={() => setMuted(!muted)}
-                    className="inline-flex items-center gap-2 px-2 h-9 rounded-lg text-[12px] font-semibold text-[#123d78] hover:bg-[#f7fbff]"
-                    type="button"
-                    aria-label={muted ? "Turn voiceover on" : "Turn voiceover off"}
-                    title={muted ? "Voiceover OFF — click to enable" : "Voiceover ON — click to mute"}
-                  >
-                    {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-                    <span>Voiceover: {muted ? "Off" : "On"}</span>
-                  </button>
-                  <select
-                    value={previewNarrationLanguage}
-                    onChange={(e) => setPreviewNarrationLanguage(e.target.value)}
-                    className="h-9 rounded-lg border border-[#e3ecf8] bg-white px-2 text-[12px] text-[#123d78] focus:outline-none focus:border-[#1d4f93]"
-                    title="Narration language"
-                    aria-label="Narration language"
-                  >
-                    {["English","Hindi","Spanish","French","German","Italian","Portuguese","Polish","Turkish","Russian","Dutch","Czech","Arabic","Chinese","Japanese","Korean","Hungarian","Norwegian","Finnish","Swedish","Danish","Bulgarian","Romanian","Greek","Filipino","Indonesian","Malay","Slovak","Ukrainian","Croatian","Tamil"].map((lang) => (
-                      <option key={lang} value={lang}>{lang}</option>
-                    ))}
-                  </select>
-                </div>
+                {currentNarration && (
+                  <div className="inline-flex items-center gap-2 rounded-xl border-2 px-2 py-1 transition-all"
+                    style={{
+                      borderColor: muted ? "#c9d8ea" : "#1d4f93",
+                      backgroundColor: muted ? "white" : "#eef4ff"
+                    }}>
+                    <button
+                      onClick={() => setMuted(!muted)}
+                      className="inline-flex items-center gap-2 px-2 h-10 rounded-lg text-[12px] font-semibold transition-all"
+                      style={{
+                        color: muted ? "#123d78" : "#1d4f93",
+                        backgroundColor: muted ? "transparent" : "#fff"
+                      }}
+                      type="button"
+                      aria-label={muted ? "Turn voiceover on" : "Turn voiceover off"}
+                      title={muted ? "Click to enable voice narration" : "Click to disable voice narration"}
+                    >
+                      {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-5 w-5 text-blue-600" />}
+                      <span className="font-bold">{muted ? "Voice Off" : "Voice On"}</span>
+                    </button>
+                    <select
+                      value={previewNarrationLanguage}
+                      onChange={(e) => setPreviewNarrationLanguage(e.target.value)}
+                      className="h-9 rounded-lg border border-[#e3ecf8] bg-white px-2 text-[12px] text-[#123d78] focus:outline-none focus:border-[#1d4f93]"
+                      title="Select narration language"
+                      aria-label="Narration language"
+                    >
+                      {["English","Hindi","Spanish","French","German","Italian","Portuguese","Polish","Turkish","Russian","Dutch","Czech","Arabic","Chinese","Japanese","Korean","Hungarian","Norwegian","Finnish","Swedish","Danish","Bulgarian","Romanian","Greek","Filipino","Indonesian","Malay","Slovak","Ukrainian","Croatian","Tamil"].map((lang) => (
+                        <option key={lang} value={lang}>{lang}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
 
 
                 <button
