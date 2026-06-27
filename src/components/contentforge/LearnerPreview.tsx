@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle } from "lucide-react";
+import { HelpModal } from "./HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
@@ -1236,6 +1237,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [startTime] = useState(Date.now());
   const [showCompletion, setShowCompletion] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [muted, setMuted] = useState(false);
   const [previewNarrationLanguage, setPreviewNarrationLanguage] = useState<string>("English");
   const [isPlaying, setIsPlaying] = useState(false);
@@ -3447,6 +3449,16 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {/* Help Button */}
+                <button
+                  onClick={() => setShowHelpModal(true)}
+                  className="inline-flex h-10 items-center gap-2 rounded-lg border border-white/14 bg-white/8 px-3 text-[12px] font-[800] text-white/90 transition-all hover:bg-white/14"
+                  type="button"
+                  title="Help & Support"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </button>
+
                 {/* Utility menu dropdown */}
                 <div className="relative">
                   <button
@@ -3760,6 +3772,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         onSelectFlipStyle={setFlipStyle}
         onPlaceVideos={unassignedCount > 0 ? () => setShowPlacer(true) : undefined}
         unassignedCount={unassignedCount}
+      />
+
+      <HelpModal
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
       />
     </div>
   );

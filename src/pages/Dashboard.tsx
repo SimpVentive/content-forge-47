@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, Search, Trash2, Edit3, Zap, Calendar, BookOpen, BarChart3, HelpCircle, LogOut, Bell, User, Settings } from "lucide-react";
 import { listCourseDraftsCloudFirst, deleteCourseDraftCloudFirst, type CourseDraft } from "@/lib/courseDrafts";
 import { useAuth } from "@/hooks/useAuth";
+import { HelpModal } from "@/components/HelpModal";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { toast } from "sonner";
 
@@ -11,7 +12,7 @@ const SIDEBAR_ITEMS = [
   { id: "templates", label: "Templates", icon: BarChart3, disabled: true },
   { id: "assets", label: "Asset Library", icon: BookOpen, disabled: true },
   { id: "analytics", label: "Analytics", icon: BarChart3, disabled: true },
-  { id: "help", label: "Help", icon: HelpCircle, disabled: true },
+  { id: "help", label: "Help", icon: HelpCircle },
 ];
 
 export const Dashboard = () => {
@@ -21,6 +22,7 @@ export const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -45,6 +47,14 @@ export const Dashboard = () => {
 
   const handleEditCourse = (courseId: string) => {
     navigate("/studio", { state: { courseId } });
+  };
+
+  const handleSidebarClick = (itemId: string) => {
+    if (itemId === "help") {
+      setShowHelpModal(true);
+    } else if (itemId === "courses") {
+      // Already on this page
+    }
   };
 
   const handleDeleteCourse = async (courseId: string) => {
@@ -91,6 +101,7 @@ export const Dashboard = () => {
             return (
               <button
                 key={item.id}
+                onClick={() => !item.disabled && handleSidebarClick(item.id)}
                 disabled={item.disabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${
                   isActive
@@ -278,6 +289,11 @@ export const Dashboard = () => {
       >
         <Zap className="w-6 h-6" />
       </button>
+
+      <HelpModal
+        isOpen={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+      />
     </div>
   );
 };
