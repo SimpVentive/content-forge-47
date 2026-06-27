@@ -11,6 +11,7 @@ import { logApiUsage } from "@/lib/edgeFunctions";
 import { generateNarrationAudio, getVoiceIdForLanguage } from "@/lib/narrationAudioService";
 import { runFinalQACheck, storeQAAuditLog, type QAResult } from "@/lib/qaService";
 import { enhanceScriptGenerationPrompt, enhanceAssessmentGenerationPrompt, type AuditLogEntry } from "@/lib/feedbackIntegrationService";
+import { checkAndPrepareAsset, recordAssetUsage, type SelectedAsset } from "@/lib/pipelineAssetIntegration";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -769,7 +770,7 @@ export function useAgentPipeline() {
     }
   };
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
     cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
@@ -1278,43 +1279,62 @@ OUTPUT FORMAT — ABSOLUTE:
                 addLog(`Visual Design Agent: Generating image ${ni + 1}.${si + 1} — "${narrative.topicTitle}" Scene ${scene.sceneNumber}...`);
 
                 try {
-                  const { data: imageData, error: imageError } = await supabase.functions.invoke("generate-slide-image", {
-                    body: {
-                      prompt: scene.imagePrompt,
-                      style: params?.imageStyleVariant || "illustrated",
-                      altText: scene.caption,
-                      moduleTitle: `${narrative.topicTitle}`,
-                      topicTitle: `Scene ${scene.sceneNumber}: ${scene.title}`,
-                    },
-                  });
+                  // NEW: Check for matching asset first
+                  const assetCheck = await checkAndPrepareAsset(
+                    `Scene ${scene.sceneNumber}: ${scene.title}`,
+                    scene.imagePrompt,
+                    selectedAssets || []
+                  );
 
-                  if (!imageError && imageData?.imageDataUrl) {
-                    // Convert PNG to JPEG for better compression
-                    let finalImageUrl = imageData.imageDataUrl;
-                    if (isPngImage(imageData.mimeType || "image/png")) {
-                      try {
-                        finalImageUrl = await convertPngToJpeg(imageData.imageDataUrl, 85);
-                        addLog(`Visual Design Agent: Converted PNG to JPEG for Scene ${scene.sceneNumber}`);
-                      } catch (convertError) {
-                        addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original — ${convertError}`);
-                      }
-                    }
+                  if (assetCheck.hasMatch && assetCheck.dataUrl) {
+                    // Use custom asset
+                    scene.imageDataUrl = assetCheck.dataUrl;
+                    addLog(`✓ Using custom asset for Scene ${scene.sceneNumber} (${narrative.topicTitle})`);
 
-                    scene.imageDataUrl = finalImageUrl;
-                    // Log BFL API usage
-                    try {
-                      await logApiUsage(
-                        "BFL (Flux 2)",
-                        1, // 1 image
-                        0.055, // Cost per image
-                        `Narrative image generation: Scene ${scene.sceneNumber}`,
-                        undefined
-                      ).catch(() => {});
-                    } catch (e) {
-                      // Silently fail, don't interrupt pipeline
+                    // Record usage for analytics
+                    if (assetCheck.assetId && courseId && userId) {
+                      await recordAssetUsage(userId, assetCheck.assetId, courseId, si + 1, `${narrative.topicTitle} - Scene ${scene.sceneNumber}`);
                     }
                   } else {
-                    addLog(`Visual Design Agent: Image generation failed for scene ${scene.sceneNumber}. Will use placeholder.`);
+                    // Fallback to Flux generation
+                    const { data: imageData, error: imageError } = await supabase.functions.invoke("generate-slide-image", {
+                      body: {
+                        prompt: scene.imagePrompt,
+                        style: params?.imageStyleVariant || "illustrated",
+                        altText: scene.caption,
+                        moduleTitle: `${narrative.topicTitle}`,
+                        topicTitle: `Scene ${scene.sceneNumber}: ${scene.title}`,
+                      },
+                    });
+
+                    if (!imageError && imageData?.imageDataUrl) {
+                      // Convert PNG to JPEG for better compression
+                      let finalImageUrl = imageData.imageDataUrl;
+                      if (isPngImage(imageData.mimeType || "image/png")) {
+                        try {
+                          finalImageUrl = await convertPngToJpeg(imageData.imageDataUrl, 85);
+                          addLog(`Visual Design Agent: Converted PNG to JPEG for Scene ${scene.sceneNumber}`);
+                        } catch (convertError) {
+                          addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original — ${convertError}`);
+                        }
+                      }
+
+                      scene.imageDataUrl = finalImageUrl;
+                      // Log BFL API usage
+                      try {
+                        await logApiUsage(
+                          "BFL (Flux 2)",
+                          1, // 1 image
+                          0.055, // Cost per image
+                          `Narrative image generation: Scene ${scene.sceneNumber}`,
+                          undefined
+                        ).catch(() => {});
+                      } catch (e) {
+                        // Silently fail, don't interrupt pipeline
+                      }
+                    } else {
+                      addLog(`Visual Design Agent: Image generation failed for scene ${scene.sceneNumber}. Will use placeholder.`);
+                    }
                   }
                 } catch (imgErr) {
                   addLog(`Visual Design Agent: Image generation error for scene ${scene.sceneNumber}: ${(imgErr as Error).message}`);
@@ -1370,47 +1390,68 @@ OUTPUT FORMAT — ABSOLUTE:
                 addLog(`Visual Design Agent: Generating image ${si + 1}.${ti + 1} — ${topicTitle}...`);
 
                 try {
-                  const { data: imageData, error: imageError } = await supabase.functions.invoke("generate-slide-image", {
-                    body: {
-                      prompt: topicVisual.image_prompt || `A realistic workplace scene illustrating ${topicTitle}.`,
-                      style: topicVisual.image_style || "realistic-office",
-                      altText: topicVisual.alt_text || `AI-generated visual illustrating ${topicTitle}.`,
-                      moduleTitle: modTitle,
-                      topicTitle,
-                    },
-                  });
+                  // NEW: Check for matching asset first
+                  const assetCheck = await checkAndPrepareAsset(
+                    topicTitle,
+                    topicVisual.image_prompt || `A realistic workplace scene illustrating ${topicTitle}.`,
+                    selectedAssets || []
+                  );
 
-                  if (!imageError && imageData?.imageDataUrl) {
-                    // Convert PNG to JPEG for better compression
-                    let finalImageUrl = imageData.imageDataUrl;
-                    let finalMimeType = imageData.mimeType || "image/png";
+                  if (assetCheck.hasMatch && assetCheck.dataUrl) {
+                    // Use custom asset
+                    topicVisual.generated_image_data_url = assetCheck.dataUrl;
+                    topicVisual.generated_image_mime_type = assetCheck.mimeType || "image/jpeg";
+                    addLog(`✓ Using custom asset for "${topicTitle}" (Module ${si + 1})`);
 
-                    if (isPngImage(finalMimeType)) {
-                      try {
-                        finalImageUrl = await convertPngToJpeg(imageData.imageDataUrl, 85);
-                        finalMimeType = "image/jpeg";
-                        addLog(`Visual Design Agent: Converted PNG to JPEG for topic "${topicTitle}"`);
-                      } catch (convertError) {
-                        addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original — ${convertError}`);
+                    // Record usage for analytics
+                    if (assetCheck.assetId && courseId && userId) {
+                      await recordAssetUsage(userId, assetCheck.assetId, courseId, si + 1, topicTitle);
+                    }
+                  } else {
+                    // Fallback to Flux generation
+                    const { data: imageData, error: imageError } = await supabase.functions.invoke("generate-slide-image", {
+                      body: {
+                        prompt: topicVisual.image_prompt || `A realistic workplace scene illustrating ${topicTitle}.`,
+                        style: topicVisual.image_style || "realistic-office",
+                        altText: topicVisual.alt_text || `AI-generated visual illustrating ${topicTitle}.`,
+                        moduleTitle: modTitle,
+                        topicTitle,
+                      },
+                    });
+
+                    if (!imageError && imageData?.imageDataUrl) {
+                      // Convert PNG to JPEG for better compression
+                      let finalImageUrl = imageData.imageDataUrl;
+                      let finalMimeType = imageData.mimeType || "image/png";
+
+                      if (isPngImage(finalMimeType)) {
+                        try {
+                          finalImageUrl = await convertPngToJpeg(imageData.imageDataUrl, 85);
+                          finalMimeType = "image/jpeg";
+                          addLog(`Visual Design Agent: Converted PNG to JPEG for topic "${topicTitle}"`);
+                        } catch (convertError) {
+                          addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original — ${convertError}`);
+                        }
                       }
-                    }
 
-                    topicVisual.generated_image_data_url = finalImageUrl;
-                    topicVisual.generated_image_mime_type = finalMimeType;
-                    topicVisual.image_approved = false;
-                    // Log BFL API usage
-                    try {
-                      await logApiUsage(
-                        "BFL (Flux 2)",
-                        1, // 1 image
-                        0.055, // Cost per image
-                        `Visual design image: ${topicTitle}`,
-                        undefined
-                      ).catch(() => {});
-                    } catch (e) {
-                      // Silently fail, don't interrupt pipeline
+                      topicVisual.generated_image_data_url = finalImageUrl;
+                      topicVisual.generated_image_mime_type = finalMimeType;
+                      topicVisual.image_approved = false;
+                      // Log BFL API usage
+                      try {
+                        await logApiUsage(
+                          "BFL (Flux 2)",
+                          1, // 1 image
+                          0.055, // Cost per image
+                          `Visual design image: ${topicTitle}`,
+                          undefined
+                        ).catch(() => {});
+                      } catch (e) {
+                        // Silently fail, don't interrupt pipeline
+                      }
+                    } else {
+                      addLog(`Visual Design Agent: Image generation failed for topic "${topicTitle}". Will use SVG fallback.`);
                     }
-                    continue;
                   }
                 } catch {
                   // Fall back to generated SVG scene below if raster image generation fails.
