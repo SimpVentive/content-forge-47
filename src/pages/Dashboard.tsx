@@ -4,13 +4,14 @@ import { Plus, Search, Trash2, Edit3, Zap, Calendar, BookOpen, BarChart3, HelpCi
 import { listCourseDraftsCloudFirst, deleteCourseDraftCloudFirst, type CourseDraft } from "@/lib/courseDrafts";
 import { useAuth } from "@/hooks/useAuth";
 import { HelpModal } from "@/components/HelpModal";
+import { AssetLibraryPanel } from "@/components/AssetLibraryPanel";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { toast } from "sonner";
 
 const SIDEBAR_ITEMS = [
   { id: "courses", label: "My Courses", icon: BookOpen },
   { id: "templates", label: "Templates", icon: BarChart3, disabled: true },
-  { id: "assets", label: "Asset Library", icon: BookOpen, disabled: true },
+  { id: "assets", label: "Asset Library", icon: BookOpen },
   { id: "analytics", label: "Analytics", icon: BarChart3, disabled: true },
   { id: "help", label: "Help", icon: HelpCircle },
 ];
