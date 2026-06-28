@@ -103,7 +103,7 @@ export const Dashboard = () => {
         <nav className="flex-1 px-4 py-6 space-y-2">
           {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
-            const isActive = item.id === "courses";
+            const isActive = item.id === activeView;
             return (
               <button
                 key={item.id}
