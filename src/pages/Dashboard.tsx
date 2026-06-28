@@ -55,7 +55,11 @@ export const Dashboard = () => {
     if (itemId === "help") {
       setShowHelpModal(true);
     } else if (itemId === "courses") {
-      // Already on this page
+      setActiveView("courses");
+      setActiveTab("dashboard");
+    } else if (itemId === "assets") {
+      setActiveView("assets");
+      setActiveTab("dashboard");
     }
   };
 
