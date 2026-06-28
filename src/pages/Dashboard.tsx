@@ -205,7 +205,16 @@ export const Dashboard = () => {
 
         {/* Main Area */}
         <div className="flex-1 overflow-auto px-8 py-8">
-          {activeTab === "dashboard" ? (
+          {activeView === "assets" ? (
+            <>
+              <h1 className="text-3xl font-bold text-slate-900 mb-6">Asset Library</h1>
+              {user?.id ? (
+                <AssetLibraryPanel userId={user.id} />
+              ) : (
+                <p className="text-slate-600">Sign in to manage assets.</p>
+              )}
+            </>
+          ) : activeTab === "dashboard" ? (
             <>
               {/* Page Title */}
               <h1 className="text-3xl font-bold text-slate-900 mb-8">Dashboard</h1>
