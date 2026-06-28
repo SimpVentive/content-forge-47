@@ -18,11 +18,12 @@ const SIDEBAR_ITEMS = [
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { profile, logout } = useAuth();
+  const { profile, user } = useAuth();
   const [courses, setCourses] = useState<CourseDraft[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeView, setActiveView] = useState<"courses" | "assets">("courses");
   const [showHelpModal, setShowHelpModal] = useState(false);
 
   useEffect(() => {
