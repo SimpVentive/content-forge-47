@@ -4,24 +4,26 @@ import { Plus, Search, Trash2, Edit3, Zap, Calendar, BookOpen, BarChart3, HelpCi
 import { listCourseDraftsCloudFirst, deleteCourseDraftCloudFirst, type CourseDraft } from "@/lib/courseDrafts";
 import { useAuth } from "@/hooks/useAuth";
 import { HelpModal } from "@/components/HelpModal";
+import { AssetLibraryPanel } from "@/components/AssetLibraryPanel";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { toast } from "sonner";
 
 const SIDEBAR_ITEMS = [
   { id: "courses", label: "My Courses", icon: BookOpen },
   { id: "templates", label: "Templates", icon: BarChart3, disabled: true },
-  { id: "assets", label: "Asset Library", icon: BookOpen, disabled: true },
+  { id: "assets", label: "Asset Library", icon: BookOpen },
   { id: "analytics", label: "Analytics", icon: BarChart3, disabled: true },
   { id: "help", label: "Help", icon: HelpCircle },
 ];
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { profile, logout } = useAuth();
+  const { profile, user } = useAuth();
   const [courses, setCourses] = useState<CourseDraft[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeView, setActiveView] = useState<"courses" | "assets">("courses");
   const [showHelpModal, setShowHelpModal] = useState(false);
 
   useEffect(() => {
@@ -53,7 +55,11 @@ export const Dashboard = () => {
     if (itemId === "help") {
       setShowHelpModal(true);
     } else if (itemId === "courses") {
-      // Already on this page
+      setActiveView("courses");
+      setActiveTab("dashboard");
+    } else if (itemId === "assets") {
+      setActiveView("assets");
+      setActiveTab("dashboard");
     }
   };
 
@@ -97,7 +103,7 @@ export const Dashboard = () => {
         <nav className="flex-1 px-4 py-6 space-y-2">
           {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
-            const isActive = item.id === "courses";
+            const isActive = item.id === activeView;
             return (
               <button
                 key={item.id}
@@ -199,7 +205,16 @@ export const Dashboard = () => {
 
         {/* Main Area */}
         <div className="flex-1 overflow-auto px-8 py-8">
-          {activeTab === "dashboard" ? (
+          {activeView === "assets" ? (
+            <>
+              <h1 className="text-3xl font-bold text-slate-900 mb-6">Asset Library</h1>
+              {user?.id ? (
+                <AssetLibraryPanel userId={user.id} />
+              ) : (
+                <p className="text-slate-600">Sign in to manage assets.</p>
+              )}
+            </>
+          ) : activeTab === "dashboard" ? (
             <>
               {/* Page Title */}
               <h1 className="text-3xl font-bold text-slate-900 mb-8">Dashboard</h1>
