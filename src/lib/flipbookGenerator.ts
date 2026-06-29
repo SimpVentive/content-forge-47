@@ -119,11 +119,27 @@ ${assessmentDetails}`,
 
     // Add MCQ questions
     if (Array.isArray(assessmentData.mcq)) {
-      assessmentData.mcq.slice(0, 10).forEach((q: any) => {
-        const options = (q.options || []).map((opt: string) => `• ${opt}`).join("\n");
+      assessmentData.mcq.slice(0, 10).forEach((q: any, qIdx: number) => {
+        const questionText = q.question || "";
+        const correctRaw = String(q.correct_answer || "").trim();
+        const stripPrefix = (s: string) => s.replace(/^\s*[A-Da-d][\.\)]\s*/, "").replace(/^\s*[-•]\s*/, "").trim();
+        const correctClean = stripPrefix(correctRaw);
+        const options: string[] = Array.isArray(q.options) ? q.options : [];
+        const optionsHtml = options.map((opt, oi) => {
+          const optClean = stripPrefix(String(opt));
+          const letter = String.fromCharCode(65 + oi);
+          const isCorrect = optClean === correctClean || String(opt) === correctRaw || letter === correctRaw || correctRaw.includes(optClean);
+          return `<button type="button" class="mcq-option" data-correct="${isCorrect ? "1" : "0"}" onclick="window.__mcqAnswer&&window.__mcqAnswer(this)"><span class="mcq-letter">${letter}</span><span class="mcq-text">${escapeHtml(optClean)}</span><span class="mcq-icon"></span></button>`;
+        }).join("");
+        const html = `
+          <div class="mcq-question">${escapeHtml(questionText)}</div>
+          <div class="mcq-options">${optionsHtml}</div>
+          <div class="mcq-feedback" data-correct-text="${escapeHtml(correctRaw)}"></div>
+        `;
         pages.push({
-          title: `Q${assessmentPageNum - Math.max(...pages.map(p => p.pageNumber || 0))} - ${q.question?.substring(0, 40) || "Question"}`,
-          content: `${q.question || ""}\n\nOptions:\n${options}\n\nCorrect Answer: ${q.correct_answer || ""}`,
+          title: `Q${qIdx + 1} - ${(questionText || "Question").substring(0, 60)}`,
+          content: "",
+          htmlContent: html,
           images: [],
           speaker: "",
           pageNumber: assessmentPageNum++,
@@ -134,10 +150,26 @@ ${assessmentDetails}`,
     // Add scenario questions
     if (Array.isArray(assessmentData.scenarios)) {
       assessmentData.scenarios.slice(0, 5).forEach((s: any) => {
-        const options = (s.options || []).map((opt: string) => `• ${opt}`).join("\n");
+        const situation = s.situation || "";
+        const correctRaw = String(s.best_response || "").trim();
+        const stripPrefix = (str: string) => str.replace(/^\s*[A-Da-d][\.\)]\s*/, "").replace(/^\s*[-•]\s*/, "").trim();
+        const correctClean = stripPrefix(correctRaw);
+        const options: string[] = Array.isArray(s.options) ? s.options : [];
+        const optionsHtml = options.map((opt, oi) => {
+          const optClean = stripPrefix(String(opt));
+          const letter = String.fromCharCode(65 + oi);
+          const isCorrect = optClean === correctClean || String(opt) === correctRaw || letter === correctRaw || correctRaw.includes(optClean);
+          return `<button type="button" class="mcq-option" data-correct="${isCorrect ? "1" : "0"}" onclick="window.__mcqAnswer&&window.__mcqAnswer(this)"><span class="mcq-letter">${letter}</span><span class="mcq-text">${escapeHtml(optClean)}</span><span class="mcq-icon"></span></button>`;
+        }).join("");
+        const html = `
+          <div class="mcq-question">${escapeHtml(situation)}</div>
+          <div class="mcq-options">${optionsHtml}</div>
+          <div class="mcq-feedback" data-correct-text="${escapeHtml(correctRaw)}"></div>
+        `;
         pages.push({
-          title: `Scenario - ${s.situation?.substring(0, 40) || "Scenario Question"}`,
-          content: `${s.situation || ""}\n\nOptions:\n${options}\n\nBest Response: ${s.best_response || ""}`,
+          title: `Scenario - ${(situation || "Scenario").substring(0, 60)}`,
+          content: "",
+          htmlContent: html,
           images: [],
           speaker: "",
           pageNumber: assessmentPageNum++,
