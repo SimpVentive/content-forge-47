@@ -8,6 +8,7 @@ import type { TopicNarrative } from "@/lib/visualNarrativeService";
 export interface FlipbookPage {
   title?: string;
   content: string;
+  htmlContent?: string;
   images?: string[];
   speaker?: string;
   audioDataUrl?: string;
