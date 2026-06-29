@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle } from "lucide-react";
-import { HelpModal } from "./HelpModal";
+import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
@@ -1105,6 +1105,7 @@ interface LearnerPreviewProps {
   /** Narration/voice language selected in the course parameters dialog. */
   narratorLanguage?: string;
   onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
+  captionsEnabled?: boolean;
 }
 
 const PREVIEW_FLIP_STYLE_STORAGE_KEY = "contentforge.preview.flipStyle.default";
@@ -1128,7 +1129,7 @@ function getCourseNotesStorageKey(courseTitle: string): string {
   return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true }) => {
   // Prefer the explicit narrator language; fall back to text language; final fallback English.
   const effectiveNarratorLanguage = narratorLanguage || textLanguage || "English";
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
@@ -1242,6 +1243,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [previewNarrationLanguage, setPreviewNarrationLanguage] = useState<string>("English");
   const [isPlaying, setIsPlaying] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
+  // BUG FIX #4: Audio Playback Management
+  const [audioPlayingSlideId, setAudioPlayingSlideId] = useState<number | null>(null);
+  const audioRefMap = useRef<Record<number, HTMLAudioElement | null>>({});
   const [voiceActivityLevel, setVoiceActivityLevel] = useState(0);
   const [activeViseme, setActiveViseme] = useState<VisemeKey>("rest");
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
@@ -1479,14 +1483,23 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     setCurrentSlide(targetSlide);
   }, [currentSlide, totalSlides]);
 
-  // Stop audio on slide change
+  // Stop audio on slide change (BUG FIX #4: Stop ALL audio)
   useEffect(() => {
+    // Stop primary audio
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
       audioRef.current = null;
       setIsPlaying(false);
     }
+    // Stop all audio in map
+    Object.values(audioRefMap.current).forEach(audioElement => {
+      if (audioElement) {
+        audioElement.pause();
+        audioElement.currentTime = 0;
+      }
+    });
+    setAudioPlayingSlideId(null);
     setHighlightWordIdx(-1);
     setHighlightSentenceIdx(-1);
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -1667,8 +1680,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   // Keyboard nav
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight" || e.key === " ") goNext();
-      if (e.key === "ArrowLeft") goPrev();
+      // BUG FIX #4: Stop audio on keyboard navigation
+      const stopAllAudio = () => {
+        Object.values(audioRefMap.current).forEach(audio => {
+          if (audio) { audio.pause(); audio.currentTime = 0; }
+        });
+      };
+      if (e.key === "ArrowRight" || e.key === " ") { stopAllAudio(); goNext(); }
+      if (e.key === "ArrowLeft") { stopAllAudio(); goPrev(); }
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", handler);
@@ -2050,6 +2069,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <NarrativeFlipbook
                 narratives={[narrative]}
                 displayStyle="smooth-slide"
+                captionsEnabled={captionsEnabled}
                 onSceneChange={(topicIdx, sceneIdx) => {
                   // Update scene index for voice sync
                 }}
@@ -3068,6 +3088,40 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           box-shadow:
             0 1px 0 rgba(0,0,0,0.15),
             inset 0 2px 6px rgba(0,0,0,0.10);
+        }
+
+        /* BUG FIX #3: Text Alignment Rules */
+        .slide-container {
+          text-align: left;
+          word-wrap: break-word;
+          overflow-wrap: break-word;
+          hyphens: auto;
+        }
+
+        .slide-container p,
+        .slide-container h1,
+        .slide-container h2,
+        .slide-container h3,
+        .slide-container h4,
+        .slide-container button {
+          text-align: left;
+          white-space: normal;
+        }
+
+        .scenario-text,
+        .question-text {
+          display: block;
+          width: 100%;
+          word-break: break-word;
+        }
+
+        .page-counter {
+          position: absolute;
+          bottom: 20px;
+          right: 28px;
+          font-size: 12px;
+          color: #94a3b8;
+          font-weight: 500;
         }
 
         @keyframes sheetFlipForward {

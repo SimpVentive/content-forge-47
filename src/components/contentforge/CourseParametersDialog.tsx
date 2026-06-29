@@ -31,12 +31,12 @@ export interface CourseParameters {
   backgroundStyle: "simple" | "office" | "classroom";
   imageStyleVariant?: "realistic" | "illustrated" | "flat-design" | "cartoon";
   characterEthnicity?: "diverse" | "indian" | "south-asian" | "east-asian" | "african" | "caucasian" | "middle-eastern" | "latino";
-  imageCount?: 1 | 2 | 3;
+  imageCount?: 1 | 2 | 3 | 4 | 5;
   imageAspectRatio?: "landscape" | "portrait" | "square";
   showAvatarNarrator?: boolean;
-  showCaption?: boolean;
+  captionsEnabled?: boolean;
   voiceoverPace?: "slow" | "normal" | "fast";
-  imageNarrativeSceneCount?: 3 | 4 | 5 | 6;
+  imageNarrativeSceneCount?: 3 | 4 | 5 | 6 | 7 | 8 | 10;
   flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal";
   imageOutputFormat?: "interactive-html" | "video" | "pdf";
   flipbookVoiceoverEnabled?: boolean;
@@ -169,7 +169,7 @@ const CHARACTER_ETHNICITIES = [
   { id: "latino", label: "Latino/Hispanic" },
 ] as const;
 
-const IMAGE_COUNTS = [1, 2, 3] as const;
+const IMAGE_COUNTS = [1, 2, 3, 4, 5] as const;
 
 const IMAGE_ASPECT_RATIOS = [
   { id: "landscape", label: "Landscape" },
@@ -183,7 +183,7 @@ const VOICEOVER_PACES = [
   { id: "fast", label: "Fast" },
 ] as const;
 
-const IMAGE_NARRATIVE_SCENE_COUNTS = [3, 4, 5, 6] as const;
+const IMAGE_NARRATIVE_SCENE_COUNTS = [3, 4, 5, 6, 7, 8, 10] as const;
 
 const FLIPBOOK_DISPLAY_STYLES = [
   { id: "page-flip", label: "Page Flip", desc: "Realistic page-turning animation" },
@@ -262,12 +262,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [backgroundStyle, setBackgroundStyle] = useState<CourseParameters["backgroundStyle"]>("office");
   const [imageStyleVariant, setImageStyleVariant] = useState<CourseParameters["imageStyleVariant"]>("illustrated");
   const [characterEthnicity, setCharacterEthnicity] = useState<CourseParameters["characterEthnicity"]>("diverse");
-  const [imageCount, setImageCount] = useState<CourseParameters["imageCount"]>(1);
+  const [imageCount, setImageCount] = useState<CourseParameters["imageCount"]>(2);
   const [imageAspectRatio, setImageAspectRatio] = useState<CourseParameters["imageAspectRatio"]>("landscape");
   const [showAvatarNarrator, setShowAvatarNarrator] = useState(false);
-  const [showCaption, setShowCaption] = useState(true);
+  const [captionsEnabled, setCaptionsEnabled] = useState(true);
   const [voiceoverPace, setVoiceoverPace] = useState<CourseParameters["voiceoverPace"]>("normal");
-  const [imageNarrativeSceneCount, setImageNarrativeSceneCount] = useState<CourseParameters["imageNarrativeSceneCount"]>(4);
+  const [imageNarrativeSceneCount, setImageNarrativeSceneCount] = useState<CourseParameters["imageNarrativeSceneCount"]>(6);
   const [flipbookDisplayStyle, setFlipbookDisplayStyle] = useState<CourseParameters["flipbookDisplayStyle"]>("smooth-slide");
   const [imageOutputFormat, setImageOutputFormat] = useState<CourseParameters["imageOutputFormat"]>("interactive-html");
   const [flipbookVoiceoverEnabled, setFlipbookVoiceoverEnabled] = useState<boolean>(false);
@@ -356,7 +356,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageCount,
       imageAspectRatio,
       showAvatarNarrator,
-      showCaption,
+      captionsEnabled,
       voiceoverPace,
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
@@ -400,7 +400,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageCount,
       imageAspectRatio,
       showAvatarNarrator,
-      showCaption,
+      captionsEnabled,
       voiceoverPace,
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
@@ -439,7 +439,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageCount,
       imageAspectRatio,
       showAvatarNarrator,
-      showCaption,
+      captionsEnabled,
       voiceoverPace,
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
@@ -964,13 +964,13 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 <p className="text-[11px] text-muted-foreground mt-1">Display text beneath images</p>
               </div>
               <button
-                onClick={() => setShowCaption(!showCaption)}
+                onClick={() => setShowCaption(!captionsEnabled)}
                 className={`w-12 h-6 rounded-full transition-all duration-200 ease-in-out relative ${
-                  showCaption ? "bg-[#34D399]" : "bg-[#D1D5DB]"
+                  captionsEnabled ? "bg-[#34D399]" : "bg-[#D1D5DB]"
                 }`}
               >
                 <div className={`w-5 h-5 rounded-full bg-white shadow-sm absolute top-0.5 transition-all duration-200 ease-in-out ${
-                  showCaption ? "left-[26px]" : "left-[2px]"
+                  captionsEnabled ? "left-[26px]" : "left-[2px]"
                 }`} />
               </button>
             </div>
@@ -1637,7 +1637,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                         <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Image Style:</span> {IMAGE_STYLES.find((s) => s.id === imageStyleVariant)?.label || "Illustrated"}</p>
                         <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Images per Step:</span> {imageCount}</p>
                         <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Aspect Ratio:</span> {IMAGE_ASPECT_RATIOS.find((r) => r.id === imageAspectRatio)?.label || "Landscape"}</p>
-                        <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Caption:</span> {showCaption ? "Enabled" : "Disabled"}</p>
+                        <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Caption:</span> {captionsEnabled ? "Enabled" : "Disabled"}</p>
                       </>
                     ) : (
                       <>

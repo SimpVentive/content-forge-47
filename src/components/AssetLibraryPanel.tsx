@@ -188,8 +188,11 @@ export const AssetLibraryPanel: React.FC<AssetLibraryPanelProps> = ({ userId }) 
           <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
         </div>
       ) : assets.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-slate-600">No assets yet. Upload your first image!</p>
+        <div className="text-center py-12">
+          <p className="text-slate-600 mb-3">No assets yet. Upload your first image!</p>
+          <p className="text-sm text-slate-500 max-w-lg mx-auto leading-relaxed">
+            To include your own or your organization's images in the content you create, upload them here. Be sure to add the appropriate tags so the system can recognize and organize your assets correctly.
+          </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

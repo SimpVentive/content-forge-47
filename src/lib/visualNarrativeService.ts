@@ -94,8 +94,19 @@ export function buildImageGenerationPrompts(
   aspectRatio: string,
   characterEthnicity?: string
 ): NarrativeScene[] {
+  const ethnicityNameMap: Record<string, string> = {
+    indian: "Indian names like Raj, Priya, Amit, Neha, Rohan, Ananya",
+    "south-asian": "South Asian names like Arjun, Divya, Adit, Simran",
+    "east-asian": "East Asian names like Wei, Yuki, Chen, Lin, Mina",
+    african: "African names like Kwame, Zainab, Kofi, Amara",
+    caucasian: "Western names like James, Sarah, Michael, Emma",
+    "middle-eastern": "Middle Eastern names like Ahmed, Fatima, Rami, Leila",
+    latino: "Latino names like Carlos, Maria, Diego, Sofia",
+    diverse: ""
+  };
+
   const ethnicityGuidance = characterEthnicity && characterEthnicity !== "diverse"
-    ? `Character ethnicity: Feature predominantly ${characterEthnicity} characters and cultural representation.`
+    ? `CRITICAL: The character MUST have ${characterEthnicity} ethnicity and appearance. Features: predominantly ${characterEthnicity} facial features, skin tone, and cultural styling. Use ${ethnicityNameMap[characterEthnicity] || 'appropriate names for this ethnicity'}. DO NOT generate other ethnicities.`
     : "Diverse mix of ethnicities and cultural backgrounds.";
 
   return scenes.map((scene, index) => ({

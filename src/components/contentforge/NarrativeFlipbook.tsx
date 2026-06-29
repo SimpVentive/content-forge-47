@@ -6,12 +6,14 @@ interface NarrativeFlipbookProps {
   narratives: TopicNarrative[];
   displayStyle?: "page-flip" | "smooth-slide" | "step-reveal";
   onSceneChange?: (topicIndex: number, sceneIndex: number) => void;
+  captionsEnabled?: boolean;
 }
 
 export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
   narratives,
   displayStyle = "smooth-slide",
   onSceneChange,
+  captionsEnabled = true,
 }) => {
   const [currentTopicIndex, setCurrentTopicIndex] = useState(0);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
@@ -121,7 +123,7 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
         <div className="bg-white border-t-2 border-gray-200 px-6 py-4">
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-gray-900">{currentScene.title}</h3>
-            <p className="text-[15px] leading-relaxed text-gray-700">{currentScene.caption}</p>
+            {captionsEnabled && <p className="text-[15px] leading-relaxed text-gray-700">{currentScene.caption}</p>}
 
             {/* Audio Player */}
             {currentScene.audioDataUrl && (

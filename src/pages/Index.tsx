@@ -1,4 +1,5 @@
 ﻿import { useState, useEffect, useRef, useMemo, lazy, Suspense } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useContentForge } from "@/hooks/ContentForgeContext";
 import type { CourseParameters } from "@/components/contentforge/CourseParametersDialog";
@@ -31,6 +32,12 @@ import { QAResultsDialog } from "@/components/contentforge/QAResultsDialog";
 import { QAConfirmationDialog } from "@/components/contentforge/QAConfirmationDialog";
 import { spendCredits } from "@/lib/edgeFunctions";
 import { estimateCredits, type CreditEstimate } from "@/lib/creditEstimator";
+import { AssetMatchingModal } from "@/components/AssetMatchingModal";
+import { AssetLibraryPanel } from "@/components/AssetLibraryPanel";
+import { useAssetMatching } from "@/hooks/useAssetMatching";
+import { extractCourseText, detectCourseType, extractSlidesFromCourseData } from "@/lib/slideExtraction";
+import { getUserAssets } from "@/lib/assetStorage";
+import type { SelectedAsset } from "@/lib/pipelineAssetIntegration";
 
 const LearnerPreview = lazy(() =>
   import("@/components/contentforge/LearnerPreview").then((module) => ({
@@ -101,6 +108,13 @@ const Index = () => {
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("input");
   const [showGenerationComplete, setShowGenerationComplete] = useState(false);
+  const [showAssetModal, setShowAssetModal] = useState(false);
+  const [showAssetLibrary, setShowAssetLibrary] = useState(false);
+  const [userAssets, setUserAssets] = useState<any[]>([]);
+  const [courseIdRef, setCourseIdRef] = useState<string>("");
+  const [pendingGenerationParams, setPendingGenerationParams] = useState<{ params: CourseParameters; courseContent: string; courseType: string } | null>(null);
+  const { selectedAssets, handleAssetsSelected } = useAssetMatching();
+  const hasProcessedAssetNav = useRef(false);
   const prevIsRunning = useRef(false);
 
   const {
@@ -134,6 +148,18 @@ const Index = () => {
   useEffect(() => {
     void refreshDrafts();
   }, []);
+
+  // Handle navigation from Dashboard to Asset Library
+  useEffect(() => {
+    if (!hasProcessedAssetNav.current) {
+      const openAssetLibrary = (location.state as any)?.openAssetLibrary;
+      if (openAssetLibrary) {
+        setShowAssetLibrary(true);
+        setActiveTab("setup");
+        hasProcessedAssetNav.current = true;
+      }
+    }
+  }, [location.key]);
 
   // Sync learningMode from learningType on mount
   useEffect(() => {
@@ -347,7 +373,48 @@ const Index = () => {
     return updated;
   };
 
-  const startGeneration = (params: CourseParameters, baseToggles = agentToggles) => {
+  const startGeneration = async (params: CourseParameters, baseToggles = agentToggles) => {
+    if (isRunning || isStartingGeneration) return;
+
+    // Generate a unique courseId for this generation
+    const generatedCourseId = uuidv4();
+    setCourseIdRef(generatedCourseId);
+
+    // For video mode, skip assets and proceed directly
+    if (params.learningType === "video") {
+      proceedWithGeneration([], params, baseToggles, generatedCourseId);
+      return;
+    }
+
+    // For static/image mode, load assets and show modal
+    try {
+      const assets = await getUserAssets(profile?.id || '');
+      setUserAssets(assets);
+
+      const courseContent = extractCourseText({ courseTitle, inputText });
+      const courseType = detectCourseType(courseContent);
+
+      setPendingGenerationParams({
+        params,
+        courseContent,
+        courseType,
+      });
+
+      // Only show modal if user has assets
+      if (assets.length > 0) {
+        setShowAssetModal(true);
+      } else {
+        // No assets, proceed directly
+        proceedWithGeneration([], params, baseToggles, generatedCourseId);
+      }
+    } catch (err) {
+      console.error('Failed to load assets:', err);
+      // Proceed without assets on error
+      proceedWithGeneration([], params, baseToggles, generatedCourseId);
+    }
+  };
+
+  const proceedWithGeneration = (selectedAssetIds: string[], params: CourseParameters, baseToggles = agentToggles, courseId = courseIdRef) => {
     if (isRunning || isStartingGeneration) return;
 
     const effectiveToggles = getEffectiveAgentToggles(params, baseToggles);
@@ -369,6 +436,9 @@ const Index = () => {
     setIsStartingGeneration(true);
     setActiveTab("creation");
 
+    // Get the selected assets for pipeline
+    const selectedAssetsData = userAssets.filter(a => selectedAssetIds.includes(a.id));
+
     window.setTimeout(() => {
       try {
         void runPipeline(courseTitle, inputText, effectiveToggles, {
@@ -378,13 +448,16 @@ const Index = () => {
           companyLogo,
           learningMode: pipelineLearningMode,
           videoSettings: effectiveVideoSettings,
-        }).catch((err) => {
+        }, selectedAssetsData, courseId, profile?.id).catch((err) => {
           toast.error(err instanceof Error ? err.message : "Generation failed to start");
         });
       } finally {
         window.setTimeout(() => setIsStartingGeneration(false), 400);
       }
     }, 0);
+
+    setShowAssetModal(false);
+    setPendingGenerationParams(null);
   };
 
   const handleParamsConfirm = async (params: CourseParameters) => {
@@ -502,6 +575,35 @@ const Index = () => {
           onApply={applyQAFixes}
           onSkip={skipQAFixes}
           isApplying={isApplyingQAFixes}
+        />
+      )}
+
+      {/* Asset Matching Modal */}
+      {showAssetModal && pendingGenerationParams && (
+        <AssetMatchingModal
+          isOpen={showAssetModal}
+          onClose={() => {
+            setShowAssetModal(false);
+            setPendingGenerationParams(null);
+          }}
+          onProceed={(selectedAssetIds) => {
+            if (pendingGenerationParams) {
+              void handleAssetsSelected(
+                selectedAssetIds,
+                userAssets,
+                courseIdRef,
+                profile?.id || '',
+                pendingGenerationParams.courseContent,
+                pendingGenerationParams.courseType
+              ).then(() => {
+                proceedWithGeneration(selectedAssetIds, pendingGenerationParams.params, agentToggles, courseIdRef);
+              });
+            }
+          }}
+          courseContent={pendingGenerationParams.courseContent}
+          slides={[]}
+          userId={profile?.id || ''}
+          courseType={pendingGenerationParams.courseType}
         />
       )}
 
@@ -694,6 +796,7 @@ const Index = () => {
             textLanguage={courseParams?.textLanguage || courseParams?.language}
             narratorLanguage={courseParams?.narratorLanguage}
             onUpdateVisualTopic={updateVisualTopicAsset}
+            captionsEnabled={courseParams?.captionsEnabled}
           />
         </Suspense>
       )}
@@ -837,7 +940,8 @@ const Index = () => {
                 />
               </Suspense>
             )}
-            {courseParams ? (
+            {!showAssetLibrary ? (
+              courseParams ? (
               <div className="max-w-2xl">
                 <h2 className="text-[24px] font-bold text-slate-900 mb-2">Course Configuration</h2>
                 <p className="text-[14px] text-slate-600 mb-8">Your course is ready to generate. Review settings below.</p>
@@ -886,6 +990,22 @@ const Index = () => {
                 >
                   Go to Input
                 </button>
+              </div>
+            )
+            ) : (
+              <div className="w-full">
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="text-[24px] font-bold text-slate-900">Asset Library</h2>
+                  <button
+                    onClick={() => setShowAssetLibrary(false)}
+                    className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
+                  >
+                    ← Back to Setup
+                  </button>
+                </div>
+                <Suspense fallback={<div className="text-center py-12">Loading...</div>}>
+                  <AssetLibraryPanel userId={profile?.id || ''} />
+                </Suspense>
               </div>
             )}
           </div>

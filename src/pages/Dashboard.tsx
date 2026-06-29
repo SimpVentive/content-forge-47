@@ -8,11 +8,11 @@ import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { toast } from "sonner";
 
 const SIDEBAR_ITEMS = [
-  { id: "courses", label: "My Courses", icon: BookOpen },
+  { id: "courses", label: "My Courses", icon: BookOpen, disabled: false },
   { id: "templates", label: "Templates", icon: BarChart3, disabled: true },
-  { id: "assets", label: "Asset Library", icon: BookOpen, disabled: true },
+  { id: "assets", label: "Asset Library", icon: BookOpen, disabled: false },
   { id: "analytics", label: "Analytics", icon: BarChart3, disabled: true },
-  { id: "help", label: "Help", icon: HelpCircle },
+  { id: "help", label: "Help", icon: HelpCircle, disabled: false },
 ];
 
 export const Dashboard = () => {
@@ -50,10 +50,21 @@ export const Dashboard = () => {
   };
 
   const handleSidebarClick = (itemId: string) => {
+    console.log("Sidebar clicked:", itemId);
     if (itemId === "help") {
+      console.log("Opening help modal");
       setShowHelpModal(true);
+    } else if (itemId === "assets") {
+      console.log("Asset Library clicked - attempting navigation");
+      try {
+        console.log("Calling navigate to /studio");
+        navigate("/studio", { state: { openAssetLibrary: true } });
+        console.log("Navigation called successfully");
+      } catch (error) {
+        console.error("Navigation error:", error);
+      }
     } else if (itemId === "courses") {
-      // Already on this page
+      console.log("Already on courses page");
     }
   };
 
@@ -101,7 +112,11 @@ export const Dashboard = () => {
             return (
               <button
                 key={item.id}
-                onClick={() => !item.disabled && handleSidebarClick(item.id)}
+                onClick={() => {
+                  if (!item.disabled) {
+                    handleSidebarClick(item.id);
+                  }
+                }}
                 disabled={item.disabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${
                   isActive
