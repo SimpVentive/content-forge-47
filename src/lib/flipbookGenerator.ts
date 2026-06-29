@@ -530,6 +530,61 @@ ${assessmentDetails}`,
         page-break-after: always;
       }
     }
+    .page-text-html { text-align: left; }
+    .mcq-question {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 4px 0 16px;
+      line-height: 1.5;
+      text-align: left;
+    }
+    .mcq-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+    .mcq-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      background: #fff;
+      border-radius: 10px;
+      font-size: 15px;
+      color: #0f172a;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .mcq-option:hover:not(.answered) { border-color: #94a3b8; background: #f8fafc; }
+    .mcq-letter {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #475569;
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+    }
+    .mcq-text { flex: 1; }
+    .mcq-icon { flex-shrink: 0; font-weight: 700; font-size: 18px; }
+    .mcq-option.correct { border-color: #10b981; background: #ecfdf5; color: #065f46; }
+    .mcq-option.correct .mcq-letter { background: #10b981; color: #fff; }
+    .mcq-option.correct .mcq-icon::before { content: "✓"; color: #10b981; }
+    .mcq-option.incorrect { border-color: #ef4444; background: #fef2f2; color: #991b1b; }
+    .mcq-option.incorrect .mcq-letter { background: #ef4444; color: #fff; }
+    .mcq-option.incorrect .mcq-icon::before { content: "✕"; color: #ef4444; }
+    .mcq-option.answered { cursor: default; }
+    .mcq-option.answered:not(.correct):not(.incorrect) { opacity: 0.55; }
+    .mcq-feedback { margin-top: 14px; font-size: 14px; font-weight: 600; }
+    .mcq-feedback.correct { color: #065f46; }
+    .mcq-feedback.incorrect { color: #991b1b; }
   </style>
 </head>
 <body>
