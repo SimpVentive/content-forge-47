@@ -227,7 +227,10 @@ export const Dashboard = () => {
         <div className="flex-1 overflow-auto px-8 py-8">
           {activeView === "assets" ? (
             <>
-              <h1 className="text-3xl font-bold text-slate-900 mb-6">Asset Library</h1>
+              <h1 className="text-3xl font-bold text-slate-900 mb-2">Asset Library</h1>
+              <p className="text-sm text-slate-600 mb-6 max-w-2xl">
+                To include your own or your organization's images in the content you create, upload them here. Be sure to add the appropriate tags so the system can recognize and organize your assets correctly.
+              </p>
               {user?.id ? (
                 <AssetLibraryPanel userId={user.id} />
               ) : (
