@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle } from "lucide-react";
-import { HelpModal } from "./HelpModal";
+import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
 import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
@@ -1110,7 +1110,7 @@ interface LearnerPreviewProps {
 const PREVIEW_FLIP_STYLE_STORAGE_KEY = "contentforge.preview.flipStyle.default";
 const PREVIEW_NOTES_STORAGE_KEY_PREFIX = "contentforge.preview.notes";
 
-type SidebarPanel = "home" | "progress" | "notes" | "resources";
+type SidebarPanel = "home" | "progress" | "objectives" | "notes" | "resources";
 type UtilityPanel = "discussion" | "glossary" | "settings" | null;
 type LearningToolPanel = "quiz" | "fact" | "takeaway" | "objectives" | null;
 
@@ -1722,6 +1722,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const currentModuleVideoCount = currentModuleSlides.filter((moduleSlide) => moduleSlide.type === "video").length;
   const currentModuleVisualCount = currentModuleSlides.filter((moduleSlide) => moduleSlide.type === "content" && (moduleSlide.visualImageDataUrl || moduleSlide.visualSvg)).length;
   const currentModuleObjectiveCount = Math.min(3, currentModuleTopics.length || currentModule?.topics?.length || 0);
+  const currentLessonObjectives = getTopicLearningObjectives(
+    currentModuleTopics.length > 0 ? currentModuleTopics : currentModule?.topics || [],
+    slide.type === "content" ? slide.topicTitle : undefined,
+  );
   const courseCompletion = totalSlides > 0 ? Math.round((visited.size / totalSlides) * 100) : 0;
   const shellPageTitle = slide.type === "title"
     ? currentModule?.title || courseTitle
@@ -3381,11 +3385,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               ) : null}
               {activeSidebarPanel === "objectives" ? (
                 <div className="space-y-3 text-[12px] leading-relaxed text-white/70">
-                  {lessonObjectives && lessonObjectives.length > 0 ? (
+                  {currentLessonObjectives.length > 0 ? (
                     <>
                       <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-white/52 mb-3">This lesson covers:</p>
                       <div className="space-y-2">
-                        {lessonObjectives.map((objective, idx) => (
+                        {currentLessonObjectives.map((objective, idx) => (
                           <div key={idx} className="flex items-start gap-2 rounded-xl bg-white/8 p-3">
                             <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#8ec5ff]" />
                             <span className="text-white/80">{objective}</span>
