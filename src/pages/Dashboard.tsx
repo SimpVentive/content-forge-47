@@ -8,7 +8,11 @@ import { AssetLibraryPanel } from "@/components/AssetLibraryPanel";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { toast } from "sonner";
 
-const SIDEBAR_ITEMS = [
+type SidebarItemId = "courses" | "templates" | "assets" | "analytics" | "help";
+
+const ACTIVE_VIEW_STORAGE_KEY = "contentforge-dashboard-active-view";
+
+const SIDEBAR_ITEMS: Array<{ id: SidebarItemId; label: string; icon: typeof BookOpen }> = [
   { id: "courses", label: "My Courses", icon: BookOpen },
   { id: "templates", label: "Templates", icon: BarChart3 },
   { id: "assets", label: "Asset Library", icon: BookOpen },
@@ -16,7 +20,12 @@ const SIDEBAR_ITEMS = [
   { id: "help", label: "Help", icon: HelpCircle },
 ];
 
-const DISABLED_SIDEBAR_IDS = new Set<string>(["templates", "analytics"]);
+const ENABLED_SIDEBAR_IDS = new Set<SidebarItemId>(["courses", "assets", "help"]);
+
+const getInitialDashboardView = (): "courses" | "assets" => {
+  if (typeof window === "undefined") return "courses";
+  return window.localStorage.getItem(ACTIVE_VIEW_STORAGE_KEY) === "assets" ? "assets" : "courses";
+};
 
 export const Dashboard = () => {
   const navigate = useNavigate();
@@ -25,8 +34,12 @@ export const Dashboard = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [activeView, setActiveView] = useState<"courses" | "assets">("courses");
+  const [activeView, setActiveView] = useState<"courses" | "assets">(getInitialDashboardView);
   const [showHelpModal, setShowHelpModal] = useState(false);
+
+  useEffect(() => {
+    window.localStorage.setItem(ACTIVE_VIEW_STORAGE_KEY, activeView);
+  }, [activeView]);
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -53,7 +66,9 @@ export const Dashboard = () => {
     navigate("/studio", { state: { courseId } });
   };
 
-  const handleSidebarClick = (itemId: string) => {
+  const handleSidebarClick = (itemId: SidebarItemId) => {
+    if (!ENABLED_SIDEBAR_IDS.has(itemId)) return;
+
     if (itemId === "help") {
       setShowHelpModal(true);
     } else if (itemId === "courses") {
@@ -106,19 +121,20 @@ export const Dashboard = () => {
           {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = item.id === activeView || (item.id === "help" && showHelpModal);
-            const isDisabled = DISABLED_SIDEBAR_IDS.has(item.id);
+            const isDisabled = !ENABLED_SIDEBAR_IDS.has(item.id);
             return (
               <button
                 type="button"
                 key={item.id}
                 onClick={() => handleSidebarClick(item.id)}
                 disabled={isDisabled}
+                aria-disabled={isDisabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${
                   isActive
                     ? "bg-teal-50 text-teal-700 border border-teal-200"
                     : isDisabled
                       ? "text-slate-300 cursor-not-allowed opacity-60"
-                      : "text-slate-800 cursor-pointer hover:bg-teal-50 hover:text-teal-700"
+                      : "text-slate-700 cursor-pointer hover:bg-teal-50 hover:text-teal-700"
                 }`}
               >
                 <Icon className="w-5 h-5" />
