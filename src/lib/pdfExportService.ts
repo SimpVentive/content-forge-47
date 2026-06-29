@@ -63,58 +63,37 @@ export async function exportNarrativeToPDF(
     // Overview page
     let overviewY = margin;
 
-    pdf.setFontSize(18);
+    pdf.setFontSize(26);
     pdf.setFont(undefined, "bold");
     pdf.setTextColor(0);
     pdf.text("Course Overview", margin, overviewY);
-    overviewY += 10;
+    overviewY += 14;
 
-    // Module Objectives
-    pdf.setFontSize(12);
-    pdf.setFont(undefined, "bold");
+    // Course Objective
+    pdf.setFontSize(13);
+    pdf.setFont(undefined, "bolditalic");
     pdf.setTextColor(40);
-    pdf.text("Module Objectives:", margin, overviewY);
-    overviewY += 6;
-
-    pdf.setFontSize(11);
-    pdf.setFont(undefined, "normal");
-    const objectives = narratives
+    const courseObjective = narratives
       .map(n => n.topicObjective || "Master key concepts")
       .filter((v, i, a) => a.indexOf(v) === i)
-      .slice(0, 3);
-
-    objectives.forEach(obj => {
-      const objLines = pdf.splitTextToSize(`• ${obj}`, contentWidth - 5);
-      pdf.text(objLines, margin + 5, overviewY);
-      overviewY += objLines.length * 4 + 2;
-    });
-
-    overviewY += 3;
+      .slice(0, 3)
+      .join(" ");
+    pdf.text(`Course Objective: ${courseObjective}`, margin, overviewY);
+    overviewY += 18;
 
     // Course Contents
-    pdf.setFontSize(12);
+    pdf.setFontSize(13);
     pdf.setFont(undefined, "bold");
     pdf.setTextColor(40);
-    pdf.text("Course Contents:", margin, overviewY);
-    overviewY += 6;
+    pdf.text("Course Content:", margin, overviewY);
+    overviewY += 7;
 
-    pdf.setFontSize(10);
+    pdf.setFontSize(11);
     pdf.setFont(undefined, "normal");
     narratives.forEach(narrative => {
       const titleLines = pdf.splitTextToSize(`• ${narrative.topicTitle}`, contentWidth - 5);
       pdf.text(titleLines, margin + 5, overviewY);
-      overviewY += titleLines.length * 3 + 1;
-
-      narrative.scenes.slice(0, 3).forEach(scene => {
-        const sceneLines = pdf.splitTextToSize(`  ◦ ${scene.title}`, contentWidth - 10);
-        pdf.text(sceneLines, margin + 10, overviewY);
-        overviewY += sceneLines.length * 3 + 0.5;
-      });
-
-      if (narrative.scenes.length > 3) {
-        pdf.text(`  ◦ ... and ${narrative.scenes.length - 3} more scenes`, margin + 10, overviewY);
-        overviewY += 3;
-      }
+      overviewY += titleLines.length * 4 + 2;
     });
 
     overviewY += 3;

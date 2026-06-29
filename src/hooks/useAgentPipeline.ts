@@ -2102,19 +2102,33 @@ ${modeInstructions}`;
       );
 
       // Store the QA audit log for learning/improvements
-      await storeQAAuditLog({
-        courseId: context.courseTitle,
-        timestamp: new Date().toISOString(),
-        qaResult: result,
-        userChanges: null, // Will be populated if user makes changes
-      });
+      const qaContext = {
+        courseTitle: context.courseTitle,
+        inputText: context.inputText,
+        domain: context.params?.domain,
+        topic: context.params?.topic,
+      };
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData.user) {
+        await storeQAAuditLog(
+          "current-draft",
+          authData.user.id,
+          result,
+          qaContext,
+          rawOutputs,
+          { ...rawOutputs, ...result.revisedOutputs },
+          supabase,
+        );
+      } else {
+        await storeQAAuditLog("current-draft", "local-user", result, qaContext, rawOutputs, rawOutputs);
+      }
 
       // Update state with QA results
       setQAResult(result);
       setShowQADialog(true);
 
       addLog(`Final QA Agent: Quality validation complete. ${result.issuesFound.length} issue(s) found.`);
-      setStatus("final-qa", result.issuesFound.length === 0 ? "success" : "warning");
+      setStatus("final-qa", result.issuesFound.length === 0 ? "complete" : "error");
 
     } catch (err) {
       addLog(`Final QA Agent: Error — ${(err as Error).message}`);

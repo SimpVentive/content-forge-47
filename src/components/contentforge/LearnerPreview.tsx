@@ -1111,7 +1111,7 @@ interface LearnerPreviewProps {
 const PREVIEW_FLIP_STYLE_STORAGE_KEY = "contentforge.preview.flipStyle.default";
 const PREVIEW_NOTES_STORAGE_KEY_PREFIX = "contentforge.preview.notes";
 
-type SidebarPanel = "home" | "progress" | "notes" | "resources";
+type SidebarPanel = "home" | "progress" | "objectives" | "notes" | "resources";
 type UtilityPanel = "discussion" | "glossary" | "settings" | null;
 type LearningToolPanel = "quiz" | "fact" | "takeaway" | "objectives" | null;
 
@@ -1741,6 +1741,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const currentModuleVideoCount = currentModuleSlides.filter((moduleSlide) => moduleSlide.type === "video").length;
   const currentModuleVisualCount = currentModuleSlides.filter((moduleSlide) => moduleSlide.type === "content" && (moduleSlide.visualImageDataUrl || moduleSlide.visualSvg)).length;
   const currentModuleObjectiveCount = Math.min(3, currentModuleTopics.length || currentModule?.topics?.length || 0);
+  const currentLessonObjectives = getTopicLearningObjectives(
+    currentModuleTopics.length > 0 ? currentModuleTopics : currentModule?.topics || [],
+    slide.type === "content" ? slide.topicTitle : undefined,
+  );
   const courseCompletion = totalSlides > 0 ? Math.round((visited.size / totalSlides) * 100) : 0;
   const shellPageTitle = slide.type === "title"
     ? currentModule?.title || courseTitle
@@ -2415,27 +2419,25 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
                 <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)] md:p-7">
                   <div className="mb-8">
-                    <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e] mb-3">{moduleLabel}</p>
-                    <h2 className="text-[35px] font-[900] leading-tight text-[#123d78] mb-8">{slide.topicTitle}</h2>
+                    <h2 className="text-[44px] font-[900] leading-tight text-[#123d78] mb-10">Course Overview</h2>
 
-                    {/* Module Objective Section */}
+                    {/* Course Objective Section */}
                     {(parts.hook || narratorExcerpt) && (
-                      <div className="mb-8">
-                        <p className="text-[16px] italic text-[#5f7898] mb-6">
-                          <span className="font-[900] not-italic text-[#123d78]">Objective:</span> {parts.hook || narratorExcerpt}
+                      <div className="mb-16">
+                        <p className="text-[18px] font-bold italic text-[#123d78] mb-8">
+                          Course Objective: <span className="font-normal not-italic text-[#35506f]">{parts.hook || narratorExcerpt}</span>
                         </p>
                       </div>
                     )}
 
-                    {/* Course Contents Section */}
+                    {/* Course Content Section */}
                     {parts.body && parts.body.length > 0 && (
                       <div>
-                        <p className="text-[14px] font-[900] text-[#123d78] mb-4">Course Contents</p>
-                        <p className="text-[13px] text-[#5f7898] mb-3">Following is the course content of this module:</p>
-                        <div className="space-y-2">
+                        <p className="text-[16px] font-[900] text-[#123d78] mb-5">Course Content:</p>
+                        <div className="space-y-3">
                           {parts.body.map((item, index) => (
-                            <div key={index} className="flex items-start gap-3 text-[14px] leading-[1.5] text-[#35506f]">
-                              <span className="font-[800] text-[#4f46e5] shrink-0 mt-0.5">•</span>
+                            <div key={index} className="flex items-start gap-3 text-[15px] leading-[1.5] text-[#35506f]">
+                              <span className="font-[800] text-[#4f46e5] shrink-0 mt-1">•</span>
                               <span>{item}</span>
                             </div>
                           ))}
@@ -3435,11 +3437,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               ) : null}
               {activeSidebarPanel === "objectives" ? (
                 <div className="space-y-3 text-[12px] leading-relaxed text-white/70">
-                  {lessonObjectives && lessonObjectives.length > 0 ? (
+                  {currentLessonObjectives.length > 0 ? (
                     <>
                       <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-white/52 mb-3">This lesson covers:</p>
                       <div className="space-y-2">
-                        {lessonObjectives.map((objective, idx) => (
+                        {currentLessonObjectives.map((objective, idx) => (
                           <div key={idx} className="flex items-start gap-2 rounded-xl bg-white/8 p-3">
                             <div className="mt-1 h-2 w-2 shrink-0 rounded-full bg-[#8ec5ff]" />
                             <span className="text-white/80">{objective}</span>

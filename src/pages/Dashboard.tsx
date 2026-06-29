@@ -4,25 +4,42 @@ import { Plus, Search, Trash2, Edit3, Zap, Calendar, BookOpen, BarChart3, HelpCi
 import { listCourseDraftsCloudFirst, deleteCourseDraftCloudFirst, type CourseDraft } from "@/lib/courseDrafts";
 import { useAuth } from "@/hooks/useAuth";
 import { HelpModal } from "@/components/HelpModal";
+import { AssetLibraryPanel } from "@/components/AssetLibraryPanel";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { toast } from "sonner";
 
-const SIDEBAR_ITEMS = [
-  { id: "courses", label: "My Courses", icon: BookOpen, disabled: false },
-  { id: "templates", label: "Templates", icon: BarChart3, disabled: true },
-  { id: "assets", label: "Asset Library", icon: BookOpen, disabled: false },
-  { id: "analytics", label: "Analytics", icon: BarChart3, disabled: true },
-  { id: "help", label: "Help", icon: HelpCircle, disabled: false },
+type SidebarItemId = "courses" | "templates" | "assets" | "analytics" | "help";
+
+const ACTIVE_VIEW_STORAGE_KEY = "contentforge-dashboard-active-view";
+
+const SIDEBAR_ITEMS: Array<{ id: SidebarItemId; label: string; icon: typeof BookOpen }> = [
+  { id: "courses", label: "My Courses", icon: BookOpen },
+  { id: "templates", label: "Templates", icon: BarChart3 },
+  { id: "assets", label: "Asset Library", icon: BookOpen },
+  { id: "analytics", label: "Analytics", icon: BarChart3 },
+  { id: "help", label: "Help", icon: HelpCircle },
 ];
+
+const ENABLED_SIDEBAR_IDS = new Set<SidebarItemId>(["courses", "assets", "help"]);
+
+const getInitialDashboardView = (): "courses" | "assets" => {
+  if (typeof window === "undefined") return "courses";
+  return window.localStorage.getItem(ACTIVE_VIEW_STORAGE_KEY) === "assets" ? "assets" : "courses";
+};
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { profile, logout } = useAuth();
+  const { profile, user } = useAuth();
   const [courses, setCourses] = useState<CourseDraft[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeView, setActiveView] = useState<"courses" | "assets">(getInitialDashboardView);
   const [showHelpModal, setShowHelpModal] = useState(false);
+
+  useEffect(() => {
+    window.localStorage.setItem(ACTIVE_VIEW_STORAGE_KEY, activeView);
+  }, [activeView]);
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -49,22 +66,17 @@ export const Dashboard = () => {
     navigate("/studio", { state: { courseId } });
   };
 
-  const handleSidebarClick = (itemId: string) => {
-    console.log("Sidebar clicked:", itemId);
+  const handleSidebarClick = (itemId: SidebarItemId) => {
+    if (!ENABLED_SIDEBAR_IDS.has(itemId)) return;
+
     if (itemId === "help") {
-      console.log("Opening help modal");
       setShowHelpModal(true);
-    } else if (itemId === "assets") {
-      console.log("Asset Library clicked - attempting navigation");
-      try {
-        console.log("Calling navigate to /studio");
-        navigate("/studio", { state: { openAssetLibrary: true } });
-        console.log("Navigation called successfully");
-      } catch (error) {
-        console.error("Navigation error:", error);
-      }
     } else if (itemId === "courses") {
-      console.log("Already on courses page");
+      setActiveView("courses");
+      setActiveTab("dashboard");
+    } else if (itemId === "assets") {
+      setActiveView("assets");
+      setActiveTab("dashboard");
     }
   };
 
@@ -108,22 +120,21 @@ export const Dashboard = () => {
         <nav className="flex-1 px-4 py-6 space-y-2">
           {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
-            const isActive = item.id === "courses";
+            const isActive = item.id === activeView || (item.id === "help" && showHelpModal);
+            const isDisabled = !ENABLED_SIDEBAR_IDS.has(item.id);
             return (
               <button
+                type="button"
                 key={item.id}
-                onClick={() => {
-                  if (!item.disabled) {
-                    handleSidebarClick(item.id);
-                  }
-                }}
-                disabled={item.disabled}
+                onClick={() => handleSidebarClick(item.id)}
+                disabled={isDisabled}
+                aria-disabled={isDisabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${
                   isActive
                     ? "bg-teal-50 text-teal-700 border border-teal-200"
-                    : item.disabled
-                      ? "text-slate-400 cursor-not-allowed"
-                      : "text-slate-600 hover:bg-slate-50"
+                    : isDisabled
+                      ? "text-slate-300 cursor-not-allowed opacity-60"
+                      : "text-slate-700 cursor-pointer hover:bg-teal-50 hover:text-teal-700"
                 }`}
               >
                 <Icon className="w-5 h-5" />
@@ -214,7 +225,19 @@ export const Dashboard = () => {
 
         {/* Main Area */}
         <div className="flex-1 overflow-auto px-8 py-8">
-          {activeTab === "dashboard" ? (
+          {activeView === "assets" ? (
+            <>
+              <h1 className="text-3xl font-bold text-slate-900 mb-2">Asset Library</h1>
+              <p className="text-sm text-slate-600 mb-6 max-w-2xl">
+                To include your own or your organization's images in the content you create, upload them here. Be sure to add the appropriate tags so the system can recognize and organize your assets correctly.
+              </p>
+              {user?.id ? (
+                <AssetLibraryPanel userId={user.id} />
+              ) : (
+                <p className="text-slate-600">Sign in to manage assets.</p>
+              )}
+            </>
+          ) : activeTab === "dashboard" ? (
             <>
               {/* Page Title */}
               <h1 className="text-3xl font-bold text-slate-900 mb-8">Dashboard</h1>

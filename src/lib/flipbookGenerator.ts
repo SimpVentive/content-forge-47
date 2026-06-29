@@ -8,6 +8,7 @@ import type { TopicNarrative } from "@/lib/visualNarrativeService";
 export interface FlipbookPage {
   title?: string;
   content: string;
+  htmlContent?: string;
   images?: string[];
   speaker?: string;
   audioDataUrl?: string;
@@ -84,10 +85,9 @@ export function generateFlipbookHTML(
 
     pages.push({
       title: "Course Overview",
-      content: `Module Objective:
-${narratives.map(n => n.topicObjective || "Master key concepts").slice(0, 3).join("\n")}
+      content: `Course Objective: ${narratives.map(n => n.topicObjective || "Master key concepts").slice(0, 3).join(" ")}
 
-Course Contents:
+Course Content:
 ${topicsList}
 
 Duration: Approximately ${estimatedMinutes} minutes
@@ -119,11 +119,27 @@ ${assessmentDetails}`,
 
     // Add MCQ questions
     if (Array.isArray(assessmentData.mcq)) {
-      assessmentData.mcq.slice(0, 10).forEach((q: any) => {
-        const options = (q.options || []).map((opt: string) => `• ${opt}`).join("\n");
+      assessmentData.mcq.slice(0, 10).forEach((q: any, qIdx: number) => {
+        const questionText = q.question || "";
+        const correctRaw = String(q.correct_answer || "").trim();
+        const stripPrefix = (s: string) => s.replace(/^\s*[A-Da-d][\.\)]\s*/, "").replace(/^\s*[-•]\s*/, "").trim();
+        const correctClean = stripPrefix(correctRaw);
+        const options: string[] = Array.isArray(q.options) ? q.options : [];
+        const optionsHtml = options.map((opt, oi) => {
+          const optClean = stripPrefix(String(opt));
+          const letter = String.fromCharCode(65 + oi);
+          const isCorrect = optClean === correctClean || String(opt) === correctRaw || letter === correctRaw || correctRaw.includes(optClean);
+          return `<button type="button" class="mcq-option" data-correct="${isCorrect ? "1" : "0"}" onclick="window.__mcqAnswer&&window.__mcqAnswer(this)"><span class="mcq-letter">${letter}</span><span class="mcq-text">${escapeHtml(optClean)}</span><span class="mcq-icon"></span></button>`;
+        }).join("");
+        const html = `
+          <div class="mcq-question">${escapeHtml(questionText)}</div>
+          <div class="mcq-options">${optionsHtml}</div>
+          <div class="mcq-feedback" data-correct-text="${escapeHtml(correctRaw)}"></div>
+        `;
         pages.push({
-          title: `Q${assessmentPageNum - Math.max(...pages.map(p => p.pageNumber || 0))} - ${q.question?.substring(0, 40) || "Question"}`,
-          content: `${q.question || ""}\n\nOptions:\n${options}\n\nCorrect Answer: ${q.correct_answer || ""}`,
+          title: `Q${qIdx + 1} - ${(questionText || "Question").substring(0, 60)}`,
+          content: "",
+          htmlContent: html,
           images: [],
           speaker: "",
           pageNumber: assessmentPageNum++,
@@ -134,10 +150,26 @@ ${assessmentDetails}`,
     // Add scenario questions
     if (Array.isArray(assessmentData.scenarios)) {
       assessmentData.scenarios.slice(0, 5).forEach((s: any) => {
-        const options = (s.options || []).map((opt: string) => `• ${opt}`).join("\n");
+        const situation = s.situation || "";
+        const correctRaw = String(s.best_response || "").trim();
+        const stripPrefix = (str: string) => str.replace(/^\s*[A-Da-d][\.\)]\s*/, "").replace(/^\s*[-•]\s*/, "").trim();
+        const correctClean = stripPrefix(correctRaw);
+        const options: string[] = Array.isArray(s.options) ? s.options : [];
+        const optionsHtml = options.map((opt, oi) => {
+          const optClean = stripPrefix(String(opt));
+          const letter = String.fromCharCode(65 + oi);
+          const isCorrect = optClean === correctClean || String(opt) === correctRaw || letter === correctRaw || correctRaw.includes(optClean);
+          return `<button type="button" class="mcq-option" data-correct="${isCorrect ? "1" : "0"}" onclick="window.__mcqAnswer&&window.__mcqAnswer(this)"><span class="mcq-letter">${letter}</span><span class="mcq-text">${escapeHtml(optClean)}</span><span class="mcq-icon"></span></button>`;
+        }).join("");
+        const html = `
+          <div class="mcq-question">${escapeHtml(situation)}</div>
+          <div class="mcq-options">${optionsHtml}</div>
+          <div class="mcq-feedback" data-correct-text="${escapeHtml(correctRaw)}"></div>
+        `;
         pages.push({
-          title: `Scenario - ${s.situation?.substring(0, 40) || "Scenario Question"}`,
-          content: `${s.situation || ""}\n\nOptions:\n${options}\n\nBest Response: ${s.best_response || ""}`,
+          title: `Scenario - ${(situation || "Scenario").substring(0, 60)}`,
+          content: "",
+          htmlContent: html,
           images: [],
           speaker: "",
           pageNumber: assessmentPageNum++,
@@ -166,7 +198,7 @@ ${assessmentDetails}`,
         ${page.title ? `<h1 class="page-title">${escapeHtml(page.title)}</h1>` : ""}
         <div class="page-content">
           ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
-          ${page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : ""}
+          ${page.htmlContent ? `<div class="page-text page-text-html">${page.htmlContent}</div>` : (page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : "")}
         </div>
         ${voiceoverEnabled && page.speaker ? `
         <div class="page-narration-section">
@@ -498,6 +530,61 @@ ${assessmentDetails}`,
         page-break-after: always;
       }
     }
+    .page-text-html { text-align: left; }
+    .mcq-question {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 4px 0 16px;
+      line-height: 1.5;
+      text-align: left;
+    }
+    .mcq-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      width: 100%;
+    }
+    .mcq-option {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      background: #fff;
+      border-radius: 10px;
+      font-size: 15px;
+      color: #0f172a;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .mcq-option:hover:not(.answered) { border-color: #94a3b8; background: #f8fafc; }
+    .mcq-letter {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: #e2e8f0;
+      color: #475569;
+      display: inline-flex;
+      align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px;
+    }
+    .mcq-text { flex: 1; }
+    .mcq-icon { flex-shrink: 0; font-weight: 700; font-size: 18px; }
+    .mcq-option.correct { border-color: #10b981; background: #ecfdf5; color: #065f46; }
+    .mcq-option.correct .mcq-letter { background: #10b981; color: #fff; }
+    .mcq-option.correct .mcq-icon::before { content: "✓"; color: #10b981; }
+    .mcq-option.incorrect { border-color: #ef4444; background: #fef2f2; color: #991b1b; }
+    .mcq-option.incorrect .mcq-letter { background: #ef4444; color: #fff; }
+    .mcq-option.incorrect .mcq-icon::before { content: "✕"; color: #ef4444; }
+    .mcq-option.answered { cursor: default; }
+    .mcq-option.answered:not(.correct):not(.incorrect) { opacity: 0.55; }
+    .mcq-feedback { margin-top: 14px; font-size: 14px; font-weight: 600; }
+    .mcq-feedback.correct { color: #065f46; }
+    .mcq-feedback.incorrect { color: #991b1b; }
   </style>
 </head>
 <body>
@@ -526,6 +613,28 @@ ${assessmentDetails}`,
   <!-- StPageFlip Library -->
   <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>
 
+  <script>
+    window.__mcqAnswer = function(btn) {
+      var container = btn.parentElement;
+      if (!container || container.dataset.locked === '1') return;
+      container.dataset.locked = '1';
+      var isCorrect = btn.getAttribute('data-correct') === '1';
+      btn.classList.add(isCorrect ? 'correct' : 'incorrect');
+      Array.prototype.forEach.call(container.querySelectorAll('.mcq-option'), function(o){
+        o.classList.add('answered');
+        if (o !== btn && o.getAttribute('data-correct') === '1') {
+          o.classList.add('correct');
+        }
+      });
+      var feedback = container.parentElement && container.parentElement.querySelector('.mcq-feedback');
+      if (feedback) {
+        feedback.classList.add(isCorrect ? 'correct' : 'incorrect');
+        feedback.textContent = isCorrect
+          ? 'Correct!'
+          : 'Incorrect. Correct answer: ' + (feedback.getAttribute('data-correct-text') || '');
+      }
+    };
+  </script>
   <script>
     let pageFlip = null;
     const totalPages = ${pages.length};

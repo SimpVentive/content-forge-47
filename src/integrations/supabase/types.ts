@@ -91,6 +91,95 @@ export type Database = {
           },
         ]
       }
+      asset_selection_preferences: {
+        Row: {
+          content_hash: string | null
+          course_id: string
+          course_type: string | null
+          created_at: string
+          id: string
+          selected_asset_ids: string[] | null
+          topic_keywords: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content_hash?: string | null
+          course_id: string
+          course_type?: string | null
+          created_at?: string
+          id?: string
+          selected_asset_ids?: string[] | null
+          topic_keywords?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content_hash?: string | null
+          course_id?: string
+          course_type?: string | null
+          created_at?: string
+          id?: string
+          selected_asset_ids?: string[] | null
+          topic_keywords?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_selection_preferences_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      asset_usage_log: {
+        Row: {
+          asset_id: string
+          course_id: string
+          id: string
+          slide_number: number
+          slide_title: string | null
+          used_at: string
+          user_id: string
+        }
+        Insert: {
+          asset_id: string
+          course_id: string
+          id?: string
+          slide_number: number
+          slide_title?: string | null
+          used_at?: string
+          user_id: string
+        }
+        Update: {
+          asset_id?: string
+          course_id?: string
+          id?: string
+          slide_number?: number
+          slide_title?: string | null
+          used_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_usage_log_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "user_assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_usage_log_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       billing_transactions: {
         Row: {
           amount_inr: number
@@ -279,6 +368,68 @@ export type Database = {
           units_purchased?: number
         }
         Relationships: []
+      }
+      user_assets: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          description: string | null
+          file_size_bytes: number
+          filename: string
+          height: number | null
+          id: string
+          mime_type: string
+          original_filename: string
+          storage_path: string
+          storage_url: string
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          file_size_bytes: number
+          filename: string
+          height?: number | null
+          id?: string
+          mime_type: string
+          original_filename: string
+          storage_path: string
+          storage_url: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          description?: string | null
+          file_size_bytes?: number
+          filename?: string
+          height?: number | null
+          id?: string
+          mime_type?: string
+          original_filename?: string
+          storage_path?: string
+          storage_url?: string
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_assets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
