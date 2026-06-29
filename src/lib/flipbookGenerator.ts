@@ -198,7 +198,7 @@ ${assessmentDetails}`,
         ${page.title ? `<h1 class="page-title">${escapeHtml(page.title)}</h1>` : ""}
         <div class="page-content">
           ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
-          ${page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : ""}
+          ${page.htmlContent ? `<div class="page-text page-text-html">${page.htmlContent}</div>` : (page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : "")}
         </div>
         ${voiceoverEnabled && page.speaker ? `
         <div class="page-narration-section">
