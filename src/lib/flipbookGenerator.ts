@@ -84,10 +84,9 @@ export function generateFlipbookHTML(
 
     pages.push({
       title: "Course Overview",
-      content: `Module Objective:
-${narratives.map(n => n.topicObjective || "Master key concepts").slice(0, 3).join("\n")}
+      content: `Course Objective: ${narratives.map(n => n.topicObjective || "Master key concepts").slice(0, 3).join(" ")}
 
-Course Contents:
+Course Content:
 ${topicsList}
 
 Duration: Approximately ${estimatedMinutes} minutes
