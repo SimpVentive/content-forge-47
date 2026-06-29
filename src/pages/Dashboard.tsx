@@ -16,6 +16,8 @@ const SIDEBAR_ITEMS = [
   { id: "help", label: "Help", icon: HelpCircle },
 ];
 
+const DISABLED_SIDEBAR_IDS = new Set(["templates", "analytics"]);
+
 export const Dashboard = () => {
   const navigate = useNavigate();
   const { profile, user } = useAuth();
@@ -104,15 +106,19 @@ export const Dashboard = () => {
           {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = item.id === activeView;
+            const isDisabled = DISABLED_SIDEBAR_IDS.has(item.id);
             return (
               <button
+                type="button"
                 key={item.id}
-                onClick={() => !item.disabled && handleSidebarClick(item.id)}
-                disabled={item.disabled}
+                onClick={() => {
+                  if (!isDisabled) handleSidebarClick(item.id);
+                }}
+                disabled={isDisabled}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all text-sm font-medium ${
                   isActive
                     ? "bg-teal-50 text-teal-700 border border-teal-200"
-                    : item.disabled
+                    : isDisabled
                       ? "text-slate-400 cursor-not-allowed"
                       : "text-slate-600 hover:bg-slate-50"
                 }`}
