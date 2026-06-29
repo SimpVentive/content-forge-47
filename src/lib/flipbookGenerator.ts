@@ -614,6 +614,28 @@ ${assessmentDetails}`,
   <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>
 
   <script>
+    window.__mcqAnswer = function(btn) {
+      var container = btn.parentElement;
+      if (!container || container.dataset.locked === '1') return;
+      container.dataset.locked = '1';
+      var isCorrect = btn.getAttribute('data-correct') === '1';
+      btn.classList.add(isCorrect ? 'correct' : 'incorrect');
+      Array.prototype.forEach.call(container.querySelectorAll('.mcq-option'), function(o){
+        o.classList.add('answered');
+        if (o !== btn && o.getAttribute('data-correct') === '1') {
+          o.classList.add('correct');
+        }
+      });
+      var feedback = container.parentElement && container.parentElement.querySelector('.mcq-feedback');
+      if (feedback) {
+        feedback.classList.add(isCorrect ? 'correct' : 'incorrect');
+        feedback.textContent = isCorrect
+          ? 'Correct!'
+          : 'Incorrect. Correct answer: ' + (feedback.getAttribute('data-correct-text') || '');
+      }
+    };
+  </script>
+  <script>
     let pageFlip = null;
     const totalPages = ${pages.length};
 
