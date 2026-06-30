@@ -324,24 +324,24 @@ export function generateFlipbookHTML(
       <div class="page-inner">
         ${companyLogoDataUrl && idx === 0 ? `<img src="${companyLogoDataUrl}" alt="Company logo" class="logo-first-page" />` : ""}
         ${page.title ? `<h1 class="page-title">${escapeHtml(page.title)}</h1>` : ""}
+        <div class="page-content">
+          ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
+          ${page.htmlContent ? `<div class="page-text page-text-html">${page.htmlContent}</div>` : (page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : "")}
+        </div>
         ${voiceoverEnabled && page.speaker ? `
         <div class="page-narration-section">
+          <div class="narration-label">Narrator:</div>
+          <div class="narration-text">${escapeHtml(page.speaker)}</div>
           ${page.audioDataUrl ? `
             <div class="audio-player-container">
-              <audio class="audio-player" controls>
+              <audio class="audio-player" controls preload="metadata">
                 <source src="${page.audioDataUrl}" type="audio/mpeg">
                 Your browser does not support the audio element.
               </audio>
             </div>
           ` : ""}
-          <div class="narration-label">Narrator:</div>
-          <div class="narration-text">${escapeHtml(page.speaker)}</div>
         </div>
         ` : ""}
-        <div class="page-content">
-          ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
-          ${page.htmlContent ? `<div class="page-text page-text-html">${page.htmlContent}</div>` : (page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : "")}
-        </div>
         ${companyLogoDataUrl && idx > 0 ? `<div style="margin-top: 10px;"><img src="${companyLogoDataUrl}" alt="Company logo" class="logo-footer" /></div>` : ""}
       </div>
     </div>
