@@ -1251,6 +1251,8 @@ export function generateFlipbookHTML(
         pageFlip.on('flip', () => {
           stopAllAudio();
           updatePageInfo();
+          // Slight delay so the page is mounted before we try to play
+          setTimeout(playCurrentPageAudio, 150);
         });
 
         // Fullscreen
