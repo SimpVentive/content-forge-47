@@ -2016,8 +2016,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 {/* Right: Representative Image (50%) - use first generated image from this module */}
                 {(() => {
                   const repImage =
-                    currentModuleSlides.find((s: any) => s.type === "narrative-flipbook" && s.narrative?.scenes?.[0]?.imageDataUrl)?.narrative?.scenes?.[0]?.imageDataUrl ||
-                    currentModuleSlides.find((s: any) => s.type === "content" && s.visualImageDataUrl)?.visualImageDataUrl;
+                    (currentModuleSlides.find((s: any) => s.type === "narrative-flipbook" && s.narrative?.scenes?.[0]?.imageDataUrl) as any)?.narrative?.scenes?.[0]?.imageDataUrl ||
+                    (currentModuleSlides.find((s: any) => s.type === "content" && s.visualImageDataUrl) as any)?.visualImageDataUrl;
                   return (
                     <div className="flex-1 flex items-center justify-center anim-fade-in-right" style={{ animationDelay: "0.1s" }}>
                       <div className="w-full h-full rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center">
