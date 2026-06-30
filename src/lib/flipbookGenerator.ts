@@ -22,7 +22,8 @@ export function generateFlipbookHTML(
   voiceoverEnabled: boolean = false,
   voiceoverPace?: "slow" | "normal" | "fast",
   assessmentRaw?: string,
-  companyLogoDataUrl?: string | null
+  companyLogoDataUrl?: string | null,
+  passThreshold: number = 70
 ): string {
   // Parse assessment if provided
   let assessmentData: any = null;
@@ -236,6 +237,53 @@ export function generateFlipbookHTML(
         title: "Reflection Exercise",
         content: "",
         htmlContent: reflectionHtml,
+        images: [],
+        speaker: "",
+        pageNumber: assessmentPageNum++,
+      });
+    }
+
+    // Add results page if there are MCQ questions
+    if (Array.isArray(assessmentData.mcq) && assessmentData.mcq.length > 0) {
+      const totalMCQ = Math.min(assessmentData.mcq.length, 10);
+      const resultsHtml = `
+        <div class="results-container">
+          <div class="results-score">
+            <div class="results-number" id="results-score-number">0</div>
+            <div class="results-label">Correct Answers</div>
+          </div>
+
+          <div class="results-progress">
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" id="results-progress-fill" style="width: 0%"></div>
+            </div>
+            <div class="progress-text">
+              <span id="results-percentage">0</span>%
+            </div>
+          </div>
+
+          <div class="results-message" id="results-message">
+            <div class="results-status" id="results-status"></div>
+            <p class="results-description" id="results-description"></p>
+          </div>
+
+          <div class="results-stats">
+            <div class="stat-row">
+              <span class="stat-label">Questions Answered:</span>
+              <span class="stat-value">${totalMCQ}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Passing Score:</span>
+              <span class="stat-value">${passThreshold}%</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      pages.push({
+        title: "Assessment Results",
+        content: "",
+        htmlContent: resultsHtml,
         images: [],
         speaker: "",
         pageNumber: assessmentPageNum++,
@@ -694,6 +742,160 @@ export function generateFlipbookHTML(
       line-height: 1.6;
       text-align: left;
     }
+
+    .mcq-score-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      background: #3b82f6;
+      color: white;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    .mcq-score-badge.perfect {
+      background: #10b981;
+    }
+
+    .mcq-score-badge.partial {
+      background: #f59e0b;
+    }
+
+    .results-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 32px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .results-score {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .results-number {
+      font-size: 64px;
+      font-weight: 800;
+      color: #0f172a;
+      line-height: 1;
+    }
+
+    .results-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .results-progress {
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .progress-bar-bg {
+      width: 100%;
+      height: 12px;
+      background: #e2e8f0;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6 0%, #667eea 100%);
+      border-radius: 6px;
+      transition: width 0.8s ease-out;
+    }
+
+    .progress-text {
+      font-size: 18px;
+      font-weight: 700;
+      color: #1f2937;
+    }
+
+    .results-message {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      padding: 20px;
+      border-radius: 12px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .results-message.passed {
+      background: #ecfdf5;
+      border: 2px solid #10b981;
+    }
+
+    .results-message.failed {
+      background: #fef2f2;
+      border: 2px solid #ef4444;
+    }
+
+    .results-status {
+      font-size: 24px;
+      font-weight: 700;
+    }
+
+    .results-message.passed .results-status {
+      color: #065f46;
+    }
+
+    .results-message.failed .results-status {
+      color: #991b1b;
+    }
+
+    .results-description {
+      font-size: 14px;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .results-message.passed .results-description {
+      color: #047857;
+    }
+
+    .results-message.failed .results-description {
+      color: #7f1d1d;
+    }
+
+    .results-stats {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      padding: 16px;
+      background: #f8fafc;
+      border-radius: 8px;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .stat-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .stat-label {
+      font-weight: 600;
+      color: #475569;
+    }
+
+    .stat-value {
+      font-weight: 700;
+      color: #0f172a;
+    }
   </style>
 </head>
 <body>
@@ -712,6 +914,7 @@ export function generateFlipbookHTML(
       <button class="btn btn-primary" id="prevBtn">&larr; Previous</button>
       <div class="page-info">
         Page <span id="currentPage">1</span> of <span id="totalPages">${pages.length}</span>
+        ${assessmentData && assessmentData.mcq && assessmentData.mcq.length > 0 ? `<span class="mcq-score-badge" id="mcq-score-display">0/${assessmentData.mcq.length}</span>` : ''}
       </div>
       <button class="btn btn-primary" id="nextBtn">Next &rarr;</button>
       <button class="btn btn-secondary" id="fullscreenBtn">Fullscreen</button>
@@ -723,11 +926,33 @@ export function generateFlipbookHTML(
   <script src="https://cdn.jsdelivr.net/npm/page-flip@2.0.7/dist/js/page-flip.browser.js"><\/script>
 
   <script>
+    // MCQ Score Tracking
+    window.__mcqScore = { correct: 0, total: 0 };
+
+    function updateScoreDisplay() {
+      var scoreEl = document.getElementById('mcq-score-display');
+      if (scoreEl) {
+        scoreEl.textContent = window.__mcqScore.correct + '/' + window.__mcqScore.total;
+      }
+      // Also persist to session storage
+      sessionStorage.setItem('mcqScore', JSON.stringify(window.__mcqScore));
+      // Update results page if visible
+      updateResultsPage(${passThreshold});
+    }
+
     window.__mcqAnswer = function(btn) {
       var container = btn.parentElement;
       if (!container || container.dataset.locked === '1') return;
       container.dataset.locked = '1';
       var isCorrect = btn.getAttribute('data-correct') === '1';
+
+      // Update score
+      window.__mcqScore.total += 1;
+      if (isCorrect) {
+        window.__mcqScore.correct += 1;
+      }
+      updateScoreDisplay();
+
       btn.classList.add(isCorrect ? 'correct' : 'incorrect');
       Array.prototype.forEach.call(container.querySelectorAll('.mcq-option'), function(o){
         o.classList.add('answered');
@@ -743,6 +968,71 @@ export function generateFlipbookHTML(
           : 'Incorrect. Correct answer: ' + (feedback.getAttribute('data-correct-text') || '');
       }
     };
+
+    // Update results page with score
+    function updateResultsPage(passThreshold) {
+      var totalCorrect = window.__mcqScore.correct;
+      var totalQuestions = window.__mcqScore.total;
+      if (totalQuestions === 0) return;
+
+      var percentage = Math.round((totalCorrect / totalQuestions) * 100);
+      var passed = percentage >= passThreshold;
+
+      // Update score number
+      var scoreNumber = document.getElementById('results-score-number');
+      if (scoreNumber) {
+        scoreNumber.textContent = totalCorrect + '/' + totalQuestions;
+      }
+
+      // Update progress bar
+      var progressFill = document.getElementById('results-progress-fill');
+      if (progressFill) {
+        setTimeout(function() {
+          progressFill.style.width = percentage + '%';
+        }, 100);
+      }
+
+      // Update percentage
+      var percentageEl = document.getElementById('results-percentage');
+      if (percentageEl) {
+        percentageEl.textContent = percentage;
+      }
+
+      // Update message
+      var messageEl = document.getElementById('results-message');
+      if (messageEl) {
+        messageEl.classList.add(passed ? 'passed' : 'failed');
+
+        var statusEl = document.getElementById('results-status');
+        if (statusEl) {
+          statusEl.textContent = passed ? '✓ Passed' : '✗ Did Not Pass';
+        }
+
+        var descEl = document.getElementById('results-description');
+        if (descEl) {
+          if (passed) {
+            descEl.textContent = 'Congratulations! You achieved ' + percentage + '% and passed the assessment.';
+          } else {
+            var needed = passThreshold - percentage;
+            descEl.textContent = 'You scored ' + percentage + '%. You need ' + needed + '% more to pass.';
+          }
+        }
+      }
+    }
+
+    // Restore MCQ score from session storage
+    function restoreMCQScore() {
+      var stored = sessionStorage.getItem('mcqScore');
+      if (stored) {
+        try {
+          window.__mcqScore = JSON.parse(stored);
+          updateScoreDisplay();
+          updateResultsPage(${passThreshold});
+        } catch (e) {
+          console.warn('Could not restore MCQ score:', e);
+        }
+      }
+    }
 
     // Save and restore reflection exercise responses
     window.__reflectionResponses = {};
@@ -890,7 +1180,8 @@ export function generateFlipbookHTML(
         // Initialize page info
         updatePageInfo();
 
-        // Restore reflection responses
+        // Restore MCQ score and reflection responses
+        restoreMCQScore();
         restoreReflectionResponses();
 
       } catch (err) {
@@ -938,7 +1229,8 @@ export function generateFlipbookHTML(
 
         showPage(0);
 
-        // Restore reflection responses
+        // Restore MCQ score and reflection responses
+        restoreMCQScore();
         restoreReflectionResponses();
       }
     });
