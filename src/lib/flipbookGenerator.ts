@@ -147,15 +147,24 @@ export function generateFlipbookHTML(
   }
 
   // Convert narratives to flipbook pages with narration support
+  let firstImageSkipped = false;
   const contentPages = narratives.flatMap((narrative, topicIdx) =>
-    narrative.scenes.map((scene, sceneIdx) => ({
-      title: scene.title,
-      content: scene.caption || "",
-      images: scene.imageDataUrl ? [scene.imageDataUrl] : [],
-      speaker: voiceoverEnabled && scene.narration ? scene.narration : "",
-      audioDataUrl: voiceoverEnabled && scene.audioDataUrl ? scene.audioDataUrl : undefined,
-      pageNumber: (topicIdx + 1) * 10 + sceneIdx + 2,
-    }))
+    narrative.scenes.map((scene, sceneIdx) => {
+      // Skip the very first scene's image because we already show it on the cover
+      let images: string[] = scene.imageDataUrl ? [scene.imageDataUrl] : [];
+      if (!firstImageSkipped && scene.imageDataUrl && scene.imageDataUrl === firstSceneImage) {
+        images = [];
+        firstImageSkipped = true;
+      }
+      return {
+        title: scene.title,
+        content: scene.caption || "",
+        images,
+        speaker: voiceoverEnabled && scene.narration ? scene.narration : "",
+        audioDataUrl: voiceoverEnabled && scene.audioDataUrl ? scene.audioDataUrl : undefined,
+        pageNumber: (topicIdx + 1) * 10 + sceneIdx + 2,
+      };
+    })
   );
 
   pages.push(...contentPages);
