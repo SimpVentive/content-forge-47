@@ -133,6 +133,18 @@ export function generateFlipbookHTML(
             ${assessmentItems.length ? `<ul class="overview-list">${assessmentItems.map(a => `<li>${escapeHtml(a)}</li>`).join("")}</ul>` : `<div class="overview-lead">${escapeHtml(assessmentDetails)}</div>`}
           </div>
         </div>
+        ${voiceoverEnabled ? `
+        <div class="overview-row">
+          <div class="overview-label">Audio Narration:</div>
+          <div class="overview-value">
+            <div class="overview-lead">Choose whether narration audio plays automatically throughout the course. Your choice will apply to every slide.</div>
+            <div class="audio-toggle-group" role="radiogroup" aria-label="Audio narration">
+              <button type="button" class="audio-toggle-btn active" data-audio-toggle="on" onclick="window.__setAudioEnabled&&window.__setAudioEnabled(true)">🔊 Audio On</button>
+              <button type="button" class="audio-toggle-btn" data-audio-toggle="off" onclick="window.__setAudioEnabled&&window.__setAudioEnabled(false)">🔇 Audio Off</button>
+            </div>
+          </div>
+        </div>
+        ` : ""}
       </div>
     `;
 
