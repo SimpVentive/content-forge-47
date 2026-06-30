@@ -83,16 +83,57 @@ export function generateFlipbookHTML(
       assessmentDetails += " comprehensive assessment questions";
     }
 
+    const objectives = narratives
+      .map(n => (n.topicObjective || "").trim())
+      .filter(Boolean)
+      .slice(0, 6);
+    const topicTitles = narratives.map(n => n.topicTitle).filter(Boolean);
+
+    const assessmentItems: string[] = [];
+    if (assessmentData) {
+      const mcqCount = (assessmentData.mcq || []).length;
+      const scenarioCount = (assessmentData.scenarios || []).length;
+      const hasReflection = !!assessmentData.reflection;
+      if (mcqCount > 0) assessmentItems.push(`${mcqCount} Multiple Choice Question${mcqCount > 1 ? "s" : ""}`);
+      if (scenarioCount > 0) assessmentItems.push(`${scenarioCount} Scenario-based Question${scenarioCount > 1 ? "s" : ""}`);
+      if (hasReflection) assessmentItems.push(`1 Reflection Exercise`);
+    }
+
+    const overviewHtml = `
+      <div class="overview-block">
+        <div class="overview-row">
+          <div class="overview-label">Course Objective:</div>
+          <div class="overview-value">
+            <div class="overview-lead">The following are the objectives of this course</div>
+            <ul class="overview-list">
+              ${(objectives.length ? objectives : ["Master key concepts"]).map(o => `<li>${escapeHtml(o)}</li>`).join("")}
+            </ul>
+          </div>
+        </div>
+        <div class="overview-row">
+          <div class="overview-label">Course Content:</div>
+          <div class="overview-value">
+            <div class="overview-lead">The course will cover the following topics</div>
+            <ul class="overview-list">
+              ${topicTitles.map(t => `<li>${escapeHtml(t)}</li>`).join("")}
+            </ul>
+            <div class="overview-meta">Duration: Approximately ${estimatedMinutes} minutes</div>
+          </div>
+        </div>
+        <div class="overview-row">
+          <div class="overview-label">Assessment:</div>
+          <div class="overview-value">
+            <div class="overview-lead">Following are the assessments mapped to this course. You will have to successfully complete them to complete the course</div>
+            ${assessmentItems.length ? `<ul class="overview-list">${assessmentItems.map(a => `<li>${escapeHtml(a)}</li>`).join("")}</ul>` : `<div class="overview-lead">${escapeHtml(assessmentDetails)}</div>`}
+          </div>
+        </div>
+      </div>
+    `;
+
     pages.push({
       title: "Course Overview",
-      content: `Course Objective: ${narratives.map(n => n.topicObjective || "Master key concepts").slice(0, 3).join(" ")}
-
-Course Content:
-${topicsList}
-
-Duration: Approximately ${estimatedMinutes} minutes
-
-${assessmentDetails}`,
+      content: "",
+      htmlContent: overviewHtml,
       images: [],
       speaker: "",
       pageNumber: 1,
