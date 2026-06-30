@@ -1195,9 +1195,8 @@ export function generateFlipbookHTML(
 
         // Stop all audio playback and reset audio elements (fallback version)
         function stopAllAudioFallback() {
-          const audioElements = document.querySelectorAll('.audio-player');
-          audioElements.forEach(audio => {
-            const audioEl = audio as HTMLAudioElement;
+          var audioElements = document.querySelectorAll('.audio-player');
+          audioElements.forEach(function (audioEl) {
             audioEl.pause();
             audioEl.currentTime = 0;
             audioEl.load();
