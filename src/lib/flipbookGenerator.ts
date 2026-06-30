@@ -43,12 +43,17 @@ export function generateFlipbookHTML(
     }
   }
 
-  // Add a title page at the beginning
+  // Pick the first available scene image to use as the cover hero image
+  const firstSceneImage = narratives
+    .flatMap((n) => n.scenes)
+    .find((s) => !!s.imageDataUrl)?.imageDataUrl;
+
+  // Add a title page at the beginning (with a relevant hero image)
   const pages: FlipbookPage[] = [
     {
       title: courseTitle,
       content: "Professional Learning Guide",
-      images: [],
+      images: firstSceneImage ? [firstSceneImage] : [],
       speaker: "",
       pageNumber: 0,
     },
