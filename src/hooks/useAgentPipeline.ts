@@ -770,7 +770,7 @@ export function useAgentPipeline() {
     }
   };
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; avatarTrainerId?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3 | 4 | 5; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; avatarTrainerId?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
     cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
@@ -1897,6 +1897,16 @@ OUTPUT FORMAT — ABSOLUTE:
           }));
           setOutputData((prev) => ({ ...prev, package: assemblyResult, outputFormat: outputFormat }));
           addLog(`Final Assembly: Complete. Output format: ${outputFormat.toUpperCase()}`);
+
+          // Ask user if they want final QA check (image-based learning branch)
+          if (toggles["final-qa"] !== false) {
+            addLog("Final QA Agent: Output generated. Awaiting user decision on final quality check...");
+            pipelineContextRef.current = { courseTitle, inputText, params };
+            setShowQAConfirmation(true);
+            return;
+          } else {
+            setStatus("final-qa", "idle");
+          }
           addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
         } else {
         const modeInstructions = getAgentModeInstructions("assembly", learningMode);

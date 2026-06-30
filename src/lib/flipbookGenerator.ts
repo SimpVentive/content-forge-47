@@ -1158,20 +1158,34 @@ export function generateFlipbookHTML(
         const fullscreenBtn = document.getElementById('fullscreenBtn');
         if (fullscreenBtn) {
           fullscreenBtn.addEventListener('click', () => {
-            const elem = document.getElementById('flipbook-container') || document.getElementById('flipbook');
-            if (!elem) return;
-
-            const requestFullscreen = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
-            if (requestFullscreen) {
-              requestFullscreen.call(elem).catch((err) => {
-                console.warn('Fullscreen unavailable:', err.message);
-                alert('Fullscreen is not available in your browser.');
-              });
-            } else {
-              alert('Fullscreen is not supported by your browser.');
+            try {
+              const docAny = document;
+              const isFs = docAny.fullscreenElement || docAny.webkitFullscreenElement || docAny.mozFullScreenElement || docAny.msFullscreenElement;
+              if (isFs) {
+                const exit = docAny.exitFullscreen || docAny.webkitExitFullscreen || docAny.mozCancelFullScreen || docAny.msExitFullscreen;
+                if (exit) exit.call(docAny);
+                return;
+              }
+              const elem = document.getElementById('flipbook-container') || document.getElementById('flipbook') || document.documentElement;
+              const req = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
+              if (!req) {
+                alert('Fullscreen is not supported by your browser.');
+                return;
+              }
+              const result = req.call(elem);
+              if (result && typeof result.catch === 'function') {
+                result.catch((err) => {
+                  console.warn('Fullscreen request rejected:', err && err.message);
+                  alert('Fullscreen was blocked. Open this file directly (not inside an iframe) and try again.');
+                });
+              }
+            } catch (err) {
+              console.error('Fullscreen error:', err);
+              alert('Fullscreen failed: ' + (err && err.message ? err.message : 'unknown error'));
             }
           });
         }
+
 
         // Print
         document.getElementById('printBtn').addEventListener('click', () => {
