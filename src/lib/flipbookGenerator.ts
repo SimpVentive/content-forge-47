@@ -137,7 +137,7 @@ ${assessmentDetails}`,
           <div class="mcq-feedback" data-correct-text="${escapeHtml(correctRaw)}"></div>
         `;
         pages.push({
-          title: `Q${qIdx + 1} - ${(questionText || "Question").substring(0, 60)}`,
+          title: `Q${qIdx + 1}`,
           content: "",
           htmlContent: html,
           images: [],
@@ -149,7 +149,7 @@ ${assessmentDetails}`,
 
     // Add scenario questions
     if (Array.isArray(assessmentData.scenarios)) {
-      assessmentData.scenarios.slice(0, 5).forEach((s: any) => {
+      assessmentData.scenarios.slice(0, 5).forEach((s: any, sIdx: number) => {
         const situation = s.situation || "";
         const correctRaw = String(s.best_response || "").trim();
         const stripPrefix = (str: string) => str.replace(/^\s*[A-Da-d][\.\)]\s*/, "").replace(/^\s*[-•]\s*/, "").trim();
@@ -167,7 +167,7 @@ ${assessmentDetails}`,
           <div class="mcq-feedback" data-correct-text="${escapeHtml(correctRaw)}"></div>
         `;
         pages.push({
-          title: `Scenario - ${(situation || "Scenario").substring(0, 60)}`,
+          title: `Scenario ${sIdx + 1}`,
           content: "",
           htmlContent: html,
           images: [],
@@ -179,9 +179,22 @@ ${assessmentDetails}`,
 
     // Add reflection exercise
     if (assessmentData.reflection) {
+      const reflectionHtml = `
+        <div class="reflection-prompt">
+          ${escapeHtml(assessmentData.reflection.prompt || "")}
+        </div>
+        <textarea class="reflection-input" placeholder="Type your response here..."></textarea>
+        ${assessmentData.reflection.guidance ? `
+        <div class="reflection-guidance">
+          <div class="reflection-guidance-label">Guidance:</div>
+          <div class="reflection-guidance-text">${escapeHtml(assessmentData.reflection.guidance)}</div>
+        </div>
+        ` : ""}
+      `;
       pages.push({
         title: "Reflection Exercise",
-        content: `Prompt: ${assessmentData.reflection.prompt || ""}\n\nGuidance: ${assessmentData.reflection.guidance || ""}`,
+        content: "",
+        htmlContent: reflectionHtml,
         images: [],
         speaker: "",
         pageNumber: assessmentPageNum++,
@@ -196,10 +209,6 @@ ${assessmentDetails}`,
       <div class="page-inner">
         ${companyLogoDataUrl && idx === 0 ? `<img src="${companyLogoDataUrl}" alt="Company logo" class="logo-first-page" />` : ""}
         ${page.title ? `<h1 class="page-title">${escapeHtml(page.title)}</h1>` : ""}
-        <div class="page-content">
-          ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
-          ${page.htmlContent ? `<div class="page-text page-text-html">${page.htmlContent}</div>` : (page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : "")}
-        </div>
         ${voiceoverEnabled && page.speaker ? `
         <div class="page-narration-section">
           ${page.audioDataUrl ? `
@@ -214,10 +223,11 @@ ${assessmentDetails}`,
           <div class="narration-text">${escapeHtml(page.speaker)}</div>
         </div>
         ` : ""}
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-          <div class="page-number">Page ${page.pageNumber}</div>
-          ${companyLogoDataUrl && idx > 0 ? `<img src="${companyLogoDataUrl}" alt="Company logo" class="logo-footer" />` : ""}
+        <div class="page-content">
+          ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
+          ${page.htmlContent ? `<div class="page-text page-text-html">${page.htmlContent}</div>` : (page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : "")}
         </div>
+        ${companyLogoDataUrl && idx > 0 ? `<div style="margin-top: 10px;"><img src="${companyLogoDataUrl}" alt="Company logo" class="logo-footer" /></div>` : ""}
       </div>
     </div>
   `
@@ -355,14 +365,6 @@ ${assessmentDetails}`,
       font-weight: 500;
     }
 
-    .page-number {
-      font-size: 11px;
-      color: #aaa;
-      text-align: center;
-      margin-top: 10px;
-      flex-shrink: 0;
-    }
-
     .logo-first-page {
       width: 180px;
       height: 180px;
@@ -382,7 +384,8 @@ ${assessmentDetails}`,
     }
 
     .page-narration-section {
-      margin-top: 15px;
+      margin-top: 12px;
+      margin-bottom: 16px;
       padding: 12px;
       background: #f0f4ff;
       border-left: 4px solid #667eea;
@@ -585,6 +588,60 @@ ${assessmentDetails}`,
     .mcq-feedback { margin-top: 14px; font-size: 14px; font-weight: 600; }
     .mcq-feedback.correct { color: #065f46; }
     .mcq-feedback.incorrect { color: #991b1b; }
+
+    .reflection-prompt {
+      font-size: 16px;
+      font-weight: 600;
+      color: #0f172a;
+      margin-bottom: 20px;
+      line-height: 1.6;
+      text-align: left;
+    }
+
+    .reflection-input {
+      width: 100%;
+      min-height: 160px;
+      padding: 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      color: #0f172a;
+      line-height: 1.5;
+      box-sizing: border-box;
+      margin-bottom: 20px;
+    }
+
+    .reflection-input:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .reflection-guidance {
+      padding: 14px;
+      background: #f8fafc;
+      border-left: 4px solid #94a3b8;
+      border-radius: 4px;
+      margin-top: 16px;
+    }
+
+    .reflection-guidance-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .reflection-guidance-text {
+      font-size: 14px;
+      color: #334155;
+      line-height: 1.6;
+      text-align: left;
+    }
   </style>
 </head>
 <body>
@@ -634,6 +691,36 @@ ${assessmentDetails}`,
           : 'Incorrect. Correct answer: ' + (feedback.getAttribute('data-correct-text') || '');
       }
     };
+
+    // Save and restore reflection exercise responses
+    window.__reflectionResponses = {};
+
+    function saveReflectionResponses() {
+      var textareas = document.querySelectorAll('.reflection-input');
+      textareas.forEach(function(textarea, idx) {
+        window.__reflectionResponses['reflection_' + idx] = textarea.value;
+      });
+      sessionStorage.setItem('reflectionResponses', JSON.stringify(window.__reflectionResponses));
+    }
+
+    function restoreReflectionResponses() {
+      var stored = sessionStorage.getItem('reflectionResponses');
+      if (stored) {
+        window.__reflectionResponses = JSON.parse(stored);
+        var textareas = document.querySelectorAll('.reflection-input');
+        textareas.forEach(function(textarea, idx) {
+          var saved = window.__reflectionResponses['reflection_' + idx];
+          if (saved) textarea.value = saved;
+        });
+      }
+    }
+
+    // Save on input
+    document.addEventListener('input', function(e) {
+      if (e.target.classList.contains('reflection-input')) {
+        saveReflectionResponses();
+      }
+    });
   </script>
   <script>
     let pageFlip = null;
@@ -675,6 +762,17 @@ ${assessmentDetails}`,
         const pageElements = document.querySelectorAll('#flipbook .page');
         pageFlip.loadFromElements(Array.from(pageElements));
 
+        // Stop all audio playback and reset audio elements
+        function stopAllAudio() {
+          const audioElements = document.querySelectorAll('.audio-player');
+          audioElements.forEach(audio => {
+            const audioEl = audio as HTMLAudioElement;
+            audioEl.pause();
+            audioEl.currentTime = 0;
+            audioEl.load();
+          });
+        }
+
         // Update page counter
         function updatePageInfo() {
           const currentPageNum = pageFlip.getCurrentPageIndex() + 1;
@@ -686,12 +784,14 @@ ${assessmentDetails}`,
         // Button events
         document.getElementById('prevBtn').addEventListener('click', () => {
           if (pageFlip.getCurrentPageIndex() > 0) {
+            stopAllAudio();
             pageFlip.flipPrev('top');
           }
         });
 
         document.getElementById('nextBtn').addEventListener('click', () => {
           if (pageFlip.getCurrentPageIndex() < totalPages - 1) {
+            stopAllAudio();
             pageFlip.flipNext('top');
           }
         });
@@ -705,8 +805,11 @@ ${assessmentDetails}`,
           }
         });
 
-        // Update page info on flip
-        pageFlip.on('flip', updatePageInfo);
+        // Update page info on flip and stop audio
+        pageFlip.on('flip', () => {
+          stopAllAudio();
+          updatePageInfo();
+        });
 
         // Fullscreen
         const fullscreenBtn = document.getElementById('fullscreenBtn');
@@ -735,6 +838,9 @@ ${assessmentDetails}`,
         // Initialize page info
         updatePageInfo();
 
+        // Restore reflection responses
+        restoreReflectionResponses();
+
       } catch (err) {
         console.error('StPageFlip initialization error:', err);
         console.log('Falling back to basic navigation...');
@@ -743,7 +849,19 @@ ${assessmentDetails}`,
         let currentPage = 0;
         const pages = document.querySelectorAll('#flipbook .page');
 
+        // Stop all audio playback and reset audio elements (fallback version)
+        function stopAllAudioFallback() {
+          const audioElements = document.querySelectorAll('.audio-player');
+          audioElements.forEach(audio => {
+            const audioEl = audio as HTMLAudioElement;
+            audioEl.pause();
+            audioEl.currentTime = 0;
+            audioEl.load();
+          });
+        }
+
         function showPage(idx) {
+          stopAllAudioFallback();
           pages.forEach(p => p.style.display = 'none');
           if (pages[idx]) {
             pages[idx].style.display = 'flex';
@@ -767,6 +885,9 @@ ${assessmentDetails}`,
         });
 
         showPage(0);
+
+        // Restore reflection responses
+        restoreReflectionResponses();
       }
     });
   </script>
