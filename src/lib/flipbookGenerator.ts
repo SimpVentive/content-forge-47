@@ -1065,13 +1065,15 @@ export function generateFlipbookHTML(
     });
   </script>
   <script>
-    let pageFlip = null;
-    const totalPages = ${pages.length};
+    var pageFlip = null;
+    var totalPages = ${pages.length};
 
     // Initialize StPageFlip after DOM and library are ready
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', function () {
       try {
-        pageFlip = new pageFlip.PageFlip(
+        var PageFlipCtor = (window.St && window.St.PageFlip) || (window.pageFlip && window.pageFlip.PageFlip) || window.PageFlip;
+        if (!PageFlipCtor) { throw new Error('PageFlip library not loaded'); }
+        pageFlip = new PageFlipCtor(
           document.getElementById('flipbook'),
           {
             width: 600,
@@ -1101,14 +1103,13 @@ export function generateFlipbookHTML(
         );
 
         // Add pages to the flipbook
-        const pageElements = document.querySelectorAll('#flipbook .page');
+        var pageElements = document.querySelectorAll('#flipbook .page');
         pageFlip.loadFromElements(Array.from(pageElements));
 
         // Stop all audio playback and reset audio elements
         function stopAllAudio() {
-          const audioElements = document.querySelectorAll('.audio-player');
-          audioElements.forEach(audio => {
-            const audioEl = audio as HTMLAudioElement;
+          var audioElements = document.querySelectorAll('.audio-player');
+          audioElements.forEach(function (audioEl) {
             audioEl.pause();
             audioEl.currentTime = 0;
             audioEl.load();
@@ -1194,9 +1195,8 @@ export function generateFlipbookHTML(
 
         // Stop all audio playback and reset audio elements (fallback version)
         function stopAllAudioFallback() {
-          const audioElements = document.querySelectorAll('.audio-player');
-          audioElements.forEach(audio => {
-            const audioEl = audio as HTMLAudioElement;
+          var audioElements = document.querySelectorAll('.audio-player');
+          audioElements.forEach(function (audioEl) {
             audioEl.pause();
             audioEl.currentTime = 0;
             audioEl.load();
