@@ -964,7 +964,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                 <p className="text-[11px] text-muted-foreground mt-1">Display text beneath images</p>
               </div>
               <button
-                onClick={() => setShowCaption(!captionsEnabled)}
+                onClick={() => setCaptionsEnabled(!captionsEnabled)}
                 className={`w-12 h-6 rounded-full transition-all duration-200 ease-in-out relative ${
                   captionsEnabled ? "bg-[#34D399]" : "bg-[#D1D5DB]"
                 }`}
