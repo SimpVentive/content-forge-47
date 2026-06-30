@@ -538,6 +538,30 @@ export function generateFlipbookHTML(
       font-style: italic;
     }
 
+    .audio-toggle-group {
+      display: inline-flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .audio-toggle-btn {
+      padding: 10px 20px;
+      border: 2px solid #cbd5e1;
+      background: #fff;
+      color: #334155;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .audio-toggle-btn:hover { border-color: #667eea; color: #667eea; }
+    .audio-toggle-btn.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+
     .flipbook-controls {
       background: white;
       padding: 20px;
