@@ -1156,6 +1156,36 @@ export function generateFlipbookHTML(
         var pageElements = document.querySelectorAll('#flipbook .page');
         pageFlip.loadFromElements(Array.from(pageElements));
 
+        // Global audio-enabled flag, persisted via localStorage. Default: ON.
+        try {
+          var stored = localStorage.getItem('flipbookAudioEnabled');
+          window.__audioEnabled = stored === null ? true : stored === 'true';
+        } catch (e) { window.__audioEnabled = true; }
+
+        function applyAudioVisibility() {
+          var sections = document.querySelectorAll('.audio-player-container');
+          sections.forEach(function (sec) {
+            sec.style.display = window.__audioEnabled ? '' : 'none';
+          });
+          var btns = document.querySelectorAll('[data-audio-toggle]');
+          btns.forEach(function (b) {
+            var on = b.getAttribute('data-audio-toggle') === 'on';
+            if ((on && window.__audioEnabled) || (!on && !window.__audioEnabled)) {
+              b.classList.add('active');
+            } else {
+              b.classList.remove('active');
+            }
+          });
+        }
+
+        window.__setAudioEnabled = function (enabled) {
+          window.__audioEnabled = !!enabled;
+          try { localStorage.setItem('flipbookAudioEnabled', String(window.__audioEnabled)); } catch (e) {}
+          applyAudioVisibility();
+          if (!window.__audioEnabled) stopAllAudio();
+          else playCurrentPageAudio();
+        };
+
         // Stop all audio playback and reset audio elements
         function stopAllAudio() {
           var audioElements = document.querySelectorAll('.audio-player');
@@ -1165,6 +1195,25 @@ export function generateFlipbookHTML(
             audioEl.load();
           });
         }
+
+        // Auto-play the current visible page's audio (if any) when audio is enabled
+        function playCurrentPageAudio() {
+          if (!window.__audioEnabled) return;
+          try {
+            var idx = pageFlip.getCurrentPageIndex();
+            var pageEls = document.querySelectorAll('#flipbook .page');
+            var cur = pageEls[idx];
+            if (!cur) return;
+            var audio = cur.querySelector('.audio-player');
+            if (audio) {
+              audio.currentTime = 0;
+              var p = audio.play();
+              if (p && typeof p.catch === 'function') p.catch(function () {});
+            }
+          } catch (e) {}
+        }
+
+        applyAudioVisibility();
 
         // Update page counter
         function updatePageInfo() {
