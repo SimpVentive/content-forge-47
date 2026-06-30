@@ -572,6 +572,17 @@ export function generateFlipbookHTML(
       }
     }
     .page-text-html { text-align: left; }
+    .overview-block { display: flex; flex-direction: column; gap: 28px; padding: 8px 12px; }
+    .overview-row { display: grid; grid-template-columns: 180px 1fr; gap: 24px; align-items: start; }
+    .overview-label { font-size: 15px; font-weight: 700; color: #0f172a; padding-top: 2px; }
+    .overview-value { font-size: 15px; color: #1f2937; line-height: 1.55; }
+    .overview-lead { margin-bottom: 8px; }
+    .overview-list { list-style: disc; padding-left: 22px; margin: 6px 0 0; }
+    .overview-list li { margin: 4px 0; }
+    .overview-meta { margin-top: 10px; font-style: italic; color: #475569; }
+    @media (max-width: 640px) {
+      .overview-row { grid-template-columns: 1fr; gap: 6px; }
+    }
     .mcq-question {
       font-size: 17px;
       font-weight: 700;
