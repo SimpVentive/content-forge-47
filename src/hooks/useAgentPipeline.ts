@@ -1897,6 +1897,16 @@ OUTPUT FORMAT — ABSOLUTE:
           }));
           setOutputData((prev) => ({ ...prev, package: assemblyResult, outputFormat: outputFormat }));
           addLog(`Final Assembly: Complete. Output format: ${outputFormat.toUpperCase()}`);
+
+          // Ask user if they want final QA check (image-based learning branch)
+          if (toggles["final-qa"] !== false) {
+            addLog("Final QA Agent: Output generated. Awaiting user decision on final quality check...");
+            pipelineContextRef.current = { courseTitle, inputText, params };
+            setShowQAConfirmation(true);
+            return;
+          } else {
+            setStatus("final-qa", "idle");
+          }
           addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
         } else {
         const modeInstructions = getAgentModeInstructions("assembly", learningMode);
