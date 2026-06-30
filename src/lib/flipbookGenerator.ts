@@ -43,12 +43,17 @@ export function generateFlipbookHTML(
     }
   }
 
-  // Add a title page at the beginning
+  // Pick the first available scene image to use as the cover hero image
+  const firstSceneImage = narratives
+    .flatMap((n) => n.scenes)
+    .find((s) => !!s.imageDataUrl)?.imageDataUrl;
+
+  // Add a title page at the beginning (with a relevant hero image)
   const pages: FlipbookPage[] = [
     {
       title: courseTitle,
       content: "Professional Learning Guide",
-      images: [],
+      images: firstSceneImage ? [firstSceneImage] : [],
       speaker: "",
       pageNumber: 0,
     },
@@ -128,6 +133,18 @@ export function generateFlipbookHTML(
             ${assessmentItems.length ? `<ul class="overview-list">${assessmentItems.map(a => `<li>${escapeHtml(a)}</li>`).join("")}</ul>` : `<div class="overview-lead">${escapeHtml(assessmentDetails)}</div>`}
           </div>
         </div>
+        ${voiceoverEnabled ? `
+        <div class="overview-row">
+          <div class="overview-label">Audio Narration:</div>
+          <div class="overview-value">
+            <div class="overview-lead">Choose whether narration audio plays automatically throughout the course. Your choice will apply to every slide.</div>
+            <div class="audio-toggle-group" role="radiogroup" aria-label="Audio narration">
+              <button type="button" class="audio-toggle-btn active" data-audio-toggle="on" onclick="window.__setAudioEnabled&&window.__setAudioEnabled(true)">🔊 Audio On</button>
+              <button type="button" class="audio-toggle-btn" data-audio-toggle="off" onclick="window.__setAudioEnabled&&window.__setAudioEnabled(false)">🔇 Audio Off</button>
+            </div>
+          </div>
+        </div>
+        ` : ""}
       </div>
     `;
 
@@ -142,15 +159,24 @@ export function generateFlipbookHTML(
   }
 
   // Convert narratives to flipbook pages with narration support
+  let firstImageSkipped = false;
   const contentPages = narratives.flatMap((narrative, topicIdx) =>
-    narrative.scenes.map((scene, sceneIdx) => ({
-      title: scene.title,
-      content: scene.caption || "",
-      images: scene.imageDataUrl ? [scene.imageDataUrl] : [],
-      speaker: voiceoverEnabled && scene.narration ? scene.narration : "",
-      audioDataUrl: voiceoverEnabled && scene.audioDataUrl ? scene.audioDataUrl : undefined,
-      pageNumber: (topicIdx + 1) * 10 + sceneIdx + 2,
-    }))
+    narrative.scenes.map((scene, sceneIdx) => {
+      // Skip the very first scene's image because we already show it on the cover
+      let images: string[] = scene.imageDataUrl ? [scene.imageDataUrl] : [];
+      if (!firstImageSkipped && scene.imageDataUrl && scene.imageDataUrl === firstSceneImage) {
+        images = [];
+        firstImageSkipped = true;
+      }
+      return {
+        title: scene.title,
+        content: scene.caption || "",
+        images,
+        speaker: voiceoverEnabled && scene.narration ? scene.narration : "",
+        audioDataUrl: voiceoverEnabled && scene.audioDataUrl ? scene.audioDataUrl : undefined,
+        pageNumber: (topicIdx + 1) * 10 + sceneIdx + 2,
+      };
+    })
   );
 
   pages.push(...contentPages);
@@ -298,24 +324,24 @@ export function generateFlipbookHTML(
       <div class="page-inner">
         ${companyLogoDataUrl && idx === 0 ? `<img src="${companyLogoDataUrl}" alt="Company logo" class="logo-first-page" />` : ""}
         ${page.title ? `<h1 class="page-title">${escapeHtml(page.title)}</h1>` : ""}
+        <div class="page-content">
+          ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
+          ${page.htmlContent ? `<div class="page-text page-text-html">${page.htmlContent}</div>` : (page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : "")}
+        </div>
         ${voiceoverEnabled && page.speaker ? `
         <div class="page-narration-section">
+          <div class="narration-label">Narrator:</div>
+          <div class="narration-text">${escapeHtml(page.speaker)}</div>
           ${page.audioDataUrl ? `
             <div class="audio-player-container">
-              <audio class="audio-player" controls>
+              <audio class="audio-player" controls preload="metadata">
                 <source src="${page.audioDataUrl}" type="audio/mpeg">
                 Your browser does not support the audio element.
               </audio>
             </div>
           ` : ""}
-          <div class="narration-label">Narrator:</div>
-          <div class="narration-text">${escapeHtml(page.speaker)}</div>
         </div>
         ` : ""}
-        <div class="page-content">
-          ${page.images ? page.images.map((img) => `<img src="${img}" alt="Page content" class="page-image" />`).join("") : ""}
-          ${page.htmlContent ? `<div class="page-text page-text-html">${page.htmlContent}</div>` : (page.content ? `<div class="page-text">${escapeHtml(page.content)}</div>` : "")}
-        </div>
         ${companyLogoDataUrl && idx > 0 ? `<div style="margin-top: 10px;"><img src="${companyLogoDataUrl}" alt="Company logo" class="logo-footer" /></div>` : ""}
       </div>
     </div>
@@ -511,6 +537,30 @@ export function generateFlipbookHTML(
       color: #333;
       font-style: italic;
     }
+
+    .audio-toggle-group {
+      display: inline-flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+    .audio-toggle-btn {
+      padding: 10px 20px;
+      border: 2px solid #cbd5e1;
+      background: #fff;
+      color: #334155;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+    .audio-toggle-btn:hover { border-color: #667eea; color: #667eea; }
+    .audio-toggle-btn.active {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #fff;
+      border-color: transparent;
+      box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
 
     .flipbook-controls {
       background: white;
@@ -1106,6 +1156,36 @@ export function generateFlipbookHTML(
         var pageElements = document.querySelectorAll('#flipbook .page');
         pageFlip.loadFromElements(Array.from(pageElements));
 
+        // Global audio-enabled flag, persisted via localStorage. Default: ON.
+        try {
+          var stored = localStorage.getItem('flipbookAudioEnabled');
+          window.__audioEnabled = stored === null ? true : stored === 'true';
+        } catch (e) { window.__audioEnabled = true; }
+
+        function applyAudioVisibility() {
+          var sections = document.querySelectorAll('.audio-player-container');
+          sections.forEach(function (sec) {
+            sec.style.display = window.__audioEnabled ? '' : 'none';
+          });
+          var btns = document.querySelectorAll('[data-audio-toggle]');
+          btns.forEach(function (b) {
+            var on = b.getAttribute('data-audio-toggle') === 'on';
+            if ((on && window.__audioEnabled) || (!on && !window.__audioEnabled)) {
+              b.classList.add('active');
+            } else {
+              b.classList.remove('active');
+            }
+          });
+        }
+
+        window.__setAudioEnabled = function (enabled) {
+          window.__audioEnabled = !!enabled;
+          try { localStorage.setItem('flipbookAudioEnabled', String(window.__audioEnabled)); } catch (e) {}
+          applyAudioVisibility();
+          if (!window.__audioEnabled) stopAllAudio();
+          else playCurrentPageAudio();
+        };
+
         // Stop all audio playback and reset audio elements
         function stopAllAudio() {
           var audioElements = document.querySelectorAll('.audio-player');
@@ -1115,6 +1195,25 @@ export function generateFlipbookHTML(
             audioEl.load();
           });
         }
+
+        // Auto-play the current visible page's audio (if any) when audio is enabled
+        function playCurrentPageAudio() {
+          if (!window.__audioEnabled) return;
+          try {
+            var idx = pageFlip.getCurrentPageIndex();
+            var pageEls = document.querySelectorAll('#flipbook .page');
+            var cur = pageEls[idx];
+            if (!cur) return;
+            var audio = cur.querySelector('.audio-player');
+            if (audio) {
+              audio.currentTime = 0;
+              var p = audio.play();
+              if (p && typeof p.catch === 'function') p.catch(function () {});
+            }
+          } catch (e) {}
+        }
+
+        applyAudioVisibility();
 
         // Update page counter
         function updatePageInfo() {
@@ -1152,6 +1251,8 @@ export function generateFlipbookHTML(
         pageFlip.on('flip', () => {
           stopAllAudio();
           updatePageInfo();
+          // Slight delay so the page is mounted before we try to play
+          setTimeout(playCurrentPageAudio, 150);
         });
 
         // Fullscreen
