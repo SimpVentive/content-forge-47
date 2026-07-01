@@ -1134,6 +1134,7 @@ OUTPUT FORMAT — ABSOLUTE:
 
               addLog(`Visual Narrative Agent: Creating ${sceneCount}-scene narrative for "${topicTitle}"...`);
 
+              const narrationLanguage = params?.flipbookNarrationLanguage || params?.narratorLanguage || "English";
               const narrativePrompt = buildNarrativeScenePrompt(
                 topicTitle,
                 objective,
@@ -1145,8 +1146,8 @@ OUTPUT FORMAT — ABSOLUTE:
               );
 
               const narrativeResult = await runAgentWithLanguage(
-                `${languageDirective}${narrativePrompt}`,
-                `Create a ${sceneCount}-scene visual narrative for: ${topicTitle}. Make it story-like, with each scene building on the previous. Output ONLY valid JSON.`,
+                `${languageDirective}${narrativePrompt}\n\nIMPORTANT: Generate all narration text in ${narrationLanguage}, not in English. If your model has other language knowledge, use it. Otherwise use ${narrationLanguage} transliterations or phonetic equivalents.`,
+                `Create a ${sceneCount}-scene visual narrative for: ${topicTitle}. Make it story-like, with each scene building on the previous. All narration text must be in ${narrationLanguage}. Output ONLY valid JSON.`,
                 addLog,
                 "Visual Narrative Agent",
                 45000
@@ -1201,9 +1202,11 @@ OUTPUT FORMAT — ABSOLUTE:
           if (params?.flipbookVoiceoverEnabled) {
             addLog("Audio Narration: Generating audio for scene narrations...");
             const narrationLanguage = params?.flipbookNarrationLanguage || params?.narratorLanguage || "English";
-            const voiceId = getVoiceIdForLanguage(narrationLanguage);
+            const voiceId = getVoiceIdForLanguage(narrationLanguage) || "21m00Tcm4TlvDq8ikWAM"; // Fallback to Rachel for ElevenLabs
             let audioGeneratedCount = 0;
             let audioFailedCount = 0;
+
+            addLog(`Audio Narration: Using language: ${narrationLanguage}`);
 
             for (let ni = 0; ni < narrativeScenes.length; ni++) {
               if (isCancelled()) break;
@@ -1216,7 +1219,7 @@ OUTPUT FORMAT — ABSOLUTE:
                 if (scene.narration && scene.narration.trim().length > 0) {
                   try {
                     addLog(`Audio Narration: Generating audio for Scene ${si + 1} in "${narrative.topicTitle}"...`);
-                    const audioResult = await generateNarrationAudio(scene.narration, voiceId);
+                    const audioResult = await generateNarrationAudio(scene.narration, voiceId, narrationLanguage);
 
                     if (audioResult.success && audioResult.audioDataUrl) {
                       scene.audioDataUrl = audioResult.audioDataUrl;
@@ -1986,6 +1989,7 @@ ${modeInstructions}`;
     }
 
     addLog("Orchestrator: Pipeline complete.");
+    // Only mark as complete if QA was not triggered (early return above prevents reaching here)
     setIsRunning(false);
   }, [addLog, setStatus]);
 

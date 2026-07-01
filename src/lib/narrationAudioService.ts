@@ -1,6 +1,6 @@
 /**
  * Narration Audio Service
- * Generates audio from narration text using ElevenLabs TTS
+ * Generates audio from narration text using ElevenLabs (English) or Google Cloud TTS (Indian languages)
  */
 
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,8 @@ export interface AudioGenerationResult {
   audioDataUrl?: string;
   error?: string;
 }
+
+const INDIAN_LANGUAGES = ["Hindi", "Tamil", "Telugu", "Kannada", "Malayalam", "Bengali", "Marathi", "Gujarati", "Punjabi", "Urdu"];
 
 /**
  * Map voiceover pace to ElevenLabs voice settings
@@ -40,18 +42,26 @@ export function getVoiceSettingsForPace(pace: "slow" | "normal" | "fast") {
 }
 
 /**
- * Generate audio from narration text using ElevenLabs
- * Returns audio as data URL for direct HTML5 audio player playback
+ * Generate audio from narration text
+ * Uses Google Cloud TTS for Indian languages (proper pronunciation & accent)
+ * Uses ElevenLabs for English and other languages
  */
 export async function generateNarrationAudio(
   text: string,
-  voiceId: string = "21m00Tcm4TlvDq8ikWAM" // Rachel voice (default)
+  voiceId: string = "21m00Tcm4TlvDq8ikWAM", // Rachel voice (default for English)
+  language: string = "English"
 ): Promise<AudioGenerationResult> {
   try {
     if (!text || text.trim().length === 0) {
       return { success: false, error: "Empty narration text" };
     }
 
+    // Use Google Cloud TTS for Indian languages (better pronunciation & native accents)
+    if (INDIAN_LANGUAGES.includes(language)) {
+      return await generateNarrationAudioViaGoogleCloud(text.trim(), language);
+    }
+
+    // Use ElevenLabs for English and other languages
     const { data, error } = await supabase.functions.invoke("elevenlabs-tts", {
       body: {
         text: text.trim(),
@@ -97,18 +107,73 @@ export async function generateNarrationAudio(
 }
 
 /**
- * Get voice ID for a given narrator language/accent
- * Maps language to a suitable ElevenLabs voice
+ * Generate audio using Google Cloud Text-to-Speech
+ * Supports Indian languages with native accents and correct pronunciation
  */
-export function getVoiceIdForLanguage(language: string): string {
+async function generateNarrationAudioViaGoogleCloud(
+  text: string,
+  language: string
+): Promise<AudioGenerationResult> {
+  try {
+    const { data, error } = await supabase.functions.invoke("google-cloud-tts", {
+      body: {
+        text,
+        language,
+      },
+    });
+
+    if (error || !data) {
+      return {
+        success: false,
+        error: data?.error || error?.message || "Failed to generate audio via Google Cloud TTS",
+      };
+    }
+
+    if (data.error) {
+      return {
+        success: false,
+        error: data.error,
+      };
+    }
+
+    if (!data.audioBase64) {
+      return {
+        success: false,
+        error: "No audio data returned from Google Cloud TTS",
+      };
+    }
+
+    // Convert base64 to data URL for HTML5 audio player
+    const audioDataUrl = `data:audio/mpeg;base64,${data.audioBase64}`;
+
+    return {
+      success: true,
+      audioBase64: data.audioBase64,
+      audioDataUrl,
+    };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Unknown error with Google Cloud TTS",
+    };
+  }
+}
+
+/**
+ * Get voice ID for a given narrator language/accent
+ * For English & European languages: maps to ElevenLabs voice ID
+ * For Indian languages: returns null (uses Google Cloud TTS instead)
+ */
+export function getVoiceIdForLanguage(language: string): string | null {
+  // Indian languages use Google Cloud TTS, not ElevenLabs
+  if (INDIAN_LANGUAGES.includes(language)) {
+    return null; // Google Cloud TTS will handle this
+  }
+
   const languageVoiceMap: Record<string, string> = {
     // English voices
     "English": "21m00Tcm4TlvDq8ikWAM", // Rachel
     "en": "21m00Tcm4TlvDq8ikWAM",
-
-    // Hindi
-    "Hindi": "21m00Tcm4TlvDq8ikWAM", // Rachel works for Hindi too
-    "hi": "21m00Tcm4TlvDq8ikWAM",
 
     // Spanish
     "Spanish": "EXAVITQu4vr4xnSDxMaL", // Sarah
@@ -126,16 +191,15 @@ export function getVoiceIdForLanguage(language: string): string {
     "Portuguese": "21m00Tcm4TlvDq8ikWAM", // Rachel
     "pt": "21m00Tcm4TlvDq8ikWAM",
 
-    // Tamil
-    "Tamil": "21m00Tcm4TlvDq8ikWAM", // Rachel works for Tamil
-    "ta": "21m00Tcm4TlvDq8ikWAM",
-
-    // Telugu
-    "Telugu": "21m00Tcm4TlvDq8ikWAM", // Rachel works for Telugu
-    "te": "21m00Tcm4TlvDq8ikWAM",
-
     // Default
   };
 
   return languageVoiceMap[language] || "21m00Tcm4TlvDq8ikWAM"; // Default to Rachel
+}
+
+/**
+ * Check if a language is an Indian language that should use Google Cloud TTS
+ */
+export function isIndianLanguage(language: string): boolean {
+  return INDIAN_LANGUAGES.includes(language);
 }
