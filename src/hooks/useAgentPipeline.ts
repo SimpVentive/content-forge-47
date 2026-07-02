@@ -306,6 +306,167 @@ function tryParseJson(raw: string): any | null {
   }
 }
 
+type SelectedAssessmentType = "mcq" | "match-the-following" | "true-false" | "scenario" | "fill-blanks";
+
+function coerceAssessmentResult(raw: string, selectedTypes: SelectedAssessmentType[]): string {
+  const parsed = tryParseJson(raw);
+  if (!parsed || typeof parsed !== "object") return raw;
+
+  const pickArray = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = parsed[key];
+      if (Array.isArray(value)) return value;
+    }
+    return [];
+  };
+  const allQuestions = Array.isArray(parsed.questions) ? parsed.questions : [];
+  const byType = (patterns: RegExp[]) =>
+    allQuestions.filter((q: any) => patterns.some((pattern) => pattern.test(String(q?.type || q?.question_type || q?.assessment_type || ""))));
+  const stripPrefix = (value: unknown) => String(value ?? "").replace(/^\s*[A-Da-d][.)]\s*/, "").replace(/^\s*[-•]\s*/, "").trim();
+
+  const mcq = pickArray("mcq", "mcqs", "multiple_choice", "multiple_choice_questions", "multipleChoice", "multipleChoiceQuestions")
+    .concat(byType([/mcq/i, /multiple[\s_-]*choice/i]))
+    .map((q: any) => ({
+      ...q,
+      question: q?.question || q?.prompt || q?.stem || "",
+      options: Array.isArray(q?.options) ? q.options : Array.isArray(q?.choices) ? q.choices : [],
+      correct_answer: q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? q?.correct ?? "",
+    }))
+    .filter((q: any) => q.question && q.options.length > 0);
+
+  const trueFalse = pickArray("true_false", "trueFalse", "true_false_questions", "trueFalseQuestions", "tf", "true_or_false")
+    .concat(byType([/true[\s_/-]*false/i, /^tf$/i]))
+    .map((q: any) => ({
+      ...q,
+      question: q?.question || q?.prompt || q?.statement || "",
+      correct_answer: q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? q?.correct ?? false,
+    }))
+    .filter((q: any) => q.question);
+
+  const matchSource = pickArray("match_the_following", "matchTheFollowing", "matching", "matching_questions", "matchingQuestions", "match", "match_following")
+    .concat(byType([/match/i, /matching/i]));
+  const matchTheFollowing = matchSource.map((item: any) => {
+    const pairings = Array.isArray(item?.correct_pairings)
+      ? item.correct_pairings
+      : Array.isArray(item?.pairs)
+        ? item.pairs
+        : Array.isArray(item?.matches)
+          ? item.matches
+          : Array.isArray(item?.items)
+            ? item.items
+            : [];
+    const columnA = Array.isArray(item?.column_a)
+      ? item.column_a
+      : Array.isArray(item?.left_column)
+        ? item.left_column
+        : pairings.map((p: any) => p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question).filter(Boolean);
+    const columnB = Array.isArray(item?.column_b)
+      ? item.column_b
+      : Array.isArray(item?.right_column)
+        ? item.right_column
+        : pairings.map((p: any) => p?.b ?? p?.right ?? p?.match ?? p?.answer ?? p?.definition).filter(Boolean);
+    return {
+      ...item,
+      column_a: columnA.map(String),
+      column_b: [...new Set(columnB.map(String))],
+      correct_pairings: pairings,
+    };
+  }).filter((item: any) => item.column_a.length > 0 && item.column_b.length > 0);
+
+  const fillBlanks = pickArray("fill_blanks", "fill_blank", "fill_in_the_blanks", "fillInTheBlanks", "fillBlanks", "blanks")
+    .concat(byType([/fill/i, /blank/i]))
+    .map((q: any) => ({
+      ...q,
+      passage: q?.passage || q?.question || q?.prompt || "",
+      correct_answer: q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? q?.blank_answer ?? "",
+    }))
+    .filter((q: any) => q.passage && q.correct_answer !== "");
+
+  const scenarios = pickArray("scenarios", "scenario", "scenario_questions", "scenarioQuestions", "scenario_based", "scenarioBasedQuestions")
+    .concat(byType([/scenario/i, /case/i]))
+    .map((q: any) => ({
+      ...q,
+      situation: q?.situation || q?.scenario || q?.question || q?.prompt || "",
+      options: Array.isArray(q?.options) ? q.options : Array.isArray(q?.choices) ? q.choices : [],
+      best_response: q?.best_response ?? q?.bestResponse ?? q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? "",
+    }))
+    .filter((q: any) => q.situation && q.options.length > 0);
+
+  const fallbackPool = [...mcq, ...scenarios].slice(0, 6);
+  const ensured: any = { ...parsed, mcq, true_false: trueFalse, match_the_following: matchTheFollowing, fill_blanks: fillBlanks, scenarios };
+
+  if (selectedTypes.includes("true-false") && ensured.true_false.length === 0) {
+    ensured.true_false = fallbackPool.slice(0, 4).map((q: any) => ({
+      module_title: q.module_title,
+      topic_title: q.topic_title,
+      question: q.question || q.situation || q.prompt || "Review this statement.",
+      correct_answer: true,
+      rationale: q.rationale || "This statement is supported by the course content.",
+      blooms_level: q.blooms_level || "Understand",
+    }));
+  }
+
+  if (selectedTypes.includes("scenario") && ensured.scenarios.length === 0) {
+    ensured.scenarios = mcq.slice(0, 4).map((q: any) => ({
+      module_title: q.module_title,
+      topic_title: q.topic_title,
+      situation: q.question,
+      options: q.options,
+      best_response: q.correct_answer,
+      rationale: q.rationale,
+      blooms_level: q.blooms_level || "Apply",
+    }));
+  }
+
+  if (selectedTypes.includes("match-the-following") && ensured.match_the_following.length === 0) {
+    const pairs = fallbackPool
+      .map((q: any) => ({
+        a: stripPrefix(q.question || q.situation || q.prompt).slice(0, 90),
+        b: stripPrefix(q.correct_answer || q.best_response || q.answer || q.options?.[0]).slice(0, 120),
+      }))
+      .filter((pair) => pair.a && pair.b)
+      .slice(0, 5);
+    if (pairs.length > 0) {
+      ensured.match_the_following = [{
+        module_title: fallbackPool[0]?.module_title,
+        topic_title: fallbackPool[0]?.topic_title,
+        column_a: pairs.map((pair) => pair.a),
+        column_b: pairs.map((pair) => pair.b).sort(() => 0.5 - Math.random()),
+        correct_pairings: pairs,
+        explanation: "Match each prompt with the strongest response from the course content.",
+        blooms_level: "Apply",
+      }];
+    }
+  }
+
+  if (selectedTypes.includes("fill-blanks") && ensured.fill_blanks.length === 0) {
+    ensured.fill_blanks = fallbackPool.slice(0, 4).map((q: any) => {
+      const answer = stripPrefix(q.correct_answer || q.best_response || q.answer || q.options?.[0]);
+      return {
+        module_title: q.module_title,
+        topic_title: q.topic_title,
+        passage: `${stripPrefix(q.question || q.situation || q.prompt)} ____`,
+        correct_answer: answer,
+        rationale: q.rationale || "This answer best completes the statement based on the course content.",
+        blooms_level: q.blooms_level || "Understand",
+      };
+    }).filter((q: any) => q.correct_answer);
+  }
+
+  if (!selectedTypes.includes("mcq")) ensured.mcq = [];
+  if (!selectedTypes.includes("true-false")) ensured.true_false = [];
+  if (!selectedTypes.includes("match-the-following")) ensured.match_the_following = [];
+  if (!selectedTypes.includes("fill-blanks")) ensured.fill_blanks = [];
+  if (!selectedTypes.includes("scenario")) ensured.scenarios = [];
+
+  ensured.metadata = {
+    ...(parsed.metadata || {}),
+    assessment_types: selectedTypes,
+  };
+
+  return JSON.stringify(ensured, null, 2);
+}
+
 function toTitleCase(value: string): string {
   return value
     .split(/\s+/)
