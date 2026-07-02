@@ -512,6 +512,12 @@ export function generateFlipbookHTML(
       background: white;
     }
 
+    .flipbook-container.fullscreen-fallback {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+    }
+
     .flipbook-header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
@@ -1493,32 +1499,51 @@ export function generateFlipbookHTML(
         if (fullscreenBtn) {
           fullscreenBtn.addEventListener('click', () => {
             try {
+              const container = document.getElementById('flipbook-container');
               const docAny = document;
               const isFs = docAny.fullscreenElement || docAny.webkitFullscreenElement || docAny.mozFullScreenElement || docAny.msFullscreenElement;
               if (isFs) {
                 const exit = docAny.exitFullscreen || docAny.webkitExitFullscreen || docAny.mozCancelFullScreen || docAny.msExitFullscreen;
                 if (exit) exit.call(docAny);
+                if (container) container.classList.remove('fullscreen-fallback');
+                fullscreenBtn.textContent = 'Fullscreen';
                 return;
               }
-              const elem = document.getElementById('flipbook-container') || document.getElementById('flipbook') || document.documentElement;
+              if (container && container.classList.contains('fullscreen-fallback')) {
+                container.classList.remove('fullscreen-fallback');
+                fullscreenBtn.textContent = 'Fullscreen';
+                return;
+              }
+              const elem = container || document.getElementById('flipbook') || document.documentElement;
               const req = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
               if (!req) {
-                alert('Fullscreen is not supported by your browser.');
+                if (container) container.classList.add('fullscreen-fallback');
+                fullscreenBtn.textContent = 'Exit Fullscreen';
                 return;
               }
               const result = req.call(elem);
+              fullscreenBtn.textContent = 'Exit Fullscreen';
               if (result && typeof result.catch === 'function') {
                 result.catch((err) => {
                   console.warn('Fullscreen request rejected:', err && err.message);
-                  alert('Fullscreen was blocked. Open this file directly (not inside an iframe) and try again.');
+                  if (container) container.classList.add('fullscreen-fallback');
+                  fullscreenBtn.textContent = 'Exit Fullscreen';
                 });
               }
             } catch (err) {
               console.error('Fullscreen error:', err);
-              alert('Fullscreen failed: ' + (err && err.message ? err.message : 'unknown error'));
+              const container = document.getElementById('flipbook-container');
+              if (container) container.classList.add('fullscreen-fallback');
+              fullscreenBtn.textContent = 'Exit Fullscreen';
             }
           });
         }
+
+        document.addEventListener('fullscreenchange', function () {
+          const container = document.getElementById('flipbook-container');
+          if (!document.fullscreenElement && container) container.classList.remove('fullscreen-fallback');
+          if (fullscreenBtn) fullscreenBtn.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
+        });
 
 
         // Print
