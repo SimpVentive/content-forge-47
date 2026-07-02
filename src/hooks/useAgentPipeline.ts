@@ -1814,6 +1814,7 @@ OUTPUT FORMAT — ABSOLUTE:
           `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nLearning Objectives:\n${researchResult}\n\nTarget Duration Minutes: ${durationMinutes}\nAssessment Intensity: ${assessmentIntensity}\nModule Count: ${moduleCount}\nTopic Count: ${topicCount}${hasMCQ ? `\nTarget MCQ Count: ${assessmentTargets.mcqCount}` : ""}${hasScenarios ? `\nTarget Scenario Count: ${assessmentTargets.scenarioCount}` : ""}\nTarget Embedded Interactions Range: ${assessmentTargets.interactionMin}-${assessmentTargets.interactionMax}\nSelected Assessment Types: ${selectedAssessmentTypes.join(", ")}`,
           addLog, "Assessment Agent"
         );
+        assessmentResult = coerceAssessmentResult(assessmentResult, selectedAssessmentTypes as SelectedAssessmentType[]);
         setStatus("assessment", "complete");
         setRawOutputs((prev) => ({ ...prev, assessment: assessmentResult }));
         setOutputData((prev) => ({ ...prev, assessment: assessmentResult }));
