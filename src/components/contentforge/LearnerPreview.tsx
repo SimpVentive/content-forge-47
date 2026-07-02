@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle, Maximize2, Minimize2 } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
@@ -1258,6 +1258,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const lipSyncFrameRef = useRef<number>(0);
   const analyserDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const visemeIndexRef = useRef(0);
+  const previewRootRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
@@ -1659,6 +1661,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     }
   }, [muted]);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === previewRootRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
   useEffect(() => () => {
     stopLipSync();
     if (audioContextRef.current && audioContextRef.current.state !== "closed") {
@@ -1809,6 +1820,40 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const currentNarration = getNarrationForSlide(currentSlide);
   const currentVisualKey = slide.type === "content" && slide.topicTitle ? `${slide.moduleTitle}::${slide.topicTitle}` : "";
 
+  const handleToggleVoiceover = useCallback(() => {
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+
+    if (nextMuted) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setIsPlaying(false);
+      stopLipSync();
+      return;
+    }
+
+    if (currentNarration && !hasAvatarVideoNarration) {
+      void playNarration();
+    }
+  }, [currentNarration, hasAvatarVideoNarration, muted, playNarration, stopLipSync]);
+
+  const handleToggleFullscreen = useCallback(async () => {
+    const target = previewRootRef.current;
+    if (!target) return;
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (target.requestFullscreen) {
+        await target.requestFullscreen();
+      }
+    } catch (error) {
+      console.warn("Fullscreen toggle failed:", error);
+    }
+  }, []);
+
   const handleSidebarSelect = useCallback((panel: SidebarPanel) => {
     setActiveSidebarPanel(panel);
 
@@ -1945,25 +1990,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       <Clock className="w-4 h-4" />
                       ~{courseDurationMinutes} minutes
                     </span>
-                    {currentNarration && (
-                      <div className="flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200">
-                        <Volume2 className="w-5 h-5 text-blue-600 shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-[13px] font-bold text-blue-900">Voice Over available for this module</p>
-                          <p className="text-[12px] text-blue-700 mt-0.5">Audio narration will help guide your learning</p>
-                        </div>
-                        <button
-                          onClick={() => setMuted(!muted)}
-                          className={`px-4 py-1.5 rounded-full font-bold text-[12px] transition-all shrink-0 ${
-                            muted
-                              ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
-                              : "bg-blue-600 text-white hover:bg-blue-700 border border-blue-600"
-                          }`}
-                        >
-                          {muted ? "Turn On" : "Turn Off"}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -3033,7 +3059,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5 learner-preview-3d" style={{ background: "#DCE6F1" }}>
+    <div ref={previewRootRef} className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5 learner-preview-3d" style={{ background: "#DCE6F1" }}>
       <style>
         {`/* ── 3D lift for buttons ─────────────────────────────────────── */
         .learner-preview-3d button {
@@ -3755,7 +3781,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       backgroundColor: muted ? "white" : "#eef4ff"
                     }}>
                     <button
-                      onClick={() => setMuted(!muted)}
+                      onClick={handleToggleVoiceover}
                       className="inline-flex items-center gap-2 px-2 h-10 rounded-lg text-[12px] font-semibold transition-all"
                       style={{
                         color: muted ? "#123d78" : "#1d4f93",
@@ -3781,6 +3807,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </select>
                   </div>
                 )}
+
+                <button
+                  onClick={handleToggleFullscreen}
+                  className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${isFullscreen ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
+                  type="button"
+                  aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                >
+                  {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+                  <span>{isFullscreen ? "Exit Full Screen" : "Full Screen"}</span>
+                </button>
 
 
 

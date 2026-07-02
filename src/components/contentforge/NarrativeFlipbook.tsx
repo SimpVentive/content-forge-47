@@ -18,7 +18,14 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
   const [currentTopicIndex, setCurrentTopicIndex] = useState(0);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  const [autoplayAudio, setAutoplayAudio] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      return window.localStorage.getItem("contentforge.narrativeFlipbook.audioEnabled") === "true";
+    } catch {
+      return false;
+    }
+  });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const flipbookContainerRef = useRef<HTMLDivElement>(null);
@@ -27,65 +34,103 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
   const currentScene = currentTopic?.scenes[currentSceneIndex];
 
   const totalScenes = narratives.reduce((sum, n) => sum + n.scenes.length, 0);
+  const hasAnyAudio = narratives.some((n) => n.scenes.some((scene) => Boolean(scene.audioDataUrl)));
   const currentSceneNumber = narratives
     .slice(0, currentTopicIndex)
     .reduce((sum, n) => sum + n.scenes.length, 0) + currentSceneIndex + 1;
 
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, []);
+
+  const playCurrentAudio = useCallback(() => {
+    if (!audioEnabled || !currentScene?.audioDataUrl || !audioRef.current) return;
+    audioRef.current.currentTime = 0;
+    audioRef.current.play().catch((err) => {
+      console.warn("Could not play audio:", err);
+    });
+  }, [audioEnabled, currentScene?.audioDataUrl]);
+
   const handlePrevious = useCallback(() => {
     if (isTransitioning) return;
     setIsTransitioning(true);
+    stopAudio();
+
+    let nextTopicIndex = currentTopicIndex;
+    let nextSceneIndex = currentSceneIndex;
 
     if (currentSceneIndex > 0) {
-      setCurrentSceneIndex(currentSceneIndex - 1);
+      nextSceneIndex = currentSceneIndex - 1;
     } else if (currentTopicIndex > 0) {
-      setCurrentTopicIndex(currentTopicIndex - 1);
-      setCurrentSceneIndex(narratives[currentTopicIndex - 1].scenes.length - 1);
+      nextTopicIndex = currentTopicIndex - 1;
+      nextSceneIndex = narratives[currentTopicIndex - 1].scenes.length - 1;
     }
 
-    onSceneChange?.(currentTopicIndex, currentSceneIndex - 1);
+    setCurrentTopicIndex(nextTopicIndex);
+    setCurrentSceneIndex(nextSceneIndex);
+    onSceneChange?.(nextTopicIndex, nextSceneIndex);
     setTimeout(() => setIsTransitioning(false), 300);
-  }, [currentSceneIndex, currentTopicIndex, isTransitioning, narratives, onSceneChange]);
+  }, [currentSceneIndex, currentTopicIndex, isTransitioning, narratives, onSceneChange, stopAudio]);
 
   const handleNext = useCallback(() => {
-    if (isTransitioning) return;
+    if (isTransitioning || !currentTopic) return;
+    if (currentTopicIndex === narratives.length - 1 && currentSceneIndex === currentTopic.scenes.length - 1) return;
     setIsTransitioning(true);
+    stopAudio();
+
+    let nextTopicIndex = currentTopicIndex;
+    let nextSceneIndex = currentSceneIndex;
 
     if (currentSceneIndex < currentTopic.scenes.length - 1) {
-      setCurrentSceneIndex(currentSceneIndex + 1);
+      nextSceneIndex = currentSceneIndex + 1;
     } else if (currentTopicIndex < narratives.length - 1) {
-      setCurrentTopicIndex(currentTopicIndex + 1);
-      setCurrentSceneIndex(0);
+      nextTopicIndex = currentTopicIndex + 1;
+      nextSceneIndex = 0;
     }
 
-    onSceneChange?.(currentTopicIndex, currentSceneIndex + 1);
+    setCurrentTopicIndex(nextTopicIndex);
+    setCurrentSceneIndex(nextSceneIndex);
+    onSceneChange?.(nextTopicIndex, nextSceneIndex);
     setTimeout(() => setIsTransitioning(false), 300);
-  }, [currentSceneIndex, currentTopicIndex, currentTopic.scenes.length, isTransitioning, narratives.length, onSceneChange]);
+  }, [currentSceneIndex, currentTopic, currentTopicIndex, isTransitioning, narratives.length, onSceneChange, stopAudio]);
 
-  const handleFullscreen = useCallback(() => {
+  const handleFullscreen = useCallback(async () => {
     if (!flipbookContainerRef.current) return;
 
-    if (!isFullscreen) {
-      // Request fullscreen
-      if (flipbookContainerRef.current.requestFullscreen) {
-        flipbookContainerRef.current.requestFullscreen().catch(() => {
-          // Fallback: just toggle the state without actual fullscreen API
-          setIsFullscreen(true);
-        });
-        setIsFullscreen(true);
-      } else {
-        // Fallback for browsers that don't support fullscreen API
-        setIsFullscreen(true);
-      }
-    } else {
-      // Exit fullscreen
+    try {
       if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {
-          setIsFullscreen(false);
-        });
+        await document.exitFullscreen();
+        setIsFullscreen(false);
+        return;
       }
-      setIsFullscreen(false);
+
+      if (flipbookContainerRef.current.requestFullscreen) {
+        await flipbookContainerRef.current.requestFullscreen();
+        setIsFullscreen(true);
+        return;
+      }
+
+      setIsFullscreen((current) => !current);
+    } catch {
+      setIsFullscreen((current) => !current);
     }
-  }, [isFullscreen]);
+  }, []);
+
+  const handleAudioToggle = useCallback((enabled: boolean) => {
+    setAudioEnabled(enabled);
+    try {
+      window.localStorage.setItem("contentforge.narrativeFlipbook.audioEnabled", String(enabled));
+    } catch {
+      // Keep audio state in memory if storage is blocked.
+    }
+
+    if (!enabled) {
+      stopAudio();
+    }
+  }, [stopAudio]);
 
   const handlePrint = useCallback(() => {
     // Trigger browser print dialog
@@ -123,16 +168,25 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
     }
   }, []);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === flipbookContainerRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
   // Auto-play audio when scene changes
   useEffect(() => {
-    if (autoplayAudio && currentScene?.audioDataUrl && audioRef.current) {
-      // Reset and play audio
-      audioRef.current.currentTime = 0;
-      audioRef.current.play().catch((err) => {
-        console.warn("Could not autoplay audio:", err);
-      });
-    }
-  }, [currentSceneIndex, currentTopicIndex, autoplayAudio, currentScene?.audioDataUrl]);
+    stopAudio();
+    window.setTimeout(playCurrentAudio, 80);
+  }, [currentSceneIndex, currentTopicIndex, playCurrentAudio, stopAudio]);
+
+  useEffect(() => {
+    if (audioEnabled) playCurrentAudio();
+    else stopAudio();
+  }, [audioEnabled, playCurrentAudio, stopAudio]);
 
   if (!currentScene) {
     return (
@@ -233,43 +287,9 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
             <h3 className="text-sm font-bold text-gray-900">{currentScene.title}</h3>
             {captionsEnabled && <p className="text-[15px] leading-relaxed text-gray-700">{currentScene.caption}</p>}
 
-            {/* Audio Player */}
+            {/* Hidden audio element controlled by the bottom toolbar */}
             {currentScene.audioDataUrl && (
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold text-gray-600">Narration</label>
-                  <button
-                    onClick={() => setAutoplayAudio(!autoplayAudio)}
-                    className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
-                      autoplayAudio
-                        ? "bg-blue-100 text-blue-700 hover:bg-blue-200"
-                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                    title={autoplayAudio ? "Audio autoplay ON" : "Audio autoplay OFF"}
-                  >
-                    {autoplayAudio ? (
-                      <>
-                        <Volume2 className="w-3 h-3" />
-                        <span>Autoplay</span>
-                      </>
-                    ) : (
-                      <>
-                        <VolumeX className="w-3 h-3" />
-                        <span>Manual</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                <audio
-                  ref={audioRef}
-                  controls
-                  src={currentScene.audioDataUrl}
-                  className="w-full h-8 bg-gray-100 rounded"
-                  style={{
-                    accentColor: "#3b82f6",
-                  }}
-                />
-              </div>
+              <audio ref={audioRef} src={currentScene.audioDataUrl} preload="metadata" />
             )}
           </div>
         </div>
@@ -310,8 +330,39 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
         </div>
 
         {/* Topic Indicator */}
-        <div className="text-right">
-          <p className="text-xs text-gray-500">
+        <div className="flex items-center justify-end gap-2 text-right">
+          {hasAnyAudio && (
+            <div className="inline-flex items-center gap-1 rounded-lg border border-gray-200 bg-white p-1">
+              <button
+                onClick={() => handleAudioToggle(true)}
+                className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold transition-colors ${audioEnabled ? "bg-blue-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                type="button"
+                aria-pressed={audioEnabled}
+                title="Turn audio on for all scenes"
+              >
+                <Volume2 className="h-3.5 w-3.5" /> On
+              </button>
+              <button
+                onClick={() => handleAudioToggle(false)}
+                className={`inline-flex h-8 items-center gap-1 rounded-md px-2 text-xs font-semibold transition-colors ${!audioEnabled ? "bg-gray-700 text-white" : "text-gray-600 hover:bg-gray-100"}`}
+                type="button"
+                aria-pressed={!audioEnabled}
+                title="Turn audio off for all scenes"
+              >
+                <VolumeX className="h-3.5 w-3.5" /> Off
+              </button>
+            </div>
+          )}
+          <button
+            onClick={handleFullscreen}
+            className="inline-flex h-10 items-center justify-center rounded-lg border border-gray-200 bg-white px-3 text-gray-700 transition-colors hover:bg-gray-100"
+            type="button"
+            aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+          </button>
+          <p className="max-w-[180px] truncate text-xs text-gray-500">
             <span className="font-semibold text-gray-700">{currentTopic.topicTitle}</span>
           </p>
         </div>
