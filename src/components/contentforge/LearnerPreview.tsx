@@ -285,7 +285,11 @@ function normalizeAssessmentData(raw: any): any {
       .filter((q: any) => q.question && q.options.length),
     true_false: pickArray("true_false", "trueFalse", "true_false_questions", "trueFalseQuestions", "tf", "true_or_false")
       .concat(byType([/true[\s_/-]*false/i, /^tf$/i]))
-      .map((q: any) => ({ ...q, assessmentKind: "true_false", question: q.question || q.prompt || q.statement || "", options: ["True", "False"], correct_answer: String(q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.correct ?? "true") }))
+      .map((q: any) => {
+        const rawAnswer = String(q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.correct ?? "true").trim().toLowerCase();
+        const isTrue = rawAnswer === "true" || rawAnswer === "t" || rawAnswer === "yes" || rawAnswer === "1";
+        return { ...q, assessmentKind: "true_false", question: q.question || q.prompt || q.statement || "", options: ["True", "False"], correct_answer: isTrue ? "True" : "False" };
+      })
       .filter((q: any) => q.question),
     match_the_following: pickArray("match_the_following", "matchTheFollowing", "matching", "matching_questions", "matchingQuestions", "match")
       .concat(byType([/match/i, /matching/i]))
