@@ -622,7 +622,7 @@ function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[]
 function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
-  const assessData = tryParseJSON(rawOutputs.assessment);
+  const assessData = normalizeAssessmentData(tryParseJSON(rawOutputs.assessment));
   const visualData = tryParseJSON(rawOutputs.visual);
   const narrativeScenesData = tryParseJSON(rawOutputs.narrativeScenes);
   const durationMinutes = getDurationMinutes(courseDuration);
@@ -643,9 +643,15 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     modules = [{ title: "Module 1", topics: ["Introduction"] }];
   }
 
-  // Extract MCQs
-  const mcqs = Array.isArray(assessData?.mcq) ? assessData.mcq : [];
-  const maxQuestionCount = Math.min(mcqs.length, getTargetCourseQuestionCount(durationMinutes, assessmentIntensity));
+  // Extract all selected assessment types, not only MCQ
+  const assessmentItems = [
+    ...(Array.isArray(assessData?.mcq) ? assessData.mcq.map((q: any) => ({ ...q, assessmentKind: "mcq" })) : []),
+    ...(Array.isArray(assessData?.true_false) ? assessData.true_false.map((q: any) => ({ ...q, assessmentKind: "true_false" })) : []),
+    ...(Array.isArray(assessData?.match_the_following) ? assessData.match_the_following.map((q: any) => ({ ...q, assessmentKind: "match_the_following" })) : []),
+    ...(Array.isArray(assessData?.fill_blanks) ? assessData.fill_blanks.map((q: any) => ({ ...q, assessmentKind: "fill_blanks" })) : []),
+    ...(Array.isArray(assessData?.scenarios) ? assessData.scenarios.map((q: any) => ({ ...q, assessmentKind: "scenario" })) : []),
+  ];
+  const maxQuestionCount = Math.min(assessmentItems.length, getTargetCourseQuestionCount(durationMinutes, assessmentIntensity));
   const questionsPerModule = allocateQuestionsPerModule(modules, maxQuestionCount);
   const usedQuestionIndexes = new Set<number>();
 
@@ -767,7 +773,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     // 3. Assessment slides (proportional to module size and duration)
     const desiredQuestionCount = questionsPerModule[mi] || 0;
     if (desiredQuestionCount > 0) {
-      const moduleMatchedIndexes = findModuleMatchedQuestionIndexes(mcqs, mod).filter((questionIndex) => !usedQuestionIndexes.has(questionIndex));
+      const moduleMatchedIndexes = findModuleMatchedQuestionIndexes(assessmentItems, mod).filter((questionIndex) => !usedQuestionIndexes.has(questionIndex));
       const selectedIndexes: number[] = [];
 
       for (const questionIndex of moduleMatchedIndexes) {
@@ -777,7 +783,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       }
 
       if (selectedIndexes.length < desiredQuestionCount) {
-        for (let questionIndex = 0; questionIndex < mcqs.length; questionIndex++) {
+        for (let questionIndex = 0; questionIndex < assessmentItems.length; questionIndex++) {
           if (selectedIndexes.length >= desiredQuestionCount) break;
           if (usedQuestionIndexes.has(questionIndex)) continue;
           selectedIndexes.push(questionIndex);
@@ -786,13 +792,14 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       }
 
       selectedIndexes.forEach((questionIndex) => {
-        const mcq = mcqs[questionIndex];
-        if (!mcq) return;
+        const assessmentItem = assessmentItems[questionIndex];
+        if (!assessmentItem) return;
         slides.push({
           type: "assessment",
           moduleIndex: mi,
           moduleTitle: mod.title,
-          question: mcq,
+          question: assessmentItem,
+          assessmentKind: assessmentItem.assessmentKind,
         });
       });
     }
