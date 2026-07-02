@@ -1862,7 +1862,7 @@ OUTPUT FORMAT — ABSOLUTE:
             // Always generate HTML as base
             const displayStyle = params?.flipbookDisplayStyle || "smooth-slide";
             const courseLevel = params?.level || "Intermediate";
-            const captionsEnabled = params?.captionsEnabled !== false; // Default to true
+            const captionsEnabled = (params as any)?.captionsEnabled !== false; // Default to true
             flipbookHtml = generateFlipbookHTML(
               narrativeScenes,
               courseTitle,
