@@ -105,8 +105,10 @@ export function buildImageGenerationPrompts(
     diverse: ""
   };
 
-  const ethnicityGuidance = characterEthnicity && characterEthnicity !== "diverse"
-    ? `CRITICAL: The character MUST have ${characterEthnicity} ethnicity and appearance. Features: predominantly ${characterEthnicity} facial features, skin tone, and cultural styling. Use ${ethnicityNameMap[characterEthnicity] || 'appropriate names for this ethnicity'}. DO NOT generate other ethnicities.`
+  // Normalize ethnicity to lowercase for consistent lookup
+  const normalizedEthnicity = characterEthnicity?.toLowerCase() || "diverse";
+  const ethnicityGuidance = normalizedEthnicity && normalizedEthnicity !== "diverse"
+    ? `CRITICAL: Generate ONLY characters with ${normalizedEthnicity} ethnicity and appearance. Features: predominantly ${normalizedEthnicity} facial features, skin tone, and cultural styling. Use ${ethnicityNameMap[normalizedEthnicity] || 'appropriate names for this ethnicity'}. NEVER generate other ethnicities. ALL characters must match this ethnicity.`
     : "Diverse mix of ethnicities and cultural backgrounds.";
 
   return scenes.map((scene, index) => ({
