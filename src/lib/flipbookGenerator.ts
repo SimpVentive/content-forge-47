@@ -1151,6 +1151,65 @@ export function generateFlipbookHTML(
       }
     };
 
+    window.__matchCheck = function(btn) {
+      var container = btn.parentElement;
+      if (!container) return;
+      var selects = container.querySelectorAll('.match-select');
+      var correct = 0, total = selects.length;
+      Array.prototype.forEach.call(selects, function(sel){
+        var want = (sel.getAttribute('data-correct') || '').trim();
+        var got = (sel.value || '').trim();
+        if (want && got && want === got) {
+          correct++;
+          sel.style.borderColor = '#059669';
+          sel.style.background = '#ecfdf5';
+        } else {
+          sel.style.borderColor = '#dc2626';
+          sel.style.background = '#fef2f2';
+        }
+      });
+      var fb = container.querySelector('.match-feedback');
+      if (fb) {
+        fb.textContent = correct + ' of ' + total + ' correct.';
+        fb.style.color = correct === total ? '#059669' : '#dc2626';
+      }
+      if (container.dataset.scored !== '1') {
+        container.dataset.scored = '1';
+        window.__mcqScore.total += 1;
+        if (correct === total) window.__mcqScore.correct += 1;
+        updateScoreDisplay();
+      }
+    };
+
+    window.__fillCheck = function(btn) {
+      var container = btn.parentElement;
+      if (!container) return;
+      var inputs = container.querySelectorAll('.fill-blank-input');
+      var allCorrect = inputs.length > 0;
+      Array.prototype.forEach.call(inputs, function(inp){
+        var want = (inp.getAttribute('data-correct') || '').trim().toLowerCase();
+        var got = (inp.value || '').trim().toLowerCase();
+        if (want && got === want) {
+          inp.style.borderBottomColor = '#059669';
+        } else {
+          inp.style.borderBottomColor = '#dc2626';
+          allCorrect = false;
+        }
+      });
+      var fb = container.querySelector('.fill-feedback');
+      if (fb) {
+        fb.textContent = allCorrect ? 'Correct!' : 'Incorrect. Correct answer: ' + (inputs[0] && inputs[0].getAttribute('data-correct') || '');
+        fb.style.color = allCorrect ? '#059669' : '#dc2626';
+      }
+      if (container.dataset.scored !== '1') {
+        container.dataset.scored = '1';
+        window.__mcqScore.total += 1;
+        if (allCorrect) window.__mcqScore.correct += 1;
+        updateScoreDisplay();
+      }
+    };
+
+
     // Update results page with score
     function updateResultsPage(passThreshold) {
       var totalCorrect = window.__mcqScore.correct;
