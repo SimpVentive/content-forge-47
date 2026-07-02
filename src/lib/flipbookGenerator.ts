@@ -75,10 +75,16 @@ export function generateFlipbookHTML(
     if (assessmentData) {
       const mcqCount = (assessmentData.mcq || []).length;
       const scenarioCount = (assessmentData.scenarios || []).length;
+      const tfCount = (assessmentData.true_false || []).length;
+      const matchCount = (assessmentData.match_the_following || []).length;
+      const fillCount = (assessmentData.fill_blanks || []).length;
       const hasReflection = !!assessmentData.reflection;
 
       const assessmentParts = [];
       if (mcqCount > 0) assessmentParts.push(`${mcqCount} Multiple Choice Questions`);
+      if (tfCount > 0) assessmentParts.push(`${tfCount} True/False Questions`);
+      if (matchCount > 0) assessmentParts.push(`${matchCount} Match the Following`);
+      if (fillCount > 0) assessmentParts.push(`${fillCount} Fill in the Blanks`);
       if (scenarioCount > 0) assessmentParts.push(`${scenarioCount} Scenario-based Questions`);
       if (hasReflection) assessmentParts.push("1 Reflection Exercise");
 
@@ -101,11 +107,18 @@ export function generateFlipbookHTML(
     if (assessmentData) {
       const mcqCount = (assessmentData.mcq || []).length;
       const scenarioCount = (assessmentData.scenarios || []).length;
+      const tfCount = (assessmentData.true_false || []).length;
+      const matchCount = (assessmentData.match_the_following || []).length;
+      const fillCount = (assessmentData.fill_blanks || []).length;
       const hasReflection = !!assessmentData.reflection;
       if (mcqCount > 0) assessmentItems.push(`${mcqCount} Multiple Choice Question${mcqCount > 1 ? "s" : ""}`);
+      if (tfCount > 0) assessmentItems.push(`${tfCount} True/False Question${tfCount > 1 ? "s" : ""}`);
+      if (matchCount > 0) assessmentItems.push(`${matchCount} Match the Following Exercise${matchCount > 1 ? "s" : ""}`);
+      if (fillCount > 0) assessmentItems.push(`${fillCount} Fill in the Blank${fillCount > 1 ? "s" : ""}`);
       if (scenarioCount > 0) assessmentItems.push(`${scenarioCount} Scenario-based Question${scenarioCount > 1 ? "s" : ""}`);
       if (hasReflection) assessmentItems.push(`1 Reflection Exercise`);
     }
+
 
     const overviewHtml = `
       <div class="overview-block">
@@ -222,6 +235,111 @@ export function generateFlipbookHTML(
         });
       });
     }
+
+    // Add True/False questions
+    if (Array.isArray(assessmentData.true_false)) {
+      assessmentData.true_false.slice(0, 10).forEach((q: any, qIdx: number) => {
+        const questionText = q.question || "";
+        const correctRaw = String(q.correct_answer ?? "").trim().toLowerCase();
+        const isTrue = correctRaw === "true" || correctRaw === "t" || correctRaw === "yes";
+        const options = ["True", "False"];
+        const optionsHtml = options.map((opt, oi) => {
+          const letter = String.fromCharCode(65 + oi);
+          const isCorrect = (opt === "True") === isTrue;
+          return `<button type="button" class="mcq-option" data-correct="${isCorrect ? "1" : "0"}" onclick="window.__mcqAnswer&&window.__mcqAnswer(this)"><span class="mcq-letter">${letter}</span><span class="mcq-text">${escapeHtml(opt)}</span><span class="mcq-icon"></span></button>`;
+        }).join("");
+        const rationale = q.rationale ? `<div class="mcq-rationale" style="margin-top:12px;font-size:13px;color:#475569;"><strong>Rationale:</strong> ${escapeHtml(q.rationale)}</div>` : "";
+        const html = `
+          <div class="mcq-question">${escapeHtml(questionText)}</div>
+          <div class="mcq-options">${optionsHtml}</div>
+          <div class="mcq-feedback" data-correct-text="${isTrue ? "True" : "False"}"></div>
+          ${rationale}
+        `;
+        pages.push({
+          title: `True/False ${qIdx + 1}`,
+          content: "",
+          htmlContent: html,
+          images: [],
+          speaker: "",
+          pageNumber: assessmentPageNum++,
+        });
+      });
+    }
+
+    // Add Match The Following questions
+    if (Array.isArray(assessmentData.match_the_following)) {
+      assessmentData.match_the_following.slice(0, 5).forEach((m: any, mIdx: number) => {
+        const colA: string[] = Array.isArray(m.column_a) ? m.column_a : [];
+        const colB: string[] = Array.isArray(m.column_b) ? m.column_b : [];
+        const pairings: any[] = Array.isArray(m.correct_pairings) ? m.correct_pairings : [];
+        const pairMap = pairings.map((p: any) => {
+          if (typeof p === "string") {
+            const parts = p.split(/[-:→=]/).map(s => s.trim());
+            return { a: parts[0], b: parts[1] };
+          }
+          return { a: String(p.a ?? p.column_a ?? p.left ?? ""), b: String(p.b ?? p.column_b ?? p.right ?? "") };
+        });
+        const rowsHtml = colA.map((a, i) => {
+          const optionsHtml = colB.map((b, bi) => `<option value="${escapeHtml(b)}">${String.fromCharCode(65 + bi)}. ${escapeHtml(b)}</option>`).join("");
+          const correct = pairMap.find(p => p.a === a || p.a === String(i + 1))?.b || "";
+          return `<tr>
+            <td style="padding:10px 14px;font-weight:600;color:#0f172a;border-bottom:1px solid #e2e8f0;">${i + 1}. ${escapeHtml(a)}</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;">
+              <select class="match-select" data-correct="${escapeHtml(correct)}" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+                <option value="">-- Select --</option>
+                ${optionsHtml}
+              </select>
+            </td>
+          </tr>`;
+        }).join("");
+        const explanation = m.explanation ? `<div class="mcq-rationale" style="margin-top:12px;font-size:13px;color:#475569;"><strong>Explanation:</strong> ${escapeHtml(m.explanation)}</div>` : "";
+        const html = `
+          <div class="mcq-question">Match each item on the left with the correct item on the right.</div>
+          <table style="width:100%;border-collapse:collapse;margin-top:12px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+            <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:10px 14px;font-size:12px;text-transform:uppercase;color:#475569;">Column A</th><th style="text-align:left;padding:10px 14px;font-size:12px;text-transform:uppercase;color:#475569;">Column B</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <button type="button" onclick="window.__matchCheck&&window.__matchCheck(this)" style="margin-top:14px;padding:10px 18px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Check Answers</button>
+          <div class="match-feedback" style="margin-top:10px;font-weight:600;"></div>
+          ${explanation}
+        `;
+        pages.push({
+          title: `Match ${mIdx + 1}`,
+          content: "",
+          htmlContent: html,
+          images: [],
+          speaker: "",
+          pageNumber: assessmentPageNum++,
+        });
+      });
+    }
+
+    // Add Fill in the Blanks
+    if (Array.isArray(assessmentData.fill_blanks)) {
+      assessmentData.fill_blanks.slice(0, 10).forEach((q: any, qIdx: number) => {
+        const passage = String(q.passage || "");
+        const correct = String(q.correct_answer || "").trim();
+        const passageHtml = escapeHtml(passage).replace(/_{2,}|\[blank\]|\{blank\}/i,
+          `<input type="text" class="fill-blank-input" data-correct="${escapeHtml(correct)}" style="display:inline-block;min-width:140px;padding:4px 8px;border:none;border-bottom:2px solid #0f766e;background:transparent;font-size:inherit;margin:0 4px;" />`);
+        const rationale = q.rationale ? `<div class="mcq-rationale" style="margin-top:12px;font-size:13px;color:#475569;"><strong>Rationale:</strong> ${escapeHtml(q.rationale)}</div>` : "";
+        const html = `
+          <div class="mcq-question" style="line-height:1.8;">${passageHtml}</div>
+          <button type="button" onclick="window.__fillCheck&&window.__fillCheck(this)" style="margin-top:14px;padding:10px 18px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Check Answer</button>
+          <div class="fill-feedback" style="margin-top:10px;font-weight:600;"></div>
+          ${rationale}
+        `;
+        pages.push({
+          title: `Fill in the Blank ${qIdx + 1}`,
+          content: "",
+          htmlContent: html,
+          images: [],
+          speaker: "",
+          pageNumber: assessmentPageNum++,
+        });
+      });
+    }
+
+
 
     // Add scenario questions
     if (Array.isArray(assessmentData.scenarios)) {
@@ -1045,6 +1163,65 @@ export function generateFlipbookHTML(
           : 'Incorrect. Correct answer: ' + (feedback.getAttribute('data-correct-text') || '');
       }
     };
+
+    window.__matchCheck = function(btn) {
+      var container = btn.parentElement;
+      if (!container) return;
+      var selects = container.querySelectorAll('.match-select');
+      var correct = 0, total = selects.length;
+      Array.prototype.forEach.call(selects, function(sel){
+        var want = (sel.getAttribute('data-correct') || '').trim();
+        var got = (sel.value || '').trim();
+        if (want && got && want === got) {
+          correct++;
+          sel.style.borderColor = '#059669';
+          sel.style.background = '#ecfdf5';
+        } else {
+          sel.style.borderColor = '#dc2626';
+          sel.style.background = '#fef2f2';
+        }
+      });
+      var fb = container.querySelector('.match-feedback');
+      if (fb) {
+        fb.textContent = correct + ' of ' + total + ' correct.';
+        fb.style.color = correct === total ? '#059669' : '#dc2626';
+      }
+      if (container.dataset.scored !== '1') {
+        container.dataset.scored = '1';
+        window.__mcqScore.total += 1;
+        if (correct === total) window.__mcqScore.correct += 1;
+        updateScoreDisplay();
+      }
+    };
+
+    window.__fillCheck = function(btn) {
+      var container = btn.parentElement;
+      if (!container) return;
+      var inputs = container.querySelectorAll('.fill-blank-input');
+      var allCorrect = inputs.length > 0;
+      Array.prototype.forEach.call(inputs, function(inp){
+        var want = (inp.getAttribute('data-correct') || '').trim().toLowerCase();
+        var got = (inp.value || '').trim().toLowerCase();
+        if (want && got === want) {
+          inp.style.borderBottomColor = '#059669';
+        } else {
+          inp.style.borderBottomColor = '#dc2626';
+          allCorrect = false;
+        }
+      });
+      var fb = container.querySelector('.fill-feedback');
+      if (fb) {
+        fb.textContent = allCorrect ? 'Correct!' : 'Incorrect. Correct answer: ' + (inputs[0] && inputs[0].getAttribute('data-correct') || '');
+        fb.style.color = allCorrect ? '#059669' : '#dc2626';
+      }
+      if (container.dataset.scored !== '1') {
+        container.dataset.scored = '1';
+        window.__mcqScore.total += 1;
+        if (allCorrect) window.__mcqScore.correct += 1;
+        updateScoreDisplay();
+      }
+    };
+
 
     // Update results page with score
     function updateResultsPage(passThreshold) {
