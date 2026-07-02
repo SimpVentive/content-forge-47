@@ -60,6 +60,57 @@ function tryParseJSON(raw: string): any | null {
   }
 }
 
+function normalizeAssessmentData(raw: any): any | null {
+  if (!raw || typeof raw !== "object") return raw || null;
+  const pickArray = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = raw[key];
+      if (Array.isArray(value)) return value;
+    }
+    return [];
+  };
+  const questions = Array.isArray(raw.questions) ? raw.questions : [];
+  const byType = (patterns: RegExp[]) =>
+    questions.filter((q: any) => patterns.some((pattern) => pattern.test(String(q?.type || q?.question_type || q?.assessment_type || ""))));
+
+  const matchItems = pickArray("match_the_following", "matchTheFollowing", "matching", "matching_questions", "matchingQuestions", "match")
+    .concat(byType([/match/i, /matching/i]));
+
+  return {
+    ...raw,
+    mcq: pickArray("mcq", "mcqs", "multiple_choice", "multiple_choice_questions", "multipleChoice", "multipleChoiceQuestions")
+      .concat(byType([/mcq/i, /multiple[\s_-]*choice/i])),
+    true_false: pickArray("true_false", "trueFalse", "true_false_questions", "trueFalseQuestions", "tf", "true_or_false")
+      .concat(byType([/true[\s_/-]*false/i, /^tf$/i])),
+    match_the_following: matchItems.map((item: any) => {
+      const pairings = Array.isArray(item?.correct_pairings)
+        ? item.correct_pairings
+        : Array.isArray(item?.pairs)
+          ? item.pairs
+          : Array.isArray(item?.matches)
+            ? item.matches
+            : Array.isArray(item?.items)
+              ? item.items
+              : [];
+      const columnA = Array.isArray(item?.column_a)
+        ? item.column_a
+        : Array.isArray(item?.left_column)
+          ? item.left_column
+          : pairings.map((p: any) => p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question).filter(Boolean);
+      const columnB = Array.isArray(item?.column_b)
+        ? item.column_b
+        : Array.isArray(item?.right_column)
+          ? item.right_column
+          : pairings.map((p: any) => p?.b ?? p?.right ?? p?.match ?? p?.answer ?? p?.definition).filter(Boolean);
+      return { ...item, column_a: columnA, column_b: columnB, correct_pairings: pairings };
+    }).filter((item: any) => item.column_a?.length && item.column_b?.length),
+    fill_blanks: pickArray("fill_blanks", "fill_blank", "fill_in_the_blanks", "fillInTheBlanks", "fillBlanks", "blanks")
+      .concat(byType([/fill/i, /blank/i])),
+    scenarios: pickArray("scenarios", "scenario", "scenario_questions", "scenarioQuestions", "scenario_based", "scenarioBasedQuestions")
+      .concat(byType([/scenario/i, /case/i])),
+  };
+}
+
 type NarrativeImageItem = {
   topicTitle: string;
   title: string;
@@ -151,7 +202,7 @@ function exportFlipbookPDF(courseTitle: string, rawOutputs: RawAgentOutputs) {
 
 /* Assessment Renderer */
 const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
-  const data = tryParseJSON(raw);
+  const data = normalizeAssessmentData(tryParseJSON(raw));
   if (!data) return <pre className="text-[13px] text-foreground/90 whitespace-pre-wrap leading-[1.7]">{raw}</pre>;
 
   return (
@@ -181,6 +232,95 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
                     );
                   })}
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {data.true_false && data.true_false.length > 0 && (
+        <div>
+          <h3 className="text-[16px] font-bold text-foreground mb-3 flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4 text-primary" />
+            True/False Questions
+          </h3>
+          <div className="space-y-4">
+            {data.true_false.map((q: any, i: number) => {
+              const answer = String(q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.correct ?? "");
+              return (
+                <div key={i} className="bg-secondary/50 rounded-xl p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <p className="text-[14px] font-semibold text-foreground">{i + 1}. {q.question || q.prompt || q.statement}</p>
+                    {q.blooms_level && <span className="text-[11px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">{q.blooms_level}</span>}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["True", "False"].map((option) => {
+                      const isCorrect = answer.toLowerCase() === option.toLowerCase();
+                      return (
+                        <div key={option} className={`text-[13px] px-3 py-2 rounded-lg ${isCorrect ? "bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200" : "bg-card text-foreground/80"}`}>
+                          {option}{isCorrect && <Check className="w-3 h-3 inline ml-1.5" />}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {q.rationale && <p className="text-[12px] text-muted-foreground mt-2 italic">Rationale: {q.rationale}</p>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {data.match_the_following && data.match_the_following.length > 0 && (
+        <div>
+          <h3 className="text-[16px] font-bold text-foreground mb-3 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-primary" />
+            Match The Following
+          </h3>
+          <div className="space-y-4">
+            {data.match_the_following.map((m: any, i: number) => {
+              const pairings = Array.isArray(m.correct_pairings) ? m.correct_pairings : [];
+              return (
+                <div key={i} className="bg-secondary/50 rounded-xl p-4">
+                  <div className="grid grid-cols-2 gap-3 text-[12px] font-bold text-muted-foreground mb-2">
+                    <span>Column A</span>
+                    <span>Column B</span>
+                  </div>
+                  <div className="space-y-2">
+                    {(m.column_a || []).map((left: string, row: number) => {
+                      const match = pairings.find((p: any) => String(p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question) === String(left));
+                      const right = match ? String(match.b ?? match.right ?? match.match ?? match.answer ?? match.definition ?? "") : String((m.column_b || [])[row] || "");
+                      return (
+                        <div key={`${left}-${row}`} className="grid grid-cols-2 gap-3 rounded-lg bg-card px-3 py-2 text-[13px] text-foreground/85">
+                          <span>{row + 1}. {left}</span>
+                          <span className="font-semibold text-emerald-700">{right}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {m.explanation && <p className="text-[12px] text-muted-foreground mt-2 italic">Explanation: {m.explanation}</p>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {data.fill_blanks && data.fill_blanks.length > 0 && (
+        <div>
+          <h3 className="text-[16px] font-bold text-foreground mb-3 flex items-center gap-2">
+            <ClipboardCheck className="w-4 h-4 text-primary" />
+            Fill in the Blanks
+          </h3>
+          <div className="space-y-4">
+            {data.fill_blanks.map((q: any, i: number) => (
+              <div key={i} className="bg-secondary/50 rounded-xl p-4">
+                <p className="text-[14px] font-semibold text-foreground mb-2">{i + 1}. {q.passage || q.question || q.prompt}</p>
+                <div className="text-[13px] px-3 py-2 rounded-lg bg-emerald-50 text-emerald-700 font-semibold border border-emerald-200 inline-flex items-center gap-1.5">
+                  Answer: {String(q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.blank_answer ?? "")}
+                  <Check className="w-3 h-3" />
+                </div>
+                {q.rationale && <p className="text-[12px] text-muted-foreground mt-2 italic">Rationale: {q.rationale}</p>}
               </div>
             ))}
           </div>
