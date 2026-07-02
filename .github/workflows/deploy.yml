@@ -1,0 +1,70 @@
+name: Deploy React App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Create .env
+        run: |
+          echo "VITE_RAZORPAY_KEY_ID=${{ secrets.VITE_RAZORPAY_KEY_ID }}" > .env
+          echo "VITE_SUPABASE_PROJECT_ID=${{ secrets.VITE_SUPABASE_PROJECT_ID }}" >> .env
+          echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" >> .env
+          echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
+          echo "VITE_HEYGEN_API_KEY=${{ secrets.VITE_HEYGEN_API_KEY }}" >> .env
+          echo "VITE_HEYGEN_ACCOUNT_ID=${{ secrets.VITE_HEYGEN_ACCOUNT_ID }}" >> .env
+          echo "VITE_HEYGEN_DEFAULT_AVATAR=${{ secrets.VITE_HEYGEN_DEFAULT_AVATAR }}" >> .env
+          echo "VITE_HEYGEN_DEFAULT_QUALITY=${{ secrets.VITE_HEYGEN_DEFAULT_QUALITY }}" >> .env
+          echo "VITE_HEYGEN_DEFAULT_BACKGROUND=${{ secrets.VITE_HEYGEN_DEFAULT_BACKGROUND }}" >> .env
+          echo "BFL_API_KEY=${{ secrets.BFL_API_KEY }}" >> .env
+
+      - name: Install Dependencies
+        run: bun install
+
+      - name: Build Expo Web
+        run: bun run build
+
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          password: ${{ secrets.PASSWORD }}
+          port: ${{ secrets.PORT }}
+          script: |
+            export BUN_INSTALL="$HOME/.bun"
+            export PATH="$BUN_INSTALL/bin:$PATH"
+
+            cd /var/www/testing.l-kurve.com/content-forge-47
+
+            git pull origin main
+
+            echo "VITE_RAZORPAY_KEY_ID=${{ secrets.VITE_RAZORPAY_KEY_ID }}" > .env
+            echo "VITE_SUPABASE_PROJECT_ID=${{ secrets.VITE_SUPABASE_PROJECT_ID }}" >> .env
+            echo "VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}" >> .env
+            echo "VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}" >> .env
+            echo "VITE_HEYGEN_API_KEY=${{ secrets.VITE_HEYGEN_API_KEY }}" >> .env
+            echo "VITE_HEYGEN_ACCOUNT_ID=${{ secrets.VITE_HEYGEN_ACCOUNT_ID }}" >> .env
+            echo "VITE_HEYGEN_DEFAULT_AVATAR=${{ secrets.VITE_HEYGEN_DEFAULT_AVATAR }}" >> .env
+            echo "VITE_HEYGEN_DEFAULT_QUALITY=${{ secrets.VITE_HEYGEN_DEFAULT_QUALITY }}" >> .env
+            echo "VITE_HEYGEN_DEFAULT_BACKGROUND=${{ secrets.VITE_HEYGEN_DEFAULT_BACKGROUND }}" >> .env
+            echo "BFL_API_KEY=${{ secrets.BFL_API_KEY }}" >> .env
+
+            bun install
+
+            bun run build
+
+            sudo systemctl reload apache2
