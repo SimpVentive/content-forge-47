@@ -24,7 +24,8 @@ export function generateFlipbookHTML(
   assessmentRaw?: string,
   companyLogoDataUrl?: string | null,
   passThreshold: number = 70,
-  courseLevel: string = "Intermediate"
+  courseLevel: string = "Intermediate",
+  captionsEnabled: boolean = true
 ): string {
   // Parse assessment if provided
   let assessmentData: any = null;
@@ -171,7 +172,8 @@ export function generateFlipbookHTML(
       }
       return {
         title: scene.title,
-        content: scene.caption || "",
+        // Only include caption if captionsEnabled is true
+        content: captionsEnabled ? (scene.caption || "") : "",
         images,
         speaker: voiceoverEnabled && scene.narration ? scene.narration : "",
         audioDataUrl: voiceoverEnabled && scene.audioDataUrl ? scene.audioDataUrl : undefined,
@@ -440,7 +442,7 @@ export function generateFlipbookHTML(
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      gap: 15px;
+      gap: 8px;
       overflow-y: auto;
     }
 
@@ -479,7 +481,8 @@ export function generateFlipbookHTML(
       color: #333;
       text-align: center;
       flex-shrink: 0;
-      margin-top: 8px;
+      margin-top: 0px;
+      margin-bottom: 0px;
       padding-top: 0px;
       border-top: none;
       width: 100%;
@@ -519,8 +522,8 @@ export function generateFlipbookHTML(
     }
 
     .page-narration-section {
-      margin-top: 12px;
-      margin-bottom: 16px;
+      margin-top: 4px;
+      margin-bottom: 0px;
       padding: 12px;
       background: #f0f4ff;
       border-left: 4px solid #667eea;

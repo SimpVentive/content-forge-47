@@ -1862,6 +1862,7 @@ OUTPUT FORMAT — ABSOLUTE:
             // Always generate HTML as base
             const displayStyle = params?.flipbookDisplayStyle || "smooth-slide";
             const courseLevel = params?.level || "Intermediate";
+            const captionsEnabled = params?.captionsEnabled !== false; // Default to true
             flipbookHtml = generateFlipbookHTML(
               narrativeScenes,
               courseTitle,
@@ -1871,7 +1872,8 @@ OUTPUT FORMAT — ABSOLUTE:
               assessmentResult,
               params?.companyLogo,
               70, // passThreshold
-              courseLevel
+              courseLevel,
+              captionsEnabled
             );
             addLog(`Final Assembly: Generated interactive HTML (${flipbookHtml.length} bytes)`);
 
