@@ -5,36 +5,12 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
-  const bytes = new Uint8Array(buffer);
-  let binary = "";
-  for (let index = 0; index < bytes.length; index++) {
-    binary += String.fromCharCode(bytes[index]);
-  }
-  return btoa(binary);
-}
-
 function softenPromptForTrainingImage(prompt: string): string {
   return prompt
     .replace(/\b(violence|violent|blood|bloody|injury|injured|weapon|weapons|gun|guns|knife|knives|explosion|explosive|fight|fighting|attack|attacking|hazardous|hazard|danger|dangerous|accident|emergency)\b/gi, "workplace safety concern")
     .replace(/\bkill|killed|death|dead|fatal|fatality\b/gi, "serious incident")
     .replace(/\s+/g, " ")
     .trim();
-}
-
-async function fetchImageAsDataUrl(url: string): Promise<{ imageDataUrl: string; mimeType: string }> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Image fetch failed: ${response.status}`);
-  }
-
-  const mimeType = response.headers.get("content-type") || "image/png";
-  const imageBuffer = await response.arrayBuffer();
-  const imageBase64 = arrayBufferToBase64(imageBuffer);
-  return {
-    imageDataUrl: `data:${mimeType};base64,${imageBase64}`,
-    mimeType,
-  };
 }
 
 serve(async (req) => {
@@ -44,10 +20,10 @@ serve(async (req) => {
 
   try {
     const { prompt, style, altText, moduleTitle, topicTitle } = await req.json();
-    const apiKey = Deno.env.get("BFL_API_KEY");
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
 
     if (!apiKey) {
-      throw new Error("BFL_API_KEY (Black Forest Labs Flux 2) is not set");
+      throw new Error("OPENAI_API_KEY is not set");
     }
 
     if (!prompt || typeof prompt !== "string") {
@@ -69,65 +45,59 @@ serve(async (req) => {
       softenPromptForTrainingImage(prompt),
     ].join(" ");
 
-    // Submit job to Black Forest Labs (async API — returns task id to poll)
-    const submitRes = await fetch("https://api.bfl.ai/v1/flux-pro-1.1", {
+    const res = await fetch("https://api.openai.com/v1/images/generations", {
       method: "POST",
       headers: {
-        "x-key": apiKey,
+        "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        model: "gpt-image-1.5-standard",
         prompt: enhancedPrompt,
-        width: 1440,
-        height: 1024,
-        prompt_upsampling: false,
-        safety_tolerance: 2,
-        output_format: "png",
+        size: "1536x1024",
+        n: 1,
       }),
     });
 
-    const submitData = await submitRes.json().catch(() => ({}));
-    if (!submitRes.ok) {
-      console.error("BFL submit failed:", submitRes.status, submitData);
-      if (submitRes.status === 401 || submitRes.status === 402 || submitRes.status === 403) {
-        return new Response(JSON.stringify({ error: "Invalid or expired BFL_API_KEY." }), {
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error("OpenAI image failed:", res.status, data);
+      if (res.status === 401 || res.status === 403) {
+        return new Response(JSON.stringify({ error: "Invalid or expired OPENAI_API_KEY." }), {
           status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (submitRes.status === 429) {
+      if (res.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limited. Please try again shortly." }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const msg = submitData?.error || submitData?.detail || `BFL submit failed: ${submitRes.status}`;
+      const msg = data?.error?.message || data?.error || `OpenAI image failed: ${res.status}`;
       throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
     }
 
-    const taskId = submitData?.id;
-    const pollUrl = submitData?.polling_url || (taskId ? `https://api.bfl.ai/v1/get_result?id=${taskId}` : null);
-    if (!pollUrl) throw new Error("BFL returned no task id");
+    const b64 = data?.data?.[0]?.b64_json;
+    const url = data?.data?.[0]?.url;
+    let imageDataUrl: string;
+    const mimeType = "image/png";
 
-    let imageUrl: string | null = null;
-    for (let i = 0; i < 30; i++) {
-      await new Promise((r) => setTimeout(r, 2000));
-      const pollRes = await fetch(pollUrl, { headers: { "x-key": apiKey, "accept": "application/json" } });
-      const pollData = await pollRes.json().catch(() => ({}));
-      const status = pollData?.status;
-      if (status === "Ready") {
-        imageUrl = pollData?.result?.sample;
-        break;
-      }
-      if (status && status !== "Pending" && status !== "Processing" && status !== "Queued") {
-        throw new Error(`BFL ${status}: ${JSON.stringify(pollData?.result || pollData)}`);
-      }
+    if (b64) {
+      imageDataUrl = `data:${mimeType};base64,${b64}`;
+    } else if (url) {
+      const imgRes = await fetch(url);
+      if (!imgRes.ok) throw new Error(`Image fetch failed: ${imgRes.status}`);
+      const buf = await imgRes.arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      imageDataUrl = `data:${mimeType};base64,${btoa(binary)}`;
+    } else {
+      throw new Error("OpenAI returned no image data");
     }
 
-    if (!imageUrl) throw new Error("BFL generation timed out");
-
-    const fetched = await fetchImageAsDataUrl(imageUrl);
-    return new Response(JSON.stringify(fetched), {
+    return new Response(JSON.stringify({ imageDataUrl, mimeType }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
