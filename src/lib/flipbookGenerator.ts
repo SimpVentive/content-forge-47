@@ -27,12 +27,6 @@ export function generateFlipbookHTML(
   courseLevel: string = "Intermediate",
   captionsEnabled: boolean = true
 ): string {
-  // Generate version/timestamp info
-  const now = new Date();
-  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
-  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-  const versionInfo = `${dateStr}, ${timeStr} of version generated`;
-
   // Parse assessment if provided
   let assessmentData: any = null;
   if (assessmentRaw) {
@@ -432,23 +426,6 @@ export function generateFlipbookHTML(
       background: white;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
       border-radius: 8px;
-    }
-
-    .version-info {
-      position: absolute;
-      top: 30px;
-      right: 30px;
-      font-size: 8px;
-      color: #666;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 6px 10px;
-      border-radius: 4px;
-      border: 1px solid #ddd;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-      white-space: nowrap;
-      font-family: 'Courier New', monospace;
-      line-height: 1.3;
-      z-index: 10;
     }
 
     .page {
@@ -1008,7 +985,6 @@ export function generateFlipbookHTML(
       <div id="flipbook">
         ${pagesHTML}
       </div>
-      <div class="version-info">${escapeHtml(versionInfo)}</div>
     </div>
 
     <div class="flipbook-controls">
