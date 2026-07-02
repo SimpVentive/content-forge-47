@@ -1471,14 +1471,18 @@ export function generateFlipbookHTML(
         document.getElementById('prevBtn').addEventListener('click', () => {
           if (pageFlip.getCurrentPageIndex() > 0) {
             stopAllAudio();
-            pageFlip.flipPrev('top');
+            if (typeof pageFlip.turnToPrevPage === 'function') pageFlip.turnToPrevPage();
+            else pageFlip.flipPrev('top');
+            setTimeout(updatePageInfo, 120);
           }
         });
 
         document.getElementById('nextBtn').addEventListener('click', () => {
           if (pageFlip.getCurrentPageIndex() < totalPages - 1) {
             stopAllAudio();
-            pageFlip.flipNext('top');
+            if (typeof pageFlip.turnToNextPage === 'function') pageFlip.turnToNextPage();
+            else pageFlip.flipNext('top');
+            setTimeout(updatePageInfo, 120);
           }
         });
 
