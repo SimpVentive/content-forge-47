@@ -262,9 +262,49 @@ interface Slide {
   visualApproved?: boolean;
   wasTrimmedForLayout?: boolean;
   contentTemplate?: ContentTemplate;
-  question?: { question: string; options: string[]; correct_answer: string; rationale?: string };
+  question?: any;
+  assessmentKind?: "mcq" | "true_false" | "match_the_following" | "fill_blanks" | "scenario";
   takeaways?: string[];
   video?: InsertedVideo;
+}
+
+function normalizeAssessmentData(raw: any): any {
+  if (!raw || typeof raw !== "object") return { mcq: [], true_false: [], match_the_following: [], fill_blanks: [], scenarios: [] };
+  const pickArray = (...keys: string[]) => {
+    for (const key of keys) if (Array.isArray(raw[key])) return raw[key];
+    return [];
+  };
+  const questions = Array.isArray(raw.questions) ? raw.questions : [];
+  const byType = (patterns: RegExp[]) => questions.filter((q: any) => patterns.some((pattern) => pattern.test(String(q?.type || q?.question_type || q?.assessment_type || ""))));
+  const pairArray = (item: any) => Array.isArray(item?.correct_pairings) ? item.correct_pairings : Array.isArray(item?.pairs) ? item.pairs : Array.isArray(item?.matches) ? item.matches : Array.isArray(item?.items) ? item.items : [];
+
+  return {
+    mcq: pickArray("mcq", "mcqs", "multiple_choice", "multiple_choice_questions", "multipleChoice", "multipleChoiceQuestions")
+      .concat(byType([/mcq/i, /multiple[\s_-]*choice/i]))
+      .map((q: any) => ({ ...q, assessmentKind: "mcq", question: q.question || q.prompt || q.stem || "", options: Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : [], correct_answer: q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.correct ?? "" }))
+      .filter((q: any) => q.question && q.options.length),
+    true_false: pickArray("true_false", "trueFalse", "true_false_questions", "trueFalseQuestions", "tf", "true_or_false")
+      .concat(byType([/true[\s_/-]*false/i, /^tf$/i]))
+      .map((q: any) => ({ ...q, assessmentKind: "true_false", question: q.question || q.prompt || q.statement || "", options: ["True", "False"], correct_answer: String(q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.correct ?? "true") }))
+      .filter((q: any) => q.question),
+    match_the_following: pickArray("match_the_following", "matchTheFollowing", "matching", "matching_questions", "matchingQuestions", "match")
+      .concat(byType([/match/i, /matching/i]))
+      .map((item: any) => {
+        const pairs = pairArray(item);
+        const columnA = Array.isArray(item.column_a) ? item.column_a : Array.isArray(item.left_column) ? item.left_column : pairs.map((p: any) => p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question).filter(Boolean);
+        const columnB = Array.isArray(item.column_b) ? item.column_b : Array.isArray(item.right_column) ? item.right_column : pairs.map((p: any) => p?.b ?? p?.right ?? p?.match ?? p?.answer ?? p?.definition).filter(Boolean);
+        return { ...item, assessmentKind: "match_the_following", question: item.question || "Match each item with the correct answer.", column_a: columnA.map(String), column_b: Array.from(new Set(columnB.map(String))), correct_pairings: pairs };
+      })
+      .filter((item: any) => item.column_a.length && item.column_b.length),
+    fill_blanks: pickArray("fill_blanks", "fill_blank", "fill_in_the_blanks", "fillInTheBlanks", "fillBlanks", "blanks")
+      .concat(byType([/fill/i, /blank/i]))
+      .map((q: any) => ({ ...q, assessmentKind: "fill_blanks", question: q.passage || q.question || q.prompt || "", correct_answer: q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.blank_answer ?? "" }))
+      .filter((q: any) => q.question && q.correct_answer !== ""),
+    scenarios: pickArray("scenarios", "scenario", "scenario_questions", "scenarioQuestions", "scenario_based", "scenarioBasedQuestions")
+      .concat(byType([/scenario/i, /case/i]))
+      .map((q: any) => ({ ...q, assessmentKind: "scenario", question: q.situation || q.scenario || q.question || q.prompt || "", options: Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : [], correct_answer: q.best_response ?? q.bestResponse ?? q.correct_answer ?? q.correctAnswer ?? q.answer ?? "" }))
+      .filter((q: any) => q.question && q.options.length),
+  };
 }
 
 function getDurationMinutes(duration?: string): number {
