@@ -75,10 +75,16 @@ export function generateFlipbookHTML(
     if (assessmentData) {
       const mcqCount = (assessmentData.mcq || []).length;
       const scenarioCount = (assessmentData.scenarios || []).length;
+      const tfCount = (assessmentData.true_false || []).length;
+      const matchCount = (assessmentData.match_the_following || []).length;
+      const fillCount = (assessmentData.fill_blanks || []).length;
       const hasReflection = !!assessmentData.reflection;
 
       const assessmentParts = [];
       if (mcqCount > 0) assessmentParts.push(`${mcqCount} Multiple Choice Questions`);
+      if (tfCount > 0) assessmentParts.push(`${tfCount} True/False Questions`);
+      if (matchCount > 0) assessmentParts.push(`${matchCount} Match the Following`);
+      if (fillCount > 0) assessmentParts.push(`${fillCount} Fill in the Blanks`);
       if (scenarioCount > 0) assessmentParts.push(`${scenarioCount} Scenario-based Questions`);
       if (hasReflection) assessmentParts.push("1 Reflection Exercise");
 
@@ -101,11 +107,18 @@ export function generateFlipbookHTML(
     if (assessmentData) {
       const mcqCount = (assessmentData.mcq || []).length;
       const scenarioCount = (assessmentData.scenarios || []).length;
+      const tfCount = (assessmentData.true_false || []).length;
+      const matchCount = (assessmentData.match_the_following || []).length;
+      const fillCount = (assessmentData.fill_blanks || []).length;
       const hasReflection = !!assessmentData.reflection;
       if (mcqCount > 0) assessmentItems.push(`${mcqCount} Multiple Choice Question${mcqCount > 1 ? "s" : ""}`);
+      if (tfCount > 0) assessmentItems.push(`${tfCount} True/False Question${tfCount > 1 ? "s" : ""}`);
+      if (matchCount > 0) assessmentItems.push(`${matchCount} Match the Following Exercise${matchCount > 1 ? "s" : ""}`);
+      if (fillCount > 0) assessmentItems.push(`${fillCount} Fill in the Blank${fillCount > 1 ? "s" : ""}`);
       if (scenarioCount > 0) assessmentItems.push(`${scenarioCount} Scenario-based Question${scenarioCount > 1 ? "s" : ""}`);
       if (hasReflection) assessmentItems.push(`1 Reflection Exercise`);
     }
+
 
     const overviewHtml = `
       <div class="overview-block">
