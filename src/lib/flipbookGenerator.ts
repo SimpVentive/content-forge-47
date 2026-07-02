@@ -223,6 +223,111 @@ export function generateFlipbookHTML(
       });
     }
 
+    // Add True/False questions
+    if (Array.isArray(assessmentData.true_false)) {
+      assessmentData.true_false.slice(0, 10).forEach((q: any, qIdx: number) => {
+        const questionText = q.question || "";
+        const correctRaw = String(q.correct_answer ?? "").trim().toLowerCase();
+        const isTrue = correctRaw === "true" || correctRaw === "t" || correctRaw === "yes";
+        const options = ["True", "False"];
+        const optionsHtml = options.map((opt, oi) => {
+          const letter = String.fromCharCode(65 + oi);
+          const isCorrect = (opt === "True") === isTrue;
+          return `<button type="button" class="mcq-option" data-correct="${isCorrect ? "1" : "0"}" onclick="window.__mcqAnswer&&window.__mcqAnswer(this)"><span class="mcq-letter">${letter}</span><span class="mcq-text">${escapeHtml(opt)}</span><span class="mcq-icon"></span></button>`;
+        }).join("");
+        const rationale = q.rationale ? `<div class="mcq-rationale" style="margin-top:12px;font-size:13px;color:#475569;"><strong>Rationale:</strong> ${escapeHtml(q.rationale)}</div>` : "";
+        const html = `
+          <div class="mcq-question">${escapeHtml(questionText)}</div>
+          <div class="mcq-options">${optionsHtml}</div>
+          <div class="mcq-feedback" data-correct-text="${isTrue ? "True" : "False"}"></div>
+          ${rationale}
+        `;
+        pages.push({
+          title: `True/False ${qIdx + 1}`,
+          content: "",
+          htmlContent: html,
+          images: [],
+          speaker: "",
+          pageNumber: assessmentPageNum++,
+        });
+      });
+    }
+
+    // Add Match The Following questions
+    if (Array.isArray(assessmentData.match_the_following)) {
+      assessmentData.match_the_following.slice(0, 5).forEach((m: any, mIdx: number) => {
+        const colA: string[] = Array.isArray(m.column_a) ? m.column_a : [];
+        const colB: string[] = Array.isArray(m.column_b) ? m.column_b : [];
+        const pairings: any[] = Array.isArray(m.correct_pairings) ? m.correct_pairings : [];
+        const pairMap = pairings.map((p: any) => {
+          if (typeof p === "string") {
+            const parts = p.split(/[-:→=]/).map(s => s.trim());
+            return { a: parts[0], b: parts[1] };
+          }
+          return { a: String(p.a ?? p.column_a ?? p.left ?? ""), b: String(p.b ?? p.column_b ?? p.right ?? "") };
+        });
+        const rowsHtml = colA.map((a, i) => {
+          const optionsHtml = colB.map((b, bi) => `<option value="${escapeHtml(b)}">${String.fromCharCode(65 + bi)}. ${escapeHtml(b)}</option>`).join("");
+          const correct = pairMap.find(p => p.a === a || p.a === String(i + 1))?.b || "";
+          return `<tr>
+            <td style="padding:10px 14px;font-weight:600;color:#0f172a;border-bottom:1px solid #e2e8f0;">${i + 1}. ${escapeHtml(a)}</td>
+            <td style="padding:10px 14px;border-bottom:1px solid #e2e8f0;">
+              <select class="match-select" data-correct="${escapeHtml(correct)}" style="width:100%;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;">
+                <option value="">-- Select --</option>
+                ${optionsHtml}
+              </select>
+            </td>
+          </tr>`;
+        }).join("");
+        const explanation = m.explanation ? `<div class="mcq-rationale" style="margin-top:12px;font-size:13px;color:#475569;"><strong>Explanation:</strong> ${escapeHtml(m.explanation)}</div>` : "";
+        const html = `
+          <div class="mcq-question">Match each item on the left with the correct item on the right.</div>
+          <table style="width:100%;border-collapse:collapse;margin-top:12px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+            <thead><tr style="background:#f1f5f9;"><th style="text-align:left;padding:10px 14px;font-size:12px;text-transform:uppercase;color:#475569;">Column A</th><th style="text-align:left;padding:10px 14px;font-size:12px;text-transform:uppercase;color:#475569;">Column B</th></tr></thead>
+            <tbody>${rowsHtml}</tbody>
+          </table>
+          <button type="button" onclick="window.__matchCheck&&window.__matchCheck(this)" style="margin-top:14px;padding:10px 18px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Check Answers</button>
+          <div class="match-feedback" style="margin-top:10px;font-weight:600;"></div>
+          ${explanation}
+        `;
+        pages.push({
+          title: `Match ${mIdx + 1}`,
+          content: "",
+          htmlContent: html,
+          images: [],
+          speaker: "",
+          pageNumber: assessmentPageNum++,
+        });
+      });
+    }
+
+    // Add Fill in the Blanks
+    if (Array.isArray(assessmentData.fill_blanks)) {
+      assessmentData.fill_blanks.slice(0, 10).forEach((q: any, qIdx: number) => {
+        const passage = String(q.passage || "");
+        const correct = String(q.correct_answer || "").trim();
+        const passageHtml = escapeHtml(passage).replace(/_{2,}|\[blank\]|\{blank\}/i,
+          `<input type="text" class="fill-blank-input" data-correct="${escapeHtml(correct)}" style="display:inline-block;min-width:140px;padding:4px 8px;border:none;border-bottom:2px solid #0f766e;background:transparent;font-size:inherit;margin:0 4px;" />`);
+        const rationale = q.rationale ? `<div class="mcq-rationale" style="margin-top:12px;font-size:13px;color:#475569;"><strong>Rationale:</strong> ${escapeHtml(q.rationale)}</div>` : "";
+        const html = `
+          <div class="mcq-question" style="line-height:1.8;">${passageHtml}</div>
+          <button type="button" onclick="window.__fillCheck&&window.__fillCheck(this)" style="margin-top:14px;padding:10px 18px;background:#0f766e;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">Check Answer</button>
+          <div class="fill-feedback" style="margin-top:10px;font-weight:600;"></div>
+          ${rationale}
+        `;
+        pages.push({
+          title: `Fill in the Blank ${qIdx + 1}`,
+          content: "",
+          htmlContent: html,
+          images: [],
+          speaker: "",
+          pageNumber: assessmentPageNum++,
+        });
+      });
+    }
+
+
+
     // Add scenario questions
     if (Array.isArray(assessmentData.scenarios)) {
       assessmentData.scenarios.slice(0, 5).forEach((s: any, sIdx: number) => {
