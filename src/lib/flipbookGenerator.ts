@@ -695,7 +695,7 @@ export function generateFlipbookHTML(
         page-break-after: always;
       }
     }
-    .page-text-html { text-align: left; }
+    .page-text-html { text-align: left !important; }
     .overview-block { display: flex; flex-direction: column; gap: 28px; padding: 8px 12px; }
     .overview-row { display: grid; grid-template-columns: 180px 1fr; gap: 24px; align-items: start; }
     .overview-label { font-size: 15px; font-weight: 700; color: #0f172a; padding-top: 2px; }
@@ -768,7 +768,7 @@ export function generateFlipbookHTML(
       color: #0f172a;
       margin-bottom: 20px;
       line-height: 1.6;
-      text-align: left;
+      text-align: left !important;
     }
 
     .reflection-input {
@@ -784,6 +784,7 @@ export function generateFlipbookHTML(
       line-height: 1.5;
       box-sizing: border-box;
       margin-bottom: 20px;
+      text-align: left;
     }
 
     .reflection-input:focus {
@@ -798,6 +799,7 @@ export function generateFlipbookHTML(
       border-left: 4px solid #94a3b8;
       border-radius: 4px;
       margin-top: 16px;
+      text-align: left;
     }
 
     .reflection-guidance-label {
@@ -807,13 +809,14 @@ export function generateFlipbookHTML(
       text-transform: uppercase;
       letter-spacing: 0.5px;
       margin-bottom: 8px;
+      text-align: left;
     }
 
     .reflection-guidance-text {
       font-size: 14px;
       color: #334155;
       line-height: 1.6;
-      text-align: left;
+      text-align: left !important;
     }
 
     .mcq-score-badge {
