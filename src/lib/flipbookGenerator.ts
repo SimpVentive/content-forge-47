@@ -44,6 +44,7 @@ export function generateFlipbookHTML(
       }
     }
   }
+  assessmentData = normalizeAssessmentData(assessmentData);
 
   // Pick the first available scene image to use as the cover hero image
   const firstSceneImage = narratives
@@ -277,7 +278,7 @@ export function generateFlipbookHTML(
             const parts = p.split(/[-:→=]/).map(s => s.trim());
             return { a: parts[0], b: parts[1] };
           }
-          return { a: String(p.a ?? p.column_a ?? p.left ?? ""), b: String(p.b ?? p.column_b ?? p.right ?? "") };
+          return { a: String(p.a ?? p.column_a ?? p.left ?? p.term ?? p.prompt ?? ""), b: String(p.b ?? p.column_b ?? p.right ?? p.match ?? p.answer ?? "") };
         });
         const rowsHtml = colA.map((a, i) => {
           const optionsHtml = colB.map((b, bi) => `<option value="${escapeHtml(b)}">${String.fromCharCode(65 + bi)}. ${escapeHtml(b)}</option>`).join("");
@@ -317,9 +318,10 @@ export function generateFlipbookHTML(
     // Add Fill in the Blanks
     if (Array.isArray(assessmentData.fill_blanks)) {
       assessmentData.fill_blanks.slice(0, 10).forEach((q: any, qIdx: number) => {
-        const passage = String(q.passage || "");
-        const correct = String(q.correct_answer || "").trim();
-        const passageHtml = escapeHtml(passage).replace(/_{2,}|\[blank\]|\{blank\}/i,
+        const passage = String(q.passage || q.question || q.prompt || "");
+        const correct = String(q.correct_answer || q.answer || "").trim();
+        const passageWithBlank = /_{2,}|\[blank\]|\{blank\}/i.test(passage) ? passage : `${passage} ____`;
+        const passageHtml = escapeHtml(passageWithBlank).replace(/_{2,}|\[blank\]|\{blank\}/i,
           `<input type="text" class="fill-blank-input" data-correct="${escapeHtml(correct)}" style="display:inline-block;min-width:140px;padding:4px 8px;border:none;border-bottom:2px solid #0f766e;background:transparent;font-size:inherit;margin:0 4px;" />`);
         const rationale = q.rationale ? `<div class="mcq-rationale" style="margin-top:12px;font-size:13px;color:#475569;"><strong>Rationale:</strong> ${escapeHtml(q.rationale)}</div>` : "";
         const html = `
@@ -703,6 +705,7 @@ export function generateFlipbookHTML(
       color: #fff;
       border-color: transparent;
       box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+    }
 
     .flipbook-controls {
       background: white;
@@ -1567,4 +1570,93 @@ function escapeHtml(text: string): string {
     "'": "&#039;",
   };
   return text.replace(/[&<>"']/g, (m) => map[m]);
+}
+
+function normalizeAssessmentData(raw: any): any | null {
+  if (!raw || typeof raw !== "object") return raw || null;
+
+  const pickArray = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = raw[key];
+      if (Array.isArray(value)) return value;
+    }
+    return [];
+  };
+
+  const allQuestions = Array.isArray(raw.questions) ? raw.questions : [];
+  const byType = (patterns: RegExp[]) =>
+    allQuestions.filter((q: any) => patterns.some((pattern) => pattern.test(String(q?.type || q?.question_type || q?.assessment_type || ""))));
+
+  const mcq = pickArray("mcq", "mcqs", "multiple_choice", "multiple_choice_questions", "multipleChoice", "multipleChoiceQuestions")
+    .concat(byType([/mcq/i, /multiple[\s_-]*choice/i]))
+    .map((q: any) => ({
+      ...q,
+      question: q?.question || q?.prompt || q?.stem || "",
+      options: Array.isArray(q?.options) ? q.options : Array.isArray(q?.choices) ? q.choices : [],
+      correct_answer: q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? q?.correct ?? "",
+    }));
+
+  const trueFalse = pickArray("true_false", "trueFalse", "true_false_questions", "trueFalseQuestions", "tf", "true_or_false")
+    .concat(byType([/true[\s_/-]*false/i, /^tf$/i]))
+    .map((q: any) => ({
+      ...q,
+      question: q?.question || q?.prompt || q?.statement || "",
+      correct_answer: q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? q?.correct ?? false,
+    }));
+
+  const matchSource = pickArray("match_the_following", "matchTheFollowing", "matching", "matching_questions", "matchingQuestions", "match", "match_following")
+    .concat(byType([/match/i, /matching/i]));
+  const matchTheFollowing = matchSource.map((item: any) => {
+    const pairings = Array.isArray(item?.correct_pairings)
+      ? item.correct_pairings
+      : Array.isArray(item?.pairs)
+        ? item.pairs
+        : Array.isArray(item?.matches)
+          ? item.matches
+          : Array.isArray(item?.items)
+            ? item.items
+            : [];
+    const columnA = Array.isArray(item?.column_a)
+      ? item.column_a
+      : Array.isArray(item?.left_column)
+        ? item.left_column
+        : pairings.map((p: any) => p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question).filter(Boolean);
+    const columnB = Array.isArray(item?.column_b)
+      ? item.column_b
+      : Array.isArray(item?.right_column)
+        ? item.right_column
+        : pairings.map((p: any) => p?.b ?? p?.right ?? p?.match ?? p?.answer ?? p?.definition).filter(Boolean);
+    return {
+      ...item,
+      column_a: columnA.map(String),
+      column_b: [...new Set(columnB.map(String))],
+      correct_pairings: pairings,
+    };
+  }).filter((item: any) => item.column_a.length > 0 && item.column_b.length > 0);
+
+  const fillBlanks = pickArray("fill_blanks", "fill_blank", "fill_in_the_blanks", "fillInTheBlanks", "fillBlanks", "blanks")
+    .concat(byType([/fill/i, /blank/i]))
+    .map((q: any) => ({
+      ...q,
+      passage: q?.passage || q?.question || q?.prompt || "",
+      correct_answer: q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? q?.blank_answer ?? "",
+    }));
+
+  const scenarios = pickArray("scenarios", "scenario", "scenario_questions", "scenarioQuestions", "scenario_based", "scenarioBasedQuestions")
+    .concat(byType([/scenario/i, /case/i]))
+    .map((q: any) => ({
+      ...q,
+      situation: q?.situation || q?.scenario || q?.question || q?.prompt || "",
+      options: Array.isArray(q?.options) ? q.options : Array.isArray(q?.choices) ? q.choices : [],
+      best_response: q?.best_response ?? q?.bestResponse ?? q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? "",
+    }));
+
+  return {
+    ...raw,
+    mcq,
+    true_false: trueFalse,
+    match_the_following: matchTheFollowing,
+    fill_blanks: fillBlanks,
+    scenarios,
+  };
 }
