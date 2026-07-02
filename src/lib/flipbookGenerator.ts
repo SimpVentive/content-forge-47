@@ -1448,7 +1448,13 @@ export function generateFlipbookHTML(
 
         // Add pages to the flipbook
         var pageElements = document.querySelectorAll('#flipbook .page');
-        pageFlip.loadFromElements(Array.from(pageElements));
+        if (typeof pageFlip.loadFromHTML === 'function') {
+          pageFlip.loadFromHTML(Array.from(pageElements));
+        } else if (typeof pageFlip.loadFromElements === 'function') {
+          pageFlip.loadFromElements(Array.from(pageElements));
+        } else {
+          throw new Error('PageFlip renderer does not expose a supported load method');
+        }
 
         loadAudioPreference();
         applyAudioVisibility();
