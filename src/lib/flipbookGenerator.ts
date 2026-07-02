@@ -23,7 +23,8 @@ export function generateFlipbookHTML(
   voiceoverPace?: "slow" | "normal" | "fast",
   assessmentRaw?: string,
   companyLogoDataUrl?: string | null,
-  passThreshold: number = 70
+  passThreshold: number = 70,
+  courseLevel: string = "Intermediate"
 ): string {
   // Parse assessment if provided
   let assessmentData: any = null;
@@ -52,7 +53,7 @@ export function generateFlipbookHTML(
   const pages: FlipbookPage[] = [
     {
       title: courseTitle,
-      content: "Professional Learning Guide",
+      content: `Professional Learning Guide\nCourse Level: ${courseLevel}`,
       images: firstSceneImage ? [firstSceneImage] : [],
       speaker: "",
       pageNumber: 0,
@@ -180,6 +181,11 @@ export function generateFlipbookHTML(
   );
 
   pages.push(...contentPages);
+
+  // Remove Page 3 (index 3 - the 4th page: title, overview, first content, second content to remove)
+  if (pages.length > 3) {
+    pages.splice(3, 1);
+  }
 
   // Add assessment pages if available
   if (assessmentData) {
@@ -478,6 +484,20 @@ export function generateFlipbookHTML(
       border-top: none;
       width: 100%;
       font-weight: 500;
+      white-space: pre-line;
+    }
+
+    .page:first-child .page-text {
+      font-size: 16px;
+      line-height: 1.3;
+      margin-top: 4px;
+      gap: 0;
+    }
+
+    .page:first-child .page-text::before {
+      content: '';
+      display: block;
+      height: 0;
     }
 
     .logo-first-page {
