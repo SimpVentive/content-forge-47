@@ -1282,6 +1282,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set());
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
+  const [assessmentTextAnswers, setAssessmentTextAnswers] = useState<Record<number, string>>({});
+  const [assessmentMatchAnswers, setAssessmentMatchAnswers] = useState<Record<number, Record<number, string>>>({});
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [startTime] = useState(Date.now());
   const [showCompletion, setShowCompletion] = useState(false);
@@ -1840,16 +1842,35 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   const handleSubmitAnswer = (slideIdx: number) => {
     const ans = assessmentAnswers[slideIdx];
-    if (!ans || ans.submitted) return;
     const q = slides[slideIdx].question;
     if (!q) return;
-    const optClean = stripOptionPrefix(q.options[ans.selected] || "");
-    const correctClean = stripOptionPrefix(q.correct_answer || "");
-    const correct = optClean === correctClean ||
-      q.options[ans.selected] === q.correct_answer ||
-      String.fromCharCode(65 + ans.selected) === q.correct_answer ||
-      q.correct_answer?.includes(optClean);
-    setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true } }));
+    if (ans?.submitted) return;
+
+    let correct = false;
+    if (q.assessmentKind === "match_the_following") {
+      const rows = Array.isArray(q.column_a) ? q.column_a : [];
+      const pairings = Array.isArray(q.correct_pairings) ? q.correct_pairings : [];
+      const selected = assessmentMatchAnswers[slideIdx] || {};
+      correct = rows.length > 0 && rows.every((left: string, row: number) => {
+        const pair = pairings.find((p: any) => String(p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question) === String(left));
+        const expected = String(pair?.b ?? pair?.right ?? pair?.match ?? pair?.answer ?? pair?.definition ?? "").trim();
+        return expected && String(selected[row] || "").trim() === expected;
+      });
+    } else if (q.assessmentKind === "fill_blanks") {
+      const expected = stripOptionPrefix(q.correct_answer || q.answer || "").toLowerCase();
+      const response = stripOptionPrefix(assessmentTextAnswers[slideIdx] || "").toLowerCase();
+      correct = Boolean(expected && response === expected);
+    } else {
+      if (!ans) return;
+      const optClean = stripOptionPrefix(q.options[ans.selected] || "");
+      const correctClean = stripOptionPrefix(q.correct_answer || "");
+      correct = optClean === correctClean ||
+        q.options[ans.selected] === q.correct_answer ||
+        String.fromCharCode(65 + ans.selected) === q.correct_answer ||
+        q.correct_answer?.includes(optClean);
+    }
+
+    setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { selected: ans?.selected ?? -1, submitted: true } }));
     setScore(prev => ({ correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1 }));
   };
 
