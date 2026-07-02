@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import { ChevronLeft, ChevronRight, Volume2, VolumeX } from "lucide-react";
+import { ChevronLeft, ChevronRight, Volume2, VolumeX, Maximize2, Minimize2, Printer } from "lucide-react";
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
 
 interface NarrativeFlipbookProps {
@@ -19,7 +19,9 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [autoplayAudio, setAutoplayAudio] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const flipbookContainerRef = useRef<HTMLDivElement>(null);
 
   const currentTopic = narratives[currentTopicIndex];
   const currentScene = currentTopic?.scenes[currentSceneIndex];
@@ -59,6 +61,37 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
     setTimeout(() => setIsTransitioning(false), 300);
   }, [currentSceneIndex, currentTopicIndex, currentTopic.scenes.length, isTransitioning, narratives.length, onSceneChange]);
 
+  const handleFullscreen = useCallback(() => {
+    if (!flipbookContainerRef.current) return;
+
+    if (!isFullscreen) {
+      // Request fullscreen
+      if (flipbookContainerRef.current.requestFullscreen) {
+        flipbookContainerRef.current.requestFullscreen().catch(() => {
+          // Fallback: just toggle the state without actual fullscreen API
+          setIsFullscreen(true);
+        });
+        setIsFullscreen(true);
+      } else {
+        // Fallback for browsers that don't support fullscreen API
+        setIsFullscreen(true);
+      }
+    } else {
+      // Exit fullscreen
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {
+          setIsFullscreen(false);
+        });
+      }
+      setIsFullscreen(false);
+    }
+  }, [isFullscreen]);
+
+  const handlePrint = useCallback(() => {
+    // Trigger browser print dialog
+    window.print();
+  }, []);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -69,6 +102,26 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleNext, handlePrevious]);
+
+  // Add print styles
+  useEffect(() => {
+    const styleId = "narrative-flipbook-print-styles";
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement("style");
+      style.id = styleId;
+      style.textContent = `
+        @media print {
+          [data-print-hide] {
+            display: none !important;
+          }
+          .print\\:ml-0 {
+            margin-left: 0 !important;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   // Auto-play audio when scene changes
   useEffect(() => {
@@ -96,11 +149,66 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
       : "transition-all duration-400 ease-out";
 
   return (
-    <div className="w-full bg-white rounded-xl shadow-lg overflow-hidden">
+    <div
+      ref={flipbookContainerRef}
+      className={`w-full bg-white rounded-xl shadow-lg overflow-hidden transition-all ${
+        isFullscreen ? "fixed inset-0 rounded-none z-50" : "relative"
+      }`}
+    >
+      {/* Left-side Toolbar */}
+      <div
+        className="absolute left-0 top-0 bottom-0 flex flex-col items-center justify-center gap-2 bg-black/10 backdrop-blur-sm px-3 py-6 z-40"
+        data-print-hide
+      >
+        <button
+          onClick={handlePrevious}
+          disabled={isTransitioning || (currentTopicIndex === 0 && currentSceneIndex === 0)}
+          className="p-3 rounded-lg hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white/20 text-gray-800 hover:text-gray-900"
+          title="Previous scene (← or A)"
+          aria-label="Previous scene"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </button>
+
+        <button
+          onClick={handleNext}
+          disabled={isTransitioning || (currentTopicIndex === narratives.length - 1 && currentSceneIndex === currentTopic.scenes.length - 1)}
+          className="p-3 rounded-lg hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all bg-white/20 text-gray-800 hover:text-gray-900"
+          title="Next scene (→ or D)"
+          aria-label="Next scene"
+        >
+          <ChevronRight className="w-6 h-6" />
+        </button>
+
+        <div className="h-px w-6 bg-white/30 my-2" />
+
+        <button
+          onClick={handleFullscreen}
+          className="p-3 rounded-lg hover:bg-white/30 transition-all bg-white/20 text-gray-800 hover:text-gray-900"
+          title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+          aria-label="Toggle fullscreen"
+        >
+          {isFullscreen ? (
+            <Minimize2 className="w-6 h-6" />
+          ) : (
+            <Maximize2 className="w-6 h-6" />
+          )}
+        </button>
+
+        <button
+          onClick={handlePrint}
+          className="p-3 rounded-lg hover:bg-white/30 transition-all bg-white/20 text-gray-800 hover:text-gray-900"
+          title="Print current page"
+          aria-label="Print"
+        >
+          <Printer className="w-6 h-6" />
+        </button>
+      </div>
+
       {/* Flipbook Container */}
       <div className="relative bg-gradient-to-b from-white to-gray-50 flex flex-col">
         {/* Scene Display */}
-        <div className="overflow-hidden flex items-center justify-center bg-black/5 relative max-h-[70vh]">
+        <div className="overflow-hidden flex items-center justify-center bg-black/5 relative max-h-[70vh] ml-16 print:ml-0">
           {currentScene.imageDataUrl ? (
             <img
               src={currentScene.imageDataUrl}
@@ -120,7 +228,7 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
         </div>
 
         {/* Caption Area (Comic-style text) — directly under the image */}
-        <div className="bg-white border-t-2 border-gray-200 px-6 py-4">
+        <div className="bg-white border-t-2 border-gray-200 px-6 py-4 ml-16 print:ml-0">
           <div className="space-y-3">
             <h3 className="text-sm font-bold text-gray-900">{currentScene.title}</h3>
             {captionsEnabled && <p className="text-[15px] leading-relaxed text-gray-700">{currentScene.caption}</p>}
@@ -168,7 +276,7 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
       </div>
 
       {/* Navigation Footer */}
-      <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-between">
+      <div className="bg-gray-50 border-t border-gray-200 px-6 py-4 flex items-center justify-between ml-16 print:ml-0" data-print-hide>
         <div className="flex items-center gap-2">
           <button
             onClick={handlePrevious}
@@ -210,7 +318,7 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
       </div>
 
       {/* Instructions Overlay (First Time) */}
-      <div className="absolute top-4 right-4 text-xs text-white bg-black/40 px-3 py-2 rounded-lg pointer-events-none">
+      <div className="absolute top-4 right-4 text-xs text-white bg-black/40 px-3 py-2 rounded-lg pointer-events-none" data-print-hide>
         ← → or A/D keys to navigate
       </div>
     </div>
