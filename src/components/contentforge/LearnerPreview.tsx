@@ -2825,6 +2825,16 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         let cleanQuestion = q.question || "";
         cleanQuestion = cleanQuestion.replace(/Correct Answer:.*$/gi, '').replace(/Options:.*$/gi, '').trim();
 
+        // Randomize option order each time this question loads (deterministic per question/slide)
+        const optionsWithIndices = q.options.map((opt: string, idx: number) => ({ opt, originalIdx: idx }));
+        const seed = currentSlide + 12345; // Consistent seed per slide
+        const shuffledOptions = [...optionsWithIndices].sort(() => {
+          const hash = Math.sin(seed * (optionsWithIndices.indexOf(optionsWithIndices[0]) + 1)) * 10000;
+          return hash - Math.floor(hash);
+        });
+
+        const getShuffledIndex = (originalIdx: number) => shuffledOptions.findIndex(item => item.originalIdx === originalIdx);
+
         return (
           <div className="w-full h-full flex flex-col" key={currentSlide}>
             <div className="flex-1 overflow-y-auto px-6 py-8">
@@ -2832,68 +2842,68 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 {/* Header */}
                 <div className="mb-8">
                   <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">
-                    Question {currentSlide + 1}
+                    Q{currentSlide + 1}
                   </span>
-                  <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed">
+                  <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">
                     {cleanQuestion}
                   </h2>
                 </div>
 
                 {/* Options */}
-                <div className="space-y-3 mb-8">
-                  {q.options.map((opt: string, oi: number) => {
+                <div className="space-y-4 mb-8">
+                  {shuffledOptions.map(({ opt: originalOpt, originalIdx }, displayIdx) => {
                     let style = "border-2 border-slate-200 bg-white hover:border-slate-300 hover:shadow-md";
-                    const optClean = stripOptionPrefix(opt);
+                    const optClean = stripOptionPrefix(originalOpt);
                     const correctClean = stripOptionPrefix(q.correct_answer || "");
 
                     if (ans?.submitted) {
                       const isCorrect = optClean === correctClean ||
-                        opt === q.correct_answer ||
-                        String.fromCharCode(65 + oi) === q.correct_answer ||
+                        originalOpt === q.correct_answer ||
+                        String.fromCharCode(65 + originalIdx) === q.correct_answer ||
                         q.correct_answer?.includes(optClean);
                       if (isCorrect) style = "border-2 border-emerald-500 bg-emerald-50 shadow-md";
-                      else if (oi === ans.selected) style = "border-2 border-red-400 bg-red-50";
-                    } else if (ans?.selected === oi) {
+                      else if (displayIdx === ans.selected) style = "border-2 border-red-400 bg-red-50";
+                    } else if (ans?.selected === displayIdx) {
                       style = "border-2 border-blue-500 bg-blue-50 shadow-md";
                     }
 
                     return (
                       <button
-                        key={oi}
-                        onClick={() => !ans?.submitted && handleSelectAnswer(currentSlide, oi)}
+                        key={displayIdx}
+                        onClick={() => !ans?.submitted && handleSelectAnswer(currentSlide, displayIdx)}
                         disabled={ans?.submitted}
                         className={`w-full px-6 py-4 rounded-lg text-left transition-all anim-fade-in-up ${style} ${ans?.submitted ? 'cursor-default' : 'cursor-pointer'}`}
-                        style={{ animationDelay: `${0.1 + oi * 0.08}s` }}
+                        style={{ animationDelay: `${0.1 + displayIdx * 0.08}s` }}
                       >
                         <div className="flex items-start gap-4">
-                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[15px] ${
+                          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[14px] ${
                             ans?.submitted && (
-                              optClean === correctClean || opt === q.correct_answer ||
-                              String.fromCharCode(65 + oi) === q.correct_answer ||
+                              optClean === correctClean || originalOpt === q.correct_answer ||
+                              String.fromCharCode(65 + originalIdx) === q.correct_answer ||
                               q.correct_answer?.includes(optClean)
                             ) ? 'bg-emerald-500 text-white' :
-                            ans?.submitted && oi === ans.selected ? 'bg-red-400 text-white' :
-                            ans?.selected === oi ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
+                            ans?.submitted && displayIdx === ans.selected ? 'bg-red-400 text-white' :
+                            ans?.selected === displayIdx ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
                           }`}>
-                            {String.fromCharCode(65 + oi)}
+                            {String.fromCharCode(65 + displayIdx)}
                           </div>
                           <div className="flex-1 text-left">
-                            <p className="text-[16px] font-medium text-slate-900">
-                              {stripOptionPrefix(opt)}
+                            <p className="text-[18px] font-medium text-slate-900 leading-relaxed">
+                              {stripOptionPrefix(originalOpt)}
                             </p>
                           </div>
                           {ans?.submitted && (
-                            optClean === correctClean || opt === q.correct_answer ||
-                            String.fromCharCode(65 + oi) === q.correct_answer ||
+                            optClean === correctClean || originalOpt === q.correct_answer ||
+                            String.fromCharCode(65 + originalIdx) === q.correct_answer ||
                             q.correct_answer?.includes(optClean)
                           ) && (
                             <div className="flex-shrink-0 text-emerald-600">
                               <Check className="w-5 h-5" />
                             </div>
                           )}
-                          {ans?.submitted && oi === ans.selected && !(
-                            optClean === correctClean || opt === q.correct_answer ||
-                            String.fromCharCode(65 + oi) === q.correct_answer ||
+                          {ans?.submitted && displayIdx === ans.selected && !(
+                            optClean === correctClean || originalOpt === q.correct_answer ||
+                            String.fromCharCode(65 + originalIdx) === q.correct_answer ||
                             q.correct_answer?.includes(optClean)
                           ) && (
                             <div className="flex-shrink-0 text-red-400">
