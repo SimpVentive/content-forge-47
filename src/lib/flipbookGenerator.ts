@@ -460,7 +460,7 @@ export function generateFlipbookHTML(
           <div class="narration-text">${escapeHtml(page.speaker)}</div>
           ${page.audioDataUrl ? `
             <div class="audio-player-container">
-              <audio class="audio-player" controls preload="metadata">
+              <audio class="audio-player" preload="metadata">
                 <source src="${page.audioDataUrl}" type="audio/mpeg">
                 Your browser does not support the audio element.
               </audio>
@@ -652,6 +652,7 @@ export function generateFlipbookHTML(
     }
 
     .audio-player-container {
+      display: none !important;
       margin-bottom: 10px;
       width: 100%;
     }
@@ -703,6 +704,21 @@ export function generateFlipbookHTML(
       color: #fff;
       border-color: transparent;
       box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+    }
+
+    .audio-control-cluster {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      padding-left: 12px;
+    }
+
+    .audio-control-label {
+      color: #334155;
+      font-size: 13px;
+      font-weight: 700;
+    }
 
     .flipbook-controls {
       background: white;
@@ -1094,7 +1110,7 @@ export function generateFlipbookHTML(
   </style>
 </head>
 <body>
-  <div class="flipbook-container">
+  <div class="flipbook-container" id="flipbook-container">
     <div class="flipbook-header">
       <h1>${escapeHtml(courseTitle)}</h1>
     </div>
@@ -1113,6 +1129,13 @@ export function generateFlipbookHTML(
       </div>
       <button class="btn btn-primary" id="nextBtn">Next &rarr;</button>
       <button class="btn btn-secondary" id="fullscreenBtn">Fullscreen</button>
+      ${voiceoverEnabled ? `
+      <div class="audio-control-cluster" aria-label="Audio narration controls">
+        <span class="audio-control-label">Audio</span>
+        <button type="button" class="audio-toggle-btn active" data-audio-toggle="on" onclick="window.__setAudioEnabled&&window.__setAudioEnabled(true)">On</button>
+        <button type="button" class="audio-toggle-btn" data-audio-toggle="off" onclick="window.__setAudioEnabled&&window.__setAudioEnabled(false)">Off</button>
+      </div>
+      ` : ""}
       <button class="btn btn-secondary" id="printBtn">Print</button>
     </div>
   </div>
@@ -1321,6 +1344,67 @@ export function generateFlipbookHTML(
   <script>
     var pageFlip = null;
     var totalPages = ${pages.length};
+    window.__fallbackCurrentPage = 0;
+
+    function loadAudioPreference() {
+      try {
+        var stored = localStorage.getItem('flipbookAudioEnabled');
+        window.__audioEnabled = stored === null ? true : stored === 'true';
+      } catch (e) { window.__audioEnabled = true; }
+    }
+
+    function stopAllAudio() {
+      var audioElements = document.querySelectorAll('.audio-player');
+      audioElements.forEach(function (audioEl) {
+        audioEl.pause();
+        audioEl.currentTime = 0;
+      });
+    }
+
+    function getCurrentPageElement() {
+      var idx = window.__fallbackCurrentPage || 0;
+      try {
+        if (pageFlip && typeof pageFlip.getCurrentPageIndex === 'function') {
+          idx = pageFlip.getCurrentPageIndex();
+        }
+      } catch (e) {}
+      var pageEls = document.querySelectorAll('#flipbook .page');
+      return pageEls[idx];
+    }
+
+    function playCurrentPageAudio() {
+      if (!window.__audioEnabled) return;
+      try {
+        var cur = getCurrentPageElement();
+        if (!cur) return;
+        var audio = cur.querySelector('.audio-player');
+        if (audio) {
+          audio.currentTime = 0;
+          var p = audio.play();
+          if (p && typeof p.catch === 'function') p.catch(function () {});
+        }
+      } catch (e) {}
+    }
+
+    function applyAudioVisibility() {
+      var btns = document.querySelectorAll('[data-audio-toggle]');
+      btns.forEach(function (b) {
+        var on = b.getAttribute('data-audio-toggle') === 'on';
+        if ((on && window.__audioEnabled) || (!on && !window.__audioEnabled)) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+    }
+
+    window.__setAudioEnabled = function (enabled) {
+      window.__audioEnabled = !!enabled;
+      try { localStorage.setItem('flipbookAudioEnabled', String(window.__audioEnabled)); } catch (e) {}
+      applyAudioVisibility();
+      stopAllAudio();
+      if (window.__audioEnabled) playCurrentPageAudio();
+    };
 
     // Initialize StPageFlip after DOM and library are ready
     window.addEventListener('DOMContentLoaded', function () {
@@ -1360,63 +1444,7 @@ export function generateFlipbookHTML(
         var pageElements = document.querySelectorAll('#flipbook .page');
         pageFlip.loadFromElements(Array.from(pageElements));
 
-        // Global audio-enabled flag, persisted via localStorage. Default: ON.
-        try {
-          var stored = localStorage.getItem('flipbookAudioEnabled');
-          window.__audioEnabled = stored === null ? true : stored === 'true';
-        } catch (e) { window.__audioEnabled = true; }
-
-        function applyAudioVisibility() {
-          var sections = document.querySelectorAll('.audio-player-container');
-          sections.forEach(function (sec) {
-            sec.style.display = window.__audioEnabled ? '' : 'none';
-          });
-          var btns = document.querySelectorAll('[data-audio-toggle]');
-          btns.forEach(function (b) {
-            var on = b.getAttribute('data-audio-toggle') === 'on';
-            if ((on && window.__audioEnabled) || (!on && !window.__audioEnabled)) {
-              b.classList.add('active');
-            } else {
-              b.classList.remove('active');
-            }
-          });
-        }
-
-        window.__setAudioEnabled = function (enabled) {
-          window.__audioEnabled = !!enabled;
-          try { localStorage.setItem('flipbookAudioEnabled', String(window.__audioEnabled)); } catch (e) {}
-          applyAudioVisibility();
-          if (!window.__audioEnabled) stopAllAudio();
-          else playCurrentPageAudio();
-        };
-
-        // Stop all audio playback and reset audio elements
-        function stopAllAudio() {
-          var audioElements = document.querySelectorAll('.audio-player');
-          audioElements.forEach(function (audioEl) {
-            audioEl.pause();
-            audioEl.currentTime = 0;
-            audioEl.load();
-          });
-        }
-
-        // Auto-play the current visible page's audio (if any) when audio is enabled
-        function playCurrentPageAudio() {
-          if (!window.__audioEnabled) return;
-          try {
-            var idx = pageFlip.getCurrentPageIndex();
-            var pageEls = document.querySelectorAll('#flipbook .page');
-            var cur = pageEls[idx];
-            if (!cur) return;
-            var audio = cur.querySelector('.audio-player');
-            if (audio) {
-              audio.currentTime = 0;
-              var p = audio.play();
-              if (p && typeof p.catch === 'function') p.catch(function () {});
-            }
-          } catch (e) {}
-        }
-
+        loadAudioPreference();
         applyAudioVisibility();
 
         // Update page counter
@@ -1454,6 +1482,7 @@ export function generateFlipbookHTML(
         // Update page info on flip and stop audio
         pageFlip.on('flip', () => {
           stopAllAudio();
+          try { window.__fallbackCurrentPage = pageFlip.getCurrentPageIndex(); } catch (e) {}
           updatePageInfo();
           // Slight delay so the page is mounted before we try to play
           setTimeout(playCurrentPageAudio, 150);
@@ -1509,6 +1538,8 @@ export function generateFlipbookHTML(
         console.log('Falling back to basic navigation...');
 
         // Fallback if StPageFlip fails to load
+        loadAudioPreference();
+        applyAudioVisibility();
         let currentPage = 0;
         const pages = document.querySelectorAll('#flipbook .page');
 
@@ -1524,6 +1555,7 @@ export function generateFlipbookHTML(
 
         function showPage(idx) {
           stopAllAudioFallback();
+          window.__fallbackCurrentPage = idx;
           pages.forEach(p => p.style.display = 'none');
           if (pages[idx]) {
             pages[idx].style.display = 'flex';
