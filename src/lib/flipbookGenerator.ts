@@ -44,7 +44,6 @@ export function generateFlipbookHTML(
       }
     }
   }
-  assessmentData = normalizeAssessmentData(assessmentData);
 
   // Pick the first available scene image to use as the cover hero image
   const firstSceneImage = narratives
@@ -278,7 +277,7 @@ export function generateFlipbookHTML(
             const parts = p.split(/[-:→=]/).map(s => s.trim());
             return { a: parts[0], b: parts[1] };
           }
-          return { a: String(p.a ?? p.column_a ?? p.left ?? p.term ?? p.prompt ?? ""), b: String(p.b ?? p.column_b ?? p.right ?? p.match ?? p.answer ?? "") };
+          return { a: String(p.a ?? p.column_a ?? p.left ?? ""), b: String(p.b ?? p.column_b ?? p.right ?? "") };
         });
         const rowsHtml = colA.map((a, i) => {
           const optionsHtml = colB.map((b, bi) => `<option value="${escapeHtml(b)}">${String.fromCharCode(65 + bi)}. ${escapeHtml(b)}</option>`).join("");
@@ -318,10 +317,9 @@ export function generateFlipbookHTML(
     // Add Fill in the Blanks
     if (Array.isArray(assessmentData.fill_blanks)) {
       assessmentData.fill_blanks.slice(0, 10).forEach((q: any, qIdx: number) => {
-        const passage = String(q.passage || q.question || q.prompt || "");
-        const correct = String(q.correct_answer || q.answer || "").trim();
-        const passageWithBlank = /_{2,}|\[blank\]|\{blank\}/i.test(passage) ? passage : `${passage} ____`;
-        const passageHtml = escapeHtml(passageWithBlank).replace(/_{2,}|\[blank\]|\{blank\}/i,
+        const passage = String(q.passage || "");
+        const correct = String(q.correct_answer || "").trim();
+        const passageHtml = escapeHtml(passage).replace(/_{2,}|\[blank\]|\{blank\}/i,
           `<input type="text" class="fill-blank-input" data-correct="${escapeHtml(correct)}" style="display:inline-block;min-width:140px;padding:4px 8px;border:none;border-bottom:2px solid #0f766e;background:transparent;font-size:inherit;margin:0 4px;" />`);
         const rationale = q.rationale ? `<div class="mcq-rationale" style="margin-top:12px;font-size:13px;color:#475569;"><strong>Rationale:</strong> ${escapeHtml(q.rationale)}</div>` : "";
         const html = `
@@ -462,7 +460,7 @@ export function generateFlipbookHTML(
           <div class="narration-text">${escapeHtml(page.speaker)}</div>
           ${page.audioDataUrl ? `
             <div class="audio-player-container">
-              <audio class="audio-player" controls preload="metadata">
+              <audio class="audio-player" preload="metadata">
                 <source src="${page.audioDataUrl}" type="audio/mpeg">
                 Your browser does not support the audio element.
               </audio>
@@ -512,6 +510,12 @@ export function generateFlipbookHTML(
       display: flex;
       flex-direction: column;
       background: white;
+    }
+
+    .flipbook-container.fullscreen-fallback {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
     }
 
     .flipbook-header {
@@ -654,6 +658,7 @@ export function generateFlipbookHTML(
     }
 
     .audio-player-container {
+      display: none !important;
       margin-bottom: 10px;
       width: 100%;
     }
@@ -705,6 +710,20 @@ export function generateFlipbookHTML(
       color: #fff;
       border-color: transparent;
       box-shadow: 0 4px 10px rgba(102, 126, 234, 0.3);
+    }
+
+    .audio-control-cluster {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-left: auto;
+      padding-left: 12px;
+    }
+
+    .audio-control-label {
+      color: #334155;
+      font-size: 13px;
+      font-weight: 700;
     }
 
     .flipbook-controls {
@@ -1097,7 +1116,7 @@ export function generateFlipbookHTML(
   </style>
 </head>
 <body>
-  <div class="flipbook-container">
+  <div class="flipbook-container" id="flipbook-container">
     <div class="flipbook-header">
       <h1>${escapeHtml(courseTitle)}</h1>
     </div>
@@ -1116,6 +1135,13 @@ export function generateFlipbookHTML(
       </div>
       <button class="btn btn-primary" id="nextBtn">Next &rarr;</button>
       <button class="btn btn-secondary" id="fullscreenBtn">Fullscreen</button>
+      ${voiceoverEnabled ? `
+      <div class="audio-control-cluster" aria-label="Audio narration controls">
+        <span class="audio-control-label">Audio</span>
+        <button type="button" class="audio-toggle-btn active" data-audio-toggle="on" onclick="window.__setAudioEnabled&&window.__setAudioEnabled(true)">On</button>
+        <button type="button" class="audio-toggle-btn" data-audio-toggle="off" onclick="window.__setAudioEnabled&&window.__setAudioEnabled(false)">Off</button>
+      </div>
+      ` : ""}
       <button class="btn btn-secondary" id="printBtn">Print</button>
     </div>
   </div>
@@ -1324,6 +1350,67 @@ export function generateFlipbookHTML(
   <script>
     var pageFlip = null;
     var totalPages = ${pages.length};
+    window.__fallbackCurrentPage = 0;
+
+    function loadAudioPreference() {
+      try {
+        var stored = localStorage.getItem('flipbookAudioEnabled');
+        window.__audioEnabled = stored === null ? true : stored === 'true';
+      } catch (e) { window.__audioEnabled = true; }
+    }
+
+    function stopAllAudio() {
+      var audioElements = document.querySelectorAll('.audio-player');
+      audioElements.forEach(function (audioEl) {
+        audioEl.pause();
+        audioEl.currentTime = 0;
+      });
+    }
+
+    function getCurrentPageElement() {
+      var idx = window.__fallbackCurrentPage || 0;
+      try {
+        if (pageFlip && typeof pageFlip.getCurrentPageIndex === 'function') {
+          idx = pageFlip.getCurrentPageIndex();
+        }
+      } catch (e) {}
+      var pageEls = document.querySelectorAll('#flipbook .page');
+      return pageEls[idx];
+    }
+
+    function playCurrentPageAudio() {
+      if (!window.__audioEnabled) return;
+      try {
+        var cur = getCurrentPageElement();
+        if (!cur) return;
+        var audio = cur.querySelector('.audio-player');
+        if (audio) {
+          audio.currentTime = 0;
+          var p = audio.play();
+          if (p && typeof p.catch === 'function') p.catch(function () {});
+        }
+      } catch (e) {}
+    }
+
+    function applyAudioVisibility() {
+      var btns = document.querySelectorAll('[data-audio-toggle]');
+      btns.forEach(function (b) {
+        var on = b.getAttribute('data-audio-toggle') === 'on';
+        if ((on && window.__audioEnabled) || (!on && !window.__audioEnabled)) {
+          b.classList.add('active');
+        } else {
+          b.classList.remove('active');
+        }
+      });
+    }
+
+    window.__setAudioEnabled = function (enabled) {
+      window.__audioEnabled = !!enabled;
+      try { localStorage.setItem('flipbookAudioEnabled', String(window.__audioEnabled)); } catch (e) {}
+      applyAudioVisibility();
+      stopAllAudio();
+      if (window.__audioEnabled) playCurrentPageAudio();
+    };
 
     // Initialize StPageFlip after DOM and library are ready
     window.addEventListener('DOMContentLoaded', function () {
@@ -1361,65 +1448,15 @@ export function generateFlipbookHTML(
 
         // Add pages to the flipbook
         var pageElements = document.querySelectorAll('#flipbook .page');
-        pageFlip.loadFromElements(Array.from(pageElements));
-
-        // Global audio-enabled flag, persisted via localStorage. Default: ON.
-        try {
-          var stored = localStorage.getItem('flipbookAudioEnabled');
-          window.__audioEnabled = stored === null ? true : stored === 'true';
-        } catch (e) { window.__audioEnabled = true; }
-
-        function applyAudioVisibility() {
-          var sections = document.querySelectorAll('.audio-player-container');
-          sections.forEach(function (sec) {
-            sec.style.display = window.__audioEnabled ? '' : 'none';
-          });
-          var btns = document.querySelectorAll('[data-audio-toggle]');
-          btns.forEach(function (b) {
-            var on = b.getAttribute('data-audio-toggle') === 'on';
-            if ((on && window.__audioEnabled) || (!on && !window.__audioEnabled)) {
-              b.classList.add('active');
-            } else {
-              b.classList.remove('active');
-            }
-          });
+        if (typeof pageFlip.loadFromHTML === 'function') {
+          pageFlip.loadFromHTML(Array.from(pageElements));
+        } else if (typeof pageFlip.loadFromElements === 'function') {
+          pageFlip.loadFromElements(Array.from(pageElements));
+        } else {
+          throw new Error('PageFlip renderer does not expose a supported load method');
         }
 
-        window.__setAudioEnabled = function (enabled) {
-          window.__audioEnabled = !!enabled;
-          try { localStorage.setItem('flipbookAudioEnabled', String(window.__audioEnabled)); } catch (e) {}
-          applyAudioVisibility();
-          if (!window.__audioEnabled) stopAllAudio();
-          else playCurrentPageAudio();
-        };
-
-        // Stop all audio playback and reset audio elements
-        function stopAllAudio() {
-          var audioElements = document.querySelectorAll('.audio-player');
-          audioElements.forEach(function (audioEl) {
-            audioEl.pause();
-            audioEl.currentTime = 0;
-            audioEl.load();
-          });
-        }
-
-        // Auto-play the current visible page's audio (if any) when audio is enabled
-        function playCurrentPageAudio() {
-          if (!window.__audioEnabled) return;
-          try {
-            var idx = pageFlip.getCurrentPageIndex();
-            var pageEls = document.querySelectorAll('#flipbook .page');
-            var cur = pageEls[idx];
-            if (!cur) return;
-            var audio = cur.querySelector('.audio-player');
-            if (audio) {
-              audio.currentTime = 0;
-              var p = audio.play();
-              if (p && typeof p.catch === 'function') p.catch(function () {});
-            }
-          } catch (e) {}
-        }
-
+        loadAudioPreference();
         applyAudioVisibility();
 
         // Update page counter
@@ -1434,14 +1471,18 @@ export function generateFlipbookHTML(
         document.getElementById('prevBtn').addEventListener('click', () => {
           if (pageFlip.getCurrentPageIndex() > 0) {
             stopAllAudio();
-            pageFlip.flipPrev('top');
+            if (typeof pageFlip.turnToPrevPage === 'function') pageFlip.turnToPrevPage();
+            else pageFlip.flipPrev('top');
+            setTimeout(updatePageInfo, 120);
           }
         });
 
         document.getElementById('nextBtn').addEventListener('click', () => {
           if (pageFlip.getCurrentPageIndex() < totalPages - 1) {
             stopAllAudio();
-            pageFlip.flipNext('top');
+            if (typeof pageFlip.turnToNextPage === 'function') pageFlip.turnToNextPage();
+            else pageFlip.flipNext('top');
+            setTimeout(updatePageInfo, 120);
           }
         });
 
@@ -1457,6 +1498,7 @@ export function generateFlipbookHTML(
         // Update page info on flip and stop audio
         pageFlip.on('flip', () => {
           stopAllAudio();
+          try { window.__fallbackCurrentPage = pageFlip.getCurrentPageIndex(); } catch (e) {}
           updatePageInfo();
           // Slight delay so the page is mounted before we try to play
           setTimeout(playCurrentPageAudio, 150);
@@ -1467,32 +1509,51 @@ export function generateFlipbookHTML(
         if (fullscreenBtn) {
           fullscreenBtn.addEventListener('click', () => {
             try {
+              const container = document.getElementById('flipbook-container');
               const docAny = document;
               const isFs = docAny.fullscreenElement || docAny.webkitFullscreenElement || docAny.mozFullScreenElement || docAny.msFullscreenElement;
               if (isFs) {
                 const exit = docAny.exitFullscreen || docAny.webkitExitFullscreen || docAny.mozCancelFullScreen || docAny.msExitFullscreen;
                 if (exit) exit.call(docAny);
+                if (container) container.classList.remove('fullscreen-fallback');
+                fullscreenBtn.textContent = 'Fullscreen';
                 return;
               }
-              const elem = document.getElementById('flipbook-container') || document.getElementById('flipbook') || document.documentElement;
+              if (container && container.classList.contains('fullscreen-fallback')) {
+                container.classList.remove('fullscreen-fallback');
+                fullscreenBtn.textContent = 'Fullscreen';
+                return;
+              }
+              const elem = container || document.getElementById('flipbook') || document.documentElement;
               const req = elem.requestFullscreen || elem.webkitRequestFullscreen || elem.mozRequestFullScreen || elem.msRequestFullscreen;
               if (!req) {
-                alert('Fullscreen is not supported by your browser.');
+                if (container) container.classList.add('fullscreen-fallback');
+                fullscreenBtn.textContent = 'Exit Fullscreen';
                 return;
               }
               const result = req.call(elem);
+              fullscreenBtn.textContent = 'Exit Fullscreen';
               if (result && typeof result.catch === 'function') {
                 result.catch((err) => {
                   console.warn('Fullscreen request rejected:', err && err.message);
-                  alert('Fullscreen was blocked. Open this file directly (not inside an iframe) and try again.');
+                  if (container) container.classList.add('fullscreen-fallback');
+                  fullscreenBtn.textContent = 'Exit Fullscreen';
                 });
               }
             } catch (err) {
               console.error('Fullscreen error:', err);
-              alert('Fullscreen failed: ' + (err && err.message ? err.message : 'unknown error'));
+              const container = document.getElementById('flipbook-container');
+              if (container) container.classList.add('fullscreen-fallback');
+              fullscreenBtn.textContent = 'Exit Fullscreen';
             }
           });
         }
+
+        document.addEventListener('fullscreenchange', function () {
+          const container = document.getElementById('flipbook-container');
+          if (!document.fullscreenElement && container) container.classList.remove('fullscreen-fallback');
+          if (fullscreenBtn) fullscreenBtn.textContent = document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen';
+        });
 
 
         // Print
@@ -1512,6 +1573,8 @@ export function generateFlipbookHTML(
         console.log('Falling back to basic navigation...');
 
         // Fallback if StPageFlip fails to load
+        loadAudioPreference();
+        applyAudioVisibility();
         let currentPage = 0;
         const pages = document.querySelectorAll('#flipbook .page');
 
@@ -1527,6 +1590,7 @@ export function generateFlipbookHTML(
 
         function showPage(idx) {
           stopAllAudioFallback();
+          window.__fallbackCurrentPage = idx;
           pages.forEach(p => p.style.display = 'none');
           if (pages[idx]) {
             pages[idx].style.display = 'flex';
@@ -1570,93 +1634,4 @@ function escapeHtml(text: string): string {
     "'": "&#039;",
   };
   return text.replace(/[&<>"']/g, (m) => map[m]);
-}
-
-function normalizeAssessmentData(raw: any): any | null {
-  if (!raw || typeof raw !== "object") return raw || null;
-
-  const pickArray = (...keys: string[]) => {
-    for (const key of keys) {
-      const value = raw[key];
-      if (Array.isArray(value)) return value;
-    }
-    return [];
-  };
-
-  const allQuestions = Array.isArray(raw.questions) ? raw.questions : [];
-  const byType = (patterns: RegExp[]) =>
-    allQuestions.filter((q: any) => patterns.some((pattern) => pattern.test(String(q?.type || q?.question_type || q?.assessment_type || ""))));
-
-  const mcq = pickArray("mcq", "mcqs", "multiple_choice", "multiple_choice_questions", "multipleChoice", "multipleChoiceQuestions")
-    .concat(byType([/mcq/i, /multiple[\s_-]*choice/i]))
-    .map((q: any) => ({
-      ...q,
-      question: q?.question || q?.prompt || q?.stem || "",
-      options: Array.isArray(q?.options) ? q.options : Array.isArray(q?.choices) ? q.choices : [],
-      correct_answer: q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? q?.correct ?? "",
-    }));
-
-  const trueFalse = pickArray("true_false", "trueFalse", "true_false_questions", "trueFalseQuestions", "tf", "true_or_false")
-    .concat(byType([/true[\s_/-]*false/i, /^tf$/i]))
-    .map((q: any) => ({
-      ...q,
-      question: q?.question || q?.prompt || q?.statement || "",
-      correct_answer: q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? q?.correct ?? false,
-    }));
-
-  const matchSource = pickArray("match_the_following", "matchTheFollowing", "matching", "matching_questions", "matchingQuestions", "match", "match_following")
-    .concat(byType([/match/i, /matching/i]));
-  const matchTheFollowing = matchSource.map((item: any) => {
-    const pairings = Array.isArray(item?.correct_pairings)
-      ? item.correct_pairings
-      : Array.isArray(item?.pairs)
-        ? item.pairs
-        : Array.isArray(item?.matches)
-          ? item.matches
-          : Array.isArray(item?.items)
-            ? item.items
-            : [];
-    const columnA = Array.isArray(item?.column_a)
-      ? item.column_a
-      : Array.isArray(item?.left_column)
-        ? item.left_column
-        : pairings.map((p: any) => p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question).filter(Boolean);
-    const columnB = Array.isArray(item?.column_b)
-      ? item.column_b
-      : Array.isArray(item?.right_column)
-        ? item.right_column
-        : pairings.map((p: any) => p?.b ?? p?.right ?? p?.match ?? p?.answer ?? p?.definition).filter(Boolean);
-    return {
-      ...item,
-      column_a: columnA.map(String),
-      column_b: [...new Set(columnB.map(String))],
-      correct_pairings: pairings,
-    };
-  }).filter((item: any) => item.column_a.length > 0 && item.column_b.length > 0);
-
-  const fillBlanks = pickArray("fill_blanks", "fill_blank", "fill_in_the_blanks", "fillInTheBlanks", "fillBlanks", "blanks")
-    .concat(byType([/fill/i, /blank/i]))
-    .map((q: any) => ({
-      ...q,
-      passage: q?.passage || q?.question || q?.prompt || "",
-      correct_answer: q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? q?.blank_answer ?? "",
-    }));
-
-  const scenarios = pickArray("scenarios", "scenario", "scenario_questions", "scenarioQuestions", "scenario_based", "scenarioBasedQuestions")
-    .concat(byType([/scenario/i, /case/i]))
-    .map((q: any) => ({
-      ...q,
-      situation: q?.situation || q?.scenario || q?.question || q?.prompt || "",
-      options: Array.isArray(q?.options) ? q.options : Array.isArray(q?.choices) ? q.choices : [],
-      best_response: q?.best_response ?? q?.bestResponse ?? q?.correct_answer ?? q?.correctAnswer ?? q?.answer ?? "",
-    }));
-
-  return {
-    ...raw,
-    mcq,
-    true_false: trueFalse,
-    match_the_following: matchTheFollowing,
-    fill_blanks: fillBlanks,
-    scenarios,
-  };
 }

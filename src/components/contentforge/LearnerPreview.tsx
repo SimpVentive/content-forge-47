@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle } from "lucide-react";
+import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle, Maximize2, Minimize2 } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "./VideosTab";
@@ -262,53 +262,9 @@ interface Slide {
   visualApproved?: boolean;
   wasTrimmedForLayout?: boolean;
   contentTemplate?: ContentTemplate;
-  question?: any;
-  assessmentKind?: "mcq" | "true_false" | "match_the_following" | "fill_blanks" | "scenario";
+  question?: { question: string; options: string[]; correct_answer: string; rationale?: string };
   takeaways?: string[];
   video?: InsertedVideo;
-}
-
-function normalizeAssessmentData(raw: any): any {
-  if (!raw || typeof raw !== "object") return { mcq: [], true_false: [], match_the_following: [], fill_blanks: [], scenarios: [] };
-  const pickArray = (...keys: string[]) => {
-    for (const key of keys) if (Array.isArray(raw[key])) return raw[key];
-    return [];
-  };
-  const questions = Array.isArray(raw.questions) ? raw.questions : [];
-  const byType = (patterns: RegExp[]) => questions.filter((q: any) => patterns.some((pattern) => pattern.test(String(q?.type || q?.question_type || q?.assessment_type || ""))));
-  const pairArray = (item: any) => Array.isArray(item?.correct_pairings) ? item.correct_pairings : Array.isArray(item?.pairs) ? item.pairs : Array.isArray(item?.matches) ? item.matches : Array.isArray(item?.items) ? item.items : [];
-
-  return {
-    mcq: pickArray("mcq", "mcqs", "multiple_choice", "multiple_choice_questions", "multipleChoice", "multipleChoiceQuestions")
-      .concat(byType([/mcq/i, /multiple[\s_-]*choice/i]))
-      .map((q: any) => ({ ...q, assessmentKind: "mcq", question: q.question || q.prompt || q.stem || "", options: Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : [], correct_answer: q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.correct ?? "" }))
-      .filter((q: any) => q.question && q.options.length),
-    true_false: pickArray("true_false", "trueFalse", "true_false_questions", "trueFalseQuestions", "tf", "true_or_false")
-      .concat(byType([/true[\s_/-]*false/i, /^tf$/i]))
-      .map((q: any) => {
-        const rawAnswer = String(q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.correct ?? "true").trim().toLowerCase();
-        const isTrue = rawAnswer === "true" || rawAnswer === "t" || rawAnswer === "yes" || rawAnswer === "1";
-        return { ...q, assessmentKind: "true_false", question: q.question || q.prompt || q.statement || "", options: ["True", "False"], correct_answer: isTrue ? "True" : "False" };
-      })
-      .filter((q: any) => q.question),
-    match_the_following: pickArray("match_the_following", "matchTheFollowing", "matching", "matching_questions", "matchingQuestions", "match")
-      .concat(byType([/match/i, /matching/i]))
-      .map((item: any) => {
-        const pairs = pairArray(item);
-        const columnA = Array.isArray(item.column_a) ? item.column_a : Array.isArray(item.left_column) ? item.left_column : pairs.map((p: any) => p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question).filter(Boolean);
-        const columnB = Array.isArray(item.column_b) ? item.column_b : Array.isArray(item.right_column) ? item.right_column : pairs.map((p: any) => p?.b ?? p?.right ?? p?.match ?? p?.answer ?? p?.definition).filter(Boolean);
-        return { ...item, assessmentKind: "match_the_following", question: item.question || "Match each item with the correct answer.", column_a: columnA.map(String), column_b: Array.from(new Set(columnB.map(String))), correct_pairings: pairs };
-      })
-      .filter((item: any) => item.column_a.length && item.column_b.length),
-    fill_blanks: pickArray("fill_blanks", "fill_blank", "fill_in_the_blanks", "fillInTheBlanks", "fillBlanks", "blanks")
-      .concat(byType([/fill/i, /blank/i]))
-      .map((q: any) => ({ ...q, assessmentKind: "fill_blanks", question: q.passage || q.question || q.prompt || "", correct_answer: q.correct_answer ?? q.correctAnswer ?? q.answer ?? q.blank_answer ?? "" }))
-      .filter((q: any) => q.question && q.correct_answer !== ""),
-    scenarios: pickArray("scenarios", "scenario", "scenario_questions", "scenarioQuestions", "scenario_based", "scenarioBasedQuestions")
-      .concat(byType([/scenario/i, /case/i]))
-      .map((q: any) => ({ ...q, assessmentKind: "scenario", question: q.situation || q.scenario || q.question || q.prompt || "", options: Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : [], correct_answer: q.best_response ?? q.bestResponse ?? q.correct_answer ?? q.correctAnswer ?? q.answer ?? "" }))
-      .filter((q: any) => q.question && q.options.length),
-  };
 }
 
 function getDurationMinutes(duration?: string): number {
@@ -626,7 +582,7 @@ function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[]
 function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
-  const assessData = normalizeAssessmentData(tryParseJSON(rawOutputs.assessment));
+  const assessData = tryParseJSON(rawOutputs.assessment);
   const visualData = tryParseJSON(rawOutputs.visual);
   const narrativeScenesData = tryParseJSON(rawOutputs.narrativeScenes);
   const durationMinutes = getDurationMinutes(courseDuration);
@@ -647,15 +603,9 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     modules = [{ title: "Module 1", topics: ["Introduction"] }];
   }
 
-  // Extract all selected assessment types, not only MCQ
-  const assessmentItems = [
-    ...(Array.isArray(assessData?.mcq) ? assessData.mcq.map((q: any) => ({ ...q, assessmentKind: "mcq" })) : []),
-    ...(Array.isArray(assessData?.true_false) ? assessData.true_false.map((q: any) => ({ ...q, assessmentKind: "true_false" })) : []),
-    ...(Array.isArray(assessData?.match_the_following) ? assessData.match_the_following.map((q: any) => ({ ...q, assessmentKind: "match_the_following" })) : []),
-    ...(Array.isArray(assessData?.fill_blanks) ? assessData.fill_blanks.map((q: any) => ({ ...q, assessmentKind: "fill_blanks" })) : []),
-    ...(Array.isArray(assessData?.scenarios) ? assessData.scenarios.map((q: any) => ({ ...q, assessmentKind: "scenario" })) : []),
-  ];
-  const maxQuestionCount = Math.min(assessmentItems.length, getTargetCourseQuestionCount(durationMinutes, assessmentIntensity));
+  // Extract MCQs
+  const mcqs = Array.isArray(assessData?.mcq) ? assessData.mcq : [];
+  const maxQuestionCount = Math.min(mcqs.length, getTargetCourseQuestionCount(durationMinutes, assessmentIntensity));
   const questionsPerModule = allocateQuestionsPerModule(modules, maxQuestionCount);
   const usedQuestionIndexes = new Set<number>();
 
@@ -777,7 +727,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
     // 3. Assessment slides (proportional to module size and duration)
     const desiredQuestionCount = questionsPerModule[mi] || 0;
     if (desiredQuestionCount > 0) {
-      const moduleMatchedIndexes = findModuleMatchedQuestionIndexes(assessmentItems, mod).filter((questionIndex) => !usedQuestionIndexes.has(questionIndex));
+      const moduleMatchedIndexes = findModuleMatchedQuestionIndexes(mcqs, mod).filter((questionIndex) => !usedQuestionIndexes.has(questionIndex));
       const selectedIndexes: number[] = [];
 
       for (const questionIndex of moduleMatchedIndexes) {
@@ -787,7 +737,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       }
 
       if (selectedIndexes.length < desiredQuestionCount) {
-        for (let questionIndex = 0; questionIndex < assessmentItems.length; questionIndex++) {
+        for (let questionIndex = 0; questionIndex < mcqs.length; questionIndex++) {
           if (selectedIndexes.length >= desiredQuestionCount) break;
           if (usedQuestionIndexes.has(questionIndex)) continue;
           selectedIndexes.push(questionIndex);
@@ -796,14 +746,13 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       }
 
       selectedIndexes.forEach((questionIndex) => {
-        const assessmentItem = assessmentItems[questionIndex];
-        if (!assessmentItem) return;
+        const mcq = mcqs[questionIndex];
+        if (!mcq) return;
         slides.push({
           type: "assessment",
           moduleIndex: mi,
           moduleTitle: mod.title,
-          question: assessmentItem,
-          assessmentKind: assessmentItem.assessmentKind,
+          question: mcq,
         });
       });
     }
@@ -1286,8 +1235,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set());
   const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
-  const [assessmentTextAnswers, setAssessmentTextAnswers] = useState<Record<number, string>>({});
-  const [assessmentMatchAnswers, setAssessmentMatchAnswers] = useState<Record<number, Record<number, string>>>({});
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [startTime] = useState(Date.now());
   const [showCompletion, setShowCompletion] = useState(false);
@@ -1311,6 +1258,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const lipSyncFrameRef = useRef<number>(0);
   const analyserDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const visemeIndexRef = useRef(0);
+  const previewRootRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const slide = slides[currentSlide];
   const totalSlides = slides.length;
@@ -1712,6 +1661,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     }
   }, [muted]);
 
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === previewRootRef.current);
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
   useEffect(() => () => {
     stopLipSync();
     if (audioContextRef.current && audioContextRef.current.state !== "closed") {
@@ -1846,40 +1804,55 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   const handleSubmitAnswer = (slideIdx: number) => {
     const ans = assessmentAnswers[slideIdx];
+    if (!ans || ans.submitted) return;
     const q = slides[slideIdx].question;
     if (!q) return;
-    if (ans?.submitted) return;
-
-    let correct = false;
-    if (q.assessmentKind === "match_the_following") {
-      const rows = Array.isArray(q.column_a) ? q.column_a : [];
-      const pairings = Array.isArray(q.correct_pairings) ? q.correct_pairings : [];
-      const selected = assessmentMatchAnswers[slideIdx] || {};
-      correct = rows.length > 0 && rows.every((left: string, row: number) => {
-        const pair = pairings.find((p: any) => String(p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question) === String(left));
-        const expected = String(pair?.b ?? pair?.right ?? pair?.match ?? pair?.answer ?? pair?.definition ?? "").trim();
-        return expected && String(selected[row] || "").trim() === expected;
-      });
-    } else if (q.assessmentKind === "fill_blanks") {
-      const expected = stripOptionPrefix(q.correct_answer || q.answer || "").toLowerCase();
-      const response = stripOptionPrefix(assessmentTextAnswers[slideIdx] || "").toLowerCase();
-      correct = Boolean(expected && response === expected);
-    } else {
-      if (!ans) return;
-      const optClean = stripOptionPrefix(q.options[ans.selected] || "");
-      const correctClean = stripOptionPrefix(q.correct_answer || "");
-      correct = optClean === correctClean ||
-        q.options[ans.selected] === q.correct_answer ||
-        String.fromCharCode(65 + ans.selected) === q.correct_answer ||
-        q.correct_answer?.includes(optClean);
-    }
-
-    setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { selected: ans?.selected ?? -1, submitted: true } }));
+    const optClean = stripOptionPrefix(q.options[ans.selected] || "");
+    const correctClean = stripOptionPrefix(q.correct_answer || "");
+    const correct = optClean === correctClean ||
+      q.options[ans.selected] === q.correct_answer ||
+      String.fromCharCode(65 + ans.selected) === q.correct_answer ||
+      q.correct_answer?.includes(optClean);
+    setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true } }));
     setScore(prev => ({ correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1 }));
   };
 
   const currentNarration = getNarrationForSlide(currentSlide);
   const currentVisualKey = slide.type === "content" && slide.topicTitle ? `${slide.moduleTitle}::${slide.topicTitle}` : "";
+
+  const handleToggleVoiceover = useCallback(() => {
+    const nextMuted = !muted;
+    setMuted(nextMuted);
+
+    if (nextMuted) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setIsPlaying(false);
+      stopLipSync();
+      return;
+    }
+
+    if (currentNarration && !hasAvatarVideoNarration) {
+      void playNarration();
+    }
+  }, [currentNarration, hasAvatarVideoNarration, muted, playNarration, stopLipSync]);
+
+  const handleToggleFullscreen = useCallback(async () => {
+    const target = previewRootRef.current;
+    if (!target) return;
+
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else if (target.requestFullscreen) {
+        await target.requestFullscreen();
+      }
+    } catch (error) {
+      console.warn("Fullscreen toggle failed:", error);
+    }
+  }, []);
 
   const handleSidebarSelect = useCallback((panel: SidebarPanel) => {
     setActiveSidebarPanel(panel);
@@ -2017,25 +1990,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       <Clock className="w-4 h-4" />
                       ~{courseDurationMinutes} minutes
                     </span>
-                    {currentNarration && (
-                      <div className="flex items-center gap-3 px-4 py-3 rounded-full bg-gradient-to-r from-blue-50 to-blue-100 border-2 border-blue-200">
-                        <Volume2 className="w-5 h-5 text-blue-600 shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-[13px] font-bold text-blue-900">Voice Over available for this module</p>
-                          <p className="text-[12px] text-blue-700 mt-0.5">Audio narration will help guide your learning</p>
-                        </div>
-                        <button
-                          onClick={() => setMuted(!muted)}
-                          className={`px-4 py-1.5 rounded-full font-bold text-[12px] transition-all shrink-0 ${
-                            muted
-                              ? "bg-white text-slate-700 border border-slate-300 hover:bg-slate-50"
-                              : "bg-blue-600 text-white hover:bg-blue-700 border border-blue-600"
-                          }`}
-                        >
-                          {muted ? "Turn On" : "Turn Off"}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -2897,104 +2851,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         let cleanQuestion = q.question || "";
         cleanQuestion = cleanQuestion.replace(/Correct Answer:.*$/gi, '').replace(/Options:.*$/gi, '').trim();
 
-        if (q.assessmentKind === "match_the_following") {
-          const rows: string[] = Array.isArray(q.column_a) ? q.column_a : [];
-          const choices: string[] = Array.isArray(q.column_b) ? q.column_b : [];
-          const selected = assessmentMatchAnswers[currentSlide] || {};
-          const pairings = Array.isArray(q.correct_pairings) ? q.correct_pairings : [];
-          const getExpected = (left: string) => {
-            const pair = pairings.find((p: any) => String(p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question) === String(left));
-            return String(pair?.b ?? pair?.right ?? pair?.match ?? pair?.answer ?? pair?.definition ?? "").trim();
-          };
-          const allSelected = rows.length > 0 && rows.every((_, row) => selected[row]);
-
-          return (
-            <div className="w-full h-full flex flex-col" key={currentSlide}>
-              <div className="flex-1 overflow-y-auto px-6 py-8">
-                <div className="max-w-[900px] mx-auto">
-                  <div className="mb-8">
-                    <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">Match</span>
-                    <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">{cleanQuestion || "Match each item with the correct answer."}</h2>
-                  </div>
-                  <div className="space-y-3 mb-8">
-                    {rows.map((left, row) => {
-                      const expected = getExpected(left);
-                      const rowCorrect = ans?.submitted && selected[row] === expected;
-                      const rowWrong = ans?.submitted && selected[row] !== expected;
-                      return (
-                        <div key={`${left}-${row}`} className={`grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-3 rounded-lg border-2 bg-white p-4 ${rowCorrect ? "border-emerald-500" : rowWrong ? "border-red-400" : "border-slate-200"}`}>
-                          <div className="text-[16px] font-semibold text-slate-900 text-left">{row + 1}. {left}</div>
-                          <select
-                            value={selected[row] || ""}
-                            disabled={ans?.submitted}
-                            onChange={(event) => setAssessmentMatchAnswers(prev => ({ ...prev, [currentSlide]: { ...(prev[currentSlide] || {}), [row]: event.target.value } }))}
-                            className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-[14px] text-slate-900"
-                          >
-                            <option value="">Select match</option>
-                            {choices.map((choice, index) => <option key={`${choice}-${index}`} value={choice}>{String.fromCharCode(65 + index)}. {choice}</option>)}
-                          </select>
-                          {ans?.submitted && rowWrong && <div className="md:col-span-2 text-[13px] text-emerald-700 text-left">Correct match: {expected}</div>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  {ans?.submitted && q.explanation && <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200 text-[14px] text-slate-700 text-left"><span className="font-semibold text-blue-700">Explanation: </span>{q.explanation}</div>}
-                </div>
-              </div>
-              <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
-                <span className="text-[13px] text-slate-600">Question {currentSlide + 1} of {totalSlides}</span>
-                {!ans?.submitted ? (
-                  <button onClick={() => handleSubmitAnswer(currentSlide)} disabled={!allSelected} className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50">Submit Answer</button>
-                ) : (
-                  <button onClick={goNext} disabled={currentSlide === totalSlides - 1} className="px-6 py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all disabled:opacity-50">{currentSlide === totalSlides - 1 ? "Finish" : "Next Question"}</button>
-                )}
-              </div>
-            </div>
-          );
-        }
-
-        if (q.assessmentKind === "fill_blanks") {
-          const response = assessmentTextAnswers[currentSlide] || "";
-          const correctAnswer = String(q.correct_answer || q.answer || "").trim();
-          const isCorrect = response.trim().toLowerCase() === correctAnswer.toLowerCase();
-
-          return (
-            <div className="w-full h-full flex flex-col" key={currentSlide}>
-              <div className="flex-1 overflow-y-auto px-6 py-8">
-                <div className="max-w-[900px] mx-auto">
-                  <div className="mb-8">
-                    <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">Fill in the Blank</span>
-                    <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">{cleanQuestion}</h2>
-                  </div>
-                  <input
-                    value={response}
-                    disabled={ans?.submitted}
-                    onChange={(event) => setAssessmentTextAnswers(prev => ({ ...prev, [currentSlide]: event.target.value }))}
-                    placeholder="Type your answer"
-                    className={`w-full rounded-lg border-2 px-4 py-3 text-[16px] text-slate-900 ${ans?.submitted ? (isCorrect ? "border-emerald-500 bg-emerald-50" : "border-red-400 bg-red-50") : "border-slate-200 bg-white focus:border-blue-500"}`}
-                  />
-                  {ans?.submitted && (
-                    <div className="mt-4 p-4 rounded-lg bg-blue-50 border border-blue-200 text-[14px] text-slate-700 text-left">
-                      <span className="font-semibold text-blue-700">Correct answer: </span>{correctAnswer}
-                      {q.rationale ? <p className="mt-2">{q.rationale}</p> : null}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
-                <span className="text-[13px] text-slate-600">Question {currentSlide + 1} of {totalSlides}</span>
-                {!ans?.submitted ? (
-                  <button onClick={() => handleSubmitAnswer(currentSlide)} disabled={!response.trim()} className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50">Submit Answer</button>
-                ) : (
-                  <button onClick={goNext} disabled={currentSlide === totalSlides - 1} className="px-6 py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all disabled:opacity-50">{currentSlide === totalSlides - 1 ? "Finish" : "Next Question"}</button>
-                )}
-              </div>
-            </div>
-          );
-        }
-
         // Randomize option order each time this question loads (deterministic per question/slide)
-        const optionsWithIndices = (q.options || []).map((opt: string, idx: number) => ({ opt, originalIdx: idx }));
+        const optionsWithIndices = q.options.map((opt: string, idx: number) => ({ opt, originalIdx: idx }));
         const seed = currentSlide + 12345; // Consistent seed per slide
         const shuffledOptions = [...optionsWithIndices].sort(() => {
           const hash = Math.sin(seed * (optionsWithIndices.indexOf(optionsWithIndices[0]) + 1)) * 10000;
@@ -3201,7 +3059,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5 learner-preview-3d" style={{ background: "#DCE6F1" }}>
+    <div ref={previewRootRef} className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5 learner-preview-3d" style={{ background: "#DCE6F1" }}>
       <style>
         {`/* ── 3D lift for buttons ─────────────────────────────────────── */
         .learner-preview-3d button {
@@ -3923,7 +3781,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       backgroundColor: muted ? "white" : "#eef4ff"
                     }}>
                     <button
-                      onClick={() => setMuted(!muted)}
+                      onClick={handleToggleVoiceover}
                       className="inline-flex items-center gap-2 px-2 h-10 rounded-lg text-[12px] font-semibold transition-all"
                       style={{
                         color: muted ? "#123d78" : "#1d4f93",
@@ -3949,6 +3807,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </select>
                   </div>
                 )}
+
+                <button
+                  onClick={handleToggleFullscreen}
+                  className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${isFullscreen ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
+                  type="button"
+                  aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                  title={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+                >
+                  {isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+                  <span>{isFullscreen ? "Exit Full Screen" : "Full Screen"}</span>
+                </button>
 
 
 
