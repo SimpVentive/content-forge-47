@@ -2893,8 +2893,104 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         let cleanQuestion = q.question || "";
         cleanQuestion = cleanQuestion.replace(/Correct Answer:.*$/gi, '').replace(/Options:.*$/gi, '').trim();
 
+        if (q.assessmentKind === "match_the_following") {
+          const rows: string[] = Array.isArray(q.column_a) ? q.column_a : [];
+          const choices: string[] = Array.isArray(q.column_b) ? q.column_b : [];
+          const selected = assessmentMatchAnswers[currentSlide] || {};
+          const pairings = Array.isArray(q.correct_pairings) ? q.correct_pairings : [];
+          const getExpected = (left: string) => {
+            const pair = pairings.find((p: any) => String(p?.a ?? p?.left ?? p?.term ?? p?.prompt ?? p?.question) === String(left));
+            return String(pair?.b ?? pair?.right ?? pair?.match ?? pair?.answer ?? pair?.definition ?? "").trim();
+          };
+          const allSelected = rows.length > 0 && rows.every((_, row) => selected[row]);
+
+          return (
+            <div className="w-full h-full flex flex-col" key={currentSlide}>
+              <div className="flex-1 overflow-y-auto px-6 py-8">
+                <div className="max-w-[900px] mx-auto">
+                  <div className="mb-8">
+                    <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">Match</span>
+                    <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">{cleanQuestion || "Match each item with the correct answer."}</h2>
+                  </div>
+                  <div className="space-y-3 mb-8">
+                    {rows.map((left, row) => {
+                      const expected = getExpected(left);
+                      const rowCorrect = ans?.submitted && selected[row] === expected;
+                      const rowWrong = ans?.submitted && selected[row] !== expected;
+                      return (
+                        <div key={`${left}-${row}`} className={`grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-3 rounded-lg border-2 bg-white p-4 ${rowCorrect ? "border-emerald-500" : rowWrong ? "border-red-400" : "border-slate-200"}`}>
+                          <div className="text-[16px] font-semibold text-slate-900 text-left">{row + 1}. {left}</div>
+                          <select
+                            value={selected[row] || ""}
+                            disabled={ans?.submitted}
+                            onChange={(event) => setAssessmentMatchAnswers(prev => ({ ...prev, [currentSlide]: { ...(prev[currentSlide] || {}), [row]: event.target.value } }))}
+                            className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-[14px] text-slate-900"
+                          >
+                            <option value="">Select match</option>
+                            {choices.map((choice, index) => <option key={`${choice}-${index}`} value={choice}>{String.fromCharCode(65 + index)}. {choice}</option>)}
+                          </select>
+                          {ans?.submitted && rowWrong && <div className="md:col-span-2 text-[13px] text-emerald-700 text-left">Correct match: {expected}</div>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {ans?.submitted && q.explanation && <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200 text-[14px] text-slate-700 text-left"><span className="font-semibold text-blue-700">Explanation: </span>{q.explanation}</div>}
+                </div>
+              </div>
+              <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
+                <span className="text-[13px] text-slate-600">Question {currentSlide + 1} of {totalSlides}</span>
+                {!ans?.submitted ? (
+                  <button onClick={() => handleSubmitAnswer(currentSlide)} disabled={!allSelected} className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50">Submit Answer</button>
+                ) : (
+                  <button onClick={goNext} disabled={currentSlide === totalSlides - 1} className="px-6 py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all disabled:opacity-50">{currentSlide === totalSlides - 1 ? "Finish" : "Next Question"}</button>
+                )}
+              </div>
+            </div>
+          );
+        }
+
+        if (q.assessmentKind === "fill_blanks") {
+          const response = assessmentTextAnswers[currentSlide] || "";
+          const correctAnswer = String(q.correct_answer || q.answer || "").trim();
+          const isCorrect = response.trim().toLowerCase() === correctAnswer.toLowerCase();
+
+          return (
+            <div className="w-full h-full flex flex-col" key={currentSlide}>
+              <div className="flex-1 overflow-y-auto px-6 py-8">
+                <div className="max-w-[900px] mx-auto">
+                  <div className="mb-8">
+                    <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">Fill in the Blank</span>
+                    <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">{cleanQuestion}</h2>
+                  </div>
+                  <input
+                    value={response}
+                    disabled={ans?.submitted}
+                    onChange={(event) => setAssessmentTextAnswers(prev => ({ ...prev, [currentSlide]: event.target.value }))}
+                    placeholder="Type your answer"
+                    className={`w-full rounded-lg border-2 px-4 py-3 text-[16px] text-slate-900 ${ans?.submitted ? (isCorrect ? "border-emerald-500 bg-emerald-50" : "border-red-400 bg-red-50") : "border-slate-200 bg-white focus:border-blue-500"}`}
+                  />
+                  {ans?.submitted && (
+                    <div className="mt-4 p-4 rounded-lg bg-blue-50 border border-blue-200 text-[14px] text-slate-700 text-left">
+                      <span className="font-semibold text-blue-700">Correct answer: </span>{correctAnswer}
+                      {q.rationale ? <p className="mt-2">{q.rationale}</p> : null}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
+                <span className="text-[13px] text-slate-600">Question {currentSlide + 1} of {totalSlides}</span>
+                {!ans?.submitted ? (
+                  <button onClick={() => handleSubmitAnswer(currentSlide)} disabled={!response.trim()} className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50">Submit Answer</button>
+                ) : (
+                  <button onClick={goNext} disabled={currentSlide === totalSlides - 1} className="px-6 py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all disabled:opacity-50">{currentSlide === totalSlides - 1 ? "Finish" : "Next Question"}</button>
+                )}
+              </div>
+            </div>
+          );
+        }
+
         // Randomize option order each time this question loads (deterministic per question/slide)
-        const optionsWithIndices = q.options.map((opt: string, idx: number) => ({ opt, originalIdx: idx }));
+        const optionsWithIndices = (q.options || []).map((opt: string, idx: number) => ({ opt, originalIdx: idx }));
         const seed = currentSlide + 12345; // Consistent seed per slide
         const shuffledOptions = [...optionsWithIndices].sort(() => {
           const hash = Math.sin(seed * (optionsWithIndices.indexOf(optionsWithIndices[0]) + 1)) * 10000;
