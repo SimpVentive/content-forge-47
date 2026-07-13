@@ -296,6 +296,7 @@ function parseScript(writerRaw: string, modules: Module[], visualRaw?: string): 
 
   const typedMap = new Map<string, ModuleSection[]>();
   const sectionMap = new Map<string, string>();
+  const orderedSections: string[] = [];
   const visualMap = parseVisualSections(visualRaw || "");
   const chunks = writerRaw.split(/^##\s+/m).map((chunk) => chunk.trim()).filter(Boolean);
 
@@ -303,14 +304,23 @@ function parseScript(writerRaw: string, modules: Module[], visualRaw?: string): 
     const [headingLine, ...bodyLines] = chunk.split("\n");
     const heading = headingLine?.trim();
     if (!heading) continue;
-    sectionMap.set(normalizeTextKey(heading), bodyLines.join("\n").trim());
+    const body = bodyLines.join("\n").trim();
+    sectionMap.set(normalizeTextKey(heading), body);
+    orderedSections.push(body);
   }
+
+  let topicCounter = 0;
 
   modules.forEach((mod) => {
     const moduleVisuals = visualMap.get(normalizeTextKey(mod.title)) || new Map();
     const moduleSections: ModuleSection[] = (mod.topics.length > 0 ? mod.topics : [mod.title]).map((topic) => {
       const heading = parseTopicLabel(topic) || mod.title;
-      const rawMarkdown = sectionMap.get(normalizeTextKey(heading)) || `Content for ${heading}`;
+      // Try exact heading match first, then fall back to positional (topic-order) match
+      const rawMarkdown =
+        sectionMap.get(normalizeTextKey(heading)) ||
+        orderedSections[topicCounter] ||
+        `Content for ${heading}`;
+      topicCounter++;
       const { cleanedMarkdown, takeaway } = extractTakeaway(rawMarkdown);
       const bodyMarkdown = cleanedMarkdown || rawMarkdown;
       const plainText = stripNarratorMarkdown(bodyMarkdown);
