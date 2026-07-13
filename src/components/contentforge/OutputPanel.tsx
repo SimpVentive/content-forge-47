@@ -1158,41 +1158,66 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
             )}
           </div>
         </div>
+
+        {hasOutput && (
+          <div className="mb-4 p-4 rounded-lg bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-500 shadow-md">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">✓</div>
+              <div className="flex-1">
+                <p className="font-bold text-green-900">🎉 E-Learning Package Ready!</p>
+                <p className="text-sm text-green-800 mt-1">Click the <strong className="bg-green-200 px-2 py-0.5 rounded">Package</strong> tab to download your {isImageSeriesOutput ? "Flipbook" : "SCORM"} package.</p>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="flex gap-1.5 flex-wrap">
           {tabs.map((tab) => {
             const isPreview = tab.key === "preview";
+            const isPackage = tab.key === "package";
             const disabled = isPreview && !hasOutput;
+            const isPackageReady = isPackage && hasOutput;
+
             return (
-              <button
-                key={tab.key}
-                disabled={disabled}
-                onClick={() => {
-                  if (isPreview && hasOutput) {
-                    setShowLearnerPreview(true);
-                  } else if (!isPreview) {
-                    setActiveTab(tab.key);
-                  }
-                }}
-                className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0.5 ${
-                  disabled
-                    ? "bg-secondary/50 text-muted-foreground/40 cursor-not-allowed"
-                    : isPreview
-                      ? "bg-white text-primary border-2 border-primary hover:bg-primary/5"
-                      : activeTab === tab.key
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-secondary text-muted-foreground hover:bg-border"
-                }`}
-                style={{
-                  boxShadow: disabled
-                    ? "none"
-                    : activeTab === tab.key
-                      ? "0 3px 0 rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)"
-                      : "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5)",
-                }}
-              >
-                {isImageSeriesOutput && tab.key === "package" ? <Images className="w-3 h-3" /> : <tab.icon className="w-3 h-3" />}
-                {isImageSeriesOutput && tab.key === "package" ? "Flipbook" : tab.label}
-              </button>
+              <div key={tab.key} className="relative">
+                <button
+                  disabled={disabled}
+                  onClick={() => {
+                    if (isPreview && hasOutput) {
+                      setShowLearnerPreview(true);
+                    } else if (!isPreview) {
+                      setActiveTab(tab.key);
+                    }
+                  }}
+                  className={`h-8 px-3 rounded-lg text-[12px] font-bold flex items-center gap-1 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0.5 ${
+                    disabled
+                      ? "bg-secondary/50 text-muted-foreground/40 cursor-not-allowed"
+                      : isPreview
+                        ? "bg-white text-primary border-2 border-primary hover:bg-primary/5"
+                        : isPackageReady && activeTab !== tab.key
+                          ? "bg-green-100 text-green-700 border-2 border-green-500 hover:bg-green-200"
+                          : activeTab === tab.key
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-muted-foreground hover:bg-border"
+                  }`}
+                  style={{
+                    boxShadow: disabled
+                      ? "none"
+                      : isPackageReady && activeTab !== tab.key
+                        ? "0 0 0 3px rgba(34, 197, 94, 0.2), 0 3px 0 rgba(34, 197, 94, 0.4), 0 4px 8px rgba(34, 197, 94, 0.2)"
+                        : activeTab === tab.key
+                          ? "0 3px 0 rgba(0,0,0,0.15), 0 4px 8px rgba(0,0,0,0.1), inset 0 1px 0 rgba(255,255,255,0.2)"
+                          : "0 2px 0 rgba(0,0,0,0.06), 0 3px 6px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.5)",
+                  }}
+                >
+                  {isImageSeriesOutput && isPackage ? <Images className="w-3 h-3" /> : <tab.icon className="w-3 h-3" />}
+                  {isImageSeriesOutput && isPackage ? "Flipbook" : tab.label}
+                </button>
+                {isPackageReady && activeTab !== tab.key && (
+                  <div className="absolute -top-2 -right-2 w-5 h-5 bg-green-500 text-white rounded-full flex items-center justify-center text-[10px] font-bold animate-pulse">
+                    ✓
+                  </div>
+                )}
+              </div>
             );
           })}
         </div>
