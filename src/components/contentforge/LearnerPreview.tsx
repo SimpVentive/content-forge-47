@@ -1378,6 +1378,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlsRef = useRef<Record<number, string>>({});
+  const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>({});
+  const moduleIntroPending = useRef<Set<number>>(new Set());
   const visemeTimelinesRef = useRef<Record<number, VisemeCue[]>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -2178,24 +2180,41 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     }
                     return undefined;
                   };
-                  const repImage = findImageIn(currentModuleSlides) || findImageIn(slides as any[]);
+                  const mi = slide.moduleIndex;
+                  const cached = moduleIntroImages[mi];
+                  const repImage = cached || findImageIn(currentModuleSlides) || findImageIn(slides as any[]);
+
+                  if (!repImage && !cached && !moduleIntroPending.current.has(mi)) {
+                    moduleIntroPending.current.add(mi);
+                    (async () => {
+                      try {
+                        const { supabase } = await import("@/integrations/supabase/client");
+                        const { data, error } = await supabase.functions.invoke("generate-slide-image", {
+                          body: {
+                            prompt: `A photorealistic, professional workplace training scene representing "${slide.moduleTitle}" in the context of ${courseTitle}. Modern, diverse, well-lit, editorial style.`,
+                            moduleTitle: slide.moduleTitle,
+                            topicTitle: slide.moduleTitle,
+                            altText: slide.moduleTitle,
+                          },
+                        });
+                        if (!error && data?.imageDataUrl) {
+                          setModuleIntroImages((prev) => ({ ...prev, [mi]: data.imageDataUrl }));
+                        }
+                      } catch (e) {
+                        console.warn("module intro image gen failed", e);
+                      }
+                    })();
+                  }
+
                   return (
                     <div className="flex-1 flex items-center justify-center anim-fade-in-right" style={{ animationDelay: "0.1s" }}>
                       <div className="w-full h-full rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center">
                         {repImage ? (
                           <img src={repImage} alt={slide.moduleTitle} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center p-8">
-                            <svg viewBox="0 0 400 400" className="w-full h-full text-blue-300" fill="none" stroke="currentColor" strokeWidth="1.5">
-                              <rect x="80" y="100" width="240" height="200" rx="20" fill="none" />
-                              <line x1="100" y1="120" x2="300" y2="120" />
-                              <line x1="100" y1="150" x2="300" y2="150" />
-                              <line x1="100" y1="180" x2="300" y2="180" />
-                              <line x1="100" y1="210" x2="300" y2="210" />
-                              <line x1="100" y1="240" x2="300" y2="240" />
-                              <circle cx="200" cy="280" r="30" fill="none" strokeWidth="2" />
-                              <path d="M200 270 L200 290 M190 280 L210 280" strokeWidth="2" strokeLinecap="round" />
-                            </svg>
+                          <div className="w-full h-full flex flex-col items-center justify-center p-8 gap-3">
+                            <div className="w-10 h-10 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                            <p className="text-[13px] text-blue-600 font-semibold">Generating module visual…</p>
                           </div>
                         )}
                       </div>
