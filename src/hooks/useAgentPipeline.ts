@@ -880,8 +880,30 @@ export function useAgentPipeline() {
         try {
           const modeInstructions = getAgentModeInstructions("research", learningMode);
           researchResult = await runAgentWithLanguage(
-            `${languageDirective}You are a Research Agent for premium corporate eLearning. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or drift into generic training filler. Extract the knowledge, tensions, examples, and practical behaviors that could support a sophisticated learner experience. Course level: ${params?.level || "intermediate"}. LANGUAGE REQUIREMENT: Write ALL text values in your JSON output (source_summary, key_themes, learner_problems, practical_behaviors, learning_objectives, and every other text field) in ${textLanguage}. Do NOT use English if ${textLanguage} is not English. CRITICAL — Target duration is ${params?.duration || "15min"}. The finished learner experience must feel like approximately ${durationMinutes} minutes of content, which means around ${targetNarrationWords} words of narration/script across the course. Generate enough depth to support that runtime. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn JSON with these keys: source_summary, key_themes, learner_problems, stakes_and_consequences, common_misconceptions, practical_behaviors, scenario_opportunities, evidence_and_examples, learning_objectives.`,
-            `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content. Target duration: ${params?.duration || "15min"}. Approximate narration budget: ${targetNarrationWords} words. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Find material that can support realistic scenarios, decisions, contrasts between weak and strong practice, and memorable learner takeaways.`,
+            `${languageDirective}You are a Research Agent for premium corporate eLearning. You MUST base your output ENTIRELY on the source material provided below. Do NOT invent topics or drift into generic training filler. Extract the knowledge, tensions, examples, and practical behaviors that could support a sophisticated learner experience. Course level: ${params?.level || "intermediate"}. LANGUAGE REQUIREMENT: Write ALL text values in your JSON output (source_summary, key_themes, learner_problems, practical_behaviors, learning_objectives, and every other text field) in ${textLanguage}. Do NOT use English if ${textLanguage} is not English. CRITICAL — Target duration is ${params?.duration || "15min"}. The finished learner experience must feel like approximately ${durationMinutes} minutes of content, which means around ${targetNarrationWords} words of narration/script across the course. Generate enough depth to support that runtime. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}.
+
+CRITICAL CONTENT FILTERING:
+IGNORE and DO NOT extract from these sections:
+- Production notes (visual cues, animation directions, sound effects like "sharp sound", "arc animation")
+- Technical implementation details (UI specs, formatting instructions like "->", implementation arrows)
+- Visual/audio effect descriptions (these are NOT learning content)
+
+EXTRACT ONLY:
+- Learning objectives and core concepts
+- Scenario storylines and human narratives
+- Problem statements and decision points
+- Practical behaviors and skills to learn
+- Assessment criteria
+- Real-world examples and evidence
+
+Your output should contain ONLY the educational content, completely stripped of production metadata.
+
+\n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn JSON with these keys: source_summary, key_themes, learner_problems, stakes_and_consequences, common_misconceptions, practical_behaviors, scenario_opportunities, evidence_and_examples, learning_objectives.`,
+            `Course Title: ${courseTitle}\n\n=== SOURCE MATERIAL (USE THIS AS YOUR PRIMARY INPUT) ===\n${inputText}\n=== END SOURCE MATERIAL ===\n\nIMPORTANT: Your entire output must be based on the source material above. Do not generate generic content.
+
+FILTER OUT: Any production notes, visual cues, sound effects, animation directions, or technical implementation details. Focus ONLY on learning content.
+
+Target duration: ${params?.duration || "15min"}. Approximate narration budget: ${targetNarrationWords} words. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Find material that can support realistic scenarios, decisions, contrasts between weak and strong practice, and memorable learner takeaways.`,
             addLog, "Research Agent", 45000
           );
           setStatus("research", "complete");
@@ -918,7 +940,23 @@ export function useAgentPipeline() {
         addLog("Content Architect: Receiving research output...");
         try {
           const modeInstructions = getAgentModeInstructions("architect", learningMode);
-          const baseArchitectPrompt = `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. LANGUAGE REQUIREMENT: Write ALL module_title, topic_title, module_promise, why_it_matters, outcome_statement, course_promise, and every other text field in ${textLanguage}. Do NOT use English if ${textLanguage} is not English. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. The sum of all module estimated_minutes must land within +/- ${durationToleranceMinutes} minutes of ${durationMinutes}. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}. \n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`;
+          const baseArchitectPrompt = `You are a senior Content Architect designing premium corporate eLearning. Given research output AND source material, create a course structure with a deliberate learning arc, not just a list of topics. You MUST use the content from the source material. Do NOT invent unrelated topics. LANGUAGE REQUIREMENT: Write ALL module_title, topic_title, module_promise, why_it_matters, outcome_statement, course_promise, and every other text field in ${textLanguage}. Do NOT use English if ${textLanguage} is not English. CRITICAL: The target course duration is ${params?.duration || "15min"}. The finished course should feel like approximately ${durationMinutes} minutes of learner time, supported by about ${targetNarrationWords} words of narrated/scripted content. The sum of all module estimated_minutes must land within +/- ${durationToleranceMinutes} minutes of ${durationMinutes}. Recommended structure: ${structureGuidance}. Sophistication requirement: ${sophisticationGuidance}. Instructional pattern guidance: ${instructionalPatternGuidance}.
+
+CRITICAL CONTENT FILTERING:
+Build the course structure ONLY from learning-relevant content. IGNORE:
+- Production notes and visual/audio cues (e.g., "sharp sound", "arc animation", "->")
+- Technical implementation details
+- Any descriptions of how visuals/sounds will be implemented
+
+FOCUS ON:
+- Learning objectives and core concepts
+- Problem statements and decision points
+- Scenario opportunities that teach the content
+- Real-world examples and evidence
+
+Do NOT create modules or topics based on production notes. All modules/topics must tie directly to learning outcomes.
+
+\n\n[LEARNING MODE: ${learningMode}]\n${modeInstructions}\n\nReturn JSON in this shape: { course_promise, audience, outcome_statement, quality_targets: { realism, instructional_variety, interaction_density, scenario_expectation }, modules: [{ module_title, module_promise, why_it_matters, estimated_minutes, module_assessment_strategy, topics: [{ topic_title, learning_objective, blooms_level, instructional_pattern, scenario_anchor, misconception_to_correct, decision_skill, practice_activity, interaction_type, feedback_focus, screen_intent, key_takeaway, evidence_or_example }] }] }. Keep module and topic titles concrete and compelling, not generic.`;
           const enhancedArchitectPrompt = enhanceScriptGenerationPrompt(baseArchitectPrompt, courseTitle, auditLogs).enhancedPrompt;
 
           archResult = await runAgentWithLanguage(
@@ -969,6 +1007,18 @@ export function useAgentPipeline() {
         const wordsPerTopicRange = `${Math.max(110, Math.floor(targetWordsPerTopic * 0.9))}-${Math.ceil(targetWordsPerTopic * 1.15)}`;
 
         const baseWriterSystemPrompt = `You are an elite instructional writer who specialises in premium corporate eLearning that people actually enjoy. Your writing style is conversational, direct, vivid, and smart — like a brilliant colleague explaining something important over coffee, not a textbook.
+
+CRITICAL CONTENT FILTERING:
+Write ONLY about learning objectives and core concepts from the source material. COMPLETELY IGNORE:
+- Production notes (visual cues, animation directions, sound effects like "sharp sound", "arc animation")
+- Technical implementation details (UI specs, arrows like "->", formatting instructions)
+- Visual/audio effect descriptions — these are production metadata, NOT learning content
+
+When writing scenarios, teach the learning moment, NOT the visual moment. For example:
+- If source says "arc -> problem": Write about the emotional/learning impact of the problem, not an animation
+- If source says "sharp sound": Describe the moment of realization or impact, not the sound effect
+
+Your script should focus entirely on transferring knowledge and skills. Do NOT incorporate or reference production specifications.
 
 LANGUAGE REQUIREMENT — THIS OVERRIDES EVERYTHING ELSE:
 - Write ALL on-screen text (topic titles, headings, body copy, examples, scenarios, takeaways, challenges, labels, bullet points) in ${textLanguage}.

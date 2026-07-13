@@ -53,6 +53,24 @@ Content Summary: ${mainContent}
 Target Scene Count: ${sceneCount}
 Learning Level: ${learningLevel}
 
+CRITICAL CONTENT FILTERING:
+Generate scenes that TEACH THE LEARNING OBJECTIVE. Do NOT generate scenes based on production notes.
+
+IGNORE completely:
+- Production/technical notes (animation directions, visual effect cues like "arc animation", "->", sound effects)
+- Implementation details
+- Anything that describes HOW visuals/sounds will be created rather than WHAT happens in the story
+
+FOCUS ON:
+- Story moments that teach the learning objective
+- Character decisions and emotional learning
+- Real-world scenarios that illustrate the concept
+- Moments where the learner recognizes a key principle or skill
+
+For example:
+- If input mentions "arc -> problem": Create a scene showing the EMOTIONAL/LEARNING moment of a problem being recognized, not an animation
+- If input mentions "sharp sound": Show a moment of realization or impact, not a sound effect
+
 Create exactly ${sceneCount} connected scenes that tell a coherent story and teach the topic. Each scene builds on the previous one.
 
 For each scene, provide:
