@@ -236,6 +236,18 @@ function extractTakeaway(markdown: string): { cleanedMarkdown: string; takeaway:
     return { cleanedMarkdown, takeaway };
   }
 
+  // Pattern 1b: inline "Key Takeaway:" embedded in paragraph
+  const inlineMarker = /\s+(?:Key Takeaway|Takeaway|Remember|Tip)\s*:\s*([^.!?]+[.!?]?)/i;
+  const inlineMatch = normalized.match(inlineMarker);
+  if (inlineMatch) {
+    const takeaway = stripNarratorMarkdown(inlineMatch[1]).trim();
+    const cleanedMarkdown = normalized
+      .replace(inlineMarker, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return { cleanedMarkdown, takeaway };
+  }
+
   // Pattern 2: short final paragraph treated as takeaway (matches LearnerPreview parseContentParts)
   const paragraphs = normalized.trim().split(/\n\n+/).map((p) => p.trim()).filter(Boolean);
   if (paragraphs.length > 1) {
