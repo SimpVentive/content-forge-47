@@ -401,7 +401,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
 
       {/* 1. Slide Preview */}
       {archRaw && visualRaw && (
-        <SlidePreview archRaw={archRaw} visualRaw={visualRaw} courseTitle={courseTitle} />
+        <SlidePreview archRaw={archRaw} visualRaw={visualRaw} writerRaw={rawOutputs.writer} courseTitle={courseTitle} />
       )}
 
       {/* 2. Metadata */}
