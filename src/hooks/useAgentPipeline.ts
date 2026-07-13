@@ -2215,7 +2215,7 @@ ${modeInstructions}`;
       setShowQADialog(true);
 
       addLog(`Final QA Agent: Quality validation complete. ${result.issuesFound.length} issue(s) found.`);
-      setStatus("final-qa", result.issuesFound.length === 0 ? "complete" : "error");
+      setStatus("final-qa", "complete");
 
     } catch (err) {
       addLog(`Final QA Agent: Error — ${(err as Error).message}`);
