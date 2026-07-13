@@ -1376,12 +1376,12 @@ OUTPUT FORMAT — ABSOLUTE:
                       }
 
                       scene.imageDataUrl = finalImageUrl;
-                      // Log BFL API usage
+                      // Log OpenAI image API usage
                       try {
                         await logApiUsage(
-                          "BFL (Flux 2)",
+                          "OpenAI (gpt-image-1)",
                           1, // 1 image
-                          0.055, // Cost per image
+                          0.04, // Approx cost per image (high quality 1536x1024)
                           `Narrative image generation: Scene ${scene.sceneNumber}`,
                           undefined
                         ).catch(() => {});
