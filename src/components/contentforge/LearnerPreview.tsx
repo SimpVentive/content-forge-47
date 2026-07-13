@@ -409,11 +409,44 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxL
 }
 
 function getTopicVisual(moduleVisual: any, topicTitle: string) {
-  const topicVisuals = Array.isArray(moduleVisual?.topic_visuals) ? moduleVisual.topic_visuals : [];
-  return topicVisuals.find((visual: any) => {
+  if (!moduleVisual) return undefined;
+
+  // Try multiple possible keys for topic visuals array
+  let topicVisuals = Array.isArray(moduleVisual?.topic_visuals) ? moduleVisual.topic_visuals : [];
+  if (topicVisuals.length === 0) {
+    topicVisuals = Array.isArray(moduleVisual?.topics) ? moduleVisual.topics : [];
+  }
+  if (topicVisuals.length === 0) {
+    topicVisuals = Array.isArray(moduleVisual?.visuals) ? moduleVisual.visuals : [];
+  }
+
+  const normalizedTopic = normalizeModuleKey(topicTitle);
+  const visual = topicVisuals.find((visual: any) => {
     const candidateTitle = visual?.topic_title || visual?.title || visual?.name || "";
-    return candidateTitle && normalizeModuleKey(candidateTitle) === normalizeModuleKey(topicTitle);
+    return candidateTitle && normalizeModuleKey(candidateTitle) === normalizedTopic;
   });
+
+  if (!visual) {
+    if (topicVisuals.length > 0) {
+      console.warn(`[Visual Matching] Could not find visual for topic "${topicTitle}". Available topics in module:`,
+        topicVisuals.map((v: any) => ({
+          title: v?.topic_title || v?.title || v?.name,
+          hasImage: !!v?.generated_image_data_url || !!v?.imageDataUrl,
+          hasSvg: !!v?.generated_scene_svg || !!v?.sceneSvg,
+        }))
+      );
+    } else {
+      console.warn(`[Visual Matching] No topic_visuals array found for topic "${topicTitle}". Module visual keys:`, Object.keys(moduleVisual || {}));
+    }
+
+    // Try a fallback: if there's only one visual and we haven't found it, use that
+    if (topicVisuals.length === 1 && !topicVisuals[0]?.topic_title && !topicVisuals[0]?.title) {
+      console.debug(`[Visual Matching] Fallback: using first visual for "${topicTitle}"`);
+      return topicVisuals[0];
+    }
+  }
+
+  return visual;
 }
 
 /* Parse writer content into structured parts */
@@ -612,6 +645,19 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   // Extract infographic descriptions from visual agent
   const visualModules = visualData?.modules || visualData?.course_visual_plan?.modules || visualData?.module_visuals || [];
 
+  // Debug: Log visual data structure to help diagnose missing visuals
+  if (visualData && Object.keys(visualData).length > 0) {
+    console.log("Visual agent data available. Structure:", {
+      hasModules: !!visualData.modules,
+      hasVisualPlan: !!visualData.course_visual_plan,
+      hasModuleVisuals: !!visualData.module_visuals,
+      visualModulesCount: visualModules.length,
+      visualModuleSample: visualModules[0],
+    });
+  } else {
+    console.warn("No visual agent data found in rawOutputs.visual");
+  }
+
   // Build slides
   const slides: Slide[] = [];
   
@@ -689,15 +735,41 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
         // Fallback to content chunks for non-image-based or when no narrative scenes
         const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes, maxLines);
         const topicVisual = getTopicVisual(matchedVisualModule, topic);
-        const generatedImageDataUrl = typeof topicVisual?.generated_image_data_url === "string" && topicVisual.generated_image_data_url.trim().length > 0
-          ? topicVisual.generated_image_data_url
-          : undefined;
-        const generatedSceneSvg = typeof topicVisual?.generated_scene_svg === "string" && topicVisual.generated_scene_svg.trim().length > 0
-          ? normalizeSvg(topicVisual.generated_scene_svg)
-          : undefined;
+
+        // Extract visual data with multiple fallback field names
+        let generatedImageDataUrl: string | undefined;
+        let generatedSceneSvg: string | undefined;
+
+        if (topicVisual) {
+          const imageUrl = topicVisual.generated_image_data_url
+            || topicVisual.imageDataUrl
+            || topicVisual.image_url
+            || topicVisual.dataUrl;
+          if (typeof imageUrl === "string" && imageUrl.trim().length > 0) {
+            generatedImageDataUrl = imageUrl;
+          }
+
+          const svgContent = topicVisual.generated_scene_svg
+            || topicVisual.sceneSvg
+            || topicVisual.svg;
+          if (typeof svgContent === "string" && svgContent.trim().length > 0) {
+            generatedSceneSvg = normalizeSvg(svgContent);
+          }
+        }
+
         const screenTemplate = topicVisual?.screen_template === "dashboard" || topicVisual?.screen_template === "guided-notes" || topicVisual?.screen_template === "scenario" || topicVisual?.screen_template === "media-quiz" || topicVisual?.screen_template === "summary-panel"
           ? topicVisual.screen_template
           : undefined;
+
+        // Detailed logging for debugging - only on first topic to reduce noise
+        if (topic === (modules[0]?.topics?.[0] || "")) {
+          console.log(`[Visual Extraction] Topic: "${topic}"`, {
+            hasTopicVisual: !!topicVisual,
+            hasImage: !!generatedImageDataUrl,
+            hasSvg: !!generatedSceneSvg,
+            visualFields: topicVisual ? Object.keys(topicVisual) : [],
+          });
+        }
 
         contentChunks.forEach((chunk, chunkIndex) => {
           slides.push({

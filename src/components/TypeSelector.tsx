@@ -29,7 +29,7 @@ const ImageIcon = () => (
   </svg>
 );
 
-export const TypeSelector = () => {
+const TypeSelector = () => {
   const navigate = useNavigate();
   const [selectedType, setSelectedType] = useState<"static" | "video" | "image" | null>(null);
   const [loading, setLoading] = useState(false);
@@ -328,3 +328,5 @@ export const TypeSelector = () => {
     </div>
   );
 };
+
+export default TypeSelector;

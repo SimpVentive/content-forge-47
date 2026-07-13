@@ -51,7 +51,7 @@ const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Signup = lazy(() => import("./pages/Signup"));
-const TypeSelector = lazy(() => import("./components/TypeSelector").then(m => ({ default: m.TypeSelector })));
+const TypeSelector = lazy(() => import("./components/TypeSelector"));
 const VideoPreviewPage = lazy(() => import("./pages/VideoPreviewPage"));
 const AdminShell = lazy(() => import("./components/admin/AdminShell"));
 const AdminDashboard = lazy(() => import("./pages/admin/Dashboard"));
