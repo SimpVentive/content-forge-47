@@ -1317,7 +1317,7 @@ function buildModuleHtml(
     .hl-sentence.active-yellow { background: var(--hl-yellow-bg, #fef9c3); box-shadow: inset 4px 0 0 var(--hl-yellow-border, #fde047); }
     .hl-sentence.active-mint { background: var(--hl-mint-bg, #d1fae5); box-shadow: inset 4px 0 0 var(--hl-mint-border, #6ee7b7); }
     .hl-sentence.active-sky { background: var(--hl-sky-bg, #dbeafe); box-shadow: inset 4px 0 0 var(--hl-sky-border, #93c5fd); }
-    .audio-section { background: linear-gradient(135deg, var(--audio-bg-start, #eef2ff), var(--audio-bg-end, #e0e7ff)); border: 1px solid var(--audio-border, #c7d2fe); border-radius: 16px; padding: 24px; margin-bottom: 28px; position: sticky; top: 0; z-index: 100; }
+    .audio-section { background: linear-gradient(135deg, var(--audio-bg-start, #eef2ff), var(--audio-bg-end, #e0e7ff)); border: 1px solid var(--audio-border, #c7d2fe); border-radius: 16px; padding: 24px; margin-bottom: 28px; }
     .audio-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
     .audio-section h2 { font-size: 18px; color: var(--primary); margin: 0; }
     .audio-player { width: 100%; height: 48px; border-radius: 12px; accent-color: var(--primary); background: var(--card); color-scheme: light dark; }
@@ -1325,7 +1325,7 @@ function buildModuleHtml(
     .audio-player::-webkit-media-controls-current-time-display,
     .audio-player::-webkit-media-controls-time-remaining-display { color: var(--text); }
     .audio-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
-    .audio-screen { position: sticky; top: 0; z-index: 200; }
+    .audio-screen { z-index: 200; }
     .palette-bar { display: flex; align-items: center; gap: 6px; }
     .palette-label { font-size: 12px; font-weight: 600; color: var(--muted); }
     .palette-btn { width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: border-color 0.2s; }
