@@ -33,6 +33,19 @@ function escapeJsString(s: unknown): string {
 // Strip a leading option-letter prefix so the renderer's own "A. " label doesn't double up.
 interface Module { title: string; topics: string[]; }
 
+interface ScormInsertedVideo {
+  videoId: string;
+  title: string;
+  channelTitle?: string;
+  thumbnail?: string;
+  duration?: string;
+  startTime?: string;
+  endTime?: string;
+  moduleTitle: string;
+  afterSlide?: number;
+  customName?: string;
+}
+
 interface ModuleSection {
   heading: string;
   bodyMarkdown: string;
@@ -602,6 +615,33 @@ interface NarrationSection {
   word_count: number;
 }
 
+function timeToSeconds(value = ""): number {
+  const parts = value.split(":").map((part) => Number.parseInt(part, 10));
+  if (parts.some((part) => Number.isNaN(part))) return 0;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0] || 0;
+}
+
+function buildYouTubeEmbedUrl(video: ScormInsertedVideo): string {
+  const start = timeToSeconds(video.startTime || "");
+  const end = timeToSeconds(video.endTime || "");
+  return `https://www.youtube.com/embed/${encodeURIComponent(video.videoId)}?rel=0&modestbranding=1${start ? `&start=${start}` : ""}${end ? `&end=${end}` : ""}`;
+}
+
+function getAvatarDisplayName(trainerId: string): string {
+  const names: Record<string, string> = {
+    priya: "Priya",
+    arjun: "Arjun",
+    soumya: "Soumya",
+    vedprakash: "Ved Prakash",
+    atul: "Atul",
+    irina: "Irina",
+    john: "John",
+  };
+  return names[trainerId] || "Sarah";
+}
+
 function parseVoiceSections(voiceRaw: string): NarrationSection[] {
   if (!voiceRaw) return [];
   const data = tryParseJSON(voiceRaw);
@@ -780,7 +820,10 @@ function buildModuleHtml(
   sections: ModuleSection[],
   quizzes: { question: string; options: string[]; correct: number }[],
   audioSrc: string | null,
-  narrationText: string
+  narrationText: string,
+  moduleVideos: ScormInsertedVideo[] = [],
+  avatarImageSrc: string | null = null,
+  avatarName = "Sarah"
 ): string {
   // Split narration into sentences for highlighting
   const sentences = narrationText
@@ -793,10 +836,47 @@ function buildModuleHtml(
     moduleContent: section.moduleContent,
   }));
 
+  const renderAvatarNarrator = (section: ModuleSection) => `
+        <div
+          class="avatar-narrator"
+          data-topic="${escapeAttribute(section.heading)}"
+          data-module-content="${escapeAttribute(section.moduleContent)}"
+          data-system-hint="${escapeAttribute("Focus on the practical benefit to an office worker.")}"
+        >
+          <div class="topic-pill-row">
+            ${moduleTopics.map((topic) => `
+              <button
+                type="button"
+                class="topic-pill${normalizeTextKey(topic.heading) === normalizeTextKey(section.heading) ? " active" : ""}"
+                data-topic="${escapeAttribute(topic.heading)}"
+                data-module-content="${escapeAttribute(topic.moduleContent)}"
+              >${escapeHtml(topic.heading)}</button>`).join("")}
+          </div>
+          <div class="avatar-head">
+            ${avatarImageSrc
+              ? `<img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)} learning guide" class="avatar-image"/>`
+              : `<div class="avatar-circle">${escapeHtml(avatarName.slice(0, 2).toUpperCase())}</div>`}
+            <div>
+              <p class="avatar-name">${escapeHtml(avatarName)}</p>
+              <p class="avatar-role">Your learning guide</p>
+            </div>
+          </div>
+          <div class="speech-bubble">
+            <span data-role="speech-text"></span>
+            <span class="avatar-cursor" aria-hidden="true"></span>
+          </div>
+          <div class="avatar-actions">
+            <button type="button" class="avatar-btn explain-btn" data-action="explain">Explain this</button>
+            <button type="button" class="avatar-btn stop-btn" data-action="stop" hidden>Stop</button>
+            <button type="button" class="avatar-btn example-btn" data-action="example" hidden>Give me an example</button>
+          </div>
+        </div>`;
+
   const renderDashboardSection = (section: ModuleSection, sectionIndex: number) => {
     const objectives = moduleTopics.slice(Math.max(0, sectionIndex - 1), Math.max(0, sectionIndex - 1) + 3);
     return `
       <section class="lesson-section lesson-template-dashboard" id="section-${sectionIndex + 1}">
+        ${renderAvatarNarrator(section)}
         <div class="dashboard-grid">
           <div class="dashboard-main-card">
             <p class="dashboard-eyebrow">Lesson ${sectionIndex + 1}</p>
@@ -841,6 +921,7 @@ function buildModuleHtml(
     const noticeLines = buildScenarioNoticeLines(parts, 4);
     return `
       <section class="lesson-section lesson-template-scenario" id="section-${sectionIndex + 1}">
+        ${renderAvatarNarrator(section)}
         <div class="scenario-grid">
           <div class="scenario-main-card">
             <div class="dashboard-card-label">Scenario</div>
@@ -883,6 +964,7 @@ function buildModuleHtml(
     const quizPreview = quizzes[sectionIndex] || quizzes[0];
     return `
       <section class="lesson-section lesson-template-media-quiz" id="section-${sectionIndex + 1}">
+        ${renderAvatarNarrator(section)}
         <div class="media-quiz-grid">
           <div class="media-quiz-main-card">
             <div class="dashboard-card-label">Media Focus</div>
@@ -921,6 +1003,7 @@ function buildModuleHtml(
     const bulletSentences = splitIntoSentences(stripNarratorMarkdown(section.bodyMarkdown)).slice(0, 3);
     return `
       <section class="lesson-section lesson-template-summary-panel" id="section-${sectionIndex + 1}">
+        ${renderAvatarNarrator(section)}
         <div class="summary-panel-header">
           <div>
             <div class="dashboard-card-label">Summary panel</div>
@@ -946,38 +1029,7 @@ function buildModuleHtml(
 
   const renderSection = (section: ModuleSection, sectionIndex: number): string => section.screenTemplate === "dashboard" ? renderDashboardSection(section, sectionIndex) : section.screenTemplate === "scenario" ? renderScenarioSection(section, sectionIndex) : section.screenTemplate === "media-quiz" ? renderMediaQuizSection(section, sectionIndex) : section.screenTemplate === "summary-panel" ? renderSummaryPanelSection(section, sectionIndex) : `
       <section class="lesson-section" id="section-${sectionIndex + 1}">
-        <div
-          class="avatar-narrator"
-          data-topic="${escapeAttribute(section.heading)}"
-          data-module-content="${escapeAttribute(section.moduleContent)}"
-          data-system-hint="${escapeAttribute("Focus on the practical benefit to an office worker.")}"
-        >
-          <div class="topic-pill-row">
-            ${moduleTopics.map((topic) => `
-              <button
-                type="button"
-                class="topic-pill${normalizeTextKey(topic.heading) === normalizeTextKey(section.heading) ? " active" : ""}"
-                data-topic="${escapeAttribute(topic.heading)}"
-                data-module-content="${escapeAttribute(topic.moduleContent)}"
-              >${escapeHtml(topic.heading)}</button>`).join("")}
-          </div>
-          <div class="avatar-head">
-            <div class="avatar-circle">SC</div>
-            <div>
-              <p class="avatar-name">Sarah</p>
-              <p class="avatar-role">Your learning guide</p>
-            </div>
-          </div>
-          <div class="speech-bubble">
-            <span data-role="speech-text"></span>
-            <span class="avatar-cursor" aria-hidden="true"></span>
-          </div>
-          <div class="avatar-actions">
-            <button type="button" class="avatar-btn explain-btn" data-action="explain">Explain this</button>
-            <button type="button" class="avatar-btn stop-btn" data-action="stop" hidden>Stop</button>
-            <button type="button" class="avatar-btn example-btn" data-action="example" hidden>Give me an example</button>
-          </div>
-        </div>
+        ${renderAvatarNarrator(section)}
         <div class="section-layout ${section.visualImageDataUrl || section.visualSvg ? `layout-${escapeAttribute(section.visualPlacement || "hero")}` : "layout-text-only"}">
           ${section.visualImageDataUrl || section.visualSvg ? `
           <div class="section-visual-card" aria-label="${escapeAttribute(section.visualAltText || section.heading)}">
@@ -1046,6 +1098,28 @@ function buildModuleHtml(
           <p class="quiz-fb" id="fb${qi}"></p>
         </div>`).join("")}
       </div>` : "";
+
+  const videoScreensHtml = moduleVideos.length > 0 ? moduleVideos.map((video, index) => `
+      <div class="scorm-screen video-screen" data-video-index="${index}">
+        <section class="lesson-section video-section">
+          <div class="video-grid">
+            <div class="video-frame">
+              <iframe
+                src="${escapeAttribute(buildYouTubeEmbedUrl(video))}"
+                title="${escapeAttribute(video.title)}"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+              ></iframe>
+            </div>
+            <div class="video-context">
+              <div class="dashboard-card-label">Inserted YouTube</div>
+              <h2>${escapeHtml(video.customName || video.title)}</h2>
+              ${video.channelTitle ? `<p class="video-channel">${escapeHtml(video.channelTitle)}</p>` : ""}
+              <p class="video-module">Module ${moduleIndex + 1}: ${escapeHtml(mod.title)}</p>
+            </div>
+          </div>
+        </section>
+      </div>`).join("\n") : "";
 
   const navPrev = moduleIndex > 0
     ? `<a href="module_${moduleIndex}.html" class="nav-btn">&larr; Previous</a>`
@@ -1203,7 +1277,9 @@ function buildModuleHtml(
     .topic-pill.active, .topic-pill:hover { background: var(--topic-pill-active-bg, #eeedfe); border-color: var(--topic-pill-active-border, #afa9ec); }
     .avatar-narrator { margin-bottom: 24px; }
     .avatar-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
-    .avatar-circle { width: 64px; height: 64px; border-radius: 999px; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; background: var(--avatar-surface, #EEEDFE); color: var(--avatar-accent, #3C3489); }
+    .avatar-circle, .avatar-image { width: 64px; height: 64px; border-radius: 999px; flex: 0 0 auto; }
+    .avatar-circle { display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 700; background: var(--avatar-surface, #EEEDFE); color: var(--avatar-accent, #3C3489); }
+    .avatar-image { display: block; object-fit: cover; border: 2px solid var(--bubble-border, #AFA9EC); background: var(--avatar-surface, #EEEDFE); }
     .avatar-name { font-size: 16px; font-weight: 700; color: var(--text); }
     .avatar-role { font-size: 14px; color: var(--muted); }
     .speech-bubble { min-height: 144px; border-radius: 24px; padding: 18px 20px; background: var(--avatar-surface, #EEEDFE); border: 1px solid var(--bubble-border, #AFA9EC); color: var(--bubble-text, #26215C); font-size: 14px; line-height: 1.9; }
@@ -1270,6 +1346,13 @@ function buildModuleHtml(
     .quiz-fb { margin-top: 8px; font-size: 13px; font-weight: 600; min-height: 20px; }
     .quiz-fb.correct { color: var(--quiz-correct-text, #065f46); }
     .quiz-fb.incorrect { color: var(--quiz-incorrect-text, #991b1b); }
+    .video-section { padding: 20px; }
+    .video-grid { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 18px; align-items: stretch; }
+    .video-frame { overflow: hidden; border-radius: 18px; border: 1px solid var(--border); background: #000; aspect-ratio: 16 / 9; }
+    .video-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+    .video-context { border-radius: 18px; border: 1px solid var(--border); background: var(--card); padding: 18px; }
+    .video-context h2 { font-size: 20px; line-height: 1.2; margin: 8px 0; }
+    .video-channel, .video-module { color: var(--muted); font-size: 13px; margin-top: 10px; }
     .nav { display: flex; justify-content: space-between; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); }
     .nav-btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 20px; border-radius: 12px; font-size: 14px; font-weight: 700; text-decoration: none; color: var(--primary); border: 2px solid var(--primary); background: transparent; cursor: pointer; transition: all 0.2s; }
     .nav-btn:hover { background: var(--primary); color: var(--text-inverse, #fff); }
@@ -1282,6 +1365,7 @@ function buildModuleHtml(
       .scenario-grid, .media-quiz-grid { grid-template-columns: 1fr; }
       .summary-panel-grid { grid-template-columns: 1fr; }
       .layout-side-panel { grid-template-columns: 1fr; }
+      .video-grid { grid-template-columns: 1fr; }
       .avatar-head { flex-direction: column; align-items: flex-start; gap: 10px; }
       .avatar-actions { flex-direction: column; }
       .avatar-btn { width: 100%; }
@@ -1297,8 +1381,9 @@ function buildModuleHtml(
     <div class="progress-bar"><div class="progress-fill" style="width:${Math.round(((moduleIndex + 1) / totalModules) * 100)}%"></div></div>
   </div>
   <div class="container">
-    ${audioHtml ? `<div class="scorm-screen audio-screen">${audioHtml}</div>` : ""}
     ${sectionScreensHtml}
+    ${videoScreensHtml}
+    ${audioHtml ? `<div class="scorm-screen audio-screen">${audioHtml}</div>` : ""}
     ${quizHtml ? `<div class="scorm-screen quiz-screen">${quizHtml}</div>` : ""}
     <div class="screen-nav">
       <button type="button" id="scormPrevBtn" onclick="prevScreen()">&larr; Previous</button>
