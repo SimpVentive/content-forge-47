@@ -2101,7 +2101,7 @@ ${modeInstructions}`;
       // Update output data
       setOutputData((prev) => ({
         ...prev,
-        ...(qaResult.revisedOutputs?.script && { script: qaResult.revisedOutputs.script }),
+        ...((qaResult.revisedOutputs?.script || qaResult.revisedOutputs?.writer) && { script: qaResult.revisedOutputs.script || qaResult.revisedOutputs.writer }),
         ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
       }));
 
