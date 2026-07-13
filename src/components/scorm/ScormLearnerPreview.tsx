@@ -68,10 +68,45 @@ export const ScormLearnerPreview: React.FC<ScormLearnerPreviewProps> = ({
                 className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-lg shadow-lg p-12 text-white text-center"
               >
                 <h1 className="text-4xl font-bold mb-4">{courseTitle}</h1>
-                <p className="text-indigo-100 text-lg mb-8">{slide.moduleTitle}</p>
-                <p className="text-indigo-200">
-                  Module {slide.moduleIndex + 1} of {totalModules}
-                </p>
+                <p className="text-indigo-100 text-lg">{slide.moduleTitle}</p>
+              </div>
+            );
+          }
+
+          if (slide.type === "objectives") {
+            return (
+              <div
+                key={index}
+                className="bg-white rounded-lg shadow-md border border-slate-200 overflow-hidden"
+              >
+                <div className="bg-gradient-to-r from-slate-700 to-slate-800 px-8 py-6 text-white">
+                  <h2 className="text-2xl font-bold">Module Overview</h2>
+                </div>
+                <div className="p-8 space-y-8">
+                  {slide.courseObjective && (
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-3 text-indigo-600">
+                        Course Objective:
+                      </h3>
+                      <p className="text-slate-700 leading-relaxed">{slide.courseObjective}</p>
+                    </div>
+                  )}
+                  {slide.courseContent && slide.courseContent.length > 0 && (
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900 mb-3 text-indigo-600">
+                        Course Content:
+                      </h3>
+                      <ul className="space-y-2">
+                        {slide.courseContent.map((item, i) => (
+                          <li key={i} className="flex items-start gap-3 text-slate-700">
+                            <span className="inline-block w-2 h-2 rounded-full bg-indigo-600 mt-2 flex-shrink-0"></span>
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
             );
           }

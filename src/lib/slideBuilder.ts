@@ -15,7 +15,7 @@ export interface Module {
   topics: string[];
 }
 
-export type SlideType = "title" | "content" | "assessment" | "summary" | "video" | "narrative-flipbook";
+export type SlideType = "title" | "objectives" | "content" | "assessment" | "summary" | "video" | "narrative-flipbook";
 
 export type ContentTemplate = "dashboard" | "guided-notes" | "scenario" | "media-quiz" | "summary-panel";
 
@@ -30,6 +30,8 @@ export interface Slide {
   topicPartIndex?: number;
   topicPartCount?: number;
   content?: string;
+  courseObjective?: string;
+  courseContent?: string[];
   infographicSvg?: string;
   visualImageDataUrl?: string;
   visualSvg?: string;
@@ -525,6 +527,18 @@ export function buildSlides(
     // 1. Title slide - first module only
     if (mi === 0) {
       slides.push({ type: "title", moduleIndex: mi, moduleTitle: mod.title });
+
+      // 1.5. Objectives slide - right after title
+      const moduleObjective = `Master the key concepts and skills covered in ${mod.title}. This module will guide you through essential knowledge and best practices.`;
+      const moduleContentTopics = mod.topics.filter(Boolean).slice(0, 6);
+
+      slides.push({
+        type: "objectives",
+        moduleIndex: mi,
+        moduleTitle: mod.title,
+        courseObjective: moduleObjective,
+        courseContent: moduleContentTopics,
+      });
     }
 
     // 2. Content slides
