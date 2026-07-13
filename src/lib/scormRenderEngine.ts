@@ -413,37 +413,6 @@ export function injectScormApi(): string {
   `;
 }
 
-/**
- * Creates complete self-contained SCORM HTML document
- */
-function createScormHtmlDocument(bodyHtml: string, title: string, css: string): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="X-UA-Compatible" content="ie=edge">
-  <title>${escapeHtml(title)}</title>
-  ${css}
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
-  <div id="root">${bodyHtml}</div>
-  <script>
-    window.addEventListener('beforeunload', function() {
-      if (typeof SCORM_API !== 'undefined' && SCORM_API) {
-        try {
-          SCORM_API.LMSCommit('');
-          SCORM_API.LMSFinish('');
-        } catch (e) {
-          console.error('SCORM API error:', e);
-        }
-      }
-    });
-  </script>
-</body>
-</html>`;
-}
-
 /* ── Helpers ── */
 
 function tryParseJSON(raw: string | undefined): any | null {
