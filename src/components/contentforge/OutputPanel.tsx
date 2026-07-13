@@ -613,6 +613,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
                   await exportScormPackage(courseTitle, rawOutputs, {
                     includeVoice: hasVoice,
                     voiceId: avatarTrainerId ? getTrainerVoiceId(avatarTrainerId) : undefined,
+                    avatarTrainerId,
                     insertedVideos,
                     onProgress: (msg) => toast.info(msg, { duration: 3000 }),
                   });
