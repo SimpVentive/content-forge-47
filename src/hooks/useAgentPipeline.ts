@@ -2094,7 +2094,7 @@ ${modeInstructions}`;
       // Apply revised outputs
       setRawOutputs((prev) => ({
         ...prev,
-        ...(qaResult.revisedOutputs?.writer && { writer: qaResult.revisedOutputs.writer }),
+        ...((qaResult.revisedOutputs?.writer || qaResult.revisedOutputs?.script) && { writer: qaResult.revisedOutputs.writer || qaResult.revisedOutputs.script }),
         ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
       }));
 
