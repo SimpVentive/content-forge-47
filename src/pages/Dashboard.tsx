@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Trash2, Edit3, Zap, Calendar, BookOpen, BarChart3, HelpCircle, LogOut, Bell, User, Settings } from "lucide-react";
+import { Plus, Search, Trash2, Edit3, Zap, Calendar, BookOpen, BarChart3, HelpCircle, LogOut, Bell, User, Settings, Download } from "lucide-react";
 import { listCourseDraftsCloudFirst, deleteCourseDraftCloudFirst, type CourseDraft } from "@/lib/courseDrafts";
 import { useAuth } from "@/hooks/useAuth";
 import { HelpModal } from "@/components/HelpModal";
 import { AssetLibraryPanel } from "@/components/AssetLibraryPanel";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { toast } from "sonner";
+import { exportToScorm, downloadBlob } from "@/lib/scormExportOrchestrator";
+import type { RawAgentOutputs } from "@/types/agents";
 
 type SidebarItemId = "courses" | "templates" | "assets" | "analytics" | "help";
 
@@ -89,6 +91,48 @@ export const Dashboard = () => {
       } catch (error) {
         toast.error("Failed to delete course");
       }
+    }
+  };
+
+  const handleExportCourse = async (course: CourseDraft) => {
+    if (!course.outputData) {
+      toast.error("Please generate course content first");
+      return;
+    }
+
+    const toastId = toast.loading("Exporting to SCORM...");
+    try {
+      const rawOutputs: RawAgentOutputs = {
+        architect: course.outputData.architect || "{}",
+        writer: course.outputData.writer || "",
+        assessment: course.outputData.assessment || "{}",
+        visual: course.outputData.visual || "{}",
+        avatar: course.outputData.avatar || "",
+      };
+
+      const result = await exportToScorm(rawOutputs, {
+        courseTitle: course.title || "Untitled Course",
+        courseDescription: course.courseParams?.description,
+        trainerId: course.courseParams?.trainerId,
+        enableVoiceNarration: course.courseParams?.enableVoiceNarration ?? true,
+        embedStrategy: "data-uri",
+        passingScore: 70,
+        courseVersion: "1.0",
+      }, (progress) => {
+        if (progress.percentage === 100) {
+          toast.dismiss(toastId);
+        }
+      });
+
+      if (result.success && result.fileBlob) {
+        downloadBlob(result.fileBlob, result.fileName);
+        toast.success("SCORM package exported successfully!");
+      } else {
+        toast.error(result.message || "Export failed");
+      }
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export course: " + (error instanceof Error ? error.message : "Unknown error"));
     }
   };
 
@@ -305,6 +349,7 @@ export const Dashboard = () => {
                         course={course}
                         onEdit={() => handleEditCourse(course.id)}
                         onDelete={() => handleDeleteCourse(course.id)}
+                        onExport={() => handleExportCourse(course)}
                       />
                     ))}
                   </div>
@@ -340,9 +385,10 @@ interface CourseCardProps {
   course: CourseDraft;
   onEdit: () => void;
   onDelete: () => void;
+  onExport: () => void;
 }
 
-const CourseCard: React.FC<CourseCardProps> = ({ course, onEdit, onDelete }) => {
+const CourseCard: React.FC<CourseCardProps> = ({ course, onEdit, onDelete, onExport }) => {
   const hasOutput = course.outputData && Object.values(course.outputData).some(v => v);
   const learningType = course.courseParams?.learningType || "static";
   const contentType = course.courseParams?.contentType || "learning-course";
@@ -424,6 +470,19 @@ const CourseCard: React.FC<CourseCardProps> = ({ course, onEdit, onDelete }) => 
           >
             <Edit3 className="w-4 h-4" />
             Edit
+          </button>
+          <button
+            onClick={onExport}
+            disabled={!hasOutput}
+            className={`px-4 py-2.5 rounded-lg transition-all border flex items-center justify-center gap-2 text-sm ${
+              hasOutput
+                ? "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 cursor-pointer"
+                : "bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed opacity-60"
+            }`}
+            title={hasOutput ? "Export as SCORM package" : "Generate course content first"}
+          >
+            <Download className="w-4 h-4" />
+            Export
           </button>
           <button
             onClick={onDelete}
