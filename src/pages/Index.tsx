@@ -620,28 +620,28 @@ const Index = () => {
             </div>
 
             <h2 className="text-2xl font-bold text-center text-slate-900 mb-2">
-              Generation Complete! 🎉
+              {learningType === "video" ? "Video Course" : learningType === "image" ? "Image-Based Course" : "Learning Course"} creation completed 🎉
             </h2>
 
             <p className="text-center text-slate-600 mb-8">
-              Your course <span className="font-semibold text-slate-900">"{courseTitle}"</span> has been generated successfully and is ready to preview.
+              <span className="font-semibold text-slate-900">"{courseTitle}"</span> is ready. Do you want to proceed to <span className="font-semibold">Course Output</span>?
             </p>
 
             <div className="space-y-3">
               <button
                 onClick={() => {
                   setShowGenerationComplete(false);
-                  setShowLearnerPreview(true);
+                  setActiveTab("output");
                 }}
                 className="w-full px-6 py-3 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
               >
-                Proceed to Preview
+                Yes, take me to Course Output
               </button>
               <button
                 onClick={() => setShowGenerationComplete(false)}
                 className="w-full px-6 py-3 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
               >
-                Continue Editing
+                Not now
               </button>
             </div>
           </div>
