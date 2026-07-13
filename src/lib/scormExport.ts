@@ -1537,7 +1537,7 @@ export async function exportScormPackage(
   const imageReplacementMap = new Map<string, string>();
   scriptMap.forEach((sections) => {
     sections.forEach((section, idx) => {
-      if (section.visualImageDataUrl && section.visualImageDataUrl.startsWith("data:")) {
+      if (section.visualImageDataUrl && typeof section.visualImageDataUrl === "string" && section.visualImageDataUrl.startsWith("data:")) {
         try {
           const matches = section.visualImageDataUrl.match(/^data:([^;]+);base64,(.+)$/);
           if (matches) {
