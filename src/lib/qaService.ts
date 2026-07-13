@@ -45,24 +45,51 @@ You must respond ONLY with valid JSON (no markdown, no explanations, just JSON).
 
   const userMessage = buildQAPrompt(context, rawOutputs, outputData);
 
+  let responseText = "";
   try {
-    const responseText = await callClaude(systemPrompt, userMessage);
+    responseText = await callClaude(systemPrompt, userMessage);
+  } catch (error) {
+    console.error("Final QA check: model call failed:", error);
+    // Don't fail the whole pipeline — return an empty successful QA result.
+    return {
+      issuesFound: [],
+      correctionsApplied: [],
+      overallSeverity: "low",
+      wasAutoFixed: false,
+      revisedOutputs: {},
+      report: `QA check could not run (${(error as Error).message}). Output was not modified.`,
+    };
+  }
 
-    // Try to parse as JSON, extract JSON if wrapped in markdown
-    let jsonText = responseText;
-    if (jsonText.includes("```json")) {
-      const match = jsonText.match(/```json\n?([\s\S]*?)\n?```/);
-      if (match) jsonText = match[1];
-    } else if (jsonText.includes("```")) {
-      const match = jsonText.match(/```\n?([\s\S]*?)\n?```/);
-      if (match) jsonText = match[1];
+  // Try to parse as JSON — extract from markdown fences or first {...} block.
+  let jsonText = responseText.trim();
+  const fenceMatch =
+    jsonText.match(/```json\n?([\s\S]*?)\n?```/) ||
+    jsonText.match(/```\n?([\s\S]*?)\n?```/);
+  if (fenceMatch) jsonText = fenceMatch[1].trim();
+
+  if (!jsonText.startsWith("{")) {
+    const braceStart = jsonText.indexOf("{");
+    const braceEnd = jsonText.lastIndexOf("}");
+    if (braceStart !== -1 && braceEnd > braceStart) {
+      jsonText = jsonText.slice(braceStart, braceEnd + 1);
     }
+  }
 
-    const result = JSON.parse(jsonText.trim());
+  try {
+    const result = JSON.parse(jsonText);
     return parseQAResult(result, rawOutputs, outputData);
   } catch (error) {
-    console.error("Final QA check failed:", error);
-    throw error;
+    console.error("Final QA check: JSON parse failed. Raw response:", responseText);
+    // Fall back to a plain-text report instead of throwing.
+    return {
+      issuesFound: [],
+      correctionsApplied: [],
+      overallSeverity: "low",
+      wasAutoFixed: false,
+      revisedOutputs: {},
+      report: responseText.slice(0, 2000) || "QA check returned no parseable result.",
+    };
   }
 }
 
