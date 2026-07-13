@@ -2094,14 +2094,14 @@ ${modeInstructions}`;
       // Apply revised outputs
       setRawOutputs((prev) => ({
         ...prev,
-        ...(qaResult.revisedOutputs?.writer && { writer: qaResult.revisedOutputs.writer }),
+        ...((qaResult.revisedOutputs?.writer || qaResult.revisedOutputs?.script) && { writer: qaResult.revisedOutputs.writer || qaResult.revisedOutputs.script }),
         ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
       }));
 
       // Update output data
       setOutputData((prev) => ({
         ...prev,
-        ...(qaResult.revisedOutputs?.script && { script: qaResult.revisedOutputs.script }),
+        ...((qaResult.revisedOutputs?.script || qaResult.revisedOutputs?.writer) && { script: qaResult.revisedOutputs.script || qaResult.revisedOutputs.writer }),
         ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
       }));
 
@@ -2215,7 +2215,7 @@ ${modeInstructions}`;
       setShowQADialog(true);
 
       addLog(`Final QA Agent: Quality validation complete. ${result.issuesFound.length} issue(s) found.`);
-      setStatus("final-qa", result.issuesFound.length === 0 ? "complete" : "error");
+      setStatus("final-qa", "complete");
 
     } catch (err) {
       addLog(`Final QA Agent: Error — ${(err as Error).message}`);

@@ -660,16 +660,68 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
 
   // Build slides
   const slides: Slide[] = [];
-  
-  // Split writer content by ## headers to map to topics
+
+  // Build a robust writer index (matches scormExport parser): supports JSON
+  // writer output, multi-level markdown headings (##/###/####), and skips
+  // module-level headings from the positional fallback so topic content aligns.
   const writerSections: Record<string, string> = {};
-  const sectionRegex = /##\s+(.+?)\n([\s\S]*?)(?=\n##\s|\n$|$)/g;
-  let match;
-  while ((match = sectionRegex.exec(writerText)) !== null) {
-    writerSections[match[1].trim().toLowerCase()] = match[2].trim();
+  const orderedTopicBodies: string[] = [];
+  const moduleTitleKeys = new Set(modules.map((m) => normalizeModuleKey(m.title)));
+  const isModuleLikeHeading = (h: string) =>
+    moduleTitleKeys.has(normalizeModuleKey(h)) || /^module\s*\d+\b/i.test(h.trim());
+  const cleanBody = (s: string) => {
+    const c = (s || "").replace(/\r\n/g, "\n").replace(/^---+\s*$/gm, "").trim();
+    return c && !isPlaceholderToken(c) ? c : "";
+  };
+  const extractObjBody = (v: any): string => {
+    if (!v || typeof v !== "object") return "";
+    const keys = ["content", "body", "text", "narrative", "narration", "script", "lesson_content", "on_screen_text", "screen_text", "description", "explanation"];
+    for (const k of keys) {
+      const val = v[k];
+      if (typeof val === "string") { const c = cleanBody(val); if (c) return c; }
+      if (Array.isArray(val)) {
+        const joined = val.map((it) => typeof it === "string" ? it : extractObjBody(it)).filter(Boolean).join("\n\n");
+        const c = cleanBody(joined); if (c) return c;
+      }
+    }
+    return "";
+  };
+  const pushSection = (heading: string, body: string) => {
+    const h = (heading || "").trim();
+    const b = cleanBody(body);
+    if (!h || !b) return;
+    const key = h.toLowerCase();
+    if (!writerSections[key]) writerSections[key] = b;
+    if (!isModuleLikeHeading(h)) orderedTopicBodies.push(b);
+  };
+  const writerJson = tryParseJSON(writerText);
+  if (writerJson) {
+    const topLevel = writerJson.sections || writerJson.lessons || writerJson.slides || writerJson.topics;
+    if (Array.isArray(topLevel)) {
+      topLevel.forEach((s: any, i: number) =>
+        pushSection(String(s?.topic_title || s?.title || s?.heading || s?.name || `Section ${i + 1}`), extractObjBody(s))
+      );
+    }
+    const mods = writerJson.modules || writerJson.course_structure?.modules || writerJson.course_modules;
+    if (Array.isArray(mods)) {
+      mods.forEach((m: any, mi: number) => {
+        pushSection(String(m?.module_title || m?.title || m?.name || `Module ${mi + 1}`), extractObjBody(m));
+        const children = m?.topics || m?.sections || m?.lessons || m?.slides || m?.content;
+        if (Array.isArray(children)) {
+          children.forEach((t: any, ti: number) =>
+            pushSection(String(t?.topic_name || t?.topic_title || t?.title || t?.heading || t?.name || `Topic ${ti + 1}`), extractObjBody(t))
+          );
+        }
+      });
+    }
   }
-  // Also split by heading for fallback
-  const writerParts = writerText.split(/(?=##\s)/).filter(Boolean);
+  const normalizedWriter = (writerText || "").replace(/\r\n/g, "\n");
+  const headingMatches = Array.from(normalizedWriter.matchAll(/^(#{2,4})\s+(.+?)\s*$/gm));
+  headingMatches.forEach((hm, i) => {
+    const start = (hm.index || 0) + hm[0].length;
+    const end = i + 1 < headingMatches.length ? (headingMatches[i + 1].index || normalizedWriter.length) : normalizedWriter.length;
+    pushSection(stripNarratorMarkdown(hm[2]).trim(), normalizedWriter.slice(start, end));
+  });
 
   let topicCounter = 0;
 
@@ -687,16 +739,16 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
 
     // 2. Content slides - one per topic
     mod.topics.forEach((topic, ti) => {
-      // Try to match writer section by topic name
-      let sectionText = writerSections[topic.toLowerCase()] || "";
-      if (!sectionText && writerParts[topicCounter]) {
-        sectionText = writerParts[topicCounter].replace(/^##\s+.+\n/, "").trim();
-      }
-      // If no content found, use empty string instead of placeholder
-      // Empty content will be handled by empty state UI in slide rendering
+      const topicKey = topic.toLowerCase();
+      let sectionText = writerSections[topicKey] || "";
       if (!sectionText) {
-        sectionText = "";
+        // Fuzzy contains match on stored headings
+        for (const [k, v] of Object.entries(writerSections)) {
+          if (k.length > 4 && (k.includes(topicKey) || topicKey.includes(k))) { sectionText = v; break; }
+        }
       }
+      if (!sectionText) sectionText = orderedTopicBodies[topicCounter] || "";
+      if (!sectionText) sectionText = "";
 
       // For image-based learning, use narrative scenes; otherwise use visual design plan
       let narrativeForTopic = null;
@@ -2116,9 +2168,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
                 {/* Right: Representative Image (50%) - use first generated image from this module */}
                 {(() => {
-                  const repImage =
-                    (currentModuleSlides.find((s: any) => s.type === "narrative-flipbook" && s.narrative?.scenes?.[0]?.imageDataUrl) as any)?.narrative?.scenes?.[0]?.imageDataUrl ||
-                    (currentModuleSlides.find((s: any) => s.type === "content" && s.visualImageDataUrl) as any)?.visualImageDataUrl;
+                  const findImageIn = (list: any[]): string | undefined => {
+                    for (const s of list) {
+                      if (s?.visualImageDataUrl) return s.visualImageDataUrl;
+                      const scenes = s?.narrative?.scenes || [];
+                      for (const sc of scenes) {
+                        if (sc?.imageDataUrl) return sc.imageDataUrl;
+                      }
+                    }
+                    return undefined;
+                  };
+                  const repImage = findImageIn(currentModuleSlides) || findImageIn(slides as any[]);
                   return (
                     <div className="flex-1 flex items-center justify-center anim-fade-in-right" style={{ animationDelay: "0.1s" }}>
                       <div className="w-full h-full rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center">

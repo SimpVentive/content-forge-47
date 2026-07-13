@@ -619,12 +619,12 @@ const Index = () => {
               </div>
             </div>
 
-            <h2 className="text-2xl font-bold text-center text-slate-900 mb-4">
-              Content Creation is completed
+            <h2 className="text-2xl font-bold text-center text-slate-900 mb-2">
+              Content Creation is completed 🎉
             </h2>
 
             <p className="text-center text-slate-600 mb-8">
-              Click on <span className="font-semibold text-slate-900">Course Output</span> to view your material.
+              <span className="font-semibold text-slate-900">"{courseTitle}"</span> is ready. Click on <span className="font-semibold">Course Output</span> to view your material.
             </p>
 
             <div className="space-y-3">
@@ -641,7 +641,7 @@ const Index = () => {
                 onClick={() => setShowGenerationComplete(false)}
                 className="w-full px-6 py-3 border border-slate-300 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
               >
-                Dismiss
+                Not now
               </button>
             </div>
           </div>

@@ -237,6 +237,69 @@ function extractTakeaway(markdown: string): { cleanedMarkdown: string; takeaway:
   return { cleanedMarkdown: normalized.trim(), takeaway: "" };
 }
 
+function parseContentPartsForExport(text: string) {
+  const lines = text
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .filter((line) => !line.match(/^#{1,4}\s/))
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0 && !isPlaceholderToken(line));
+
+  const paragraphs = lines
+    .join("\n")
+    .split(/\n\n+/)
+    .map((paragraph) => safeLearnerText(paragraph))
+    .filter(Boolean);
+
+  let hook = "";
+  let body: string[] = [];
+  let takeaway = "";
+  let challenge = "";
+
+  paragraphs.forEach((paragraph, index) => {
+    if (index === 0) {
+      hook = paragraph;
+    } else if (/^(Key Takeaway|Takeaway|Remember|Tip)\s*:/i.test(paragraph)) {
+      takeaway = safeLearnerText(paragraph.replace(/^(Key Takeaway|Takeaway|Remember|Tip)\s*:\s*/i, ""));
+    } else if (/^(Challenge|Try this)\s*:/i.test(paragraph) || (index === paragraphs.length - 1 && paragraph.length < 120)) {
+      challenge = safeLearnerText(paragraph.replace(/^(Challenge|Try this)\s*:\s*/i, ""));
+    } else {
+      body.push(paragraph);
+    }
+  });
+
+  if (!takeaway && body.length > 1) {
+    const last = body[body.length - 1];
+    if (last.length < 100) {
+      takeaway = last;
+      body = body.slice(0, -1);
+    }
+  }
+
+  return { hook, body, takeaway, challenge };
+}
+
+function buildScenarioNoticeLines(parts: { hook: string; body: string[]; takeaway: string; challenge: string }, maxLines = 4): string[] {
+  const lines: string[] = [];
+  const pushSentences = (text: string) => {
+    if (!text || lines.length >= maxLines) return;
+    const normalized = stripNarratorMarkdown(text);
+    const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+    for (const sentence of sentences) {
+      if (lines.length >= maxLines) break;
+      const cleaned = sentence.replace(/^Key takeaway:\s*/i, "").replace(/^Challenge:\s*/i, "").trim();
+      if (cleaned && !isPlaceholderToken(cleaned)) lines.push(cleaned);
+    }
+  };
+
+  pushSentences(parts.hook);
+  parts.body.forEach(pushSentences);
+  pushSentences(parts.takeaway);
+  pushSentences(parts.challenge);
+
+  return Array.from(new Set(lines)).slice(0, maxLines);
+}
+
 function parseModules(archRaw: string): Module[] {
   const data = tryParseJSON(archRaw);
   if (data?.modules) {
@@ -291,26 +354,174 @@ function parseVisualSections(visualRaw: string): Map<string, Map<string, { image
   return visualMap;
 }
 
+type WriterSection = { heading: string; body: string; level?: number };
+
+function cleanWriterBody(body: unknown): string {
+  if (typeof body !== "string") return "";
+  const cleaned = body
+    .replace(/\r\n/g, "\n")
+    .replace(/^---+\s*$/gm, "")
+    .trim();
+  return cleaned && !isPlaceholderToken(cleaned) ? cleaned : "";
+}
+
+function extractBodyFromObject(value: any): string {
+  if (!value || typeof value !== "object") return "";
+  const candidates = [
+    value.content,
+    value.body,
+    value.text,
+    value.narrative,
+    value.narration,
+    value.script,
+    value.lesson_content,
+    value.on_screen_text,
+    value.screen_text,
+    value.description,
+    value.explanation,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string") {
+      const cleaned = cleanWriterBody(candidate);
+      if (cleaned) return cleaned;
+    }
+    if (Array.isArray(candidate)) {
+      const joined = candidate.map((item) => typeof item === "string" ? item : extractBodyFromObject(item)).filter(Boolean).join("\n\n");
+      const cleaned = cleanWriterBody(joined);
+      if (cleaned) return cleaned;
+    }
+  }
+
+  return "";
+}
+
+function getModuleLikeTitles(modules: Module[]): Set<string> {
+  const titles = new Set<string>();
+  modules.forEach((module) => {
+    const normalized = normalizeTextKey(module.title || "");
+    if (normalized) titles.add(normalized);
+  });
+  return titles;
+}
+
+function isModuleHeading(heading: string, moduleTitles: Set<string>): boolean {
+  const normalized = normalizeTextKey(heading);
+  return moduleTitles.has(normalized) || /^module\s*\d+\b/i.test(heading.trim());
+}
+
+function extractJsonWriterSections(writerRaw: string): WriterSection[] {
+  const data = tryParseJSON(writerRaw);
+  if (!data) return [];
+
+  const sections: WriterSection[] = [];
+  const push = (heading: unknown, body: unknown) => {
+    const parsedHeading = parseTopicLabel(heading);
+    const cleanedBody = typeof body === "string" ? cleanWriterBody(body) : extractBodyFromObject(body);
+    if (parsedHeading && cleanedBody) sections.push({ heading: parsedHeading, body: cleanedBody });
+  };
+
+  const topLevelSections = data.sections || data.lessons || data.slides || data.topics || [];
+  if (Array.isArray(topLevelSections)) {
+    topLevelSections.forEach((section: any, index: number) => push(section?.topic_title || section?.title || section?.heading || section?.name || `Section ${index + 1}`, section));
+  }
+
+  const modules = data.modules || data.course_structure?.modules || data.course_modules || [];
+  if (Array.isArray(modules)) {
+    modules.forEach((module: any, moduleIndex: number) => {
+      push(module?.module_title || module?.title || module?.name || `Module ${moduleIndex + 1}`, module);
+      const children = module?.topics || module?.sections || module?.lessons || module?.slides || module?.content || [];
+      if (Array.isArray(children)) {
+        children.forEach((topic: any, topicIndex: number) => {
+          push(topic?.topic_name || topic?.topic_title || topic?.title || topic?.heading || topic?.name || `Topic ${topicIndex + 1}`, topic);
+        });
+      }
+    });
+  }
+
+  return sections;
+}
+
+function extractMarkdownWriterSections(writerRaw: string): WriterSection[] {
+  const normalized = writerRaw.replace(/\r\n/g, "\n");
+  const headingMatches = Array.from(normalized.matchAll(/^(#{2,4})\s+(.+?)\s*$/gm));
+
+  if (headingMatches.length === 0) {
+    const fallback = cleanWriterBody(normalized.replace(/^#\s+.+$/m, ""));
+    return fallback ? [{ heading: "Course Content", body: fallback, level: 1 }] : [];
+  }
+
+  return headingMatches
+    .map((match, index) => {
+      const start = (match.index || 0) + match[0].length;
+      const end = index + 1 < headingMatches.length ? headingMatches[index + 1].index || normalized.length : normalized.length;
+      return {
+        heading: stripNarratorMarkdown(match[2]).trim(),
+        body: cleanWriterBody(normalized.slice(start, end)),
+        level: match[1].length,
+      };
+    })
+    .filter((section) => section.heading && section.body);
+}
+
+function buildWriterSectionIndex(writerRaw: string, modules: Module[]) {
+  const sections = [
+    ...extractJsonWriterSections(writerRaw),
+    ...extractMarkdownWriterSections(writerRaw),
+  ];
+  const moduleTitles = getModuleLikeTitles(modules);
+  const sectionMap = new Map<string, string>();
+  const orderedSections: string[] = [];
+
+  sections.forEach((section) => {
+    const normalizedHeading = normalizeTextKey(section.heading);
+    if (normalizedHeading && !sectionMap.has(normalizedHeading)) {
+      sectionMap.set(normalizedHeading, section.body);
+    }
+
+    // Positional matching should mirror LearnerPreview topic order. Module-level
+    // wrappers are useful for exact module matches, but they shift topic content
+    // by one screen when used as positional fallbacks.
+    if (!isModuleHeading(section.heading, moduleTitles)) {
+      orderedSections.push(section.body);
+    }
+  });
+
+  return { sectionMap, orderedSections };
+}
+
+function findWriterSectionMarkdown(heading: string, sectionMap: Map<string, string>, orderedSections: string[], index: number): string {
+  const normalizedHeading = normalizeTextKey(heading);
+  const exact = sectionMap.get(normalizedHeading);
+  if (exact) return exact;
+
+  if (normalizedHeading.length > 4) {
+    for (const [candidateHeading, body] of sectionMap.entries()) {
+      if (candidateHeading.includes(normalizedHeading) || normalizedHeading.includes(candidateHeading)) {
+        return body;
+      }
+    }
+  }
+
+  return orderedSections[index] || "";
+}
+
 function parseScript(writerRaw: string, modules: Module[], visualRaw?: string): Map<string, ModuleSection[]> {
   if (!writerRaw) return new Map<string, ModuleSection[]>();
 
   const typedMap = new Map<string, ModuleSection[]>();
-  const sectionMap = new Map<string, string>();
   const visualMap = parseVisualSections(visualRaw || "");
-  const chunks = writerRaw.split(/^##\s+/m).map((chunk) => chunk.trim()).filter(Boolean);
+  const { sectionMap, orderedSections } = buildWriterSectionIndex(writerRaw, modules);
 
-  for (const chunk of chunks) {
-    const [headingLine, ...bodyLines] = chunk.split("\n");
-    const heading = headingLine?.trim();
-    if (!heading) continue;
-    sectionMap.set(normalizeTextKey(heading), bodyLines.join("\n").trim());
-  }
+  let topicCounter = 0;
 
   modules.forEach((mod) => {
     const moduleVisuals = visualMap.get(normalizeTextKey(mod.title)) || new Map();
     const moduleSections: ModuleSection[] = (mod.topics.length > 0 ? mod.topics : [mod.title]).map((topic) => {
       const heading = parseTopicLabel(topic) || mod.title;
-      const rawMarkdown = sectionMap.get(normalizeTextKey(heading)) || `Content for ${heading}`;
+      // Try exact heading match first, then fall back to positional (topic-order) match
+      const rawMarkdown = findWriterSectionMarkdown(heading, sectionMap, orderedSections, topicCounter);
+      topicCounter++;
       const { cleanedMarkdown, takeaway } = extractTakeaway(rawMarkdown);
       const bodyMarkdown = cleanedMarkdown || rawMarkdown;
       const plainText = stripNarratorMarkdown(bodyMarkdown);
@@ -319,7 +530,7 @@ function parseScript(writerRaw: string, modules: Module[], visualRaw?: string): 
         heading,
         bodyMarkdown,
         bodyHtml: markdownToHtml(bodyMarkdown),
-        moduleContent: getFirstSentences(plainText, 3) || plainText || `Key point: ${heading}`,
+        moduleContent: getFirstSentences(plainText, 3) || plainText || heading,
         keyTakeaway: takeaway,
         visualImageDataUrl: visual?.imageDataUrl,
         visualSvg: visual?.svg,
@@ -624,17 +835,31 @@ function buildModuleHtml(
   };
 
   const renderScenarioSection = (section: ModuleSection, sectionIndex: number) => {
-    const supportingText = getFirstSentences(stripNarratorMarkdown(section.bodyMarkdown), 2) || section.moduleContent;
+    const parts = parseContentPartsForExport(section.bodyMarkdown);
+    const situation = parts.body[0] || parts.hook || section.moduleContent;
+    const betterMove = parts.body[1] || parts.challenge || parts.takeaway || section.keyTakeaway || section.moduleContent;
+    const noticeLines = buildScenarioNoticeLines(parts, 4);
     return `
       <section class="lesson-section lesson-template-scenario" id="section-${sectionIndex + 1}">
         <div class="scenario-grid">
           <div class="scenario-main-card">
             <div class="dashboard-card-label">Scenario</div>
             <h2>${escapeHtml(section.heading)}</h2>
-            <p class="dashboard-summary">${escapeHtml(section.moduleContent)}</p>
             <div class="scenario-callout">
-              <div class="dashboard-card-label">What is happening?</div>
-              <p>${escapeHtml(supportingText)}</p>
+              <div class="dashboard-card-label">Situation</div>
+              <p>${escapeHtml(situation)}</p>
+            </div>
+            <div class="scenario-two-column">
+              <div class="dashboard-info-card">
+                <div class="dashboard-card-label">What to Notice</div>
+                <div class="dashboard-objectives">
+                  ${(noticeLines.length ? noticeLines : [section.moduleContent]).map((line) => `<div class="dashboard-objective"><span class="dashboard-dot"></span><span>${escapeHtml(line)}</span></div>`).join("")}
+                </div>
+              </div>
+              <div class="dashboard-info-card dashboard-info-card-warm">
+                <div class="dashboard-card-label">Better move</div>
+                <p>${renderInlineMarkdown(betterMove)}</p>
+              </div>
             </div>
             <div class="dashboard-copy-card">
               ${section.bodyHtml}
@@ -646,12 +871,8 @@ function buildModuleHtml(
               <div class="dashboard-hero-frame">
                 ${section.visualImageDataUrl
                   ? `<img src="${escapeAttribute(section.visualImageDataUrl)}" alt="${escapeAttribute(section.visualAltText || section.heading)}" class="section-visual-image"/>`
-                  : section.visualSvg || generateFallbackScenarioSvg(section.heading, supportingText)}
+                  : section.visualSvg || generateFallbackScenarioSvg(section.heading, situation)}
               </div>
-            </div>
-            <div class="dashboard-info-card dashboard-info-card-warm">
-              <div class="dashboard-card-label">Better move</div>
-              <p>${renderInlineMarkdown(section.keyTakeaway || section.moduleContent)}</p>
             </div>
           </div>
         </div>
@@ -956,6 +1177,7 @@ function buildModuleHtml(
     .scenario-main-card, .media-quiz-main-card { border-radius: 20px; border: 1px solid var(--border); background: rgba(255,255,255,0.92); box-shadow: 0 12px 28px var(--shadow-elevated, rgba(79, 70, 229, 0.06)); padding: 20px; }
     .scenario-side-column { display: grid; gap: 16px; }
     .scenario-callout { margin-top: 16px; border-radius: 18px; border: 1px solid var(--border); background: linear-gradient(180deg, #f8fbff, #eef4fa); padding: 16px; }
+    .scenario-two-column { display: grid; gap: 14px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; }
     .scenario-empty-visual { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; min-height: 220px; color: var(--muted); font-size: 14px; text-align: center; padding: 18px; background: linear-gradient(180deg, #f7fafc, #edf2f7); }
     .media-quiz-question { font-size: 15px; font-weight: 800; color: var(--text); margin-bottom: 12px; }
     .media-quiz-options { display: grid; gap: 8px; }
@@ -1572,9 +1794,9 @@ export async function exportScormPackage(
   modules.forEach((mod, i) => {
     const sections = scriptMap.get(mod.title) || [{
       heading: mod.topics[0] || mod.title,
-      bodyMarkdown: `Content for ${mod.title}`,
-      bodyHtml: `<p>${escapeHtml(`Content for ${mod.title}`)}</p>`,
-      moduleContent: `Content for ${mod.title}`,
+      bodyMarkdown: "",
+      bodyHtml: "",
+      moduleContent: mod.topics[0] || mod.title,
       keyTakeaway: "",
     }];
     const startQ = i * quizzesPerModule;
