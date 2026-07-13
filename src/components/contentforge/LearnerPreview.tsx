@@ -748,11 +748,14 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       selectedIndexes.forEach((questionIndex) => {
         const mcq = mcqs[questionIndex];
         if (!mcq) return;
+        // Determine template: scenario-based questions get "scenario", others get default
+        const isScenario = mcq.situation || mcq.scenario || mcq.context;
         slides.push({
           type: "assessment",
           moduleIndex: mi,
           moduleTitle: mod.title,
           question: mcq,
+          contentTemplate: isScenario ? "scenario" : undefined,
         });
       });
     }
@@ -2847,6 +2850,115 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const q = slide.question;
         if (!q) return null;
 
+        // If this is a scenario-based assessment, render it with avatar and 2-column layout
+        if (slide.contentTemplate === "scenario" && (q.situation || q.scenario)) {
+          return (
+            <div className="mx-auto max-w-[1280px]" key={currentSlide}>
+              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+
+                {/* LEFT: scenario content */}
+                <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-8 shadow-[0_22px_54px_rgba(15,23,42,0.1)] space-y-6">
+                  {/* Header */}
+                  <div className="flex flex-wrap items-start justify-between gap-4">
+                    <div>
+                      <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Scenario</p>
+                      <h2 className="mt-1 text-[32px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle || slide.moduleTitle}</h2>
+                    </div>
+                  </div>
+
+                  {/* Situation */}
+                  <div className="rounded-[22px] bg-[#f3f8fd] border border-[#d8e2ef] p-6">
+                    <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592] mb-3">Situation</p>
+                    <p className="text-[18px] leading-relaxed text-[#1a3a5c] font-[500]">
+                      {q.situation || q.scenario || "Scenario context"}
+                    </p>
+                  </div>
+
+                  {/* Options (Responses) */}
+                  <div className="space-y-3">
+                    <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592]">Your Response Options</p>
+                    {(q.options || []).map((option: string, optionIdx: number) => {
+                      const isCorrect = option === q.best_response || option === q.correct_answer;
+                      let style = "border-2 border-slate-200 bg-white hover:border-slate-300";
+
+                      if (ans?.submitted) {
+                        if (isCorrect) {
+                          style = "border-2 border-emerald-500 bg-emerald-50";
+                        } else if (optionIdx === ans.selected) {
+                          style = "border-2 border-red-400 bg-red-50";
+                        }
+                      } else if (ans?.selected === optionIdx) {
+                        style = "border-2 border-blue-500 bg-blue-50";
+                      }
+
+                      return (
+                        <button
+                          key={optionIdx}
+                          onClick={() => !ans?.submitted && handleSelectAnswer(currentSlide, optionIdx)}
+                          disabled={ans?.submitted}
+                          className={`w-full px-6 py-4 rounded-lg text-left transition-all ${style} ${ans?.submitted ? 'cursor-default' : 'cursor-pointer'}`}
+                        >
+                          <div className="flex items-start gap-4">
+                            <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[14px] ${
+                              ans?.submitted && isCorrect ? 'bg-emerald-500 text-white' :
+                              ans?.submitted && optionIdx === ans.selected ? 'bg-red-400 text-white' :
+                              ans?.selected === optionIdx ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
+                            }`}>
+                              {String.fromCharCode(65 + optionIdx)}
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-[16px] font-medium text-slate-900">{option}</p>
+                            </div>
+                            {ans?.submitted && isCorrect && (
+                              <div className="flex-shrink-0 text-emerald-600">
+                                <Check className="w-5 h-5" />
+                              </div>
+                            )}
+                            {ans?.submitted && optionIdx === ans.selected && !isCorrect && (
+                              <div className="flex-shrink-0 text-red-400">
+                                <X className="w-5 h-5" />
+                              </div>
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Rationale/Explanation */}
+                  {ans?.submitted && (q.rationale || q.explanation) && (
+                    <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                      <p className="text-[14px] text-slate-700">
+                        <span className="font-semibold text-blue-700">Explanation: </span>
+                        {q.rationale || q.explanation}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* RIGHT: avatar coach */}
+                <div className="xl:sticky xl:top-6 xl:self-start">
+                  <AvatarNarrator
+                    topic={slide.topicTitle || slide.moduleTitle}
+                    moduleContent={q.situation || "Review this scenario carefully."}
+                    systemHint="Coach the learner through this scenario response and emphasize the best approach."
+                    trainerName={trainerName}
+                    avatarImageUrl={avatarImageUrl}
+                    avatarVideoUrl={avatarVideoUrl}
+                    avatarPosterUrl={avatarPosterUrl}
+                    trainerId={selectedTrainer.id}
+                    isVoiceActive={isPlaying}
+                    isVoiceLoading={audioLoading}
+                    currentViseme={activeViseme}
+                    narratorLanguage={effectiveNarratorLanguage}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        // Regular MCQ assessment rendering
         // Clean up question text - remove any answer hints or "Correct Answer:" labels
         let cleanQuestion = q.question || "";
         cleanQuestion = cleanQuestion.replace(/Correct Answer:.*$/gi, '').replace(/Options:.*$/gi, '').trim();
