@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Maximize2, Play, Volume2, X, Youtube } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, Volume2, X, Youtube } from "lucide-react";
 import { isPlaceholderToken, safeLearnerText, stripNarratorMarkdown } from "@/lib/textCleaningUtility";
 import type { InsertedVideo } from "./VideosTab";
 
