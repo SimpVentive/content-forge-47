@@ -10,6 +10,7 @@ import { InfographicPreview } from "./InfographicPreview";
 import { LearnerPreview } from "./LearnerPreview";
 import { VideosTab, InsertedVideo } from "./VideosTab";
 import { NarrativeFlipbook } from "./NarrativeFlipbook";
+import { getTrainerVoiceId } from "@/lib/avatarTrainers";
 
 interface OutputPanelProps {
   outputData: OutputData;
@@ -401,7 +402,15 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
 
       {/* 1. Slide Preview */}
       {archRaw && visualRaw && (
-        <SlidePreview archRaw={archRaw} visualRaw={visualRaw} writerRaw={rawOutputs.writer} courseTitle={courseTitle} />
+        <SlidePreview
+          archRaw={archRaw}
+          visualRaw={visualRaw}
+          writerRaw={rawOutputs.writer}
+          voiceRaw={rawOutputs.voice}
+          courseTitle={courseTitle}
+          insertedVideos={insertedVideos}
+          avatarTrainerId={avatarTrainerId}
+        />
       )}
 
       {/* 2. Metadata */}
@@ -603,6 +612,8 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
                   const hasVoice = !!rawOutputs.voice;
                   await exportScormPackage(courseTitle, rawOutputs, {
                     includeVoice: hasVoice,
+                    voiceId: avatarTrainerId ? getTrainerVoiceId(avatarTrainerId) : undefined,
+                    insertedVideos,
                     onProgress: (msg) => toast.info(msg, { duration: 3000 }),
                   });
                   toast.success(hasVoice
