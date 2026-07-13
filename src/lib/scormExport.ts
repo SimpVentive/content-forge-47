@@ -1773,12 +1773,17 @@ export async function exportScormPackage(
   options?: {
     includeVoice?: boolean;
     voiceId?: string;
+    avatarTrainerId?: string;
+    insertedVideos?: ScormInsertedVideo[];
     onProgress?: (message: string) => void;
   }
 ): Promise<void> {
   const zip = new JSZip();
   const includeVoice = options?.includeVoice ?? true;
   const voiceId = options?.voiceId || "21m00Tcm4TlvDq8ikWAM"; // Rachel default
+  const avatarTrainerId = options?.avatarTrainerId || "irina";
+  const avatarName = getAvatarDisplayName(avatarTrainerId);
+  const insertedVideos = options?.insertedVideos || [];
   const onProgress = options?.onProgress || (() => {});
 
   // Parse course data
@@ -1839,6 +1844,18 @@ export async function exportScormPackage(
     }
   });
 
+  let avatarImageSrc: string | null = null;
+  try {
+    const avatarResponse = await fetch(`/trainers/${avatarTrainerId}.png`);
+    if (avatarResponse.ok) {
+      const avatarBuffer = await avatarResponse.arrayBuffer();
+      avatarImageSrc = `trainers/${avatarTrainerId}.png`;
+      zip.file(avatarImageSrc, avatarBuffer);
+    }
+  } catch (err) {
+    console.warn("Avatar image packaging failed:", err);
+  }
+
   // Extract images from data URLs and add them as separate files
   // This is necessary because large data URLs can exceed SCORM player limits
   const imageReplacementMap = new Map<string, string>();
@@ -1888,7 +1905,8 @@ export async function exportScormPackage(
     const modQuizzes = allQuizzes.slice(startQ, startQ + quizzesPerModule);
     const audioSrc = audioSrcMap.get(i) || null;
     const narrationText = voiceSections[i]?.narration_text || "";
-    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioSrc, narrationText);
+    const moduleVideos = insertedVideos.filter((video) => normalizeTextKey(video.moduleTitle || "") === normalizeTextKey(mod.title));
+    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioSrc, narrationText, moduleVideos, avatarImageSrc, avatarName);
     zip.file(`module_${i + 1}.html`, html);
   });
 
