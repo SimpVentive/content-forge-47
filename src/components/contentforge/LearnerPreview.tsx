@@ -2847,7 +2847,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
       case "assessment": {
         const ans = assessmentAnswers[currentSlide];
-        const q = slide.question;
+        const q = slide.question as any;
         if (!q) return null;
 
         // If this is a scenario-based assessment, render it with avatar and 2-column layout
