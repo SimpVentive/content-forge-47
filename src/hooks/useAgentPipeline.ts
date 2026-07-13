@@ -1322,7 +1322,7 @@ OUTPUT FORMAT — ABSOLUTE:
 
         // ── Narrative Image Generation (image-based learning) ──
         if (learningMode === "image_based_learning" && narrativeScenes.length > 0) {
-          addLog("Visual Design Agent: Generating narrative scene images with Flux 2...");
+          addLog("Visual Design Agent: Generating narrative scene images with OpenAI gpt-image-1...");
           try {
             for (let ni = 0; ni < narrativeScenes.length; ni++) {
               if (isCancelled()) break;
@@ -1376,12 +1376,12 @@ OUTPUT FORMAT — ABSOLUTE:
                       }
 
                       scene.imageDataUrl = finalImageUrl;
-                      // Log BFL API usage
+                      // Log OpenAI image API usage
                       try {
                         await logApiUsage(
-                          "BFL (Flux 2)",
+                          "OpenAI (gpt-image-1)",
                           1, // 1 image
-                          0.055, // Cost per image
+                          0.04, // Approx cost per image (high quality 1536x1024)
                           `Narrative image generation: Scene ${scene.sceneNumber}`,
                           undefined
                         ).catch(() => {});
@@ -1493,12 +1493,12 @@ OUTPUT FORMAT — ABSOLUTE:
                       topicVisual.generated_image_data_url = finalImageUrl;
                       topicVisual.generated_image_mime_type = finalMimeType;
                       topicVisual.image_approved = false;
-                      // Log BFL API usage
+                      // Log OpenAI image API usage
                       try {
                         await logApiUsage(
-                          "BFL (Flux 2)",
+                          "OpenAI (gpt-image-1)",
                           1, // 1 image
-                          0.055, // Cost per image
+                          0.04, // Approx cost per image (high quality 1536x1024)
                           `Visual design image: ${topicTitle}`,
                           undefined
                         ).catch(() => {});
