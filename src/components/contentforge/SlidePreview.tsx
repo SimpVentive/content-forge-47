@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, Volume2, X, Youtube } from "lucide-react";
 import { isPlaceholderToken, safeLearnerText, stripNarratorMarkdown } from "@/lib/textCleaningUtility";
+import { AVATAR_TRAINERS, getTrainerMedia } from "@/lib/avatarTrainers";
 import type { InsertedVideo } from "./VideosTab";
 
 interface SlidePreviewProps {
@@ -246,8 +247,10 @@ const TitleSlide: React.FC<{ slide: SlideData }> = ({ slide }) => (
   </div>
 );
 
-const ContentSlide: React.FC<{ slide: SlideData }> = ({ slide }) => {
+const ContentSlide: React.FC<{ slide: SlideData; avatarTrainerId?: string; hasVoice?: boolean }> = ({ slide, avatarTrainerId = "irina", hasVoice = false }) => {
   const parts = parseContentParts(slide.body || "");
+  const trainer = AVATAR_TRAINERS.find((item) => item.id === avatarTrainerId) || AVATAR_TRAINERS[0];
+  const trainerMedia = getTrainerMedia(trainer.id, import.meta.env as Record<string, string | undefined>);
   const hasRichContent = !!(parts.hook || parts.body.length || parts.takeaway || parts.challenge);
   const situation = parts.hook || parts.body[0] || slide.topicTitle || slide.moduleTitle;
   const notice = sentenceBullets([parts.hook, ...parts.body, parts.takeaway].filter(Boolean));
@@ -313,10 +316,10 @@ const ContentSlide: React.FC<{ slide: SlideData }> = ({ slide }) => {
           </div>
           <div className="mt-3 rounded-xl border border-primary/15 bg-primary/5 p-3">
             <div className="flex items-center gap-2">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-[11px] font-black text-primary-foreground">AV</div>
+              <img src={trainerMedia.imageUrl} alt={`${trainer.name} avatar guide`} className="h-9 w-9 rounded-full border border-primary/20 object-cover bg-secondary" />
               <div className="min-w-0">
-                <p className="text-[11px] font-black uppercase tracking-wide text-primary">Avatar Guide</p>
-                <p className="truncate text-[12px] font-semibold text-foreground/75">Narration available in output</p>
+                <p className="text-[11px] font-black uppercase tracking-wide text-primary">{trainer.name}</p>
+                <p className="truncate text-[12px] font-semibold text-foreground/75">{hasVoice ? "Voice narration available" : "Avatar guide included"}</p>
               </div>
             </div>
           </div>
@@ -352,7 +355,7 @@ const VideoSlide: React.FC<{ slide: SlideData }> = ({ slide }) => {
   );
 };
 
-export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, writerRaw, voiceRaw, courseTitle, insertedVideos = [] }) => {
+export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, writerRaw, voiceRaw, courseTitle, insertedVideos = [], avatarTrainerId }) => {
   const slides = buildSlides(archRaw, visualRaw, writerRaw, courseTitle, insertedVideos);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
@@ -368,7 +371,7 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, 
   }, [slides.length]);
   if (slides.length === 0) return null;
   const slide = slides[currentSlide];
-  const renderSlide = (s: SlideData) => s.type === "title" ? <TitleSlide slide={s} /> : s.type === "video" ? <VideoSlide slide={s} /> : <ContentSlide slide={s} />;
+  const renderSlide = (s: SlideData) => s.type === "title" ? <TitleSlide slide={s} /> : s.type === "video" ? <VideoSlide slide={s} /> : <ContentSlide slide={s} avatarTrainerId={avatarTrainerId} hasVoice={hasVoice} />;
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
