@@ -1322,7 +1322,7 @@ OUTPUT FORMAT — ABSOLUTE:
 
         // ── Narrative Image Generation (image-based learning) ──
         if (learningMode === "image_based_learning" && narrativeScenes.length > 0) {
-          addLog("Visual Design Agent: Generating narrative scene images with Flux 2...");
+          addLog("Visual Design Agent: Generating narrative scene images with OpenAI gpt-image-1...");
           try {
             for (let ni = 0; ni < narrativeScenes.length; ni++) {
               if (isCancelled()) break;
