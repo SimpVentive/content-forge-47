@@ -2094,14 +2094,14 @@ ${modeInstructions}`;
       // Apply revised outputs
       setRawOutputs((prev) => ({
         ...prev,
-        ...(qaResult.revisedOutputs?.writer && { writer: qaResult.revisedOutputs.writer }),
+        ...((qaResult.revisedOutputs?.writer || qaResult.revisedOutputs?.script) && { writer: qaResult.revisedOutputs.writer || qaResult.revisedOutputs.script }),
         ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
       }));
 
       // Update output data
       setOutputData((prev) => ({
         ...prev,
-        ...(qaResult.revisedOutputs?.script && { script: qaResult.revisedOutputs.script }),
+        ...((qaResult.revisedOutputs?.script || qaResult.revisedOutputs?.writer) && { script: qaResult.revisedOutputs.script || qaResult.revisedOutputs.writer }),
         ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
       }));
 
