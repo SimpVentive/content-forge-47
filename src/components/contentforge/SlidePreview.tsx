@@ -1,12 +1,17 @@
 import React, { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight, Maximize2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Maximize2, Volume2, X, Youtube } from "lucide-react";
 import { isPlaceholderToken, safeLearnerText, stripNarratorMarkdown } from "@/lib/textCleaningUtility";
+import { AVATAR_TRAINERS, getTrainerMedia } from "@/lib/avatarTrainers";
+import type { InsertedVideo } from "./VideosTab";
 
 interface SlidePreviewProps {
   archRaw: string;
   visualRaw: string;
   writerRaw?: string;
+  voiceRaw?: string;
   courseTitle: string;
+  insertedVideos?: InsertedVideo[];
+  avatarTrainerId?: string;
 }
 
 function tryParseJSON(raw: string | undefined | null): any | null {
@@ -19,7 +24,7 @@ function tryParseJSON(raw: string | undefined | null): any | null {
 }
 
 interface SlideData {
-  type: "title" | "content";
+  type: "title" | "content" | "video";
   moduleNum: number;
   moduleTitle: string;
   courseTitle: string;
@@ -29,6 +34,7 @@ interface SlideData {
   body?: string;
   imageDataUrl?: string;
   visualAltText?: string;
+  video?: InsertedVideo;
 }
 
 type WriterSection = { heading: string; body: string };
@@ -168,7 +174,21 @@ function getVisualForTopic(visualModules: any[], moduleIndex: number, topicTitle
   return topicVisuals.find((visual: any) => normalizeKey(String(visual?.topic_title || visual?.title || visual?.name || "")) === key) || topicVisuals[0];
 }
 
-function buildSlides(archRaw: string, visualRaw: string, writerRaw: string | undefined, courseTitle: string): SlideData[] {
+function timeToSeconds(value = ""): number {
+  const parts = value.split(":").map((part) => Number.parseInt(part, 10));
+  if (parts.some((part) => Number.isNaN(part))) return 0;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  return parts[0] || 0;
+}
+
+function youtubeEmbedUrl(video: InsertedVideo): string {
+  const start = timeToSeconds(video.startTime);
+  const end = timeToSeconds(video.endTime);
+  return `https://www.youtube.com/embed/${encodeURIComponent(video.videoId)}?rel=0&modestbranding=1${start ? `&start=${start}` : ""}${end ? `&end=${end}` : ""}`;
+}
+
+function buildSlides(archRaw: string, visualRaw: string, writerRaw: string | undefined, courseTitle: string, insertedVideos: InsertedVideo[] = []): SlideData[] {
   const arch = tryParseJSON(archRaw);
   const visual = tryParseJSON(visualRaw);
   const slides: SlideData[] = [];
@@ -209,6 +229,11 @@ function buildSlides(archRaw: string, visualRaw: string, writerRaw: string | und
         });
       });
     }
+    insertedVideos
+      .filter((video) => normalizeKey(video.moduleTitle || "") === normalizeKey(title))
+      .forEach((video) => {
+        slides.push({ type: "video", moduleNum: i + 1, moduleTitle: title, courseTitle, topicTitle: video.title, video });
+      });
   });
   return slides;
 }
@@ -222,8 +247,10 @@ const TitleSlide: React.FC<{ slide: SlideData }> = ({ slide }) => (
   </div>
 );
 
-const ContentSlide: React.FC<{ slide: SlideData }> = ({ slide }) => {
+const ContentSlide: React.FC<{ slide: SlideData; avatarTrainerId?: string; hasVoice?: boolean }> = ({ slide, avatarTrainerId = "irina", hasVoice = false }) => {
   const parts = parseContentParts(slide.body || "");
+  const trainer = AVATAR_TRAINERS.find((item) => item.id === avatarTrainerId) || AVATAR_TRAINERS[0];
+  const trainerMedia = getTrainerMedia(trainer.id, import.meta.env as Record<string, string | undefined>);
   const hasRichContent = !!(parts.hook || parts.body.length || parts.takeaway || parts.challenge);
   const situation = parts.hook || parts.body[0] || slide.topicTitle || slide.moduleTitle;
   const notice = sentenceBullets([parts.hook, ...parts.body, parts.takeaway].filter(Boolean));
@@ -284,8 +311,17 @@ const ContentSlide: React.FC<{ slide: SlideData }> = ({ slide }) => {
         </div>
         <div className="rounded-2xl border border-border bg-card p-3 shadow-sm overflow-hidden">
           <p className="mb-2 text-[10px] font-[900] uppercase tracking-[0.14em] text-muted-foreground">Visual Context</p>
-          <div className="flex h-[calc(100%-24px)] items-center justify-center overflow-hidden rounded-xl bg-secondary">
+          <div className="flex h-[calc(100%-96px)] min-h-[190px] items-center justify-center overflow-hidden rounded-xl bg-secondary">
             {slide.imageDataUrl ? <img src={slide.imageDataUrl} alt={slide.visualAltText || slide.topicTitle || slide.moduleTitle} className="h-full w-full object-cover" /> : <p className="px-4 text-center text-[12px] font-semibold text-muted-foreground">{slide.layoutType || "Scenario visual"}</p>}
+          </div>
+          <div className="mt-3 rounded-xl border border-primary/15 bg-primary/5 p-3">
+            <div className="flex items-center gap-2">
+              <img src={trainerMedia.imageUrl} alt={`${trainer.name} avatar guide`} className="h-9 w-9 rounded-full border border-primary/20 object-cover bg-secondary" />
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-wide text-primary">{trainer.name}</p>
+                <p className="truncate text-[12px] font-semibold text-foreground/75">{hasVoice ? "Voice narration available" : "Avatar guide included"}</p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -293,10 +329,37 @@ const ContentSlide: React.FC<{ slide: SlideData }> = ({ slide }) => {
   );
 };
 
-export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, writerRaw, courseTitle }) => {
-  const slides = buildSlides(archRaw, visualRaw, writerRaw, courseTitle);
+const VideoSlide: React.FC<{ slide: SlideData }> = ({ slide }) => {
+  if (!slide.video) return null;
+  return (
+    <div className="w-full rounded-2xl bg-card border border-border overflow-hidden p-5" style={{ height: 400 }}>
+      <div className="grid h-full gap-4 lg:grid-cols-[minmax(0,1fr)_240px]">
+        <div className="overflow-hidden rounded-xl border border-border bg-secondary">
+          <iframe
+            src={youtubeEmbedUrl(slide.video)}
+            title={slide.video.title}
+            className="h-full w-full"
+            allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </div>
+        <div className="rounded-xl border border-border bg-secondary/60 p-4">
+          <Youtube className="mb-3 h-5 w-5 text-primary" />
+          <p className="text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground">Inserted YouTube</p>
+          <h3 className="mt-2 text-[18px] font-black leading-tight text-foreground line-clamp-4">{slide.video.title}</h3>
+          <p className="mt-2 text-[12px] font-semibold text-muted-foreground">{slide.video.channelTitle}</p>
+          <p className="mt-4 text-[12px] text-foreground/70">Placed in Module {slide.moduleNum}: {slide.moduleTitle}</p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, writerRaw, voiceRaw, courseTitle, insertedVideos = [], avatarTrainerId }) => {
+  const slides = buildSlides(archRaw, visualRaw, writerRaw, courseTitle, insertedVideos);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
+  const hasVoice = !!voiceRaw;
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowLeft") setCurrentSlide((c) => Math.max(0, c - 1));
@@ -308,13 +371,15 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, 
   }, [slides.length]);
   if (slides.length === 0) return null;
   const slide = slides[currentSlide];
-  const renderSlide = (s: SlideData) => s.type === "title" ? <TitleSlide slide={s} /> : <ContentSlide slide={s} />;
+  const renderSlide = (s: SlideData) => s.type === "title" ? <TitleSlide slide={s} /> : s.type === "video" ? <VideoSlide slide={s} /> : <ContentSlide slide={s} avatarTrainerId={avatarTrainerId} hasVoice={hasVoice} />;
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="text-[16px] font-bold text-foreground flex items-center gap-2">
           Slide Preview
           <span className="text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full">{slides.length} slides</span>
+          {hasVoice && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full"><Volume2 className="h-3 w-3" /> Voice</span>}
+          {insertedVideos.length > 0 && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-primary bg-primary/10 px-2 py-0.5 rounded-full"><Youtube className="h-3 w-3" /> {insertedVideos.length} YouTube</span>}
         </h3>
         <button onClick={() => setFullscreen(true)} className="h-8 px-3 rounded-lg text-[12px] font-semibold text-primary bg-primary/10 hover:bg-primary/20 flex items-center gap-1.5 transition-all">
           <Maximize2 className="w-3.5 h-3.5" />
