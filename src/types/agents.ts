@@ -15,17 +15,17 @@ export interface OutputData {
 }
 
 export interface RawAgentOutputs {
-  research: string;
+  research?: string;
   architect: string;
   writer: string;
   visual: string;
-  animation: string;
-  youtube: string;
-  compliance: string;
+  animation?: string;
+  youtube?: string;
+  compliance?: string;
   assessment: string;
-  quality: string;
-  voice: string;
-  assembly: string;
+  quality?: string;
+  voice?: string;
+  assembly?: string;
   "final-qa"?: string;
   avatar?: string;
   heygenVideos?: string;

@@ -123,9 +123,9 @@ export const Dashboard = () => {
 
       const result = await exportToScorm(rawOutputs, {
         courseTitle: course.title || "Untitled Course",
-        courseDescription: course.courseParams?.description,
-        trainerId: course.courseParams?.trainerId,
-        enableVoiceNarration: course.courseParams?.enableVoiceNarration ?? true,
+        courseDescription: course.inputText,
+        trainerId: course.courseParams?.avatarTrainerId,
+        enableVoiceNarration: Boolean(course.rawOutputs?.voice),
         embedStrategy: "data-uri",
         passingScore: 70,
         courseVersion: "1.0",
