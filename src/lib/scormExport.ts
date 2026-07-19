@@ -358,8 +358,19 @@ function parseVisualSections(visualRaw: string): Map<string, Map<string, { image
     const topicVisuals = Array.isArray(moduleVisual?.topic_visuals) ? moduleVisual.topic_visuals : [];
     topicVisuals.forEach((topicVisual: any) => {
       const topicTitle = String(topicVisual?.topic_title || topicVisual?.title || topicVisual?.name || "").trim();
-      const generatedImageDataUrl = String(topicVisual?.generated_image_data_url || "").trim();
-      const generatedSceneSvg = String(topicVisual?.generated_scene_svg || "").trim();
+      const generatedImageDataUrl = String(
+        topicVisual?.generated_image_data_url
+        || topicVisual?.imageDataUrl
+        || topicVisual?.image_url
+        || topicVisual?.dataUrl
+        || ""
+      ).trim();
+      const generatedSceneSvg = String(
+        topicVisual?.generated_scene_svg
+        || topicVisual?.sceneSvg
+        || topicVisual?.svg
+        || ""
+      ).trim();
       const screenTemplate = topicVisual?.screen_template === "dashboard" || topicVisual?.screen_template === "guided-notes" || topicVisual?.screen_template === "scenario" || topicVisual?.screen_template === "media-quiz" || topicVisual?.screen_template === "summary-panel"
         ? topicVisual.screen_template
         : undefined;
@@ -886,27 +897,59 @@ function buildModuleHtml(
 
   const renderDashboardSection = (section: ModuleSection, sectionIndex: number) => {
     const objectives = moduleTopics.slice(Math.max(0, sectionIndex - 1), Math.max(0, sectionIndex - 1) + 3);
+    const parts = parseContentPartsForExport(section.bodyMarkdown);
+    const objective = parts.hook || section.moduleContent || getFirstSentences(stripNarratorMarkdown(section.bodyMarkdown), 1) || section.heading;
+    const courseContent = (parts.body.length > 0 ? parts.body : splitIntoSentences(stripNarratorMarkdown(section.bodyMarkdown)).slice(1, 5))
+      .map((item) => safeLearnerText(item))
+      .filter((item) => item && !isPlaceholderToken(item))
+      .slice(0, 6);
+    const coreLines = buildScenarioNoticeLines(parts, 4);
+    const guidance = parts.challenge || parts.takeaway || section.keyTakeaway || section.moduleContent;
+    const quickFact = section.keyTakeaway || getFirstSentences(stripNarratorMarkdown(section.bodyMarkdown), 1) || section.moduleContent;
+
     return `
       <section class="lesson-section lesson-template-dashboard" id="section-${sectionIndex + 1}">
-        ${renderAvatarNarrator(section)}
         <div class="dashboard-grid">
           <div class="dashboard-main-card">
-            <p class="dashboard-eyebrow">Lesson ${sectionIndex + 1}</p>
-            <h2>${escapeHtml(section.heading)}</h2>
-            <p class="dashboard-summary">${escapeHtml(section.moduleContent)}</p>
+            <div class="course-overview-block">
+              <h2 class="course-overview-title">Course Overview</h2>
+              <div class="course-objective-row">
+                <span>Course Objective:</span>
+                <p>${escapeHtml(objective)}</p>
+              </div>
+              ${courseContent.length > 0 ? `
+              <div class="course-content-row">
+                <p class="course-content-label">Course Content:</p>
+                <div class="course-content-list">
+                  ${courseContent.map((item) => `<div class="course-content-item"><span>•</span><p>${escapeHtml(item)}</p></div>`).join("")}
+                </div>
+              </div>` : ""}
+            </div>
             ${section.visualImageDataUrl || section.visualSvg ? `
             <div class="dashboard-hero-card" aria-label="${escapeAttribute(section.visualAltText || section.heading)}">
+              <div class="dashboard-card-label">Lesson Canvas</div>
               <div class="dashboard-hero-frame">
                 ${section.visualImageDataUrl
                   ? `<img src="${escapeAttribute(section.visualImageDataUrl)}" alt="${escapeAttribute(section.visualAltText || section.heading)}" class="section-visual-image"/>`
                   : section.visualSvg || ""}
               </div>
             </div>` : ""}
-            <div class="dashboard-copy-card">
-              ${section.bodyHtml}
+            <div class="dashboard-two-column">
+              <div class="dashboard-copy-card">
+                <div class="dashboard-card-label">Core Explanation</div>
+                <div class="dashboard-objectives">
+                  ${(coreLines.length ? coreLines : [objective]).map((line) => `<div class="dashboard-objective"><span class="dashboard-dot"></span><span>${escapeHtml(line)}</span></div>`).join("")}
+                </div>
+              </div>
+              <div class="dashboard-copy-card dashboard-info-card-warm">
+                <div class="dashboard-card-label warm-label">Guided Coaching</div>
+                <p>${renderInlineMarkdown(guidance)}</p>
+                ${quickFact ? `<div class="dashboard-takeaway-mini"><div class="dashboard-card-label warm-label">Key Takeaway</div><p>${renderInlineMarkdown(quickFact)}</p></div>` : ""}
+              </div>
             </div>
           </div>
           <div class="dashboard-side-column">
+            ${renderAvatarNarrator(section)}
             <div class="dashboard-info-card">
               <div class="dashboard-card-label">Learning objectives</div>
               <div class="dashboard-objectives">
@@ -919,7 +962,7 @@ function buildModuleHtml(
             </div>
             <div class="dashboard-info-card dashboard-info-card-warm">
               <div class="dashboard-card-label">Did you know?</div>
-              <p>${escapeHtml(section.keyTakeaway || getFirstSentences(stripNarratorMarkdown(section.bodyMarkdown), 1) || section.moduleContent)}</p>
+              <p>${escapeHtml(quickFact)}</p>
             </div>
           </div>
         </div>
@@ -1039,7 +1082,16 @@ function buildModuleHtml(
       </section>`;
   };
 
-  const renderSection = (section: ModuleSection, sectionIndex: number): string => section.screenTemplate === "dashboard" ? renderDashboardSection(section, sectionIndex) : section.screenTemplate === "scenario" ? renderScenarioSection(section, sectionIndex) : section.screenTemplate === "media-quiz" ? renderMediaQuizSection(section, sectionIndex) : section.screenTemplate === "summary-panel" ? renderSummaryPanelSection(section, sectionIndex) : `
+  const renderSection = (section: ModuleSection, sectionIndex: number): string => {
+    const hasVisual = Boolean(section.visualImageDataUrl || section.visualSvg);
+    const inferredTemplate = section.screenTemplate || (sectionIndex === 0 || hasVisual ? "dashboard" : "guided-notes");
+
+    if (inferredTemplate === "dashboard") return renderDashboardSection(section, sectionIndex);
+    if (inferredTemplate === "scenario") return renderScenarioSection(section, sectionIndex);
+    if (inferredTemplate === "media-quiz") return renderMediaQuizSection(section, sectionIndex);
+    if (inferredTemplate === "summary-panel") return renderSummaryPanelSection(section, sectionIndex);
+
+    return `
       <section class="lesson-section" id="section-${sectionIndex + 1}">
         ${renderAvatarNarrator(section)}
         <div class="section-layout ${section.visualImageDataUrl || section.visualSvg ? `layout-${escapeAttribute(section.visualPlacement || "hero")}` : "layout-text-only"}">
@@ -1062,6 +1114,7 @@ function buildModuleHtml(
           <p>${renderInlineMarkdown(section.keyTakeaway)}</p>
         </aside>` : ""}
       </section>`;
+  };
 
   // Wrap each section as its own screen for slide-by-slide navigation. Audio
   // and quiz become trailing screens so the learner can step through them.
