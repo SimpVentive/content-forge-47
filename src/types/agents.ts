@@ -27,6 +27,7 @@ export interface RawAgentOutputs {
   voice: string;
   assembly: string;
   "final-qa"?: string;
+  avatar?: string;
   heygenVideos?: string;
   narrativeScenes?: string; // JSON string of TopicNarrative[] for image-based learning
   flipbookHTML?: string; // Generated interactive HTML flipbook

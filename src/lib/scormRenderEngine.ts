@@ -7,7 +7,7 @@
 import React from "react";
 import ReactDOMServer from "react-dom/server";
 import type { RawAgentOutputs } from "@/types/agents";
-import { buildSlides, tryParseJSON, type Module, type Slide } from "@/lib/slideBuilder";
+import { tryParseJSON, type Module, type Slide } from "@/lib/slideBuilder";
 
 export interface ScormRenderOptions {
   courseTitle: string;
@@ -142,7 +142,6 @@ export async function extractScormAssets(
  */
 export function buildComprehensiveTailwindCss(): string {
   return `
-    <style>
       /* CSS Reset */
       * { margin: 0; padding: 0; box-sizing: border-box; border: 0 solid #e5e7eb; }
       html { line-height: 1.5; -webkit-text-size-adjust: 100%; tab-size: 4; }
@@ -344,7 +343,6 @@ export function buildComprehensiveTailwindCss(): string {
 
       /* Object Fit */
       .object-cover { object-fit: cover; }
-    </style>
   `;
 }
 
@@ -411,25 +409,6 @@ export function injectScormApi(): string {
       window.addEventListener('beforeunload', scormFinish);
     </script>
   `;
-}
-
-/* ── Helpers ── */
-
-function tryParseJSON(raw: string | undefined): any | null {
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw);
-  } catch {
-    const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (m) {
-      try {
-        return JSON.parse(m[1].trim());
-      } catch {
-        return null;
-      }
-    }
-    return null;
-  }
 }
 
 function escapeHtml(s: string): string {

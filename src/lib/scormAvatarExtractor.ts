@@ -35,13 +35,13 @@ export function extractAvatarMedia(trainerId?: string): AvatarMedia {
   }
 
   // Get trainer media (images, videos)
-  const media = getTrainerMedia(trainerId);
+  const media = getTrainerMedia(trainerId, import.meta.env as Record<string, string | undefined>);
   if (!media) {
     console.warn(`[Avatar Extractor] No media found for trainer: ${trainerId}`);
     return {
       trainerName: trainer.name || "Trainer",
       voiceId: getTrainerVoiceId(trainerId),
-      voiceName: trainer.defaultVoice || "Unknown",
+      voiceName: trainer.subtitle || "Unknown",
     };
   }
 
@@ -49,21 +49,19 @@ export function extractAvatarMedia(trainerId?: string): AvatarMedia {
   let imageUrl: string | undefined;
 
   // Try to find a static image (preferred for SCORM)
-  if (media.staticImageUrl) {
-    imageUrl = media.staticImageUrl;
+  if (media.imageUrl) {
+    imageUrl = media.imageUrl;
   } else if (media.videoUrl) {
     // Fallback to video thumbnail if available
-    imageUrl = media.videoThumbnailUrl || media.videoUrl;
-  } else if (media.imagePath) {
-    imageUrl = media.imagePath;
+    imageUrl = media.posterUrl || media.videoUrl;
   }
 
   return {
     trainerName: trainer.name || "Trainer",
-    imagePath: media.imagePath,
+    imagePath: media.imageUrl,
     imageUrl,
     voiceId: getTrainerVoiceId(trainerId),
-    voiceName: trainer.defaultVoice || "Unknown",
+    voiceName: trainer.subtitle || "Unknown",
   };
 }
 
@@ -88,13 +86,13 @@ export function validateAvatarMedia(trainerId?: string): {
     return { isValid: false, warnings };
   }
 
-  const media = getTrainerMedia(trainerId);
+  const media = getTrainerMedia(trainerId, import.meta.env as Record<string, string | undefined>);
   if (!media) {
     warnings.push(`No media found for trainer: ${trainer.name}`);
     return { isValid: false, warnings };
   }
 
-  if (!media.staticImageUrl && !media.videoUrl && !media.imagePath) {
+  if (!media.imageUrl && !media.videoUrl && !media.posterUrl) {
     warnings.push(`Trainer "${trainer.name}" has no image or video assets`);
     return { isValid: false, warnings };
   }
@@ -118,15 +116,15 @@ export function getAvailableTrainers(): Array<{
   voiceName: string;
 }> {
   return AVATAR_TRAINERS.map((trainer) => {
-    const media = getTrainerMedia(trainer.id);
+    const media = getTrainerMedia(trainer.id, import.meta.env as Record<string, string | undefined>);
     const voiceId = getTrainerVoiceId(trainer.id);
 
     return {
       id: trainer.id,
       name: trainer.name || "Unknown Trainer",
-      hasImage: !!(media?.staticImageUrl || media?.imagePath),
+      hasImage: !!media?.imageUrl,
       hasVideo: !!media?.videoUrl,
-      voiceName: trainer.defaultVoice || "Unknown",
+      voiceName: trainer.subtitle || "Unknown",
     };
   });
 }
@@ -157,7 +155,7 @@ export function extractNarrationConfig(trainerId?: string): NarrationConfig {
   return {
     enabled: !!voiceId,
     voiceId,
-    voiceName: trainer.defaultVoice,
+    voiceName: trainer.subtitle,
     trainerName: trainer.name,
   };
 }
@@ -175,7 +173,7 @@ export function estimateAvatarStorageSize(trainerId?: string): {
   // JPEG image: 50-200KB
   // MP3 audio: 1MB per minute (128kbps)
 
-  const media = trainerId ? getTrainerMedia(trainerId) : null;
+  const media = trainerId ? getTrainerMedia(trainerId, import.meta.env as Record<string, string | undefined>) : null;
 
   return {
     imageSize: 0.15, // MB - typical compressed trainer image

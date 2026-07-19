@@ -103,11 +103,22 @@ export const Dashboard = () => {
     const toastId = toast.loading("Exporting to SCORM...");
     try {
       const rawOutputs: RawAgentOutputs = {
-        architect: course.outputData.architect || "{}",
-        writer: course.outputData.writer || "",
+        research: course.rawOutputs?.research || "",
+        architect: course.rawOutputs?.architect || course.outputData.outline || "{}",
+        writer: course.rawOutputs?.writer || course.outputData.script || "",
         assessment: course.outputData.assessment || "{}",
-        visual: course.outputData.visual || "{}",
-        avatar: course.outputData.avatar || "",
+        visual: course.rawOutputs?.visual || "{}",
+        animation: course.rawOutputs?.animation || "",
+        youtube: course.rawOutputs?.youtube || "",
+        compliance: course.rawOutputs?.compliance || "",
+        quality: course.rawOutputs?.quality || "",
+        voice: course.rawOutputs?.voice || "",
+        assembly: course.rawOutputs?.assembly || course.outputData.package || "",
+        "final-qa": course.rawOutputs?.["final-qa"] || "",
+        avatar: course.rawOutputs?.avatar || "",
+        heygenVideos: course.rawOutputs?.heygenVideos || "",
+        narrativeScenes: course.rawOutputs?.narrativeScenes || "",
+        flipbookHTML: course.rawOutputs?.flipbookHTML || "",
       };
 
       const result = await exportToScorm(rawOutputs, {
