@@ -1,7 +1,7 @@
 ﻿import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
 import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2, AlertCircle, Info, Images } from "lucide-react";
-import { exportScormPackage } from "@/lib/scormExport";
+import { exportToScorm, downloadBlob } from "@/lib/scormExportOrchestrator";
 import { validateCourse, type QAReport } from "@/lib/qaValidator";
 import { toast } from "sonner";
 import { VoicePreview } from "./VoicePreview";
@@ -10,7 +10,6 @@ import { InfographicPreview } from "./InfographicPreview";
 import { LearnerPreview } from "./LearnerPreview";
 import { VideosTab, InsertedVideo } from "./VideosTab";
 import { NarrativeFlipbook } from "./NarrativeFlipbook";
-import { getTrainerVoiceId } from "@/lib/avatarTrainers";
 
 interface OutputPanelProps {
   outputData: OutputData;
@@ -610,13 +609,27 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
                   }
                 } else {
                   const hasVoice = !!rawOutputs.voice;
-                  await exportScormPackage(courseTitle, rawOutputs, {
-                    includeVoice: hasVoice,
-                    voiceId: avatarTrainerId ? getTrainerVoiceId(avatarTrainerId) : undefined,
-                    avatarTrainerId,
-                    insertedVideos,
-                    onProgress: (msg) => toast.info(msg, { duration: 3000 }),
-                  });
+                  const result = await exportToScorm(
+                    rawOutputs,
+                    {
+                      courseTitle,
+                      courseDescription: courseDuration,
+                      trainerId: avatarTrainerId,
+                      enableVoiceNarration: hasVoice,
+                      embedStrategy: "data-uri",
+                      passingScore: 70,
+                      courseVersion: "1.0",
+                    },
+                    (progress) => {
+                      if (progress.message) toast.info(progress.message, { duration: 2000 });
+                    }
+                  );
+
+                  if (!result.success || !result.fileBlob) {
+                    throw new Error(result.message || "Export failed");
+                  }
+
+                  downloadBlob(result.fileBlob, result.fileName);
                   toast.success(hasVoice
                     ? "SCORM package with voice narration exported!"
                     : "SCORM package exported successfully!");

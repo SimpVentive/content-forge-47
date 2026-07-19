@@ -281,8 +281,8 @@ export function buildTailwindCss(): string {
  * Injects CSS directly into HTML for self-contained SCORM modules
  */
 export function injectCssIntoHtml(html: string, css: string): string {
-  const styleTag = \`<style type="text/css">\${css}</style>\`;
-  return html.replace(/<head>/, \`<head>\${styleTag}\`);
+  const styleTag = `<style type="text/css">${css}</style>`;
+  return html.replace(/<head>/, `<head>${styleTag}`);
 }
 
 /**
@@ -295,18 +295,18 @@ export function createScormHtmlDocument(
 ): string {
   const styles = css || buildTailwindCss();
 
-  return \`<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>\${title}</title>
+  <title>${title}</title>
   <style type="text/css">
-    \${styles}
+    ${styles}
   </style>
 </head>
 <body>
-  \${bodyHtml}
+  ${bodyHtml}
 </body>
-</html>\`;
+</html>`;
 }
