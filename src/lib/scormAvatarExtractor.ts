@@ -34,8 +34,9 @@ export function extractAvatarMedia(trainerId?: string): AvatarMedia {
     return defaultAvatar;
   }
 
-  // Get trainer media (images, videos)
-  const media = getTrainerMedia(trainerId);
+  // Get trainer media (images, videos) - pass environment variables for proper URL resolution
+  const env = import.meta.env as Record<string, string | undefined>;
+  const media = getTrainerMedia(trainerId, env);
   if (!media) {
     console.warn(`[Avatar Extractor] No media found for trainer: ${trainerId}`);
     return {
@@ -45,22 +46,17 @@ export function extractAvatarMedia(trainerId?: string): AvatarMedia {
     };
   }
 
-  // Determine best image to use for avatar
-  let imageUrl: string | undefined;
+  // Determine best image to use for avatar (prefer imageUrl which comes from env or local paths)
+  let imageUrl: string | undefined = media.imageUrl;
 
-  // Try to find a static image (preferred for SCORM)
-  if (media.staticImageUrl) {
-    imageUrl = media.staticImageUrl;
-  } else if (media.videoUrl) {
-    // Fallback to video thumbnail if available
-    imageUrl = media.videoThumbnailUrl || media.videoUrl;
-  } else if (media.imagePath) {
-    imageUrl = media.imagePath;
+  // If no imageUrl, try posterUrl as fallback
+  if (!imageUrl && media.posterUrl) {
+    imageUrl = media.posterUrl;
   }
 
   return {
     trainerName: trainer.name || "Trainer",
-    imagePath: media.imagePath,
+    imagePath: media.imageUrl,
     imageUrl,
     voiceId: getTrainerVoiceId(trainerId),
     voiceName: trainer.defaultVoice || "Unknown",
@@ -88,13 +84,14 @@ export function validateAvatarMedia(trainerId?: string): {
     return { isValid: false, warnings };
   }
 
-  const media = getTrainerMedia(trainerId);
+  const env = import.meta.env as Record<string, string | undefined>;
+  const media = getTrainerMedia(trainerId, env);
   if (!media) {
     warnings.push(`No media found for trainer: ${trainer.name}`);
     return { isValid: false, warnings };
   }
 
-  if (!media.staticImageUrl && !media.videoUrl && !media.imagePath) {
+  if (!media.imageUrl && !media.videoUrl) {
     warnings.push(`Trainer "${trainer.name}" has no image or video assets`);
     return { isValid: false, warnings };
   }
@@ -117,14 +114,15 @@ export function getAvailableTrainers(): Array<{
   hasVideo: boolean;
   voiceName: string;
 }> {
+  const env = import.meta.env as Record<string, string | undefined>;
   return AVATAR_TRAINERS.map((trainer) => {
-    const media = getTrainerMedia(trainer.id);
+    const media = getTrainerMedia(trainer.id, env);
     const voiceId = getTrainerVoiceId(trainer.id);
 
     return {
       id: trainer.id,
       name: trainer.name || "Unknown Trainer",
-      hasImage: !!(media?.staticImageUrl || media?.imagePath),
+      hasImage: !!media?.imageUrl,
       hasVideo: !!media?.videoUrl,
       voiceName: trainer.defaultVoice || "Unknown",
     };
@@ -175,7 +173,8 @@ export function estimateAvatarStorageSize(trainerId?: string): {
   // JPEG image: 50-200KB
   // MP3 audio: 1MB per minute (128kbps)
 
-  const media = trainerId ? getTrainerMedia(trainerId) : null;
+  const env = import.meta.env as Record<string, string | undefined>;
+  const media = trainerId ? getTrainerMedia(trainerId, env) : null;
 
   return {
     imageSize: 0.15, // MB - typical compressed trainer image

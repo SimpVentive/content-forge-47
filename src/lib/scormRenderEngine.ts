@@ -141,9 +141,7 @@ export async function extractScormAssets(
  * Includes all utilities needed for slide rendering
  */
 export function buildComprehensiveTailwindCss(): string {
-  return `
-    <style>
-      /* CSS Reset */
+  return `/* CSS Reset */
       * { margin: 0; padding: 0; box-sizing: border-box; border: 0 solid #e5e7eb; }
       html { line-height: 1.5; -webkit-text-size-adjust: 100%; tab-size: 4; }
       body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: inherit; }
@@ -344,7 +342,6 @@ export function buildComprehensiveTailwindCss(): string {
 
       /* Object Fit */
       .object-cover { object-fit: cover; }
-    </style>
   `;
 }
 

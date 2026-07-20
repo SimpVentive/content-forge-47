@@ -123,15 +123,27 @@ export class ScormExportOrchestrator {
         const module = modules[modIndex];
         const moduleSlides = slides.filter((s) => s.moduleIndex === modIndex);
 
+        // Apply embedded asset URLs to slides (replace visual URLs with processed URLs from asset map)
+        const slidesWithEmbeddedAssets = moduleSlides.map((slide) => {
+          if (slide.type !== "content") return slide;
+
+          const updatedSlide = { ...slide };
+          if (slide.topicTitle && assetResult.assetMap.visuals.has(slide.topicTitle)) {
+            updatedSlide.visualImageDataUrl = assetResult.assetMap.visuals.get(slide.topicTitle);
+          }
+
+          return updatedSlide;
+        });
+
         try {
           const html = await renderScormModuleHtml({
             courseTitle: options.courseTitle,
             module,
             moduleIndex: modIndex,
             totalModules: modules.length,
-            slides: moduleSlides,
+            slides: slidesWithEmbeddedAssets,
             quizzes: [],
-            avatarImageUrl: assetResult.avatar.imageUrl,
+            avatarImageUrl: assetResult.assetMap.avatar,
             trainerName: assetResult.avatar.trainerName,
           });
 
