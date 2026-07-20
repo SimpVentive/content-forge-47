@@ -183,6 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setTitleSpans,
   companyLogo,
   setCompanyLogo,
+  onDocumentMeta,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
