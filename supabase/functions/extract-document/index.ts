@@ -143,7 +143,49 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // === PDF / images via Gemini multimodal ===
+    // === PDF extraction - try pdfparse first, fallback to Gemini ===
+    if (mimeType === "application/pdf") {
+      try {
+        // Try server-side PDF text extraction using pdfjs
+        const { getDocument } = await import("https://esm.sh/pdfjs-dist@4.0.269");
+        const bytes = base64ToUint8Array(fileBase64);
+        const pdf = await getDocument({ data: bytes }).promise;
+        const textContent: string[] = [];
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const text = await page.getTextContent();
+          const pageText = text.items
+            .map((item: any) => item.str || "")
+            .join(" ");
+          if (pageText.trim()) {
+            textContent.push(pageText);
+          }
+        }
+
+        const extractedText = textContent.join("\n\n");
+
+        if (extractedText.trim().length > 50) {
+          const wordCount = (extractedText.match(/\b[\w''-]+\b/g) || []).length;
+          const estimatedMinutes = Math.ceil(wordCount / 130);
+          console.log(`[PDF Extraction - Server-side] File: ${fileName}, Words: ${wordCount}, Estimated minutes: ${estimatedMinutes}`);
+
+          return new Response(JSON.stringify({
+            text: extractedText,
+            extractedWordCount: wordCount,
+            estimatedMinutes: estimatedMinutes,
+            method: "pdfjs-server-side"
+          }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } catch (pdfErr) {
+        console.warn("Server-side PDF extraction failed, falling back to Gemini:", pdfErr);
+        // Fall through to Gemini
+      }
+    }
+
+    // === Fallback: PDF / images via Gemini multimodal ===
     const isGeminiSupported = GEMINI_SUPPORTED.some((t) => mimeType?.startsWith(t));
     if (!isGeminiSupported) {
       return new Response(JSON.stringify({
