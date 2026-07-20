@@ -174,16 +174,17 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: "You are a document content extractor. Extract ALL text content from the uploaded document. Preserve the structure — headings, bullet points, numbered lists, tables (as markdown). Output ONLY the extracted text, no commentary.",
+            content: "You are a comprehensive document content extractor. Your task is to extract EVERY SINGLE WORD and EVERY PIECE OF TEXT from the uploaded document. Do not skip, summarize, or condense any content. Preserve all structure: headings, subheadings, body text, bullet points, numbered lists, tables (as markdown), captions, footnotes, and any other text visible. Output the complete extracted content with NO commentary, NO filtering, NO summaries. Include all pages completely.",
           },
           {
             role: "user",
             content: [
-              { type: "text", text: `Extract all text content from this ${fileName} file. Return the full text content preserving structure.` },
+              { type: "text", text: `This is a ${fileName} file with potentially multiple pages and dense content. Extract EVERY WORD AND EVERY LINE of text from this entire document. Do not truncate, do not summarize, do not skip any content. Return the COMPLETE text preserving structure and formatting. Include every single page.` },
               { type: "image_url", image_url: { url: `data:${mimeType};base64,${fileBase64}` } },
             ],
           },
         ],
+        temperature: 0.1,
       }),
     });
 
