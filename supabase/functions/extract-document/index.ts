@@ -185,7 +185,7 @@ serve(async (req) => {
           },
         ],
         temperature: 0.1,
-        max_tokens: 32000,
+        max_tokens: 16000,
       }),
     });
 
@@ -196,11 +196,15 @@ serve(async (req) => {
     }
 
     const rawText = await response.text();
+
+    // Log raw response for debugging
+    console.log(`[PDF Extraction - Raw Response] Length: ${rawText.length}, First 500 chars:`, rawText.substring(0, 500));
+
     let data;
     try {
       data = JSON.parse(rawText);
     } catch (parseErr) {
-      console.error("Failed to parse AI response, length:", rawText.length);
+      console.error("Failed to parse AI response, length:", rawText.length, "Error:", parseErr);
       const contentMatch = rawText.match(/"content"\s*:\s*"((?:[^"\\]|\\.)*)"/);
       if (contentMatch) {
         return new Response(JSON.stringify({ text: contentMatch[1].replace(/\\n/g, "\n").replace(/\\"/g, '"') }), {
@@ -209,12 +213,18 @@ serve(async (req) => {
       }
       throw new Error("Failed to parse AI response - document may be too large.");
     }
+
     const text = data.choices?.[0]?.message?.content || "";
 
     // Log extraction metrics for debugging duration mismatch issues
     const wordCount = (text.match(/\b[\w''-]+\b/g) || []).length;
     const estimatedMinutes = Math.ceil(wordCount / 130);
     console.log(`[PDF Extraction] File: ${fileName}, Words: ${wordCount}, Estimated minutes: ${estimatedMinutes}`);
+
+    // CRITICAL: If extraction seems truncated, log warning
+    if (wordCount < 200 && fileName.toLowerCase().endsWith('.pdf')) {
+      console.warn(`[PDF Extraction WARNING] Suspiciously low word count (${wordCount}) for PDF - may be truncated`);
+    }
 
     return new Response(JSON.stringify({
       text,
