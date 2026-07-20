@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useContentForge } from "@/hooks/ContentForgeContext";
 import type { CourseParameters } from "@/components/contentforge/CourseParametersDialog";
-import { estimateMinutesFromText } from "@/components/contentforge/Sidebar";
+import { estimateMinutesCombined } from "@/components/contentforge/Sidebar";
 import type { TitleSpan } from "@/components/contentforge/RichTitleEditor";
 import { Sidebar } from "@/components/contentforge/Sidebar";
 import { AgentPipeline } from "@/components/contentforge/AgentPipeline";
@@ -112,6 +112,7 @@ const Index = () => {
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
   const [userAssets, setUserAssets] = useState<any[]>([]);
   const [courseIdRef, setCourseIdRef] = useState<string>("");
+  const [uploadedDocMeta, setUploadedDocMeta] = useState<{ fileName: string; fileSize: number; extractedWordCount: number } | null>(null);
   const [pendingGenerationParams, setPendingGenerationParams] = useState<{ params: CourseParameters; courseContent: string; courseType: string } | null>(null);
   const { selectedAssets, handleAssetsSelected } = useAssetMatching();
   const hasProcessedAssetNav = useRef(false);
@@ -851,6 +852,7 @@ const Index = () => {
               setTitleSpans={setTitleSpans}
               companyLogo={companyLogo}
               setCompanyLogo={setCompanyLogo}
+              onDocumentMeta={setUploadedDocMeta}
             />
           </div>
         )}
@@ -931,7 +933,7 @@ const Index = () => {
                 <CourseParametersDialog
                   open={showParamsDialog}
                   courseTitle={courseTitle}
-                  estimatedMinutes={estimateMinutesFromText(inputText)}
+                  estimatedMinutes={estimateMinutesCombined(inputText, uploadedDocMeta?.fileSize, uploadedDocMeta?.fileName)}
                   youtubeAgentEnabled={agentToggles.youtube}
                   initialLearningType={learningType as "static" | "video" | "image"}
                   contentType={contentType}
