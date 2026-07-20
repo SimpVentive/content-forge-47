@@ -180,17 +180,17 @@ export class ScormExportOrchestrator {
         passingScore: options.passingScore || 70,
       };
 
+      // Organization items should match actual module resources
       const manifestOrganization: ManifestOrganization = {
         title: options.courseTitle,
-        items: slides
-          .filter((s) => s.type === "content")
-          .map((slide, idx) => ({
-            identifier: `slide_${slide.moduleIndex}_${idx}`,
-            title: slide.topicTitle || `Slide ${idx + 1}`,
-            resourceId: `res_${slide.moduleIndex}_${idx}`,
-          })),
+        items: modules.map((module, idx) => ({
+          identifier: `module_${idx}`,
+          title: module.title,
+          resourceId: `res_module_${idx}`,
+        })),
       };
 
+      // Resources correspond to module HTML files
       const manifestResources: ManifestResource[] = moduleHtmls.map((item, idx) => ({
         id: `res_module_${idx}`,
         type: "webcontent",
