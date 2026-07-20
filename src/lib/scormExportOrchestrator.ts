@@ -71,12 +71,26 @@ export class ScormExportOrchestrator {
     const fileName = `${sanitizeFilename(options.courseTitle)}_SCORM.zip`;
 
     try {
-      // Step 1: PRE-EXPORT VALIDATION
-      this.report("validation", 5, "Running pre-export validation...");
+      // Step 1: BUILD SLIDES
+      this.report("rendering", 10, "Building course slides...");
+
+      const { modules, slides } = buildSlides(
+        rawOutputs,
+        [],
+        options.courseDescription
+      );
+
+      this.report("rendering", 20, "Slides built", `${slides.length} slides created`);
+
+      // Step 2: VALIDATE STRUCTURE (now with actual modules)
+      this.report("validation", 25, "Validating course structure...");
 
       const preValidation = validateScormPackage({
         courseTitle: options.courseTitle,
-        modules: [],
+        modules: modules.map(m => ({
+          title: m.title,
+          slides: slides.filter(s => s.moduleIndex === modules.indexOf(m))
+        })),
         avatar: options.trainerId ? { trainerName: "Trainer" } : undefined,
       });
 
@@ -90,18 +104,7 @@ export class ScormExportOrchestrator {
         };
       }
 
-      this.report("validation", 15, "Validation passed", `Quality score: ${Math.round((preValidation.passedChecks / preValidation.totalChecks) * 100)}%`);
-
-      // Step 2: BUILD SLIDES
-      this.report("rendering", 20, "Building course slides...");
-
-      const { modules, slides } = buildSlides(
-        rawOutputs,
-        [],
-        options.courseDescription
-      );
-
-      this.report("rendering", 30, "Slides built", `${slides.length} slides created`);
+      this.report("validation", 30, "Validation passed", `Quality score: ${Math.round((preValidation.passedChecks / preValidation.totalChecks) * 100)}%`);
 
       // Step 3: ORCHESTRATE ASSETS
       this.report("assets", 35, "Orchestrating assets...");
@@ -149,7 +152,7 @@ export class ScormExportOrchestrator {
 
           moduleHtmls.push({ html, module });
 
-          const progress = 55 + (modIndex / modules.length) * 25;
+          const progress = 60 + (modIndex / modules.length) * 20;
           this.report("rendering", progress, `Rendered module ${modIndex + 1}/${modules.length}`);
         } catch (error) {
           console.error(`Failed to render module ${modIndex}:`, error);
