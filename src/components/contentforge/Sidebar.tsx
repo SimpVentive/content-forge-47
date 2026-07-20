@@ -6,11 +6,15 @@ import { RichTitleEditor, type TitleSpan } from "./RichTitleEditor";
 import { LogoUploader } from "./LogoUploader";
 import { SOPFormatDialog } from "./SOPFormatDialog";
 
-/** Estimate e-learning minutes from word count (~150 words/min narrated) */
+/** Estimate e-learning minutes from word count (130 words/min narrated - normalized across system) */
 export function estimateMinutesFromText(text: string): number {
   if (!text) return 0;
   const words = text.trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(1, Math.round(words / 150));
+  if (words === 0) return 0;
+  // Use 130 WPM consistent with creditEstimator.ts
+  const minutes = Math.ceil(words / 130);
+  // Return actual estimate, don't artificially floor to 1 (that masks extraction failures)
+  return minutes;
 }
 
 interface SidebarProps {
@@ -200,9 +204,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         } else if (data?.text && data.text.length > 0) {
           extractedText = data.text;
           setInputText(extractedText);
+          // Log extraction metrics for debugging
+          if (data.extractedWordCount) {
+            console.log(`[Sidebar] Document extraction: ${file.name} -> ${data.extractedWordCount} words, ~${data.estimatedMinutes} min`);
+          }
         } else {
           extractedText = `[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nCould not extract text. You can paste additional notes below.`;
           setInputText(extractedText);
+          console.warn(`[Sidebar] Document extraction failed or empty: ${file.name}`);
         }
       } catch (err) {
         console.error("Document extraction error:", err);

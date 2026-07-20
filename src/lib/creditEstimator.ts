@@ -24,11 +24,11 @@ const CREDITS_PER_VIDEO_MINUTE = 83;
 
 /**
  * Estimate word count from text input
- * Assumes average 5 words per line
+ * Counts actual words without artificial minimums that mask extraction failures
  */
 function estimateWordCount(text: string): number {
-  const words = text.trim().split(/\s+/).length;
-  return Math.max(words, 100);
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(words, 0);
 }
 
 /**

@@ -209,7 +209,16 @@ serve(async (req) => {
     }
     const text = data.choices?.[0]?.message?.content || "";
 
-    return new Response(JSON.stringify({ text }), {
+    // Log extraction metrics for debugging duration mismatch issues
+    const wordCount = (text.match(/\b[\w''-]+\b/g) || []).length;
+    const estimatedMinutes = Math.ceil(wordCount / 130);
+    console.log(`[PDF Extraction] File: ${fileName}, Words: ${wordCount}, Estimated minutes: ${estimatedMinutes}`);
+
+    return new Response(JSON.stringify({
+      text,
+      extractedWordCount: wordCount,
+      estimatedMinutes: estimatedMinutes
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
