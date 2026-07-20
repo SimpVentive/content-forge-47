@@ -191,7 +191,7 @@ export const ScormLearnerPreview: React.FC<ScormLearnerPreviewProps> = ({
               assessmentQuestionIndex++;
               const assessmentQuestions = slides.filter((s) => s.type === "assessment");
 
-              if (slide.contentTemplate === "scenario" && slide.question?.situation) {
+              if (slide.contentTemplate === "scenario" && (slide.question as any)?.situation) {
                 return (
                   <ScenarioSlide
                     key={index}
