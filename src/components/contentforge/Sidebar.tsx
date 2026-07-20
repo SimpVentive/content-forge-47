@@ -266,6 +266,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
     }
 
+    // Report meta for duration estimation (uses file size as fallback for weak text extraction)
+    if (onDocumentMeta) {
+      const words = extractedText.trim().split(/\s+/).filter(Boolean).length;
+      onDocumentMeta({ fileName: file.name, fileSize: file.size, extractedWordCount: words });
+    }
+
     // Detect if this is an SOP and show format selection
     const isSOP = detectSOP(extractedText);
     if (isSOP) {
