@@ -226,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           supabase.functions.invoke("extract-document", {
             body: { fileBase64: base64, fileName: file.name, mimeType },
           }),
-          25000,
+          60000,
           "Document extraction timed out"
         );
 
