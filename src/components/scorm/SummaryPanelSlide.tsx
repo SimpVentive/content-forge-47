@@ -7,20 +7,27 @@ import React from "react";
 
 export interface SummaryPanelSlideProps {
   moduleTitle: string;
-  moduleIndex: number;
-  totalModules: number;
-  takeaways: string[];
+  moduleIndex?: number;
+  totalModules?: number;
+  takeaways?: string[];
   isLastModule?: boolean;
+  topicTitle?: string;
+  content?: string;
+  infographicSvg?: string;
 }
 
 export const SummaryPanelSlide: React.FC<SummaryPanelSlideProps> = ({
   moduleTitle,
-  moduleIndex,
-  totalModules,
+  moduleIndex = 0,
+  totalModules = 1,
   takeaways,
   isLastModule = false,
+  content,
 }) => {
-  const displayTakeaways = takeaways.filter(Boolean).slice(0, 5);
+  const derived = Array.isArray(takeaways) && takeaways.length > 0
+    ? takeaways
+    : (content ? content.split(/\n+/).map((s) => s.replace(/^[-*•]\s*/, "").trim()) : []);
+  const displayTakeaways = derived.filter(Boolean).slice(0, 5);
 
   return (
     <div className="scorm-summary-panel-slide bg-gradient-to-br from-slate-900 to-slate-800 rounded-lg shadow-lg overflow-hidden text-white">
