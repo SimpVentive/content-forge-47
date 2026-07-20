@@ -122,9 +122,19 @@ export class ScormExportOrchestrator {
 
       const moduleHtmls: Array<{ html: string; module: Module }> = [];
 
+      // Validate slides array
+      if (!slides || slides.length === 0) {
+        throw new Error("No slides generated from course content. Ensure your content has enough material to create slides.");
+      }
+
       for (let modIndex = 0; modIndex < modules.length; modIndex++) {
         const module = modules[modIndex];
         const moduleSlides = slides.filter((s) => s.moduleIndex === modIndex);
+
+        // If module has no slides, create a placeholder
+        if (moduleSlides.length === 0) {
+          console.warn(`Module ${modIndex} ("${module.title}") has no slides. This may indicate a content parsing issue.`);
+        }
 
         // Apply embedded asset URLs to slides (replace visual URLs with processed URLs from asset map)
         const slidesWithEmbeddedAssets = moduleSlides.map((slide) => {

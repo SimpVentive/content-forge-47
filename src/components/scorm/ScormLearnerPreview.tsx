@@ -34,6 +34,20 @@ export const ScormLearnerPreview: React.FC<ScormLearnerPreviewProps> = ({
   avatarImageUrl,
   trainerName = "Trainer",
 }) => {
+  // Guard against undefined slides
+  if (!slides || !Array.isArray(slides)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 p-8">
+        <div className="max-w-[1400px] mx-auto">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <h2 className="text-red-900 font-bold text-lg mb-2">Module Rendering Error</h2>
+            <p className="text-red-700">No slides were provided for module "{moduleTitle}". This indicates a content parsing issue.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   let assessmentQuestionIndex = 0;
 
   return (
