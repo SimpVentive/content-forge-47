@@ -112,6 +112,7 @@ const Index = () => {
   const [showAssetLibrary, setShowAssetLibrary] = useState(false);
   const [userAssets, setUserAssets] = useState<any[]>([]);
   const [courseIdRef, setCourseIdRef] = useState<string>("");
+  const [uploadedDocMeta, setUploadedDocMeta] = useState<{ fileName: string; fileSize: number; extractedWordCount: number } | null>(null);
   const [pendingGenerationParams, setPendingGenerationParams] = useState<{ params: CourseParameters; courseContent: string; courseType: string } | null>(null);
   const { selectedAssets, handleAssetsSelected } = useAssetMatching();
   const hasProcessedAssetNav = useRef(false);
@@ -851,6 +852,7 @@ const Index = () => {
               setTitleSpans={setTitleSpans}
               companyLogo={companyLogo}
               setCompanyLogo={setCompanyLogo}
+              onDocumentMeta={setUploadedDocMeta}
             />
           </div>
         )}
@@ -931,7 +933,7 @@ const Index = () => {
                 <CourseParametersDialog
                   open={showParamsDialog}
                   courseTitle={courseTitle}
-                  estimatedMinutes={estimateMinutesFromText(inputText)}
+                  estimatedMinutes={estimateMinutesCombined(inputText, uploadedDocMeta?.fileSize, uploadedDocMeta?.fileName)}
                   youtubeAgentEnabled={agentToggles.youtube}
                   initialLearningType={learningType as "static" | "video" | "image"}
                   contentType={contentType}
