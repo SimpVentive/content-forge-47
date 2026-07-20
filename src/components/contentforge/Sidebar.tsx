@@ -67,6 +67,7 @@ interface SidebarProps {
   setTitleSpans?: (v: TitleSpan[]) => void;
   companyLogo?: string | null;
   setCompanyLogo?: (v: string | null) => void;
+  onDocumentMeta?: (meta: { fileName: string; fileSize: number; extractedWordCount: number } | null) => void;
 }
 
 const BINARY_EXTENSIONS = ['.pptx', '.ppt', '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.zip'];
