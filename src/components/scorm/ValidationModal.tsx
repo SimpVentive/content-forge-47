@@ -29,7 +29,7 @@ export const ValidationModal: React.FC<ValidationModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
-  const report = stage === "pre-export" ? validationReport : packageReport;
+  const report = (stage === "pre-export" ? validationReport : packageReport) as any;
   if (!report) return null;
 
   const isPreExport = stage === "pre-export";

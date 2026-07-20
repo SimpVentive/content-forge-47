@@ -42,16 +42,17 @@ export function extractAvatarMedia(trainerId?: string): AvatarMedia {
     return {
       trainerName: trainer.name || "Trainer",
       voiceId: getTrainerVoiceId(trainerId),
-      voiceName: trainer.defaultVoice || "Unknown",
+      voiceName: trainer.subtitle || "Unknown",
     };
   }
 
   // Determine best image to use for avatar (prefer imageUrl which comes from env or local paths)
   let imageUrl: string | undefined = media.imageUrl;
 
-  // If no imageUrl, try posterUrl as fallback
-  if (!imageUrl && media.posterUrl) {
-    imageUrl = media.posterUrl;
+  // Try to find a static image (preferred for SCORM)
+  if (!imageUrl && media.videoUrl) {
+    // Fallback to video thumbnail if available
+    imageUrl = media.posterUrl || media.videoUrl;
   }
 
   return {
@@ -59,7 +60,7 @@ export function extractAvatarMedia(trainerId?: string): AvatarMedia {
     imagePath: media.imageUrl,
     imageUrl,
     voiceId: getTrainerVoiceId(trainerId),
-    voiceName: trainer.defaultVoice || "Unknown",
+    voiceName: trainer.subtitle || "Unknown",
   };
 }
 
@@ -91,7 +92,7 @@ export function validateAvatarMedia(trainerId?: string): {
     return { isValid: false, warnings };
   }
 
-  if (!media.imageUrl && !media.videoUrl) {
+  if (!media.imageUrl && !media.videoUrl && !media.posterUrl) {
     warnings.push(`Trainer "${trainer.name}" has no image or video assets`);
     return { isValid: false, warnings };
   }
@@ -124,7 +125,7 @@ export function getAvailableTrainers(): Array<{
       name: trainer.name || "Unknown Trainer",
       hasImage: !!media?.imageUrl,
       hasVideo: !!media?.videoUrl,
-      voiceName: trainer.defaultVoice || "Unknown",
+      voiceName: trainer.subtitle || "Unknown",
     };
   });
 }
@@ -155,7 +156,7 @@ export function extractNarrationConfig(trainerId?: string): NarrationConfig {
   return {
     enabled: !!voiceId,
     voiceId,
-    voiceName: trainer.defaultVoice,
+    voiceName: trainer.subtitle,
     trainerName: trainer.name,
   };
 }
