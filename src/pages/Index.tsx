@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useContentForge } from "@/hooks/ContentForgeContext";
 import type { CourseParameters } from "@/components/contentforge/CourseParametersDialog";
-import { estimateMinutesFromText } from "@/components/contentforge/Sidebar";
+import { estimateMinutesCombined } from "@/components/contentforge/Sidebar";
 import type { TitleSpan } from "@/components/contentforge/RichTitleEditor";
 import { Sidebar } from "@/components/contentforge/Sidebar";
 import { AgentPipeline } from "@/components/contentforge/AgentPipeline";
