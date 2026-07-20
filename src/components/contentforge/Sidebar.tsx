@@ -11,10 +11,43 @@ export function estimateMinutesFromText(text: string): number {
   if (!text) return 0;
   const words = text.trim().split(/\s+/).filter(Boolean).length;
   if (words === 0) return 0;
-  // Use 130 WPM consistent with creditEstimator.ts
   const minutes = Math.ceil(words / 130);
-  // Return actual estimate, don't artificially floor to 1 (that masks extraction failures)
   return minutes;
+}
+
+/**
+ * Fallback: estimate minutes from uploaded document size when text extraction
+ * under-reports (e.g. Gemini summarises a large PDF instead of returning full text).
+ * Empirical bytes-per-page heuristics × ~250 words/page ÷ 130 wpm.
+ */
+export function estimateMinutesFromDocumentMeta(
+  fileSize: number | null | undefined,
+  fileName?: string | null,
+): number {
+  if (!fileSize || fileSize <= 0) return 0;
+  const name = (fileName || "").toLowerCase();
+  const dot = name.lastIndexOf(".");
+  const ext = dot >= 0 ? name.slice(dot) : "";
+  const bytesPerPage =
+    ext === ".pdf" ? 40_000 :
+    ext === ".pptx" || ext === ".ppt" ? 120_000 :
+    ext === ".docx" || ext === ".doc" ? 15_000 :
+    ext === ".xlsx" || ext === ".xls" ? 25_000 :
+    30_000;
+  const estPages = Math.max(1, Math.round(fileSize / bytesPerPage));
+  return Math.ceil((estPages * 250) / 130);
+}
+
+/** Use the larger of the text-based and document-size-based estimates. */
+export function estimateMinutesCombined(
+  text: string,
+  fileSize?: number | null,
+  fileName?: string | null,
+): number {
+  return Math.max(
+    estimateMinutesFromText(text),
+    estimateMinutesFromDocumentMeta(fileSize, fileName),
+  );
 }
 
 interface SidebarProps {
@@ -34,6 +67,7 @@ interface SidebarProps {
   setTitleSpans?: (v: TitleSpan[]) => void;
   companyLogo?: string | null;
   setCompanyLogo?: (v: string | null) => void;
+  onDocumentMeta?: (meta: { fileName: string; fileSize: number; extractedWordCount: number } | null) => void;
 }
 
 const BINARY_EXTENSIONS = ['.pptx', '.ppt', '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.zip'];
@@ -149,6 +183,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setTitleSpans,
   companyLogo,
   setCompanyLogo,
+  onDocumentMeta,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
@@ -191,7 +226,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           supabase.functions.invoke("extract-document", {
             body: { fileBase64: base64, fileName: file.name, mimeType },
           }),
-          25000,
+          60000,
           "Document extraction timed out"
         );
 
@@ -229,6 +264,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         extractedText = `[Document] Uploaded: ${file.name} - Could not extract text. Try pasting content directly.`;
         setInputText(extractedText);
       }
+    }
+
+    // Report meta for duration estimation (uses file size as fallback for weak text extraction)
+    if (onDocumentMeta) {
+      const words = extractedText.trim().split(/\s+/).filter(Boolean).length;
+      onDocumentMeta({ fileName: file.name, fileSize: file.size, extractedWordCount: words });
     }
 
     // Detect if this is an SOP and show format selection
