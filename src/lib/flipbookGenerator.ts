@@ -460,8 +460,7 @@ export function generateFlipbookHTML(
           <div class="narration-text">${escapeHtml(page.speaker)}</div>
           ${page.audioDataUrl ? `
             <div class="audio-player-container">
-              <audio class="audio-player" preload="metadata">
-                <source src="${page.audioDataUrl}" type="audio/mpeg">
+              <audio class="audio-player" controls preload="auto" src="${page.audioDataUrl}">
                 Your browser does not support the audio element.
               </audio>
             </div>
@@ -658,7 +657,7 @@ export function generateFlipbookHTML(
     }
 
     .audio-player-container {
-      display: none !important;
+      display: block;
       margin-bottom: 10px;
       width: 100%;
     }
@@ -1387,10 +1386,29 @@ export function generateFlipbookHTML(
         if (audio) {
           audio.currentTime = 0;
           var p = audio.play();
-          if (p && typeof p.catch === 'function') p.catch(function () {});
+          if (p && typeof p.catch === 'function') {
+            p.catch(function () {
+              // Browsers block autoplay until the learner interacts with the page.
+              // Retry once the first gesture arrives.
+              window.__audioBlocked = true;
+            });
+          }
         }
       } catch (e) {}
     }
+
+    // Unlock audio on the first user gesture (autoplay policy workaround).
+    (function () {
+      function unlock() {
+        document.removeEventListener('click', unlock, true);
+        document.removeEventListener('keydown', unlock, true);
+        document.removeEventListener('touchstart', unlock, true);
+        if (window.__audioEnabled) playCurrentPageAudio();
+      }
+      document.addEventListener('click', unlock, true);
+      document.addEventListener('keydown', unlock, true);
+      document.addEventListener('touchstart', unlock, true);
+    })();
 
     function applyAudioVisibility() {
       var btns = document.querySelectorAll('[data-audio-toggle]');
