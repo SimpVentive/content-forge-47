@@ -460,8 +460,7 @@ export function generateFlipbookHTML(
           <div class="narration-text">${escapeHtml(page.speaker)}</div>
           ${page.audioDataUrl ? `
             <div class="audio-player-container">
-              <audio class="audio-player" preload="metadata">
-                <source src="${page.audioDataUrl}" type="audio/mpeg">
+              <audio class="audio-player" controls preload="auto" src="${page.audioDataUrl}">
                 Your browser does not support the audio element.
               </audio>
             </div>
@@ -658,7 +657,7 @@ export function generateFlipbookHTML(
     }
 
     .audio-player-container {
-      display: none !important;
+      display: block;
       margin-bottom: 10px;
       width: 100%;
     }
