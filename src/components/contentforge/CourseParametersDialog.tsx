@@ -1052,11 +1052,11 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </div>
             )}
 
-            {/* Voiceover (Image Course only) */}
-            {localLearningType === "image" && (
+            {/* Voiceover (for Flipbook/Narrative Output) */}
+            {(localLearningType === "image" || true) && (
               <div className={surfaceCardClass}>
                 <label className="text-[13px] text-[#2E2E2E] mb-3 flex items-center gap-1.5 block" style={{ fontFamily: bodyFont, fontWeight: 600 }}>
-                  Voiceover Narration
+                  Voiceover Narration {localLearningType !== "image" && <span className="text-[11px] text-[#6B7280]">(when generating flipbooks)</span>}
                   <InfoHint text="Add a spoken narration to each scene. Learners can also toggle this on/off in the preview." />
                 </label>
                 <div className="flex gap-2 mb-3">
