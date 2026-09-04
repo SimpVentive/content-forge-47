@@ -13,11 +13,11 @@ serve(async (req) => {
 
   try {
     const { text, voiceId } = await req.json();
-    const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
+    const apiKey = Deno.env.get("ELEVENLABS_API_KEY") || Deno.env.get("ElevenLabs");
 
     if (!apiKey) {
-      console.error("[ElevenLabs TTS] ELEVENLABS_API_KEY environment variable not set");
-      return new Response(JSON.stringify({ error: "ELEVENLABS_API_KEY is not configured. Add it in Supabase → Settings → Secrets." }), {
+      console.error("[ElevenLabs TTS] ElevenLabs API key environment variable not set");
+      return new Response(JSON.stringify({ error: "ElevenLabs API key is not configured in backend secrets." }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
