@@ -460,12 +460,15 @@ export function generateFlipbookHTML(
           <div class="narration-text">${escapeHtml(page.speaker)}</div>
           ${page.audioDataUrl ? `
             <div class="audio-player-container">
-              <audio class="audio-player" preload="metadata">
-                <source src="${page.audioDataUrl}" type="audio/mpeg">
+              <audio class="audio-player" controls preload="auto" src="${page.audioDataUrl}">
                 Your browser does not support the audio element.
               </audio>
             </div>
-          ` : ""}
+          ` : `
+            <div class="audio-player-container">
+              <button type="button" class="narration-play-btn" onclick="window.__playPageNarration&&window.__playPageNarration(this)">▶ Play narration</button>
+            </div>
+          `}
         </div>
         ` : ""}
         ${companyLogoDataUrl && idx > 0 ? `<div style="margin-top: 10px;"><img src="${companyLogoDataUrl}" alt="Company logo" class="logo-footer" /></div>` : ""}
@@ -658,7 +661,7 @@ export function generateFlipbookHTML(
     }
 
     .audio-player-container {
-      display: none !important;
+      display: block;
       margin-bottom: 10px;
       width: 100%;
     }
@@ -668,6 +671,23 @@ export function generateFlipbookHTML(
       height: 32px;
       border-radius: 4px;
       background: white;
+    }
+
+    .narration-play-btn {
+      min-height: 36px;
+      padding: 8px 14px;
+      border: 1px solid #667eea;
+      border-radius: 6px;
+      background: white;
+      color: #4338ca;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .narration-play-btn:hover {
+      background: #eef2ff;
     }
 
     .narration-label {
@@ -1365,7 +1385,37 @@ export function generateFlipbookHTML(
         audioEl.pause();
         audioEl.currentTime = 0;
       });
+      if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+      document.querySelectorAll('.narration-play-btn').forEach(function (button) {
+        button.textContent = '▶ Play narration';
+      });
     }
+
+    function speakNarrationForPage(pageElement, triggerButton) {
+      if (!window.__audioEnabled || !pageElement || !('speechSynthesis' in window)) return;
+      var narrationElement = pageElement.querySelector('.narration-text');
+      var narrationText = narrationElement ? narrationElement.textContent.trim() : '';
+      if (!narrationText) return;
+      window.speechSynthesis.cancel();
+      var utterance = new SpeechSynthesisUtterance(narrationText);
+      utterance.rate = ${voiceoverPace === "slow" ? "0.85" : voiceoverPace === "fast" ? "1.2" : "1"};
+      utterance.onstart = function () {
+        if (triggerButton) triggerButton.textContent = '■ Stop narration';
+      };
+      utterance.onend = utterance.onerror = function () {
+        if (triggerButton) triggerButton.textContent = '▶ Play narration';
+      };
+      window.speechSynthesis.speak(utterance);
+    }
+
+    window.__playPageNarration = function (button) {
+      if ('speechSynthesis' in window && window.speechSynthesis.speaking) {
+        stopAllAudio();
+        return;
+      }
+      var pageElement = button && button.closest ? button.closest('.page') : getCurrentPageElement();
+      speakNarrationForPage(pageElement, button);
+    };
 
     function getCurrentPageElement() {
       var idx = window.__fallbackCurrentPage || 0;
@@ -1387,10 +1437,31 @@ export function generateFlipbookHTML(
         if (audio) {
           audio.currentTime = 0;
           var p = audio.play();
-          if (p && typeof p.catch === 'function') p.catch(function () {});
+          if (p && typeof p.catch === 'function') {
+            p.catch(function () {
+              // Browsers block autoplay until the learner interacts with the page.
+              // Retry once the first gesture arrives.
+              window.__audioBlocked = true;
+            });
+          }
+        } else {
+          speakNarrationForPage(cur, cur.querySelector('.narration-play-btn'));
         }
       } catch (e) {}
     }
+
+    // Unlock audio on the first user gesture (autoplay policy workaround).
+    (function () {
+      function unlock() {
+        document.removeEventListener('click', unlock, true);
+        document.removeEventListener('keydown', unlock, true);
+        document.removeEventListener('touchstart', unlock, true);
+        if (window.__audioEnabled) playCurrentPageAudio();
+      }
+      document.addEventListener('click', unlock, true);
+      document.addEventListener('keydown', unlock, true);
+      document.addEventListener('touchstart', unlock, true);
+    })();
 
     function applyAudioVisibility() {
       var btns = document.querySelectorAll('[data-audio-toggle]');
