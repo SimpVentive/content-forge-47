@@ -13,11 +13,19 @@ serve(async (req) => {
 
   try {
     const { text, voiceId } = await req.json();
-    const apiKey = Deno.env.get("ElevenLabs");
+    const apiKey = Deno.env.get("ELEVENLABS_API_KEY");
 
     if (!apiKey) {
-      return new Response(JSON.stringify({ error: "ELEVENLABS_API_KEY is not configured. Add it in Cloud → Secrets." }), {
+      console.error("[ElevenLabs TTS] ELEVENLABS_API_KEY environment variable not set");
+      return new Response(JSON.stringify({ error: "ELEVENLABS_API_KEY is not configured. Add it in Supabase → Settings → Secrets." }), {
         status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (!text || text.trim().length === 0) {
+      return new Response(JSON.stringify({ error: "Text parameter is required" }), {
+        status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -45,29 +53,50 @@ serve(async (req) => {
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error("ElevenLabs error:", response.status, errText);
+      console.error(`[ElevenLabs TTS] API error: ${response.status}`, errText);
+
       const isBilling = response.status === 401 || response.status === 402;
       const message = isBilling
-        ? "ElevenLabs credits exhausted or API key invalid. Top up at elevenlabs.io to resume voice generation."
-        : `ElevenLabs API error: ${response.status}`;
+        ? "ElevenLabs: Invalid API key or insufficient credits. Check ELEVENLABS_API_KEY and account balance."
+        : `ElevenLabs API error: ${response.status} ${response.statusText}`;
+
       return new Response(JSON.stringify({
         error: message,
-        error_type: isBilling ? "BILLING_ERROR" : "SERVICE_UNAVAILABLE",
-        fallback: true,
+        status: response.status,
+        details: errText,
       }), {
-        status: 200,
+        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const payload = await response.json();
-
-    if (!payload?.audio_base64) {
-      return new Response(JSON.stringify({ error: "ElevenLabs response missing audio payload" }), {
+    let payload;
+    try {
+      payload = await response.json();
+    } catch (parseErr) {
+      console.error("[ElevenLabs TTS] Failed to parse JSON response");
+      const text = await response.text();
+      return new Response(JSON.stringify({
+        error: "ElevenLabs returned invalid JSON",
+        details: text.substring(0, 500),
+      }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    if (!payload?.audio_base64) {
+      console.error("[ElevenLabs TTS] Response missing audio_base64", Object.keys(payload || {}));
+      return new Response(JSON.stringify({
+        error: "ElevenLabs response missing audio payload",
+        received_keys: Object.keys(payload || {}),
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log(`[ElevenLabs TTS] ✅ Generated audio (${text.length} chars) with voice ${voiceId || "default"}`);
 
     return new Response(JSON.stringify({
       audioBase64: payload.audio_base64,
