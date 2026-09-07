@@ -67,7 +67,9 @@ serve(async (req: Request): Promise<Response> => {
       );
     }
 
-    const googleApiKey = Deno.env.get("GOOGLE_CLOUD_TTS_API_KEY");
+    const googleApiKey =
+      Deno.env.get("GOOGLE_CLOUD_TTS_API_KEY") ||
+      Deno.env.get("GOOGLE_API_KEY");
     if (!googleApiKey) {
       return new Response(
         JSON.stringify({ error: "Google Cloud TTS API key not configured" } as TTSResponse),
