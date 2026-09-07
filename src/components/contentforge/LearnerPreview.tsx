@@ -10,6 +10,7 @@ import { NarrativeFlipbook } from "./NarrativeFlipbook";
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
+import { generateNarrationAudio } from "@/lib/narrationAudioService";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
 
@@ -1710,32 +1711,23 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       return;
     }
 
-    // Fetch from ElevenLabs
+    // Use generateNarrationAudio which routes based on language (Telugu → Google Cloud TTS, English → ElevenLabs, etc.)
     setAudioLoading(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            text: narrationText.slice(0, 2500),
-            voiceId: trainerVoiceId,
-          }),
-        }
+      const result = await generateNarrationAudio(
+        narrationText.slice(0, 2500),
+        trainerVoiceId,
+        narratorLanguage
       );
-      if (!response.ok) {
-        const errText = await response.text();
-        console.error("TTS error:", response.status, errText);
+
+      if (!result.success || !result.audioDataUrl) {
+        const errorMsg = result.error || "Failed to generate audio";
+        console.error("TTS error:", errorMsg);
+        toast.error("Failed to generate narration audio");
         return;
       }
-      const { audioUrl, visemeTimeline } = await parseTtsResponse(response);
-      visemeTimelinesRef.current[currentSlide] = visemeTimeline;
-      const url = audioUrl;
+
+      const url = result.audioDataUrl;
       audioUrlsRef.current[currentSlide] = url;
       const audio = new Audio(url);
       wireAudio(audio);
@@ -1743,15 +1735,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         console.error("Audio playback failed:", err);
       });
 
-      // Log ElevenLabs TTS usage
+      // Log TTS usage
       try {
         const textLength = narrationText.slice(0, 2500).length;
+        const providerName = ["Hindi", "Tamil", "Telugu", "Kannada", "Malayalam", "Bengali", "Marathi", "Gujarati", "Punjabi", "Urdu"].includes(narratorLanguage)
+          ? "Google Cloud TTS"
+          : "ElevenLabs";
         const costInr = (textLength * 0.0003) / 1000 * 10; // Rough estimate
         await logApiUsage(
-          "ElevenLabs",
+          providerName,
           textLength,
           costInr,
-          "Text-to-speech narration playback",
+          `Text-to-speech narration (${narratorLanguage})`,
           undefined
         ).catch(() => {});
       } catch (e) {
@@ -1759,10 +1754,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     } catch (err) {
       console.error("TTS fetch failed:", err);
+      toast.error("Failed to generate narration audio");
     } finally {
       setAudioLoading(false);
     }
-  }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio]);
+  }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio, narratorLanguage]);
 
   // Auto-play narration when slide changes
   useEffect(() => {
