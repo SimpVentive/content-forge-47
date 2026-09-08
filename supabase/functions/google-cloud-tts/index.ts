@@ -31,17 +31,18 @@ const LANGUAGE_CODE_MAP: Record<string, string> = {
 };
 
 // Language to voice name mapping (Google Cloud TTS voice names)
+// Note: some languages (Telugu, Urdu, Punjabi) only support Standard voices.
 const VOICE_NAME_MAP: Record<string, string> = {
   "hi-IN": "hi-IN-Neural2-A", // Female voice
-  "ta-IN": "ta-IN-Neural2-A", // Female voice
-  "te-IN": "te-IN-Neural2-A", // Female voice
-  "kn-IN": "kn-IN-Neural2-A", // Female voice
-  "ml-IN": "ml-IN-Neural2-A", // Female voice
-  "bn-IN": "bn-IN-Neural2-A", // Female voice
-  "mr-IN": "mr-IN-Neural2-A", // Female voice
-  "gu-IN": "gu-IN-Neural2-A", // Female voice
-  "pa-IN": "pa-IN-Neural2-A", // Female voice
-  "ur-PK": "ur-PK-Neural2-A", // Female voice
+  "ta-IN": "ta-IN-Standard-A", // Female voice
+  "te-IN": "te-IN-Standard-A", // Female voice
+  "kn-IN": "kn-IN-Standard-A", // Female voice
+  "ml-IN": "ml-IN-Standard-A", // Female voice
+  "bn-IN": "bn-IN-Standard-A", // Female voice
+  "mr-IN": "mr-IN-Standard-A", // Female voice
+  "gu-IN": "gu-IN-Standard-A", // Female voice
+  "pa-IN": "pa-IN-Standard-A", // Female voice
+  "ur-PK": "ur-PK-Standard-A", // Female voice
 };
 
 serve(async (req: Request): Promise<Response> => {
