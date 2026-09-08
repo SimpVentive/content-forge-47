@@ -1352,11 +1352,11 @@ OUTPUT FORMAT — ABSOLUTE:
                       await recordAssetUsage(userId, assetCheck.assetId, courseId, si + 1, `${narrative.topicTitle} - Scene ${scene.sceneNumber}`);
                     }
                   } else {
-                    // Fallback to Flux generation
+                    // Fallback to BFL Flux 2 image generation
                     const { data: imageData, error: imageError } = await supabase.functions.invoke("generate-slide-image", {
                       body: {
                         prompt: scene.imagePrompt,
-                        style: params?.imageStyleVariant || "illustrated",
+                        style: params?.imageStyleVariant || "realistic-office",
                         altText: scene.caption,
                         moduleTitle: `${narrative.topicTitle}`,
                         topicTitle: `Scene ${scene.sceneNumber}: ${scene.title}`,
@@ -1369,19 +1369,19 @@ OUTPUT FORMAT — ABSOLUTE:
                       if (isPngImage(imageData.mimeType || "image/png")) {
                         try {
                           finalImageUrl = await convertPngToJpeg(imageData.imageDataUrl, 85);
-                          addLog(`Visual Design Agent: Converted PNG to JPEG for Scene ${scene.sceneNumber}`);
+                          addLog(`Visual Design Agent: ✓ Converted PNG to JPEG for Scene ${scene.sceneNumber}`);
                         } catch (convertError) {
-                          addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original — ${convertError}`);
+                          addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original PNG — ${convertError}`);
                         }
                       }
 
                       scene.imageDataUrl = finalImageUrl;
-                      // Log OpenAI image API usage
+                      // Log BFL Flux 2 image API usage
                       try {
                         await logApiUsage(
-                          "OpenAI (gpt-image-1)",
+                          "Black Forest Labs Flux 2",
                           1, // 1 image
-                          0.04, // Approx cost per image (high quality 1536x1024)
+                          0.0125, // ~BRL $1 per image (1536x1024)
                           `Narrative image generation: Scene ${scene.sceneNumber}`,
                           undefined
                         ).catch(() => {});
@@ -1389,19 +1389,23 @@ OUTPUT FORMAT — ABSOLUTE:
                         // Silently fail, don't interrupt pipeline
                       }
                     } else {
-                      addLog(`Visual Design Agent: Image generation failed for scene ${scene.sceneNumber}. Will use placeholder.`);
+                      const errorMsg = typeof imageError === "string" ? imageError : imageError?.message || "Unknown error";
+                      addLog(`Visual Design Agent: ⚠️ Image generation failed for scene ${scene.sceneNumber}: ${errorMsg}`);
                     }
                   }
                 } catch (imgErr) {
-                  addLog(`Visual Design Agent: Image generation error for scene ${scene.sceneNumber}: ${(imgErr as Error).message}`);
+                  const errorMsg = imgErr instanceof Error ? imgErr.message : String(imgErr);
+                  addLog(`Visual Design Agent: ⚠️ Image generation exception for scene ${scene.sceneNumber}: ${errorMsg}`);
                 }
               }
             }
 
             setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
-            addLog(`Visual Design Agent: Generated ${narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0)} narrative scene images.`);
+            const totalNarrativeScenes = narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0);
+            const generatedScenes = narrativeScenes.reduce((sum, n) => sum + n.scenes.filter((s) => !!s.imageDataUrl).length, 0);
+            addLog(`Visual Design Agent: ✓ Narrative image generation complete — ${generatedScenes}/${totalNarrativeScenes} scenes with images (via BFL Flux 2).`);
           } catch (narrativeImgErr) {
-            addLog(`Visual Design Agent: Narrative image generation error — ${(narrativeImgErr as Error).message}`);
+            addLog(`Visual Design Agent: ⚠️ Narrative image generation error — ${(narrativeImgErr as Error).message}`);
           }
         }
 
@@ -1464,7 +1468,7 @@ OUTPUT FORMAT — ABSOLUTE:
                       await recordAssetUsage(userId, assetCheck.assetId, courseId, si + 1, topicTitle);
                     }
                   } else {
-                    // Fallback to Flux generation
+                    // Fallback to BFL Flux 2 image generation
                     const { data: imageData, error: imageError } = await supabase.functions.invoke("generate-slide-image", {
                       body: {
                         prompt: topicVisual.image_prompt || `A realistic workplace scene illustrating ${topicTitle}.`,
@@ -1484,21 +1488,21 @@ OUTPUT FORMAT — ABSOLUTE:
                         try {
                           finalImageUrl = await convertPngToJpeg(imageData.imageDataUrl, 85);
                           finalMimeType = "image/jpeg";
-                          addLog(`Visual Design Agent: Converted PNG to JPEG for topic "${topicTitle}"`);
+                          addLog(`Visual Design Agent: ✓ Converted PNG to JPEG for topic "${topicTitle}"`);
                         } catch (convertError) {
-                          addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original — ${convertError}`);
+                          addLog(`Visual Design Agent: PNG to JPEG conversion failed, using original PNG — ${convertError}`);
                         }
                       }
 
                       topicVisual.generated_image_data_url = finalImageUrl;
                       topicVisual.generated_image_mime_type = finalMimeType;
                       topicVisual.image_approved = false;
-                      // Log OpenAI image API usage
+                      // Log BFL Flux 2 image API usage
                       try {
                         await logApiUsage(
-                          "OpenAI (gpt-image-1)",
+                          "Black Forest Labs Flux 2",
                           1, // 1 image
-                          0.04, // Approx cost per image (high quality 1536x1024)
+                          0.0125, // ~$0.0125 per image
                           `Visual design image: ${topicTitle}`,
                           undefined
                         ).catch(() => {});
@@ -1506,11 +1510,13 @@ OUTPUT FORMAT — ABSOLUTE:
                         // Silently fail, don't interrupt pipeline
                       }
                     } else {
-                      addLog(`Visual Design Agent: Image generation failed for topic "${topicTitle}". Will use SVG fallback.`);
+                      const errorMsg = typeof imageError === "string" ? imageError : imageError?.message || "Unknown error";
+                      addLog(`Visual Design Agent: ⚠️ Image generation failed for topic "${topicTitle}": ${errorMsg} — Will use SVG fallback.`);
                     }
                   }
-                } catch {
-                  // Fall back to generated SVG scene below if raster image generation fails.
+                } catch (imgErr) {
+                  const errorMsg = imgErr instanceof Error ? imgErr.message : String(imgErr);
+                  addLog(`Visual Design Agent: ⚠️ Flux 2 exception for "${topicTitle}": ${errorMsg} — Generating SVG fallback...`);
                 }
 
                 try {
@@ -1532,9 +1538,10 @@ OUTPUT FORMAT — ABSOLUTE:
           const updatedVisual = { ...visParsed, generatedSvgs: svgs };
           const updatedVisualStr = JSON.stringify(updatedVisual);
           setRawOutputs((prev) => ({ ...prev, visual: updatedVisualStr }));
-          addLog(`Visual Design Agent: ${svgs.filter(Boolean).length} SVG infographics generated.`);
+          const svgCount = svgs.filter(Boolean).length;
+          addLog(`Visual Design Agent: ✓ Image generation complete — ${svgCount} SVG infographics generated (via Claude), raster images via BFL Flux 2.`);
         } catch (svgErr) {
-          addLog("Visual Design Agent: SVG generation skipped (parse error).");
+          addLog("Visual Design Agent: ⚠️ SVG generation skipped (parse error in visual data).");
         }
       } else {
         setStatus("visual", "idle");
