@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
 import { convertPngToJpeg, isPngImage } from "@/lib/imageConverter";
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
-import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, type TopicNarrative } from "@/lib/visualNarrativeService";
+import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, trimNarrationToDuration, DEFAULT_MAX_NARRATION_SECONDS, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { exportNarrativeToPDF, downloadPDF } from "@/lib/pdfExportService";
 import { logApiUsage } from "@/lib/edgeFunctions";
