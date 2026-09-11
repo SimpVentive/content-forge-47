@@ -1213,7 +1213,11 @@ OUTPUT FORMAT — ABSOLUTE:
                       sceneNumber: s.sceneNumber || 0,
                       title: s.title || "",
                       caption: s.caption || "",
-                      narration: s.narration || "",
+                      narration: trimNarrationToDuration(
+                        s.narration || "",
+                        maxNarrationSeconds,
+                        (params?.voiceoverPace as any) || "normal"
+                      ),
                       imagePrompt: s.imagePrompt || "",
                     })),
                     topicTitle,
