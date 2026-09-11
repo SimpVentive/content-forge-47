@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
 import { convertPngToJpeg, isPngImage } from "@/lib/imageConverter";
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
-import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, type TopicNarrative } from "@/lib/visualNarrativeService";
+import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, trimNarrationToDuration, DEFAULT_MAX_NARRATION_SECONDS, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { exportNarrativeToPDF, downloadPDF } from "@/lib/pdfExportService";
 import { logApiUsage } from "@/lib/edgeFunctions";
@@ -1185,6 +1185,7 @@ OUTPUT FORMAT — ABSOLUTE:
               addLog(`Visual Narrative Agent: Creating ${sceneCount}-scene narrative for "${topicTitle}"...`);
 
               const narrationLanguage = params?.flipbookNarrationLanguage || params?.narratorLanguage || "English";
+              const maxNarrationSeconds = (params as any)?.maxSceneNarrationSeconds || DEFAULT_MAX_NARRATION_SECONDS;
               const narrativePrompt = buildNarrativeScenePrompt(
                 topicTitle,
                 objective,
@@ -1192,7 +1193,8 @@ OUTPUT FORMAT — ABSOLUTE:
                 sceneCount,
                 params?.level || "intermediate",
                 params?.flipbookVoiceoverEnabled || false,
-                params?.voiceoverPace || "normal"
+                params?.voiceoverPace || "normal",
+                maxNarrationSeconds
               );
 
               const narrativeResult = await runAgentWithLanguage(
@@ -1211,7 +1213,11 @@ OUTPUT FORMAT — ABSOLUTE:
                       sceneNumber: s.sceneNumber || 0,
                       title: s.title || "",
                       caption: s.caption || "",
-                      narration: s.narration || "",
+                      narration: trimNarrationToDuration(
+                        s.narration || "",
+                        maxNarrationSeconds,
+                        (params?.voiceoverPace as any) || "normal"
+                      ),
                       imagePrompt: s.imagePrompt || "",
                     })),
                     topicTitle,
