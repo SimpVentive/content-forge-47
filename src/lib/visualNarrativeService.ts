@@ -27,6 +27,42 @@ export interface TopicNarrative {
  * Input: topic title, objective, and main content
  * Output: Array of scenes with captions and image prompts
  */
+export const WORDS_PER_SECOND_BY_PACE: Record<"slow" | "normal" | "fast", number> = {
+  slow: 1.6,
+  normal: 2.3,
+  fast: 2.9,
+};
+
+/** Max spoken seconds allowed per scene in image-based learning. */
+export const DEFAULT_MAX_NARRATION_SECONDS = 10;
+
+/** Word budget for a scene narration at a given pace and duration cap. */
+export function narrationWordBudget(
+  maxSeconds: number = DEFAULT_MAX_NARRATION_SECONDS,
+  pace: "slow" | "normal" | "fast" = "normal"
+): number {
+  return Math.max(8, Math.round(maxSeconds * WORDS_PER_SECOND_BY_PACE[pace]));
+}
+
+/**
+ * Hard-trim narration so it never exceeds the allowed spoken duration.
+ * Cuts at the last sentence boundary within budget when possible.
+ */
+export function trimNarrationToDuration(
+  narration: string,
+  maxSeconds: number = DEFAULT_MAX_NARRATION_SECONDS,
+  pace: "slow" | "normal" | "fast" = "normal"
+): string {
+  const budget = narrationWordBudget(maxSeconds, pace);
+  const words = (narration || "").trim().split(/\s+/).filter(Boolean);
+  if (words.length <= budget) return (narration || "").trim();
+
+  const clipped = words.slice(0, budget).join(" ");
+  const lastStop = Math.max(clipped.lastIndexOf("."), clipped.lastIndexOf("!"), clipped.lastIndexOf("?"));
+  if (lastStop > clipped.length * 0.5) return clipped.slice(0, lastStop + 1);
+  return clipped.replace(/[,;:\-–—]+$/, "") + ".";
+}
+
 export function buildNarrativeScenePrompt(
   topicTitle: string,
   topicObjective: string,
@@ -34,15 +70,19 @@ export function buildNarrativeScenePrompt(
   sceneCount: number,
   learningLevel: string,
   voiceoverEnabled: boolean = false,
-  voiceoverPace: "slow" | "normal" | "fast" = "normal"
+  voiceoverPace: "slow" | "normal" | "fast" = "normal",
+  maxNarrationSeconds: number = DEFAULT_MAX_NARRATION_SECONDS
 ): string {
+  const wordBudget = narrationWordBudget(maxNarrationSeconds, voiceoverPace);
   const narrationGuidance = voiceoverEnabled
-    ? `\n\nNARRATION REQUIREMENTS (for voiceover):
+    ? `\n\nNARRATION REQUIREMENTS (for voiceover) — STRICT LENGTH LIMIT:
 For each scene, provide a "narration" field with voiceover script.
-${voiceoverPace === "slow" ? "Pace: SLOW - Use short sentences (5-8 words max), include pauses for emphasis. Aim for ~80-100 words per minute." : ""}
-${voiceoverPace === "normal" ? "Pace: NORMAL - Conversational speed. Aim for ~120-140 words per minute." : ""}
-${voiceoverPace === "fast" ? "Pace: FAST - Energetic and concise. Aim for ~160-180 words per minute." : ""}
-The narration should complement but not simply repeat the caption. Include context, emphasis, or additional insight.`
+HARD LIMIT: each scene's narration must be spoken in ${maxNarrationSeconds} seconds or less — that is a MAXIMUM of ${wordBudget} words. Never exceed ${wordBudget} words in a single scene narration.
+Write 1-2 short, punchy sentences only. No preamble, no repetition of the caption, no filler.
+${voiceoverPace === "slow" ? "Pace: SLOW - very short sentences (5-8 words)." : ""}
+${voiceoverPace === "normal" ? "Pace: NORMAL - conversational speed." : ""}
+${voiceoverPace === "fast" ? "Pace: FAST - energetic and concise." : ""}
+This is IMAGE-BASED learning: the image carries the story, the voice only adds one crisp insight.`
     : "";
 
   return `You are a visual storyboarding expert creating a narrative sequence for corporate training.
