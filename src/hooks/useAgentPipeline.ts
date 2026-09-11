@@ -1185,6 +1185,7 @@ OUTPUT FORMAT — ABSOLUTE:
               addLog(`Visual Narrative Agent: Creating ${sceneCount}-scene narrative for "${topicTitle}"...`);
 
               const narrationLanguage = params?.flipbookNarrationLanguage || params?.narratorLanguage || "English";
+              const maxNarrationSeconds = (params as any)?.maxSceneNarrationSeconds || DEFAULT_MAX_NARRATION_SECONDS;
               const narrativePrompt = buildNarrativeScenePrompt(
                 topicTitle,
                 objective,
@@ -1192,7 +1193,8 @@ OUTPUT FORMAT — ABSOLUTE:
                 sceneCount,
                 params?.level || "intermediate",
                 params?.flipbookVoiceoverEnabled || false,
-                params?.voiceoverPace || "normal"
+                params?.voiceoverPace || "normal",
+                maxNarrationSeconds
               );
 
               const narrativeResult = await runAgentWithLanguage(
