@@ -948,6 +948,16 @@ export function generateFlipbookHTML(
       text-align: left;
     }
 
+    .page textarea,
+    .page input,
+    .page select {
+      pointer-events: auto !important;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      touch-action: auto !important;
+      cursor: text;
+    }
+
     .reflection-input:focus {
       outline: none;
       border-color: #667eea;
