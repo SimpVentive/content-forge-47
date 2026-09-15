@@ -948,6 +948,16 @@ export function generateFlipbookHTML(
       text-align: left;
     }
 
+    .page textarea,
+    .page input,
+    .page select {
+      pointer-events: auto !important;
+      user-select: text !important;
+      -webkit-user-select: text !important;
+      touch-action: auto !important;
+      cursor: text;
+    }
+
     .reflection-input:focus {
       outline: none;
       border-color: #667eea;
@@ -1366,6 +1376,29 @@ export function generateFlipbookHTML(
         saveReflectionResponses();
       }
     });
+
+    // Let learners type: stop the page-flip engine from swallowing clicks/typing in form fields
+    function isFormField(el) {
+      if (!el || !el.tagName) return false;
+      var tag = el.tagName.toLowerCase();
+      return tag === 'textarea' || tag === 'input' || tag === 'select' || el.isContentEditable;
+    }
+
+    ['mousedown', 'mouseup', 'click', 'touchstart', 'touchend', 'pointerdown', 'pointerup'].forEach(function (evt) {
+      document.addEventListener(evt, function (e) {
+        if (isFormField(e.target)) {
+          e.stopPropagation();
+          if (evt === 'mousedown' || evt === 'pointerdown') {
+            try { e.target.focus(); } catch (err) {}
+          }
+        }
+      }, true);
+    });
+
+    // Keep arrow keys from flipping pages while typing
+    document.addEventListener('keydown', function (e) {
+      if (isFormField(e.target)) e.stopPropagation();
+    }, true);
   </script>
   <script>
     var pageFlip = null;
