@@ -1,6 +1,15 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const API_KEY = Deno.env.get("HEYGEN_API_KEY_ACTIVE") ?? Deno.env.get("HEYGEN_API_KEY") ?? "";
+const LIVEAVATAR_KEY = Deno.env.get("LIVEAVATAR_API_KEY") ?? "";
+const API_KEY =
+  Deno.env.get("HEYGEN_API_KEY_ACTIVE") ?? Deno.env.get("HEYGEN_API_KEY") ?? LIVEAVATAR_KEY;
+
+// LiveAvatar authenticates with X-API-KEY; HeyGen uses X-Api-Key.
+const authHeaders = (): Record<string, string> => {
+  const h: Record<string, string> = { "X-Api-Key": API_KEY };
+  if (LIVEAVATAR_KEY) h["X-API-KEY"] = LIVEAVATAR_KEY;
+  return h;
+};
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -24,7 +33,7 @@ Deno.serve(async (req) => {
       if (!videoId) return json({ error: "videoId is required" }, 400);
       const res = await fetch(
         `https://api.heygen.com/v1/video_status.get?video_id=${encodeURIComponent(videoId)}`,
-        { headers: { "X-Api-Key": API_KEY } }
+        { headers: authHeaders() }
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -44,7 +53,7 @@ Deno.serve(async (req) => {
 
     const res = await fetch("https://api.heygen.com/v2/video/generate", {
       method: "POST",
-      headers: { "X-Api-Key": API_KEY, "Content-Type": "application/json" },
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const data = await res.json().catch(() => ({}));
