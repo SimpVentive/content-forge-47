@@ -770,6 +770,65 @@ export function useAgentPipeline() {
     }
   };
 
+  /**
+   * Extract SVG diagrams and visual assets for a module to include in video as whiteboard overlays
+   */
+  const extractVisualAssetsForModule = (visualOutput: string, moduleTitle: string, totalDurationSeconds: number) => {
+    const diagrams: Array<{ svgContent: string; startSeconds: number; durationSeconds: number }> = [];
+
+    if (!visualOutput) return diagrams;
+
+    try {
+      const visParsed = JSON.parse(visualOutput);
+      const modules = visParsed.modules || [];
+
+      // Find the matching module
+      const moduleData = modules.find((m: any) =>
+        (m.module_title || m.title || "").toLowerCase().includes(moduleTitle.toLowerCase()) ||
+        moduleTitle.toLowerCase().includes((m.module_title || m.title || "").toLowerCase())
+      );
+
+      if (!moduleData) return diagrams;
+
+      // Extract module-level infographic
+      const infographicSvg = moduleData.infographic_svg || moduleData.generated_infographic_svg;
+      if (infographicSvg && infographicSvg.toLowerCase().startsWith("<svg")) {
+        // Show module infographic in first 1/3 of video
+        const startTime = Math.floor(totalDurationSeconds / 6);
+        const durationTime = Math.floor(totalDurationSeconds / 3);
+        diagrams.push({
+          svgContent: infographicSvg,
+          startSeconds: startTime,
+          durationSeconds: durationTime,
+        });
+      }
+
+      // Extract topic-level SVG visuals (if any)
+      const topicVisuals = moduleData.topic_visuals || [];
+      const topicCount = topicVisuals.length;
+      if (topicCount > 0) {
+        // Distribute topic visuals throughout the video
+        topicVisuals.forEach((topic: any, index: number) => {
+          const sceneSvg = topic.generated_scene_svg || topic.scene_svg;
+          if (sceneSvg && sceneSvg.toLowerCase().startsWith("<svg")) {
+            // Distribute visuals evenly throughout video
+            const startTime = Math.floor((totalDurationSeconds * (index + 1)) / (topicCount + 1));
+            const durationTime = Math.floor(totalDurationSeconds / (topicCount * 2));
+            diagrams.push({
+              svgContent: sceneSvg,
+              startSeconds: Math.max(0, startTime - durationTime / 2),
+              durationSeconds: durationTime,
+            });
+          }
+        });
+      }
+    } catch (err) {
+      console.warn("[Video Generation] Failed to extract visual assets:", err);
+    }
+
+    return diagrams;
+  };
+
   const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentTypes?: ("mcq" | "match-the-following" | "true-false" | "scenario" | "fill-blanks")[]; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3 | 4 | 5; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; avatarTrainerId?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
     cancelledRef.current = false;
     setIsRunning(true);
@@ -1836,13 +1895,29 @@ OUTPUT FORMAT — ABSOLUTE:
             const script = extractModuleScript(voiceParsed, writerResult, moduleTitle, i);
 
             addLog(`HeyGen Video Agent: Generating "${moduleTitle}" (${i + 1}/${modules.length})...`);
+
+            // Extract visual assets for this module
+            const cleanScript = stripVideoMarkers(script);
+            const scriptDurationSeconds = Math.ceil((cleanScript.split(/\s+/).length / 150) * 60); // ~150 words/min
+
+            // Get SVG diagrams from visual output to add as overlays
+            const visualAssets = extractVisualAssetsForModule(visualResult, moduleTitle, scriptDurationSeconds);
+
+            if (visualAssets.length > 0) {
+              addLog(`HeyGen Video Agent: ✓ Adding ${visualAssets.length} visual overlay(s) to "${moduleTitle}"`);
+            }
+
             const pending = await generateHeyGenVideo({
               avatarId,
-              script: stripVideoMarkers(script),
+              script: cleanScript,
               voiceId,
               backgroundStyle: (videoSettings?.backgroundStyle || heygenConfig.defaultBackground || "office") as any,
               quality: (videoSettings?.videoQuality || heygenConfig.defaultVideoQuality || "1080p") as any,
               videoTitle: moduleTitle,
+              whiteboard: visualAssets.length > 0 ? {
+                enabled: true,
+                diagrams: visualAssets,
+              } : undefined,
             });
 
             addLog(`HeyGen Video Agent: Polling completion for "${moduleTitle}"...`);
