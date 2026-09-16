@@ -37,11 +37,12 @@ const avatarMap: Record<string, string> = {
   josh: "Aditya_public_1",
 };
 
-const dimensionMap: Record<string, { width: number; height: number }> = {
-  "720p": { width: 1280, height: 720 },
-  "1080p": { width: 1920, height: 1080 },
-  "4k": { width: 3840, height: 2160 },
+const resolutionMap: Record<string, string> = {
+  "720p": "720p",
+  "1080p": "1080p",
+  "4k": "1080p", // v3 caps avatar renders at 1080p
 };
+
 
 const backgroundMap: Record<string, string> = {
   simple: "#f5f5f5",
