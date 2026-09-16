@@ -1807,18 +1807,19 @@ OUTPUT FORMAT — ABSOLUTE:
         addLog("HeyGen Video Agent: Starting video generation...");
         try {
           const heygenConfig = JSON.parse(localStorage.getItem("heygenSettings") || "{}");
-          if (!heygenConfig?.apiKey) {
-            throw new Error("HeyGen API not configured. Contact admin.");
-          }
 
           // Parse modules from architect output
           const archParsed = tryParseJson(archResult) || {};
           const modules: any[] = archParsed.modules || archParsed.course_modules || [];
+          if (modules.length === 0) {
+            throw new Error("No modules available to render videos from.");
+          }
 
+          // HeyGen public voice IDs (not avatar IDs)
           const voiceIdMap: Record<string, string> = {
-            rachel: "Rachel_public_3_20240108",
-            josh: "josh_lite3_20230714",
-            anna: "Daisy-inskirt-20220818",
+            rachel: "44c2584dd48f46b7bce9b66c8bf086e0",
+            anna: "405f88d3faf2485e97ba8460b7b62efd",
+            josh: "31c61db6d4894da3af7ed2784507448e",
           };
           // Course Setup instructor IDs → closest HeyGen public avatar.
           const TRAINER_TO_HEYGEN: Record<string, "rachel" | "josh" | "anna"> = {

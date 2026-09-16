@@ -1,10 +1,10 @@
 /**
  * HeyGen Video Generation Service
- * Handles avatar video creation with customization options
+ * All calls go through the `heygen-video` edge function (the browser cannot
+ * call api.heygen.com directly: CORS + the API key must stay server-side).
  */
 
-const HEYGEN_API_URL = "https://api.heygen.com/v1";
-const HEYGEN_API_KEY = import.meta.env.VITE_HEYGEN_API_KEY;
+import { supabase } from "@/integrations/supabase/client";
 
 export interface HeyGenVideoParams {
   avatarId: "rachel" | "josh" | "anna" | string;
@@ -32,43 +32,52 @@ export interface GeneratedVideo {
 }
 
 const avatarMap: Record<string, string> = {
-  rachel: "Rachel_public_3_20240108",
-  josh: "josh_lite3_20230714",
-  anna: "Daisy-inskirt-20220818",
+  rachel: "Anna_public_3_20240108",
+  anna: "Anna_public_20240108",
+  josh: "Aditya_public_1",
 };
 
-const qualityMap: Record<string, string> = {
-  "720p": "low",
-  "1080p": "medium",
-  "4k": "high",
+const dimensionMap: Record<string, { width: number; height: number }> = {
+  "720p": { width: 1280, height: 720 },
+  "1080p": { width: 1920, height: 1080 },
+  "4k": { width: 3840, height: 2160 },
 };
 
 const backgroundMap: Record<string, string> = {
-  simple: "simple_white",
-  office: "office",
-  classroom: "classroom",
+  simple: "#f5f5f5",
+  office: "#e8eef7",
+  classroom: "#eef7ee",
 };
 
-/**
- * Estimate script duration in seconds (rough estimate: ~150 words per minute)
- */
+const DEFAULT_VOICE_ID = "44c2584dd48f46b7bce9b66c8bf086e0";
+
 function estimateScriptDuration(script: string): number {
-  const wordCount = script.split(/\s+/).length;
-  const minutes = wordCount / 150;
-  return Math.ceil(minutes * 60);
+  const wordCount = script.trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(5, Math.ceil((wordCount / 150) * 60));
+}
+
+async function callFunction<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke("heygen-video", { body });
+  if (error) {
+    // Surface the function's own error message when available
+    const detail = (data as any)?.error;
+    throw new Error(detail || error.message || "HeyGen request failed");
+  }
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as T;
 }
 
 /**
- * Generate video via HeyGen API
+ * Generate video via HeyGen (through the edge function)
  */
 export async function generateHeyGenVideo(params: HeyGenVideoParams): Promise<GeneratedVideo> {
-  if (!HEYGEN_API_KEY) {
-    throw new Error("HEYGEN_API_KEY not configured");
-  }
+  const script = (params.script || "").trim();
+  if (!script) throw new Error("Empty narration script — nothing to render");
 
   const avatarId = avatarMap[params.avatarId] || params.avatarId;
+  const dims = dimensionMap[params.quality] || dimensionMap["1080p"];
 
-  const heygenPayload = {
+  const payload = {
     video_inputs: [
       {
         character: {
@@ -77,139 +86,68 @@ export async function generateHeyGenVideo(params: HeyGenVideoParams): Promise<Ge
           avatar_style: "normal",
         },
         voice: {
-          type: "text_to_speech",
-          input_text: params.script,
-          voice_id: params.voiceId,
+          type: "text",
+          input_text: script.slice(0, 4500),
+          voice_id: params.voiceId || DEFAULT_VOICE_ID,
           speed: 1.0,
         },
         background: {
-          type: backgroundMap[params.backgroundStyle] || "office",
+          type: "color",
+          value: backgroundMap[params.backgroundStyle] || backgroundMap.office,
         },
       },
     ],
-    quality: qualityMap[params.quality] || "medium",
-    output_format: "mp4",
+    dimension: dims,
+    title: params.videoTitle?.slice(0, 100) || "Course video",
   };
 
-  // Add whiteboard overlays if present
-  if (params.whiteboard?.enabled && params.whiteboard.diagrams.length > 0) {
-    (heygenPayload as any).visual_layers = params.whiteboard.diagrams.map((diagram, index) => ({
-      type: "svg_overlay",
-      svg_data: diagram.svgContent,
-      start_time: diagram.startSeconds,
-      duration: diagram.durationSeconds,
-      position: "right",
-      opacity: 0.95,
-    }));
-  }
+  const { videoId } = await callFunction<{ videoId: string }>({ action: "generate", payload });
 
-  try {
-    const response = await fetch(`${HEYGEN_API_URL}/video_generate`, {
-      method: "POST",
-      headers: {
-        "X-HEYGEN-API-KEY": HEYGEN_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(heygenPayload),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(`HeyGen API error: ${error.error?.message || response.statusText}`);
-    }
-
-    const data = (await response.json()) as any;
-    const videoId = data.data?.video_id || data.video_id;
-
-    if (!videoId) {
-      throw new Error("No video_id in HeyGen response");
-    }
-
-    return {
-      videoId,
-      videoUrl: "", // Will be filled after polling
-      title: params.videoTitle,
-      duration: estimateScriptDuration(params.script),
-      status: "pending",
-    };
-  } catch (error) {
-    console.error("HeyGen video generation failed:", error);
-    throw error;
-  }
+  return {
+    videoId,
+    videoUrl: "",
+    title: params.videoTitle,
+    duration: estimateScriptDuration(script),
+    status: "pending",
+  };
 }
 
 /**
- * Poll HeyGen API for video completion
+ * Poll for video completion
  */
 export async function pollForVideoCompletion(
   videoId: string,
   maxAttempts = 120,
   pollIntervalMs = 5000
 ): Promise<string> {
-  if (!HEYGEN_API_KEY) {
-    throw new Error("HEYGEN_API_KEY not configured");
-  }
-
+  let lastError = "";
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const response = await fetch(`${HEYGEN_API_URL}/video/${videoId}`, {
-        headers: {
-          "X-HEYGEN-API-KEY": HEYGEN_API_KEY,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HeyGen API error: ${response.statusText}`);
+      const res = await getVideoStatus(videoId);
+      if (res.status === "completed" && res.url) return res.url;
+      if (res.status === "failed") {
+        throw new Error(`HeyGen video generation failed: ${res.error || "Unknown error"}`);
       }
-
-      const data = (await response.json()) as any;
-      const status = data.data?.status || data.status;
-
-      if (status === "completed") {
-        return data.data?.download_url || data.download_url;
-      }
-
-      if (status === "failed") {
-        throw new Error(`HeyGen video generation failed: ${data.data?.error || "Unknown error"}`);
-      }
-
-      // Wait before next poll
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
     } catch (error) {
-      console.error(`Poll attempt ${attempt + 1} failed:`, error);
-      if (attempt === maxAttempts - 1) {
-        throw new Error("Video generation polling timeout");
-      }
-      await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+      lastError = error instanceof Error ? error.message : String(error);
+      if (lastError.startsWith("HeyGen video generation failed")) throw error;
+      console.error(`Poll attempt ${attempt + 1} failed:`, lastError);
     }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   }
-
-  throw new Error("Video generation timeout after polling");
+  throw new Error(`Video generation timed out${lastError ? ` (${lastError})` : ""}`);
 }
 
 /**
  * Get video status without waiting
  */
-export async function getVideoStatus(videoId: string): Promise<{ status: string; url?: string }> {
-  if (!HEYGEN_API_KEY) {
-    throw new Error("HEYGEN_API_KEY not configured");
-  }
-
-  const response = await fetch(`${HEYGEN_API_URL}/video/${videoId}`, {
-    headers: {
-      "X-HEYGEN-API-KEY": HEYGEN_API_KEY,
-    },
+export async function getVideoStatus(
+  videoId: string
+): Promise<{ status: string; url?: string | null; error?: string | null }> {
+  return await callFunction<{ status: string; url?: string | null; error?: string | null }>({
+    action: "status",
+    videoId,
   });
-
-  if (!response.ok) {
-    throw new Error(`Failed to get video status: ${response.statusText}`);
-  }
-
-  const data = (await response.json()) as any;
-  return {
-    status: data.data?.status || data.status,
-    url: data.data?.download_url || data.download_url,
-  };
 }
 
 /**
