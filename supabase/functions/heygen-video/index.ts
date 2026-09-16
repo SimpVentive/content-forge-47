@@ -1,6 +1,7 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const LIVEAVATAR_KEY = Deno.env.get("LIVEAVATAR_API_KEY") ?? "";
+const LIVEAVATAR_KEY =
+  Deno.env.get("LIVEAVATAR_API_KEY_NEW") ?? Deno.env.get("LIVEAVATAR_API_KEY") ?? "";
 const API_KEY =
   Deno.env.get("HEYGEN_API_KEY_ACTIVE") ?? Deno.env.get("HEYGEN_API_KEY") ?? LIVEAVATAR_KEY;
 
