@@ -76,33 +76,24 @@ export async function generateHeyGenVideo(params: HeyGenVideoParams): Promise<Ge
   if (!script) throw new Error("Empty narration script — nothing to render");
 
   const avatarId = avatarMap[params.avatarId] || params.avatarId;
-  const dims = dimensionMap[params.quality] || dimensionMap["1080p"];
+  const resolution = resolutionMap[params.quality] || "1080p";
 
   const payload = {
-    video_inputs: [
-      {
-        character: {
-          type: "avatar",
-          avatar_id: avatarId,
-          avatar_style: "normal",
-        },
-        voice: {
-          type: "text",
-          input_text: script.slice(0, 4500),
-          voice_id: params.voiceId || DEFAULT_VOICE_ID,
-          speed: 1.0,
-        },
-        background: {
-          type: "color",
-          value: backgroundMap[params.backgroundStyle] || backgroundMap.office,
-        },
-      },
-    ],
-    dimension: dims,
+    type: "avatar",
     title: params.videoTitle?.slice(0, 100) || "Course video",
+    avatar_id: avatarId,
+    script: script.slice(0, 4500),
+    voice_id: params.voiceId || DEFAULT_VOICE_ID,
+    aspect_ratio: "16:9",
+    resolution,
+    background: {
+      type: "color",
+      value: backgroundMap[params.backgroundStyle] || backgroundMap.office,
+    },
   };
 
   const { videoId } = await callFunction<{ videoId: string }>({ action: "generate", payload });
+
 
   return {
     videoId,
