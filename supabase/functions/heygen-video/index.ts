@@ -1,6 +1,6 @@
 import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
-const API_KEY = Deno.env.get("HEYGEN_API_KEY") ?? "";
+const API_KEY = Deno.env.get("HEYGEN_API_KEY_ACTIVE") ?? Deno.env.get("HEYGEN_API_KEY") ?? "";
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
