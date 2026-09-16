@@ -1817,9 +1817,9 @@ OUTPUT FORMAT — ABSOLUTE:
 
           // HeyGen public voice IDs (not avatar IDs)
           const voiceIdMap: Record<string, string> = {
-            rachel: "1bd001e7e50f421d891986aad5158bc8",
-            anna: "1bd001e7e50f421d891986aad5158bc8",
-            josh: "d7bbcdd6964c47bdaae26decade4a933",
+            rachel: "44c2584dd48f46b7bce9b66c8bf086e0",
+            anna: "405f88d3faf2485e97ba8460b7b62efd",
+            josh: "31c61db6d4894da3af7ed2784507448e",
           };
           // Course Setup instructor IDs → closest HeyGen public avatar.
           const TRAINER_TO_HEYGEN: Record<string, "rachel" | "josh" | "anna"> = {

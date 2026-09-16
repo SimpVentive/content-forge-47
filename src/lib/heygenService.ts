@@ -32,9 +32,9 @@ export interface GeneratedVideo {
 }
 
 const avatarMap: Record<string, string> = {
-  rachel: "Rachel_public_3_20240108",
-  josh: "josh_lite3_20230714",
-  anna: "Daisy-inskirt-20220818",
+  rachel: "Anna_public_3_20240108",
+  anna: "Anna_public_20240108",
+  josh: "Aditya_public_1",
 };
 
 const dimensionMap: Record<string, { width: number; height: number }> = {
@@ -49,7 +49,7 @@ const backgroundMap: Record<string, string> = {
   classroom: "#eef7ee",
 };
 
-const DEFAULT_VOICE_ID = "1bd001e7e50f421d891986aad5158bc8";
+const DEFAULT_VOICE_ID = "44c2584dd48f46b7bce9b66c8bf086e0";
 
 function estimateScriptDuration(script: string): number {
   const wordCount = script.trim().split(/\s+/).filter(Boolean).length;
