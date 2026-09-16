@@ -37,11 +37,12 @@ const avatarMap: Record<string, string> = {
   josh: "Aditya_public_1",
 };
 
-const dimensionMap: Record<string, { width: number; height: number }> = {
-  "720p": { width: 1280, height: 720 },
-  "1080p": { width: 1920, height: 1080 },
-  "4k": { width: 3840, height: 2160 },
+const resolutionMap: Record<string, string> = {
+  "720p": "720p",
+  "1080p": "1080p",
+  "4k": "1080p", // v3 caps avatar renders at 1080p
 };
+
 
 const backgroundMap: Record<string, string> = {
   simple: "#f5f5f5",
@@ -75,33 +76,24 @@ export async function generateHeyGenVideo(params: HeyGenVideoParams): Promise<Ge
   if (!script) throw new Error("Empty narration script — nothing to render");
 
   const avatarId = avatarMap[params.avatarId] || params.avatarId;
-  const dims = dimensionMap[params.quality] || dimensionMap["1080p"];
+  const resolution = resolutionMap[params.quality] || "1080p";
 
   const payload = {
-    video_inputs: [
-      {
-        character: {
-          type: "avatar",
-          avatar_id: avatarId,
-          avatar_style: "normal",
-        },
-        voice: {
-          type: "text",
-          input_text: script.slice(0, 4500),
-          voice_id: params.voiceId || DEFAULT_VOICE_ID,
-          speed: 1.0,
-        },
-        background: {
-          type: "color",
-          value: backgroundMap[params.backgroundStyle] || backgroundMap.office,
-        },
-      },
-    ],
-    dimension: dims,
+    type: "avatar",
     title: params.videoTitle?.slice(0, 100) || "Course video",
+    avatar_id: avatarId,
+    script: script.slice(0, 4500),
+    voice_id: params.voiceId || DEFAULT_VOICE_ID,
+    aspect_ratio: "16:9",
+    resolution,
+    background: {
+      type: "color",
+      value: backgroundMap[params.backgroundStyle] || backgroundMap.office,
+    },
   };
 
   const { videoId } = await callFunction<{ videoId: string }>({ action: "generate", payload });
+
 
   return {
     videoId,
@@ -124,10 +116,14 @@ export async function pollForVideoCompletion(
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const res = await getVideoStatus(videoId);
-      if (res.status === "completed" && res.url) return res.url;
-      if (res.status === "failed") {
+      const status = (res.status || "").toLowerCase();
+      if (["completed", "complete", "success", "succeeded", "ready", "done"].includes(status) && res.url) {
+        return res.url;
+      }
+      if (["failed", "error", "cancelled", "canceled"].includes(status)) {
         throw new Error(`HeyGen video generation failed: ${res.error || "Unknown error"}`);
       }
+
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
       if (lastError.startsWith("HeyGen video generation failed")) throw error;
