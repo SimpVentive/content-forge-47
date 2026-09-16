@@ -116,10 +116,14 @@ export async function pollForVideoCompletion(
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       const res = await getVideoStatus(videoId);
-      if (res.status === "completed" && res.url) return res.url;
-      if (res.status === "failed") {
+      const status = (res.status || "").toLowerCase();
+      if (["completed", "complete", "success", "succeeded", "ready", "done"].includes(status) && res.url) {
+        return res.url;
+      }
+      if (["failed", "error", "cancelled", "canceled"].includes(status)) {
         throw new Error(`HeyGen video generation failed: ${res.error || "Unknown error"}`);
       }
+
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
       if (lastError.startsWith("HeyGen video generation failed")) throw error;
