@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
 import { convertPngToJpeg, isPngImage } from "@/lib/imageConverter";
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
-import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, type TopicNarrative } from "@/lib/visualNarrativeService";
+import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, trimNarrationToDuration, DEFAULT_MAX_NARRATION_SECONDS, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { exportNarrativeToPDF, downloadPDF } from "@/lib/pdfExportService";
 import { logApiUsage } from "@/lib/edgeFunctions";
@@ -1244,6 +1244,7 @@ OUTPUT FORMAT — ABSOLUTE:
               addLog(`Visual Narrative Agent: Creating ${sceneCount}-scene narrative for "${topicTitle}"...`);
 
               const narrationLanguage = params?.flipbookNarrationLanguage || params?.narratorLanguage || "English";
+              const maxNarrationSeconds = (params as any)?.maxSceneNarrationSeconds || DEFAULT_MAX_NARRATION_SECONDS;
               const narrativePrompt = buildNarrativeScenePrompt(
                 topicTitle,
                 objective,
@@ -1251,7 +1252,8 @@ OUTPUT FORMAT — ABSOLUTE:
                 sceneCount,
                 params?.level || "intermediate",
                 params?.flipbookVoiceoverEnabled || false,
-                params?.voiceoverPace || "normal"
+                params?.voiceoverPace || "normal",
+                maxNarrationSeconds
               );
 
               const narrativeResult = await runAgentWithLanguage(
@@ -1270,7 +1272,11 @@ OUTPUT FORMAT — ABSOLUTE:
                       sceneNumber: s.sceneNumber || 0,
                       title: s.title || "",
                       caption: s.caption || "",
-                      narration: s.narration || "",
+                      narration: trimNarrationToDuration(
+                        s.narration || "",
+                        maxNarrationSeconds,
+                        (params?.voiceoverPace as any) || "normal"
+                      ),
                       imagePrompt: s.imagePrompt || "",
                     })),
                     topicTitle,
@@ -1860,18 +1866,19 @@ OUTPUT FORMAT — ABSOLUTE:
         addLog("HeyGen Video Agent: Starting video generation...");
         try {
           const heygenConfig = JSON.parse(localStorage.getItem("heygenSettings") || "{}");
-          if (!heygenConfig?.apiKey) {
-            throw new Error("HeyGen API not configured. Contact admin.");
-          }
 
           // Parse modules from architect output
           const archParsed = tryParseJson(archResult) || {};
           const modules: any[] = archParsed.modules || archParsed.course_modules || [];
+          if (modules.length === 0) {
+            throw new Error("No modules available to render videos from.");
+          }
 
+          // HeyGen public voice IDs (not avatar IDs)
           const voiceIdMap: Record<string, string> = {
-            rachel: "Rachel_public_3_20240108",
-            josh: "josh_lite3_20230714",
-            anna: "Daisy-inskirt-20220818",
+            rachel: "44c2584dd48f46b7bce9b66c8bf086e0",
+            anna: "405f88d3faf2485e97ba8460b7b62efd",
+            josh: "31c61db6d4894da3af7ed2784507448e",
           };
           // Course Setup instructor IDs → closest HeyGen public avatar.
           const TRAINER_TO_HEYGEN: Record<string, "rachel" | "josh" | "anna"> = {
