@@ -1907,11 +1907,11 @@ OUTPUT FORMAT — ABSOLUTE:
             const cleanScript = stripVideoMarkers(script);
             const scriptDurationSeconds = Math.ceil((cleanScript.split(/\s+/).length / 150) * 60); // ~150 words/min
 
-            // Get SVG diagrams from visual output to add as overlays
+            // Get SVG diagrams from visual output to display alongside video
             const visualAssets = extractVisualAssetsForModule(visualResult, moduleTitle, scriptDurationSeconds);
 
             if (visualAssets.length > 0) {
-              addLog(`HeyGen Video Agent: ✓ Adding ${visualAssets.length} visual overlay(s) to "${moduleTitle}"`);
+              addLog(`HeyGen Video Agent: ✓ Prepared ${visualAssets.length} visual diagram(s) to display alongside "${moduleTitle}"`);
             }
 
             const pending = await generateHeyGenVideo({
@@ -1921,10 +1921,7 @@ OUTPUT FORMAT — ABSOLUTE:
               backgroundStyle: (videoSettings?.backgroundStyle || heygenConfig.defaultBackground || "office") as any,
               quality: (videoSettings?.videoQuality || heygenConfig.defaultVideoQuality || "1080p") as any,
               videoTitle: moduleTitle,
-              whiteboard: visualAssets.length > 0 ? {
-                enabled: true,
-                diagrams: visualAssets,
-              } : undefined,
+              visualOverlays: visualAssets,
             });
 
             addLog(`HeyGen Video Agent: Polling completion for "${moduleTitle}"...`);

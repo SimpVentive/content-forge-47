@@ -12,15 +12,14 @@ export interface HeyGenVideoParams {
   voiceId: string;
   backgroundStyle: "simple" | "office" | "classroom";
   quality: "720p" | "1080p" | "4k";
-  whiteboard?: {
-    enabled: boolean;
-    diagrams: Array<{
-      svgContent: string;
-      startSeconds: number;
-      durationSeconds: number;
-    }>;
-  };
   videoTitle: string;
+  visualOverlays?: VisualOverlay[];
+}
+
+export interface VisualOverlay {
+  svgContent: string;
+  startSeconds: number;
+  durationSeconds: number;
 }
 
 export interface GeneratedVideo {
@@ -29,6 +28,7 @@ export interface GeneratedVideo {
   title: string;
   duration: number;
   status: "pending" | "processing" | "ready" | "failed";
+  visualOverlays?: VisualOverlay[];
 }
 
 const avatarMap: Record<string, string> = {
@@ -94,13 +94,13 @@ export async function generateHeyGenVideo(params: HeyGenVideoParams): Promise<Ge
 
   const { videoId } = await callFunction<{ videoId: string }>({ action: "generate", payload });
 
-
   return {
     videoId,
     videoUrl: "",
     title: params.videoTitle,
     duration: estimateScriptDuration(script),
     status: "pending",
+    visualOverlays: params.visualOverlays || [],
   };
 }
 

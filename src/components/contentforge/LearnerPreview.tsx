@@ -7,6 +7,7 @@ import { VideoTimelinePlacer } from "./VideoTimelinePlacer";
 import { FLIP_STYLES, HIGHLIGHT_PALETTES, PreviewActionBar, type FlipStyle, type HighlightPalette } from "./PreviewActionBar";
 import { AvatarNarrator } from "./AvatarNarrator";
 import { NarrativeFlipbook } from "./NarrativeFlipbook";
+import { VideoWithVisuals, type VisualOverlay } from "./VideoWithVisuals";
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
@@ -266,6 +267,12 @@ interface Slide {
   question?: { question: string; options: string[]; correct_answer: string; rationale?: string };
   takeaways?: string[];
   video?: InsertedVideo;
+  heygenVideo?: {
+    videoUrl: string;
+    duration: number;
+    visualOverlays: VisualOverlay[];
+    title: string;
+  };
 }
 
 function getDurationMinutes(duration?: string): number {
@@ -3277,6 +3284,32 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         );
 
       case "video": {
+        // HeyGen video with visual overlays
+        if (slide.heygenVideo) {
+          const { videoUrl, duration, visualOverlays, title } = slide.heygenVideo;
+          if (!videoUrl) {
+            return (
+              <div className="max-w-4xl mx-auto" key={currentSlide}>
+                <div className="rounded-2xl bg-slate-100 p-12 text-center anim-fade-in-up">
+                  <div className="w-12 h-12 rounded-full border-2 border-blue-400 border-t-transparent animate-spin mx-auto mb-4" />
+                  <p className="text-slate-600">Generating video... This may take a few moments.</p>
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div className="max-w-6xl mx-auto" key={currentSlide}>
+              <VideoWithVisuals
+                videoUrl={videoUrl}
+                videoDurationSeconds={duration}
+                visualOverlays={visualOverlays}
+                title={title}
+              />
+            </div>
+          );
+        }
+
+        // YouTube video (user-inserted)
         const vid = slide.video;
         if (!vid) return null;
         const startSec = vid.startTime ? vid.startTime.split(":").reduce((a: number, b: string) => a * 60 + parseInt(b), 0) : 0;
