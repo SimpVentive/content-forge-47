@@ -626,6 +626,7 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
   const assessData = tryParseJSON(rawOutputs.assessment);
   const visualData = tryParseJSON(rawOutputs.visual);
   const narrativeScenesData = tryParseJSON(rawOutputs.narrativeScenes);
+  const heygenVideosData = tryParseJSON(rawOutputs.heygenVideos);
   const durationMinutes = getDurationMinutes(courseDuration);
 
   // Extract modules
@@ -892,7 +893,34 @@ function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[
       });
     }
 
-    // 3b. Insert video slides for this module (exact match module titles).
+    // 3b. Insert HeyGen video slides for this module
+    if (Array.isArray(heygenVideosData)) {
+      const modHeygenVideos = heygenVideosData.filter((vid: any) => {
+        const assignedModule = (vid.videoTitle || "").toLowerCase();
+        const currentModule = mod.title.toLowerCase();
+        // Match based on title similarity or exact match
+        return assignedModule.includes(currentModule) || currentModule.includes(assignedModule.split(" ")[0]);
+      });
+
+      modHeygenVideos.forEach((vid: any) => {
+        if (vid.videoUrl && vid.duration) {
+          slides.push({
+            type: "video",
+            moduleIndex: mi,
+            moduleTitle: mod.title,
+            topicTitle: vid.title || vid.videoTitle,
+            heygenVideo: {
+              videoUrl: vid.videoUrl,
+              duration: vid.duration,
+              visualOverlays: vid.visualOverlays || [],
+              title: vid.title || vid.videoTitle,
+            },
+          });
+        }
+      });
+    }
+
+    // 3c. Insert user-inserted video slides for this module (exact match module titles).
     // Videos with no assigned module are NOT automatically placed - they appear in a separate "unassigned" list.
     const modVideos = insertedVideos.filter(v => {
       const assigned = (v.moduleTitle || "").trim();
