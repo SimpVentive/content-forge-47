@@ -2772,6 +2772,21 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </div>
                   </div>
                 </div>
+                <div className="xl:sticky xl:top-6 xl:self-start">
+                  <AvatarNarrator
+                    topic={slide.topicTitle || slide.moduleTitle}
+                    moduleContent={narratorExcerpt}
+                    trainerName={trainerName}
+                    avatarImageUrl={avatarImageUrl}
+                    avatarVideoUrl={avatarVideoUrl}
+                    avatarPosterUrl={avatarPosterUrl}
+                    trainerId={selectedTrainer.id}
+                    isVoiceActive={isPlaying}
+                    isVoiceLoading={audioLoading}
+                    currentViseme={activeViseme}
+                    narratorLanguage={effectiveNarratorLanguage}
+                  />
+                </div>
               </div>
             </div>
           );
