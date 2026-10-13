@@ -2368,7 +2368,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const quickFact = getQuickFact(parts);
         const scenarioLead = parts.body[0] || parts.hook || narratorExcerpt;
         const scenarioSupport = parts.body[1] || parts.challenge || parts.takeaway || quickFact;
-        const summaryBullets = Array.from(new Set(chartSentenceEntries.map((entry) => entry.text))).slice(0, 4);
+        const normForDedupe = (t: string) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        const usedScenarioText = normForDedupe(`${scenarioLead || ""} ${scenarioSupport || ""}`);
+        const summaryBullets = Array.from(new Set(chartSentenceEntries.map((entry) => entry.text)))
+          .filter((text) => { const n = normForDedupe(text); return n.length > 0 && !usedScenarioText.includes(n); })
+          .slice(0, 4);
         const fallbackChartText = safeLearnerText(parts.hook)
           || safeLearnerText(narratorExcerpt)
           || (slide.topicTitle ? `This section covers ${slide.topicTitle}.` : "");
@@ -3169,11 +3173,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
         // Randomize option order each time this question loads (deterministic per question/slide)
         const optionsWithIndices = q.options.map((opt: string, idx: number) => ({ opt, originalIdx: idx }));
-        const seed = currentSlide + 12345; // Consistent seed per slide
-        const shuffledOptions = [...optionsWithIndices].sort(() => {
-          const hash = Math.sin(seed * (optionsWithIndices.indexOf(optionsWithIndices[0]) + 1)) * 10000;
-          return hash - Math.floor(hash);
-        });
+        const shuffledOptions = [...optionsWithIndices];
+        {
+          let h = 2166136261;
+          for (const ch of `${currentSlide}|${q.question || ""}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+          const rand = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; };
+          for (let i = shuffledOptions.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]]; }
+        }
 
         const getShuffledIndex = (originalIdx: number) => shuffledOptions.findIndex(item => item.originalIdx === originalIdx);
 
@@ -3204,15 +3210,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         String.fromCharCode(65 + originalIdx) === q.correct_answer ||
                         q.correct_answer?.includes(optClean);
                       if (isCorrect) style = "border-2 border-emerald-500 bg-emerald-50 shadow-md";
-                      else if (displayIdx === ans.selected) style = "border-2 border-red-400 bg-red-50";
-                    } else if (ans?.selected === displayIdx) {
+                      else if (originalIdx === ans.selected) style = "border-2 border-red-400 bg-red-50";
+                    } else if (ans?.selected === originalIdx) {
                       style = "border-2 border-blue-500 bg-blue-50 shadow-md";
                     }
 
                     return (
                       <button
                         key={displayIdx}
-                        onClick={() => !ans?.submitted && handleSelectAnswer(currentSlide, displayIdx)}
+                        onClick={() => !ans?.submitted && handleSelectAnswer(currentSlide, originalIdx)}
                         disabled={ans?.submitted}
                         className={`w-full px-6 py-4 rounded-lg text-left transition-all anim-fade-in-up ${style} ${ans?.submitted ? 'cursor-default' : 'cursor-pointer'}`}
                         style={{ animationDelay: `${0.1 + displayIdx * 0.08}s` }}
@@ -3224,8 +3230,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                               String.fromCharCode(65 + originalIdx) === q.correct_answer ||
                               q.correct_answer?.includes(optClean)
                             ) ? 'bg-emerald-500 text-white' :
-                            ans?.submitted && displayIdx === ans.selected ? 'bg-red-400 text-white' :
-                            ans?.selected === displayIdx ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
+                            ans?.submitted && originalIdx === ans.selected ? 'bg-red-400 text-white' :
+                            ans?.selected === originalIdx ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
                           }`}>
                             {String.fromCharCode(65 + displayIdx)}
                           </div>
@@ -3671,7 +3677,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               return (
                 <button
                   key={item.label}
-                  onClick={() => handleSidebarSelect(item.id)}
+                  onClick={() => { handleSidebarSelect(item.id); setTimeout(() => document.getElementById("cf-sidebar-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50); }}
                   type="button"
                   className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-semibold transition-all ${isActive ? "bg-white/14 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]" : "text-white/72 hover:bg-white/8 hover:text-white"}`}
                 >
@@ -3734,7 +3740,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             ))}
           </div>
 
-          <div className="border-t border-white/10 px-4 py-4">
+          <div id="cf-sidebar-panel" className="border-t border-white/10 px-4 py-4">
             <div className="rounded-2xl bg-white/8 p-4">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-[12px] font-[800] text-white">
@@ -4136,17 +4142,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-5 w-5 text-blue-600" />}
                       <span className="font-bold">{muted ? "Voice Off" : "Voice On"}</span>
                     </button>
-                    <select
-                      value={previewNarrationLanguage}
-                      onChange={(e) => setPreviewNarrationLanguage(e.target.value)}
-                      className="h-9 rounded-lg border border-[#e3ecf8] bg-white px-2 text-[12px] text-[#123d78] focus:outline-none focus:border-[#1d4f93]"
-                      title="Select narration language"
-                      aria-label="Narration language"
-                    >
-                      {["English","Hindi","Spanish","French","German","Italian","Portuguese","Polish","Turkish","Russian","Dutch","Czech","Arabic","Chinese","Japanese","Korean","Hungarian","Norwegian","Finnish","Swedish","Danish","Bulgarian","Romanian","Greek","Filipino","Indonesian","Malay","Slovak","Ukrainian","Croatian","Tamil"].map((lang) => (
-                        <option key={lang} value={lang}>{lang}</option>
-                      ))}
-                    </select>
                   </div>
                 )}
 
