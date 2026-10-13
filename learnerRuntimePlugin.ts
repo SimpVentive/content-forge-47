@@ -24,7 +24,7 @@ export function learnerRuntimePlugin(): Plugin {
         });
       } }],
     });
-    const source = (await fs.readFile("src/index.css", "utf8")).replace(/@import\s+url\([^;]+;/g, "");
+    const source = (await fs.readFile("src/index.css", "utf8")).replace(/@import\s+url\([\s\S]*?\)\s*;/g, "");
     const css = await postcss([tailwindcss(), autoprefixer()]).process(source, { from: path.resolve("src/index.css") });
     return { js: result.outputFiles[0].text, css: css.css };
   })();

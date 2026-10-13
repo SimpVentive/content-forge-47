@@ -113,6 +113,6 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   const html = learnerDocument(props.courseTitle, { ...props, rawOutputs, exportMedia: media, standalone: true }, runtime, passingScore);
   zip.file("module_0.html", html);
   zip.file("index.html", html);
-  zip.file("imsmanifest.xml", generateManifest({ courseId: `course_${Date.now()}`, courseTitle: props.courseTitle, passingScore }, { title: props.courseTitle, items: [{ identifier: "course", title: props.courseTitle, resourceId: "res_course" }] }, [{ id: "res_course", type: "webcontent", href: "module_0.html", scormType: "sco", files: [{ href: "module_0.html" }, { href: "index.html" }, ...Object.keys(zip.files).filter(name => name.startsWith("assets/") && !zip.files[name].dir).map(href => ({ href }))] }]));
+  zip.file("imsmanifest.xml", generateManifest({ courseId: `course_${Date.now()}`, courseTitle: props.courseTitle, passingScore, createdDate: new Date(), modifiedDate: new Date() }, { title: props.courseTitle, items: [{ identifier: "course", title: props.courseTitle, resourceId: "res_course" }] }, [{ id: "res_course", type: "webcontent", href: "module_0.html", scormType: "sco", files: [{ href: "module_0.html" }, { href: "index.html" }, ...Object.keys(zip.files).filter(name => name.startsWith("assets/") && !zip.files[name].dir).map(href => ({ href }))] }]));
   return { zip, slides: slides.length };
 }
