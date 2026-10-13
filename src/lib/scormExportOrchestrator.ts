@@ -5,6 +5,7 @@
  */
 
 import JSZip from "jszip";
+import { createLearnerScormPackage, type PortableLearnerProps } from "@/lib/learnerScormPackage";
 import type { RawAgentOutputs } from "@/types/agents";
 import { buildSlides, type Slide, type Module } from "@/lib/slideBuilder";
 import { renderScormModuleHtml } from "@/lib/scormRenderEngine";
@@ -19,7 +20,7 @@ import {
   type ManifestResource,
 } from "@/lib/scormManifestGenerator";
 
-export interface ExportOptions {
+export interface ExportOptions extends Partial<Omit<PortableLearnerProps, "rawOutputs" | "courseTitle">> {
   courseTitle: string;
   courseDescription?: string;
   trainerId?: string;
@@ -105,6 +106,36 @@ export class ScormExportOrchestrator {
       }
 
       this.report("validation", 30, "Validation passed", `Quality score: ${Math.round((preValidation.passedChecks / preValidation.totalChecks) * 100)}%`);
+
+      // Package the real stateful preview. Static SSR loses navigation, trainer
+      // animation and assessments and is not a valid substitute for the preview.
+      const portable = await createLearnerScormPackage({
+        courseTitle: options.courseTitle,
+        rawOutputs,
+        avatarTrainerId: options.trainerId,
+        courseDuration: options.courseDuration,
+        insertedVideos: options.insertedVideos,
+        slideLayout: options.slideLayout,
+        learnerNotesEnabled: options.learnerNotesEnabled,
+        resourcesPanelEnabled: options.resourcesPanelEnabled,
+        glossaryEnabled: options.glossaryEnabled,
+        discussionEnabled: options.discussionEnabled,
+        assessmentIntensity: options.assessmentIntensity,
+        flipStylePreference: options.flipStylePreference,
+        textLanguage: options.textLanguage,
+        narratorLanguage: options.narratorLanguage,
+        captionsEnabled: options.captionsEnabled,
+      }, options.passingScore ?? 70, message => this.report("assets", 50, message));
+      this.report("packaging", 90, "Finalizing learner package...");
+      const portableBlob = await portable.zip.generateAsync({ type: "blob" });
+      const portableValidation = await validatePackage(portable.zip, portableBlob.size);
+      this.report("complete", 100, "Export complete!");
+      return {
+        success: portableValidation.isValid, zip: portable.zip, fileBlob: portableBlob,
+        fileName, preValidation, postValidation: portableValidation,
+        message: portableValidation.isValid ? "SCORM package created successfully" : "Package validation failed",
+        fileSize: portableBlob.size, duration: Date.now() - startTime,
+      };
 
       // Step 3: ORCHESTRATE ASSETS
       this.report("assets", 35, "Orchestrating assets...");
