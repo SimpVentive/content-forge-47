@@ -13,7 +13,7 @@ export function serializeCourseData(data: unknown): string {
 
 export function learnerDocument(title: string, props: PortableLearnerProps, runtime: { js: string; css: string }, passingScore = 70): string {
   const safeTitle = title.replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char] || char));
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${safeTitle}</title><style>${runtime.css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="root"></div><script>
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${safeTitle}</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Poppins:wght@500;700&amp;family=Manrope:wght@500;600;700;800&amp;family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap"><style>${runtime.css.replace(/<\/style/gi, "<\\/style")}</style></head><body><div id="root"></div><script>
 window.__CONTENTFORGE_COURSE__=${serializeCourseData(props)};
 (function(){
 var api=null, modern=false, node=window, finished=false;

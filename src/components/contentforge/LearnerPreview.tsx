@@ -2682,7 +2682,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     ) : null}
                   </div>
 
-                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_390px]">
+                  <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
                     <div className="space-y-5">
                       <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-[#f5f8fc] p-5">
                         <div className="mb-3 flex items-center justify-between gap-3">
