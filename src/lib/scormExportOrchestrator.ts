@@ -7,19 +7,11 @@
 import JSZip from "jszip";
 import { createLearnerScormPackage, type PortableLearnerProps } from "@/lib/learnerScormPackage";
 import type { RawAgentOutputs } from "@/types/agents";
-import { buildSlides, type Slide, type Module } from "@/lib/slideBuilder";
-import { renderScormModuleHtml } from "@/lib/scormRenderEngine";
-import { orchestrateAssets, type OrchestrationResult } from "@/lib/scormAssetOrchestrator";
+
+
+
 import { validateScormPackage, type ValidationReport } from "@/lib/scormValidator";
 import { validateScormPackage as validatePackage, type PackageValidationReport } from "@/lib/scormPackageValidator";
-import {
-  generateManifest,
-  msToIsoDuration,
-  type ManifestMetadata,
-  type ManifestOrganization,
-  type ManifestResource,
-} from "@/lib/scormManifestGenerator";
-
 export interface ExportOptions extends Partial<Omit<PortableLearnerProps, "rawOutputs" | "courseTitle">> {
   courseTitle: string;
   courseDescription?: string;
@@ -75,11 +67,8 @@ export class ScormExportOrchestrator {
       // Step 1: BUILD SLIDES
       this.report("rendering", 10, "Building course slides...");
 
-      const { modules, slides } = buildSlides(
-        rawOutputs,
-        [],
-        options.courseDescription
-      );
+      const { buildSlides } = await import("@/components/contentforge/LearnerPreview");
+      const { modules, slides } = buildSlides(rawOutputs, options.insertedVideos, options.courseDuration, options.slideLayout?.maxLines, options.assessmentIntensity);
 
       this.report("rendering", 20, "Slides built", `${slides.length} slides created`);
 
@@ -137,65 +126,7 @@ export class ScormExportOrchestrator {
         fileSize: portableBlob.size, duration: Date.now() - startTime,
       };
 
-      // Step 3: ORCHESTRATE ASSETS
-      this.report("assets", 35, "Orchestrating assets...");
-
-      const assetResult = await orchestrateAssets(rawOutputs, {
-        trainerId: options.trainerId,
-        embedStrategy: options.embedStrategy || "data-uri",
-        enableVoiceNarration: options.enableVoiceNarration,
-      });
-
-      this.report("assets", 50, "Assets prepared", `${assetResult.assetMap.visuals.size} visuals bundled`);
-
-      // Step 4: RENDER MODULES TO HTML
-      this.report("rendering", 55, "Rendering modules to HTML...");
-
-      const moduleHtmls: Array<{ html: string; module: Module }> = [];
-
-      // Validate slides array
-      if (!slides || slides.length === 0) {
-        throw new Error("No slides generated from course content. Ensure your content has enough material to create slides.");
-      }
-
-      for (let modIndex = 0; modIndex < modules.length; modIndex++) {
-        const module = modules[modIndex];
-        const moduleSlides = slides.filter((s) => s.moduleIndex === modIndex);
-
-        // If module has no slides, create a placeholder
-        if (moduleSlides.length === 0) {
-          console.warn(`Module ${modIndex} ("${module.title}") has no slides. This may indicate a content parsing issue.`);
-        }
-
-        // Apply embedded asset URLs to slides (replace visual URLs with processed URLs from asset map)
-        const slidesWithEmbeddedAssets = moduleSlides.map((slide) => {
-          if (slide.type !== "content") return slide;
-
-          const updatedSlide = { ...slide };
-          if (slide.topicTitle && assetResult.assetMap.visuals.has(slide.topicTitle)) {
-            updatedSlide.visualImageDataUrl = assetResult.assetMap.visuals.get(slide.topicTitle);
-          }
-
-          return updatedSlide;
-        });
-
-        try {
-          const html = await renderScormModuleHtml({
-            courseTitle: options.courseTitle,
-            module,
-            moduleIndex: modIndex,
-            totalModules: modules.length,
-            slides: slidesWithEmbeddedAssets,
-            quizzes: [],
-            avatarImageUrl: assetResult.assetMap.avatar,
-            trainerName: assetResult.avatar.trainerName,
-          });
-
-          moduleHtmls.push({ html, module });
-
-          const progress = 60 + (modIndex / modules.length) * 20;
-          this.report("rendering", progress, `Rendered module ${modIndex + 1}/${modules.length}`);
-        } catch (error) {
+    } catch (error) {
           console.error(`Failed to render module ${modIndex}:`, error);
           throw new Error(`Module rendering failed for "${module.title}": ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
