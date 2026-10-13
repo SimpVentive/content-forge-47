@@ -154,6 +154,17 @@ Block time for deep work and meetings separately. Key Takeaway: Intentional sche
     }
   });
 
+  it("bundles an explicit first-page image even without a preview session", async () => {
+    const image = "data:image/png;base64,firstpage";
+    const result = await exportToScorm(sampleCourseData, {
+      courseTitle: "First page image test",
+      exportMedia: { introImages: { 0: image } },
+    });
+    expect(result.success).toBe(true);
+    const html = await result.zip?.file("module_0.html")?.async("string");
+    expect(html).toContain(`"0":"${image}"`);
+  });
+
   it("should generate valid SCORM manifest", async () => {
     const result = await exportToScorm(
       sampleCourseData,

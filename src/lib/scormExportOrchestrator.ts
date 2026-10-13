@@ -114,6 +114,7 @@ export class ScormExportOrchestrator {
         textLanguage: options.textLanguage,
         narratorLanguage: options.narratorLanguage,
         captionsEnabled: options.captionsEnabled,
+        exportMedia: options.exportMedia,
       }, options.passingScore ?? 70, message => this.report("assets", 50, message));
       this.report("packaging", 90, "Finalizing learner package...");
       const portableBlob = await portable.zip.generateAsync({ type: "blob" });

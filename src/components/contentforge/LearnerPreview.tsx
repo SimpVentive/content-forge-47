@@ -15,6 +15,8 @@ import { generateNarrationAudio } from "@/lib/narrationAudioService";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
 import { learnerExportMedia, type LearnerExportMedia } from "@/lib/learnerExportData";
+import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
+import { Button } from "@/components/ui/button";
 
 /* helpers */
 function tryParseJSON(raw: string | undefined | null): any | null {
@@ -1420,6 +1422,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const audioUrlsRef = useRef<Record<number, string>>({});
   const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>(exportMedia?.introImages || learnerExportMedia.get(courseTitle)?.introImages || {});
   const moduleIntroPending = useRef<Set<number>>(new Set());
+  const [moduleIntroErrors, setModuleIntroErrors] = useState<Record<number, string>>({});
+  const [introRetry, setIntroRetry] = useState(0);
   const visemeTimelinesRef = useRef<Record<number, VisemeCue[]>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
@@ -1431,6 +1435,21 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const slide = slides[currentSlide];
+  const introImage = slide ? moduleIntroImages[slide.moduleIndex] || resolveIntroImage(slides, slide.moduleIndex) : undefined;
+  useEffect(() => {
+    if (standalone || !slide || slide.type !== "title" || introImage) return;
+    const mi = slide.moduleIndex;
+    if (moduleIntroPending.current.has(mi)) return;
+    moduleIntroPending.current.add(mi);
+    setModuleIntroErrors(prev => { const next = { ...prev }; delete next[mi]; return next; });
+    generateIntroImage(slide.moduleTitle, courseTitle).then(image => {
+      setModuleIntroImages(prev => ({ ...prev, [mi]: image }));
+      const cached = learnerExportMedia.get(courseTitle);
+      learnerExportMedia.set(courseTitle, { ...cached, introImages: { ...cached?.introImages, [mi]: image } });
+    }).catch((error: unknown) => {
+      setModuleIntroErrors(prev => ({ ...prev, [mi]: error instanceof Error ? error.message : "Image generation failed." }));
+    }).finally(() => { moduleIntroPending.current.delete(mi); });
+  }, [standalone, slide, introImage, courseTitle, introRetry]);
   const totalSlides = slides.length;
   // courseDuration may arrive as "3min", "15min", "3 min", or "3" — normalize once.
   const courseDurationMinutes = (() => {
@@ -2216,48 +2235,19 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
                 {/* Right: Representative Image (50%) - use first generated image from this module */}
                 {(() => {
-                  const findImageIn = (list: any[]): string | undefined => {
-                    for (const s of list) {
-                      if (s?.visualImageDataUrl) return s.visualImageDataUrl;
-                      const scenes = s?.narrative?.scenes || [];
-                      for (const sc of scenes) {
-                        if (sc?.imageDataUrl) return sc.imageDataUrl;
-                      }
-                    }
-                    return undefined;
-                  };
                   const mi = slide.moduleIndex;
-                  const cached = moduleIntroImages[mi];
-                  const repImage = cached || findImageIn(currentModuleSlides) || findImageIn(slides as any[]);
-
-                  if (!standalone && !repImage && !cached && !moduleIntroPending.current.has(mi)) {
-                    moduleIntroPending.current.add(mi);
-                    (async () => {
-                      try {
-                        const { supabase } = await import("@/integrations/supabase/client");
-                        const { data, error } = await supabase.functions.invoke("generate-slide-image", {
-                          body: {
-                            prompt: `A photorealistic, professional workplace training scene representing "${slide.moduleTitle}" in the context of ${courseTitle}. Modern, diverse, well-lit, editorial style.`,
-                            moduleTitle: slide.moduleTitle,
-                            topicTitle: slide.moduleTitle,
-                            altText: slide.moduleTitle,
-                          },
-                        });
-                        if (!error && data?.imageDataUrl) {
-                          setModuleIntroImages((prev) => ({ ...prev, [mi]: data.imageDataUrl }));
-                          learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), introImages: { ...moduleIntroImages, [mi]: data.imageDataUrl } });
-                        }
-                      } catch (e) {
-                        console.warn("module intro image gen failed", e);
-                      }
-                    })();
-                  }
+                  const repImage = introImage;
 
                   return (
                     <div className="flex-1 flex items-center justify-center anim-fade-in-right" style={{ animationDelay: "0.1s" }}>
                       <div className="w-full h-full rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center">
                         {repImage ? (
                           <img src={repImage} alt={slide.moduleTitle} className="w-full h-full object-cover" />
+                        ) : standalone || moduleIntroErrors[mi] ? (
+                          <div role="status" className="flex flex-col items-center gap-3 p-8 text-center text-muted-foreground">
+                            <p>{moduleIntroErrors[mi] || "The introduction image was not included in this package. Please download the course again."}</p>
+                            {!standalone && <Button variant="outline" onClick={() => setIntroRetry(prev => prev + 1)}><RefreshCw />Retry image</Button>}
+                          </div>
                         ) : (
                           <div className="w-full h-full flex flex-col items-center justify-center p-8 gap-3">
                             <div className="w-10 h-10 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
