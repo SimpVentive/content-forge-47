@@ -15,10 +15,12 @@ export function learnerRuntimePlugin(): Plugin {
       loader: { ".png": "dataurl", ".jpg": "dataurl", ".svg": "dataurl" },
       define: { "process.env.NODE_ENV": '"production"', "import.meta.env": "{}" },
       plugins: [{ name: "standalone-alias", setup(builder) {
-        builder.onResolve({ filter: /^@\// }, args => ({ path: path.resolve(args.path === "@/integrations/supabase/client" || args.path === "@/lib/supabase" ? "src/lib/standaloneLearnerBackend.ts" : `src/${args.path.slice(2)}`) }));
-        builder.onResolve({ filter: /.*/ }, async args => {
-          if (!args.path.startsWith("@/")) return;
-          return undefined;
+        builder.onResolve({ filter: /^@\// }, async args => {
+          const base = path.resolve(args.path === "@/integrations/supabase/client" || args.path === "@/lib/supabase" ? "src/lib/standaloneLearnerBackend.ts" : `src/${args.path.slice(2)}`);
+          for (const candidate of [base, `${base}.ts`, `${base}.tsx`, `${base}.js`, path.join(base, "index.ts"), path.join(base, "index.tsx")]) {
+            try { if ((await fs.stat(candidate)).isFile()) return { path: candidate }; } catch { /* Try the next extension. */ }
+          }
+          return { path: base };
         });
       } }],
     });
