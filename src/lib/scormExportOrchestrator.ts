@@ -5,21 +5,14 @@
  */
 
 import JSZip from "jszip";
+import { createLearnerScormPackage, type PortableLearnerProps } from "@/lib/learnerScormPackage";
 import type { RawAgentOutputs } from "@/types/agents";
-import { buildSlides, type Slide, type Module } from "@/lib/slideBuilder";
-import { renderScormModuleHtml } from "@/lib/scormRenderEngine";
-import { orchestrateAssets, type OrchestrationResult } from "@/lib/scormAssetOrchestrator";
+
+
+
 import { validateScormPackage, type ValidationReport } from "@/lib/scormValidator";
 import { validateScormPackage as validatePackage, type PackageValidationReport } from "@/lib/scormPackageValidator";
-import {
-  generateManifest,
-  msToIsoDuration,
-  type ManifestMetadata,
-  type ManifestOrganization,
-  type ManifestResource,
-} from "@/lib/scormManifestGenerator";
-
-export interface ExportOptions {
+export interface ExportOptions extends Partial<Omit<PortableLearnerProps, "rawOutputs" | "courseTitle">> {
   courseTitle: string;
   courseDescription?: string;
   trainerId?: string;
@@ -74,11 +67,8 @@ export class ScormExportOrchestrator {
       // Step 1: BUILD SLIDES
       this.report("rendering", 10, "Building course slides...");
 
-      const { modules, slides } = buildSlides(
-        rawOutputs,
-        [],
-        options.courseDescription
-      );
+      const { buildSlides } = await import("@/components/contentforge/LearnerPreview");
+      const { modules, slides } = buildSlides(rawOutputs, options.insertedVideos, options.courseDuration, options.slideLayout?.maxLines, options.assessmentIntensity);
 
       this.report("rendering", 20, "Slides built", `${slides.length} slides created`);
 
@@ -106,163 +96,36 @@ export class ScormExportOrchestrator {
 
       this.report("validation", 30, "Validation passed", `Quality score: ${Math.round((preValidation.passedChecks / preValidation.totalChecks) * 100)}%`);
 
-      // Step 3: ORCHESTRATE ASSETS
-      this.report("assets", 35, "Orchestrating assets...");
-
-      const assetResult = await orchestrateAssets(rawOutputs, {
-        trainerId: options.trainerId,
-        embedStrategy: options.embedStrategy || "data-uri",
-        enableVoiceNarration: options.enableVoiceNarration,
-      });
-
-      this.report("assets", 50, "Assets prepared", `${assetResult.assetMap.visuals.size} visuals bundled`);
-
-      // Step 4: RENDER MODULES TO HTML
-      this.report("rendering", 55, "Rendering modules to HTML...");
-
-      const moduleHtmls: Array<{ html: string; module: Module }> = [];
-
-      // Validate slides array
-      if (!slides || slides.length === 0) {
-        throw new Error("No slides generated from course content. Ensure your content has enough material to create slides.");
-      }
-
-      for (let modIndex = 0; modIndex < modules.length; modIndex++) {
-        const module = modules[modIndex];
-        const moduleSlides = slides.filter((s) => s.moduleIndex === modIndex);
-
-        // If module has no slides, create a placeholder
-        if (moduleSlides.length === 0) {
-          console.warn(`Module ${modIndex} ("${module.title}") has no slides. This may indicate a content parsing issue.`);
-        }
-
-        // Apply embedded asset URLs to slides (replace visual URLs with processed URLs from asset map)
-        const slidesWithEmbeddedAssets = moduleSlides.map((slide) => {
-          if (slide.type !== "content") return slide;
-
-          const updatedSlide = { ...slide };
-          if (slide.topicTitle && assetResult.assetMap.visuals.has(slide.topicTitle)) {
-            updatedSlide.visualImageDataUrl = assetResult.assetMap.visuals.get(slide.topicTitle);
-          }
-
-          return updatedSlide;
-        });
-
-        try {
-          const html = await renderScormModuleHtml({
-            courseTitle: options.courseTitle,
-            module,
-            moduleIndex: modIndex,
-            totalModules: modules.length,
-            slides: slidesWithEmbeddedAssets,
-            quizzes: [],
-            avatarImageUrl: assetResult.assetMap.avatar,
-            trainerName: assetResult.avatar.trainerName,
-          });
-
-          moduleHtmls.push({ html, module });
-
-          const progress = 60 + (modIndex / modules.length) * 20;
-          this.report("rendering", progress, `Rendered module ${modIndex + 1}/${modules.length}`);
-        } catch (error) {
-          console.error(`Failed to render module ${modIndex}:`, error);
-          throw new Error(`Module rendering failed for "${module.title}": ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      }
-
-      this.report("rendering", 80, "HTML rendering complete");
-
-      // Step 5: CREATE ZIP PACKAGE
-      this.report("packaging", 85, "Creating SCORM package...");
-
-      const zip = new JSZip();
-
-      // Add manifest
-      const manifestMetadata: ManifestMetadata = {
-        courseId: `course_${Date.now()}`,
+      // Package the real stateful preview. Static SSR loses navigation, trainer
+      // animation and assessments and is not a valid substitute for the preview.
+      const portable = await createLearnerScormPackage({
         courseTitle: options.courseTitle,
-        courseDescription: options.courseDescription,
-        courseVersion: options.courseVersion || "1.0",
-        author: "Content Forge",
-        createdDate: new Date(),
-        modifiedDate: new Date(),
-        duration: msToIsoDuration(modules.length * 15 * 60 * 1000), // Estimate 15min per module
-        passingScore: options.passingScore || 70,
-      };
-
-      // Organization items should match actual module resources
-      const manifestOrganization: ManifestOrganization = {
-        title: options.courseTitle,
-        items: modules.map((module, idx) => ({
-          identifier: `module_${idx}`,
-          title: module.title,
-          resourceId: `res_module_${idx}`,
-        })),
-      };
-
-      // Resources correspond to module HTML files
-      const manifestResources: ManifestResource[] = moduleHtmls.map((item, idx) => ({
-        id: `res_module_${idx}`,
-        type: "webcontent",
-        href: `module_${idx}.html`,
-        scormType: "sco",
-        files: [{ href: `module_${idx}.html` }],
-      }));
-
-      const manifestXml = generateManifest(manifestMetadata, manifestOrganization, manifestResources);
-      zip.file("imsmanifest.xml", manifestXml);
-
-      // Add HTML modules with assets applied
-      for (let i = 0; i < moduleHtmls.length; i++) {
-        const item = moduleHtmls[i];
-        // Assets are already inlined in renderScormModuleHtml, just add to ZIP
-        zip.file(`module_${i}.html`, item.html);
-      }
-
-      // Add assets to ZIP
-      if (assetResult.assetMap.avatar) {
-        if (!assetResult.assetMap.avatar.startsWith("data:")) {
-          zip.file(`assets/images/avatar.jpg`, assetResult.assetMap.avatar);
-        }
-      }
-
-      for (const [topicTitle, assetUrl] of assetResult.assetMap.visuals) {
-        if (!assetUrl.startsWith("data:")) {
-          const filename = `${sanitizeFilename(topicTitle)}.png`;
-          zip.file(`assets/images/${filename}`, assetUrl);
-        }
-      }
-
-      this.report("packaging", 92, "Package structure created");
-
-      // Step 6: GENERATE ZIP BLOB
-      this.report("packaging", 95, "Finalizing package...");
-
-      const fileBlob = await zip.generateAsync({ type: "blob" });
-      const fileSize = fileBlob.size;
-
-      this.report("packaging", 98, "Package generated", `Size: ${(fileSize / 1024 / 1024).toFixed(1)}MB`);
-
-      // Step 7: POST-EXPORT VALIDATION
-      this.report("packaging", 99, "Validating package...");
-
-      const postValidation = await validatePackage(zip, fileSize);
-
-      this.report("complete", 100, "Export complete!", `Package ready for download`);
-
+        rawOutputs,
+        avatarTrainerId: options.trainerId,
+        courseDuration: options.courseDuration,
+        insertedVideos: options.insertedVideos,
+        slideLayout: options.slideLayout,
+        learnerNotesEnabled: options.learnerNotesEnabled,
+        resourcesPanelEnabled: options.resourcesPanelEnabled,
+        glossaryEnabled: options.glossaryEnabled,
+        discussionEnabled: options.discussionEnabled,
+        assessmentIntensity: options.assessmentIntensity,
+        flipStylePreference: options.flipStylePreference,
+        textLanguage: options.textLanguage,
+        narratorLanguage: options.narratorLanguage,
+        captionsEnabled: options.captionsEnabled,
+      }, options.passingScore ?? 70, message => this.report("assets", 50, message));
+      this.report("packaging", 90, "Finalizing learner package...");
+      const portableBlob = await portable.zip.generateAsync({ type: "blob" });
+      const portableValidation = await validatePackage(portable.zip, portableBlob.size);
+      this.report("complete", 100, "Export complete!");
       return {
-        success: postValidation.isValid,
-        zip,
-        fileBlob,
-        fileName,
-        preValidation,
-        postValidation,
-        message: postValidation.isValid
-          ? "SCORM package created successfully"
-          : "Package created with warnings",
-        fileSize,
-        duration: Date.now() - startTime,
+        success: portableValidation.isValid, zip: portable.zip, fileBlob: portableBlob,
+        fileName, preValidation, postValidation: portableValidation,
+        message: portableValidation.isValid ? "SCORM package created successfully" : "Package validation failed",
+        fileSize: portableBlob.size, duration: Date.now() - startTime,
       };
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       console.error("[Export Orchestrator] Error:", error);

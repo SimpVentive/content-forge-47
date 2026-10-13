@@ -14,6 +14,7 @@ import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOption
 import { generateNarrationAudio } from "@/lib/narrationAudioService";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
+import { learnerExportMedia, type LearnerExportMedia } from "@/lib/learnerExportData";
 
 /* helpers */
 function tryParseJSON(raw: string | undefined | null): any | null {
@@ -620,7 +621,7 @@ function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[]
 }
 
 /* build slides from agent outputs */
-function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
+export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
   const assessData = tryParseJSON(rawOutputs.assessment);
@@ -1245,7 +1246,10 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
 };
 
 
-interface LearnerPreviewProps {
+export interface LearnerPreviewProps {
+  standalone?: boolean;
+  exportMedia?: LearnerExportMedia;
+  onLearnerProgress?: (progress: { slide: number; total: number; score: number; answered: number; completed: boolean }) => void;
   courseTitle: string;
   rawOutputs: RawAgentOutputs;
   onClose: () => void;
@@ -1292,12 +1296,12 @@ function getCourseNotesStorageKey(courseTitle: string): string {
   return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true, standalone = false, exportMedia, onLearnerProgress }) => {
   // Prefer the explicit narrator language; fall back to text language; final fallback English.
   const effectiveNarratorLanguage = narratorLanguage || textLanguage || "English";
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
   const avatarEnv = import.meta.env as Record<string, string | undefined>;
-  const trainerMedia = getTrainerMedia(selectedTrainer.id, avatarEnv);
+  const trainerMedia = exportMedia?.trainerMedia || getTrainerMedia(selectedTrainer.id, avatarEnv);
   const trainerVoiceId = getTrainerVoiceId(selectedTrainer.id);
   const avatarVideoUrl = trainerMedia.videoUrl;
   const avatarPosterUrl = trainerMedia.posterUrl;
@@ -1414,7 +1418,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlsRef = useRef<Record<number, string>>({});
-  const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>({});
+  const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>(exportMedia?.introImages || learnerExportMedia.get(courseTitle)?.introImages || {});
   const moduleIntroPending = useRef<Set<number>>(new Set());
   const visemeTimelinesRef = useRef<Record<number, VisemeCue[]>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -1492,7 +1496,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   useEffect(() => {
     Object.values(audioUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
-    audioUrlsRef.current = {};
+    audioUrlsRef.current = { ...exportMedia?.audioBySlide };
     visemeTimelinesRef.current = {};
 
     if (audioRef.current) {
@@ -1746,6 +1750,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       return;
     }
 
+    if (standalone) {
+      toast.error("No recorded narration is included for this slide.");
+      return;
+    }
+
     // Use generateNarrationAudio which routes based on language (Telugu → Google Cloud TTS, English → ElevenLabs, etc.)
     setAudioLoading(true);
     try {
@@ -1764,6 +1773,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
       const url = result.audioDataUrl;
       audioUrlsRef.current[currentSlide] = url;
+      learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), audioBySlide: { ...audioUrlsRef.current } });
       const audio = new Audio(url);
       wireAudio(audio);
       await audio.play().catch((err) => {
@@ -1793,7 +1803,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     } finally {
       setAudioLoading(false);
     }
-  }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio, narratorLanguage]);
+  }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio, narratorLanguage, standalone, courseTitle]);
 
   // Auto-play narration when slide changes
   useEffect(() => {
@@ -1838,6 +1848,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   }, [stopLipSync]);
 
   // Mark visited
+  useEffect(() => {
+    onLearnerProgress?.({ slide: currentSlide, total: totalSlides, score: score.correct, answered: score.total, completed: showCompletion });
+    if (standalone) window.dispatchEvent(new CustomEvent("contentforge:progress", { detail: { slide: currentSlide, total: totalSlides, score: score.correct, answered: score.total, completed: showCompletion } }));
+  }, [currentSlide, totalSlides, score.correct, score.total, showCompletion, standalone, onLearnerProgress]);
+
   useEffect(() => {
     setVisited(prev => new Set(prev).add(currentSlide));
     if (currentSlide === totalSlides - 1 && slides[currentSlide]?.type === "summary") {
@@ -2215,7 +2230,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   const cached = moduleIntroImages[mi];
                   const repImage = cached || findImageIn(currentModuleSlides) || findImageIn(slides as any[]);
 
-                  if (!repImage && !cached && !moduleIntroPending.current.has(mi)) {
+                  if (!standalone && !repImage && !cached && !moduleIntroPending.current.has(mi)) {
                     moduleIntroPending.current.add(mi);
                     (async () => {
                       try {
@@ -2230,6 +2245,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         });
                         if (!error && data?.imageDataUrl) {
                           setModuleIntroImages((prev) => ({ ...prev, [mi]: data.imageDataUrl }));
+                          learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), introImages: { ...moduleIntroImages, [mi]: data.imageDataUrl } });
                         }
                       } catch (e) {
                         console.warn("module intro image gen failed", e);
@@ -2666,7 +2682,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     ) : null}
                   </div>
 
-                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_390px]">
+                  <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
                     <div className="space-y-5">
                       <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-[#f5f8fc] p-5">
                         <div className="mb-3 flex items-center justify-between gap-3">
@@ -2755,6 +2771,22 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       </div>
                     </div>
                   </div>
+                </div>
+                <div className="xl:sticky xl:top-6 xl:self-start">
+                  <AvatarNarrator
+                    topic={slide.topicTitle || slide.moduleTitle}
+                    moduleContent={narratorExcerpt}
+                    systemHint="Explain this lesson's practical application."
+                    trainerName={trainerName}
+                    avatarImageUrl={avatarImageUrl}
+                    avatarVideoUrl={avatarVideoUrl}
+                    avatarPosterUrl={avatarPosterUrl}
+                    trainerId={selectedTrainer.id}
+                    isVoiceActive={isPlaying}
+                    isVoiceLoading={audioLoading}
+                    currentViseme={activeViseme}
+                    narratorLanguage={effectiveNarratorLanguage}
+                  />
                 </div>
               </div>
             </div>

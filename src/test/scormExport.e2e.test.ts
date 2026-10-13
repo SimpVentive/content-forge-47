@@ -3,7 +3,7 @@
  * Tests the full pipeline from course data to downloadable SCORM package
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { exportToScorm, type ExportResult } from "@/lib/scormExportOrchestrator";
 import type { RawAgentOutputs } from "@/types/agents";
 
@@ -90,7 +90,14 @@ Block time for deep work and meetings separately. Key Takeaway: Intentional sche
 
   beforeEach(() => {
     progressUpdates = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: URL | string) => {
+      const path = String(url);
+      if (path.includes("learner-runtime.js")) return new Response("window.realLearnerRuntime = true;", { headers: { "Content-Type": "application/javascript" } });
+      if (path.includes("learner-runtime.css")) return new Response("body { margin: 0; }", { headers: { "Content-Type": "text/css" } });
+      return new Response(new Blob(["trainer image"], { type: "image/png" }), { headers: { "Content-Type": "image/png" } });
+    }));
   });
+  afterEach(() => vi.unstubAllGlobals());
 
   it("should export complete course to SCORM package", async () => {
     const result = await exportToScorm(
@@ -114,6 +121,7 @@ Block time for deep work and meetings separately. Key Takeaway: Intentional sche
 
     // Verify export completed (success or validation warnings)
     expect(result).toBeDefined();
+    expect(result.success).toBe(true);
     expect(result.fileName).toContain("SCORM.zip");
 
     // If successful, verify blob
@@ -160,7 +168,8 @@ Block time for deep work and meetings separately. Key Takeaway: Intentional sche
       if (manifestContent) {
         expect(manifestContent).toContain("<?xml");
         expect(manifestContent).toContain("manifest");
-        expect(manifestContent).toContain("imsmanifest");
+        expect(manifestContent).toContain("<resources>");
+        expect(manifestContent).toContain("adlcp:scormType='sco'");
       }
     }
   });
@@ -183,7 +192,8 @@ Block time for deep work and meetings separately. Key Takeaway: Intentional sche
           expect(html).toContain("<!DOCTYPE html>");
           expect(html).toContain("<html");
           expect(html).toContain("<meta charset");
-          expect(html).toContain("SCORM_API");
+          expect(html).toContain("contentforge:progress");
+          expect(html).toContain("window.realLearnerRuntime = true;");
         }
       }
     }
