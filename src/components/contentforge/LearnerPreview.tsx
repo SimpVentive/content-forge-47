@@ -3210,15 +3210,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         String.fromCharCode(65 + originalIdx) === q.correct_answer ||
                         q.correct_answer?.includes(optClean);
                       if (isCorrect) style = "border-2 border-emerald-500 bg-emerald-50 shadow-md";
-                      else if (displayIdx === ans.selected) style = "border-2 border-red-400 bg-red-50";
-                    } else if (ans?.selected === displayIdx) {
+                      else if (originalIdx === ans.selected) style = "border-2 border-red-400 bg-red-50";
+                    } else if (ans?.selected === originalIdx) {
                       style = "border-2 border-blue-500 bg-blue-50 shadow-md";
                     }
 
                     return (
                       <button
                         key={displayIdx}
-                        onClick={() => !ans?.submitted && handleSelectAnswer(currentSlide, displayIdx)}
+                        onClick={() => !ans?.submitted && handleSelectAnswer(currentSlide, originalIdx)}
                         disabled={ans?.submitted}
                         className={`w-full px-6 py-4 rounded-lg text-left transition-all anim-fade-in-up ${style} ${ans?.submitted ? 'cursor-default' : 'cursor-pointer'}`}
                         style={{ animationDelay: `${0.1 + displayIdx * 0.08}s` }}
@@ -3230,8 +3230,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                               String.fromCharCode(65 + originalIdx) === q.correct_answer ||
                               q.correct_answer?.includes(optClean)
                             ) ? 'bg-emerald-500 text-white' :
-                            ans?.submitted && displayIdx === ans.selected ? 'bg-red-400 text-white' :
-                            ans?.selected === displayIdx ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
+                            ans?.submitted && originalIdx === ans.selected ? 'bg-red-400 text-white' :
+                            ans?.selected === originalIdx ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
                           }`}>
                             {String.fromCharCode(65 + displayIdx)}
                           </div>
