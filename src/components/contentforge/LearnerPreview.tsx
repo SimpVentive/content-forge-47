@@ -2776,6 +2776,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <AvatarNarrator
                     topic={slide.topicTitle || slide.moduleTitle}
                     moduleContent={narratorExcerpt}
+                    systemHint="Explain this lesson's practical application."
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
                     avatarVideoUrl={avatarVideoUrl}

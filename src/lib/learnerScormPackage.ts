@@ -56,7 +56,7 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
     const existing = mediaCache.get(url);
     if (existing) return existing;
     const task = (async () => {
-      const response = await fetch(url);
+      const response = await fetch(new URL(url, window.location.origin));
       if (!response.ok || response.headers.get("content-type")?.includes("text/html")) throw new Error(`A course media file could not be downloaded: ${url.split("?")[0]}`);
       const blob = await response.blob();
       const dataUrl = await new Promise<string>((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(blob); });
