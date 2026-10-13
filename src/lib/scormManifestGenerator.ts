@@ -209,7 +209,7 @@ export class ScormManifestGenerator {
       const attrs = [
         `identifier='${escapeXml(resource.id)}'`,
         `type='${escapeXml(resource.type)}'`,
-        `adlcp:scormtype='${escapeXml(resource.scormType)}'`,
+        `adlcp:scormType='${escapeXml(resource.scormType)}'`,
         `href='${escapeXml(resource.href)}'`,
       ];
 

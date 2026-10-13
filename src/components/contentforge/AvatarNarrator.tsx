@@ -299,6 +299,11 @@ export function AvatarNarrator({
   // ── narration fetch ───────────────────────────────────────────────────────
   const runNarration = async (mode: RequestMode) => {
     if (isStreaming) return;
+    if (window.__CONTENTFORGE_COURSE__?.standalone) {
+      setSpeechText(moduleContent);
+      setHasSpoken(true);
+      return;
+    }
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
