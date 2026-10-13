@@ -4,6 +4,7 @@ import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId } from "@/lib/avata
 import { learnerExportMedia } from "@/lib/learnerExportData";
 import { generateNarrationAudio } from "@/lib/narrationAudioService";
 import { generateManifest } from "@/lib/scormManifestGenerator";
+import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 
 export type PortableLearnerProps = Omit<LearnerPreviewProps, "onClose" | "onUpdateVisualTopic" | "onLearnerProgress">;
 
@@ -46,7 +47,7 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   const cached = learnerExportMedia.get(props.courseTitle);
   const trainerId = props.avatarTrainerId || AVATAR_TRAINERS[0].id;
   const trainerMedia = cached?.trainerMedia || getTrainerMedia(trainerId, import.meta.env as Record<string, string | undefined>);
-  const media = { ...cached, trainerMedia: { ...trainerMedia }, audioBySlide: { ...cached?.audioBySlide } };
+  const media = { ...cached, ...props.exportMedia, trainerMedia: { ...trainerMedia, ...props.exportMedia?.trainerMedia }, audioBySlide: { ...cached?.audioBySlide, ...props.exportMedia?.audioBySlide }, introImages: { ...cached?.introImages, ...props.exportMedia?.introImages } };
   const { slides } = buildSlides(props.rawOutputs, props.insertedVideos, props.courseDuration, props.slideLayout?.maxLines, props.assessmentIntensity);
   const zip = new JSZip();
   const mediaCache = new Map<string, Promise<string>>();
@@ -81,6 +82,12 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   };
 
   report("Including the preview's images and presenter...");
+  for (const slide of slides.filter(slide => slide.type === "title")) {
+    const mi = slide.moduleIndex;
+    const image = media.introImages[mi] || resolveIntroImage(slides, mi);
+    if (!image) report(`Preparing the introduction image for ${slide.moduleTitle}...`);
+    media.introImages[mi] = image || await generateIntroImage(slide.moduleTitle, props.courseTitle);
+  }
   const rawOutputs = await portableValue(props.rawOutputs) as PortableLearnerProps["rawOutputs"];
   for (const key of ["imageUrl", "videoUrl", "posterUrl"] as const) {
     const url = media.trainerMedia[key];
