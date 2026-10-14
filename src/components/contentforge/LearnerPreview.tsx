@@ -3752,13 +3752,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       ) : (
                         <div className="h-2 w-2 shrink-0 rounded-full bg-white/25" />
                       )}
-                      <span className="truncate">
-                        {s.type === "title" ? "Introduction" :
-                          s.type === "assessment" ? "Knowledge Check" :
-                          s.type === "summary" ? "Summary" :
-                          s.type === "video" ? `Video: ${s.topicTitle?.slice(0, 20) || "Resource"}` :
-                          s.topicTitle || `Topic ${(s.topicIndex || 0) + 1}`}
-                      </span>
+                      <span className="truncate">{label}</span>
                     </button>
                   ))}
                 </div>
