@@ -1124,6 +1124,14 @@ OUTPUT FORMAT — ABSOLUTE:
 - The very first character of your response must be “#” (a markdown heading), never “{“ or “[“ or “\`”.
 - You MUST use content from the source material provided. Do NOT invent unrelated examples.
 - You MUST respect the supplied runtime plan. Hit the requested word budgets closely so the narration lands within ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target.
+- NEVER output metadata lines such as "Word Count:", "Estimated time:", "Duration:", or "Read time:". The learner sees everything you write.
+
+ZERO-REPETITION RULE — ABSOLUTE:
+- Every sentence must add new information. Never restate a sentence, even reworded, anywhere in the same topic.
+- The "Key Takeaway:" line must be a NEW one-sentence synthesis. It must NOT copy or paraphrase any sentence from the hook, explanation, or scenario.
+- The scenario/situation describes WHAT HAPPENS. The analysis that follows explains WHAT TO NOTICE and WHY — different points, never the same bullets repeated.
+- Do not reuse a topic's heading as a sentence in its body. Each topic heading appears exactly once.
+- Do not add "Did you know" facts that repeat the takeaway; a "Did you know" fact must be a separate, surprising detail or omit it.
 
       Write content that feels expensive, practical, and memorable — something a learner would actually respect, not skim out of obligation.`;
 
@@ -1195,7 +1203,7 @@ OUTPUT FORMAT — ABSOLUTE:
         addLog("Quality Reviewer: Scoring instructional quality and revising weak sections...");
         qualityResult = await runAgentWithLanguage(
           `${languageDirective}You are a Quality Reviewer for premium corporate eLearning. Review the architect plan and draft script with a ruthless instructional-design lens. Score the draft on instructional clarity, realism, interaction quality, learner engagement, assessment readiness, and duration alignment. Then rewrite any weak content so the output feels sharper, more teachable, more scenario-based, and less generic while still landing near the requested runtime. LANGUAGE REQUIREMENT: The entire revised_script must be written in ${textLanguage}. Narration text must be in ${narratorLanguage}. Do not revert content to English if ${textLanguage} is not English. Return JSON in this exact shape: { instructional_score, realism_score, interaction_score, engagement_score, assessment_readiness_score, duration_alignment_score, strengths: [], issues: [], revision_summary: [], revised_script }. The revised_script must preserve the same module and topic headings while improving the content beneath them.`,
-          `Course Title: ${courseTitle}\n\nArchitect Plan:\n${archResult}\n\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nDraft Script:\n${writerResult}\n\nCurrent Draft Word Count: ${countWords(writerResult)}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\n\nResearch Context:\n${researchResult}\n\nReview the draft against the architect schema. If a topic feels generic, lacks a decision point, ignores a misconception, misses a practical scenario, or materially under-runs or over-runs its word budget, fix it in revised_script.`,
+          `Course Title: ${courseTitle}\n\nArchitect Plan:\n${archResult}\n\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nDraft Script:\n${writerResult}\n\nCurrent Draft Word Count: ${countWords(writerResult)}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\n\nResearch Context:\n${researchResult}\n\nReview the draft against the architect schema. If a topic feels generic, lacks a decision point, ignores a misconception, misses a practical scenario, or materially under-runs or over-runs its word budget, fix it in revised_script. Also remove any repeated or paraphrased sentence within a topic (especially a Key Takeaway that restates the body, or a scenario and its analysis making the same points), and delete metadata lines like "Word Count:".`,
           addLog, "Quality Reviewer"
         );
 
