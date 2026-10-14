@@ -466,7 +466,9 @@ function parseContentParts(text: string) {
     .split("\n")
     .filter((line) => !line.match(/^#{1,3}\s/))
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !isPlaceholderToken(line));
+    .filter((line) => line.length > 0 && !isPlaceholderToken(line))
+    // Drop generation metadata lines that leak into content (e.g. "Word Count: 398")
+    .filter((line) => !/^(word\s*count|wordcount|token\s*count|char(acter)?\s*count)\s*[:=]/i.test(line));
   const joined = lines.join("\n").trim();
   const paragraphs = joined
     .split(/\n\n+/)
@@ -1627,7 +1629,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       const contentSlides = slides.filter(sl => sl.type === "content");
       const contentIdx = contentSlides.indexOf(s);
       if (contentIdx >= 0 && narrationSections[contentIdx]) {
-        const txt = narrationSections[contentIdx].narration_text || "";
+        const txt = (narrationSections[contentIdx].narration_text || "")
+          // Strip generation metadata so the audio never says "Word Count: 398"
+          .replace(/(^|[.\n\r])\s*word\s*count\s*[:=]\s*\d+\s*[.\n\r]?/gi, "$1 ")
+          .trim();
         if (txt) return txt;
       }
     }
@@ -1716,24 +1721,30 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     const totalWords = narrationWords.length;
     if (!totalSentences || !totalWords) return;
 
-    // Pre-compute cumulative word counts per sentence to map audio progress to a sentence
-    const sentenceWordCounts = narrationSentences.map(s => s.split(/\s+/).length);
-    const cumulativeWords: number[] = [];
-    sentenceWordCounts.reduce((acc, count, i) => {
-      cumulativeWords[i] = acc + count;
+    // Weight sentences by character length (spoken time tracks characters better than
+    // word count) and trail the audio slightly so the highlight never races ahead.
+    const sentenceCharCounts = narrationSentences.map(s => Math.max(1, s.length));
+    const totalChars = sentenceCharCounts.reduce((a, b) => a + b, 0);
+    const cumulativeChars: number[] = [];
+    sentenceCharCounts.reduce((acc, count, i) => {
+      cumulativeChars[i] = acc + count;
       return acc + count;
     }, 0);
+    const LAG_SECONDS = 0.35;
 
     const tick = () => {
       if (audio.paused || audio.ended) return;
-      const progress = audio.duration > 0 ? audio.currentTime / audio.duration : 0;
-      const wordIdx = Math.floor(progress * totalWords);
-      // Find which sentence this word belongs to
+      const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+      if (!duration) { animFrameRef.current = requestAnimationFrame(tick); return; }
+      const adjustedTime = Math.max(0, audio.currentTime - LAG_SECONDS);
+      const progress = Math.min(1, adjustedTime / duration);
+      const charPos = progress * totalChars;
       let sentIdx = 0;
-      for (let i = 0; i < cumulativeWords.length; i++) {
-        if (wordIdx < cumulativeWords[i]) { sentIdx = i; break; }
+      for (let i = 0; i < cumulativeChars.length; i++) {
+        if (charPos < cumulativeChars[i]) { sentIdx = i; break; }
         sentIdx = i;
       }
+      const wordIdx = Math.floor(progress * totalWords);
       setHighlightWordIdx(wordIdx);
       setHighlightSentenceIdx(sentIdx);
       animFrameRef.current = requestAnimationFrame(tick);
