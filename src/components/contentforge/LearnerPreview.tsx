@@ -1638,7 +1638,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       const lines: string[] = [];
       if (parts.hook) lines.push(parts.hook);
       parts.body.forEach(p => lines.push(p));
-      if (parts.takeaway) lines.push(`Key takeaway: ${parts.takeaway}`);
+      if (parts.takeaway) lines.push(parts.takeaway);
       return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
     }
 
@@ -2417,7 +2417,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const scenarioLead = parts.body[0] || parts.hook || narratorExcerpt;
         const scenarioSupport = parts.body[1] || parts.challenge || parts.takeaway || quickFact;
         const normForDedupe = (t: string) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-        const usedScenarioText = normForDedupe(`${scenarioLead || ""} ${scenarioSupport || ""}`);
+        const usedScenarioText = normForDedupe(`${scenarioLead || ""} ${scenarioSupport || ""} ${parts.body.join(" ")} ${parts.hook || ""} ${parts.challenge || ""}`);
         const summaryBullets = Array.from(new Set(chartSentenceEntries.map((entry) => entry.text)))
           .filter((text) => { const n = normForDedupe(text); return n.length > 0 && !usedScenarioText.includes(n); })
           .slice(0, 4);

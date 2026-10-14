@@ -278,7 +278,7 @@ export function AvatarNarrator({
     clearMouthHold();
     stopFlushLoop();
     stopStreamViseme();
-    setSpeechText(`Here is the key point: ${moduleContent}`);
+    setSpeechText(`I'm having trouble connecting right now — please tap again in a moment and I'll walk you through ${topic}.`);
     setIsStreaming(false);
     setIsMouthHold(false);
     if (mode === "initial") setHasSpoken(true);
