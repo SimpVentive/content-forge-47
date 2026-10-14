@@ -1637,7 +1637,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       const parts = parseContentParts(s.content || "");
       const lines: string[] = [];
       if (parts.hook) lines.push(parts.hook);
-      parts.body.forEach(p => lines.push(p));
+      const takeawayKey = String(parts.takeaway || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      parts.body.forEach(p => {
+        const pKey = String(p || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        // Skip body lines that merely repeat the takeaway so the audio doesn't say it twice.
+        if (takeawayKey && pKey && (pKey.includes(takeawayKey) || takeawayKey.includes(pKey))) return;
+        lines.push(p);
+      });
       if (parts.takeaway) lines.push(parts.takeaway);
       return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
     }
@@ -2413,11 +2419,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const showSideVisual = Boolean(visualMarkup) && slide.visualPlacement === "side-panel";
         const contentTemplate: ContentTemplate = inferContentTemplate(slide, Boolean(visualMarkup));
         const lessonObjectives = getTopicLearningObjectives(currentModuleTopics, slide.topicTitle);
-        const quickFact = getQuickFact(parts);
+        const rawQuickFact = getQuickFact(parts);
+        const takeawayNorm = String(parts.takeaway || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        const quickFactNorm = String(rawQuickFact || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        // Hide "Did You Know" when it merely repeats the Key Takeaway.
+        const quickFact = quickFactNorm && takeawayNorm && (quickFactNorm.includes(takeawayNorm) || takeawayNorm.includes(quickFactNorm))
+          ? ""
+          : rawQuickFact;
         const scenarioLead = parts.body[0] || parts.hook || narratorExcerpt;
         const scenarioSupport = parts.body[1] || parts.challenge || parts.takeaway || quickFact;
         const normForDedupe = (t: string) => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-        const usedScenarioText = normForDedupe(`${scenarioLead || ""} ${scenarioSupport || ""} ${parts.body.join(" ")} ${parts.hook || ""} ${parts.challenge || ""}`);
+        const usedScenarioText = normForDedupe(`${scenarioLead || ""} ${scenarioSupport || ""} ${parts.body.join(" ")} ${parts.hook || ""} ${parts.challenge || ""} ${parts.takeaway || ""}`);
         const summaryBullets = Array.from(new Set(chartSentenceEntries.map((entry) => entry.text)))
           .filter((text) => { const n = normForDedupe(text); return n.length > 0 && !usedScenarioText.includes(n); })
           .slice(0, 4);
