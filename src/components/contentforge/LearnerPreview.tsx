@@ -1420,6 +1420,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlsRef = useRef<Record<number, string>>({});
+  const translatedNarrationRef = useRef<Record<string, string>>({});
   const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>(exportMedia?.introImages || learnerExportMedia.get(courseTitle)?.introImages || {});
   const moduleIntroPending = useRef<Set<number>>(new Set());
   const [moduleIntroErrors, setModuleIntroErrors] = useState<Record<number, string>>({});
@@ -1759,10 +1760,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   // Browser speech fallback: keeps narration + sentence highlight working when the TTS service fails
   const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const playSpeechFallback = useCallback((text: string) => {
+  const playSpeechFallback = useCallback((text: string, language: string = "English") => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
     const sentences = narrationSentences;
     const utterance = new SpeechSynthesisUtterance(text);
+    const langCodes: Record<string, string> = { Hindi: "hi-IN", Telugu: "te-IN", Tamil: "ta-IN", Kannada: "kn-IN", Malayalam: "ml-IN", Bengali: "bn-IN", Marathi: "mr-IN", Gujarati: "gu-IN", Punjabi: "pa-IN", Urdu: "ur-PK", Spanish: "es-ES", French: "fr-FR", German: "de-DE", Italian: "it-IT", Portuguese: "pt-PT", Arabic: "ar-SA", Chinese: "zh-CN", Japanese: "ja-JP", Korean: "ko-KR", Russian: "ru-RU" };
+    if (langCodes[language]) utterance.lang = langCodes[language];
     utterance.onstart = () => setIsPlaying(true);
     utterance.onend = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); setHighlightWordIdx(-1); };
     utterance.onerror = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); };
@@ -1801,9 +1804,35 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
     // Use generateNarrationAudio which routes based on language (Telugu → Google Cloud TTS, English → ElevenLabs, etc.)
     setAudioLoading(true);
+    let textToNarrate = narrationText.slice(0, 2500);
+    const targetLanguage = narratorLanguage || "English";
     try {
+      // Translate the narration first when a non-English language is selected,
+      // otherwise the TTS voice reads English text with an accent.
+      if (targetLanguage !== "English") {
+        const cacheKey = `${currentSlide}:${targetLanguage}`;
+        const cachedTranslation = translatedNarrationRef.current[cacheKey];
+        if (cachedTranslation) {
+          textToNarrate = cachedTranslation;
+        } else {
+          try {
+            const { supabase } = await import("@/integrations/supabase/client");
+            const { data: translationData, error: translationError } = await supabase.functions.invoke("translate-text", {
+              body: { text: textToNarrate, targetLanguage },
+            });
+            if (!translationError && translationData?.translatedText) {
+              textToNarrate = translationData.translatedText;
+              translatedNarrationRef.current[cacheKey] = textToNarrate;
+            } else {
+              console.error("Translation failed:", translationError || translationData?.error);
+            }
+          } catch (translationErr) {
+            console.error("Translation request failed, narrating original text:", translationErr);
+          }
+        }
+      }
       const result = await generateNarrationAudio(
-        narrationText.slice(0, 2500),
+        textToNarrate,
         trainerVoiceId,
         narratorLanguage
       );
@@ -1811,7 +1840,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       if (!result.success || !result.audioDataUrl) {
         const errorMsg = result.error || "Failed to generate audio";
         console.error("TTS error:", errorMsg);
-        if (playSpeechFallback(narrationText)) return;
+        if (playSpeechFallback(textToNarrate, targetLanguage)) return;
         toast.error("Failed to generate narration audio");
         return;
       }
@@ -1844,7 +1873,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     } catch (err) {
       console.error("TTS fetch failed:", err);
-      if (playSpeechFallback(narrationText)) return;
+      if (playSpeechFallback(textToNarrate, targetLanguage)) return;
       toast.error("Failed to generate narration audio");
     } finally {
       setAudioLoading(false);
@@ -3988,30 +4017,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           </div>
 
           <div className="flex-1 overflow-y-auto bg-[#eef3f9] px-5 py-6 md:px-8 md:py-8">
-            <div className="mx-auto mb-5 grid max-w-[1260px] gap-3 lg:grid-cols-[minmax(0,1fr)_420px]">
-              <div className="rounded-[26px] border border-[#d6e1ef] bg-white/88 px-5 py-4 shadow-sm backdrop-blur">
-                <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Lesson Context</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-[#48627f]">
-                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Module {slide.moduleIndex + 1}</span>
-                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Screen {currentSlide + 1} of {totalSlides}</span>
-                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Estimated {courseDurationMinutes}</span>
-                </div>
-              </div>
-              <div className="rounded-[26px] border border-[#d6e1ef] bg-white/88 px-5 py-4 shadow-sm backdrop-blur">
-                <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Learning Objectives</p>
-                <div className="mt-3 space-y-2">
-                  {(currentModuleTopics.length > 0 ? currentModuleTopics : currentModule?.topics || []).slice(0, 3).map((topic, index) => (
-                    <div key={`${topic}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
-                      <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
-                      <span>{topic}</span>
-                    </div>
-                  ))}
-                  {currentModuleTopics.length === 0 && !(currentModule?.topics || []).length && (
-                    <p className="text-[13px] text-[#6a809c]">Objectives will appear once topic structure is available.</p>
-                  )}
-                </div>
-              </div>
-            </div>
 
             <div className="relative mx-auto max-w-[1280px] [perspective:2200px]">
               {showStageGlow && (
