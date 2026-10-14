@@ -3988,30 +3988,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           </div>
 
           <div className="flex-1 overflow-y-auto bg-[#eef3f9] px-5 py-6 md:px-8 md:py-8">
-            <div className="mx-auto mb-5 grid max-w-[1260px] gap-3 lg:grid-cols-[minmax(0,1fr)_420px]">
-              <div className="rounded-[26px] border border-[#d6e1ef] bg-white/88 px-5 py-4 shadow-sm backdrop-blur">
-                <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Lesson Context</p>
-                <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-[#48627f]">
-                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Module {slide.moduleIndex + 1}</span>
-                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Screen {currentSlide + 1} of {totalSlides}</span>
-                  <span className="rounded-full bg-[#eef3f8] px-3 py-1 font-semibold">Estimated {courseDurationMinutes}</span>
-                </div>
-              </div>
-              <div className="rounded-[26px] border border-[#d6e1ef] bg-white/88 px-5 py-4 shadow-sm backdrop-blur">
-                <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Learning Objectives</p>
-                <div className="mt-3 space-y-2">
-                  {(currentModuleTopics.length > 0 ? currentModuleTopics : currentModule?.topics || []).slice(0, 3).map((topic, index) => (
-                    <div key={`${topic}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
-                      <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
-                      <span>{topic}</span>
-                    </div>
-                  ))}
-                  {currentModuleTopics.length === 0 && !(currentModule?.topics || []).length && (
-                    <p className="text-[13px] text-[#6a809c]">Objectives will appear once topic structure is available.</p>
-                  )}
-                </div>
-              </div>
-            </div>
 
             <div className="relative mx-auto max-w-[1280px] [perspective:2200px]">
               {showStageGlow && (
