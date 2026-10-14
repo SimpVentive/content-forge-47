@@ -3207,7 +3207,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 {/* Header */}
                 <div className="mb-8">
                   <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">
-                    Q{currentSlide + 1}
+                    Q{questionNumber}
                   </span>
                   <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">
                     {cleanQuestion}
@@ -3296,7 +3296,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             {/* Footer with button */}
             <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2 text-[13px] text-slate-600">
-                <span>Question {currentSlide + 1} of {totalSlides}</span>
+                <span>Question {questionNumber} of {questionTotal}</span>
               </div>
               <div className="flex gap-3">
                 {ans && !ans.submitted && (
