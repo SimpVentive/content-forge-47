@@ -93,6 +93,8 @@ const Index = () => {
   const [courseParams, setCourseParams] = useState<CourseParameters | null>(null);
   const [showVideoWorkflow, setShowVideoWorkflow] = useState(false);
   const [workflowClips, setWorkflowClips] = useState<any[]>([]);
+  // Videos inserted manually from Course Output > Videos. Single source of truth for preview + export.
+  const [manualVideos, setManualVideos] = useState<InsertedVideo[]>([]);
   const [runElapsedSeconds, setRunElapsedSeconds] = useState(0);
   const [showDraftsPanel, setShowDraftsPanel] = useState(false);
   const [currentDraftId, setCurrentDraftId] = useState<string | null>(null);
@@ -326,6 +328,7 @@ const Index = () => {
     setInputText(draft.inputText || "");
     setCourseParams(draft.courseParams || null);
     setWorkflowClips(Array.isArray(draft.workflowClips) ? draft.workflowClips : []);
+    setManualVideos([]);
     loadPersistedState(draft.rawOutputs, draft.outputData, []);
     setShowDraftsPanel(false);
     toast.success("Draft loaded");
@@ -543,7 +546,7 @@ const Index = () => {
     customName: clip.customName || clip.title,
     moduleTitle: clip.insertAfterModule || "",
     afterSlide: -1,
-  })), [workflowClips]);
+  })).concat(manualVideos.filter((v) => !workflowClips.some((c) => c.videoId === v.videoId))), [workflowClips, manualVideos]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-background">
@@ -1047,6 +1050,8 @@ const Index = () => {
             onUpdateVisualTopic={updateVisualTopicAsset}
             onUpdateCourseContent={updateCourseContent}
             onOpenLearnerPreview={() => setShowLearnerPreview(true)}
+            manualInsertedVideos={manualVideos}
+            onManualInsertedVideosChange={setManualVideos}
           />
         )}
       </TabContainer>

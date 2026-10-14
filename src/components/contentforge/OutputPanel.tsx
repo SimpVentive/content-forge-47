@@ -36,6 +36,9 @@ interface OutputPanelProps {
   onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
   onUpdateCourseContent?: (section: "outline" | "script" | "assessment" | "package", value: string) => void;
   onOpenLearnerPreview?: () => void;
+  /** Controlled list of videos inserted from the Videos tab (owned by the page so every preview/export sees it). */
+  manualInsertedVideos?: InsertedVideo[];
+  onManualInsertedVideosChange?: React.Dispatch<React.SetStateAction<InsertedVideo[]>>;
 }
 
 const baseTabs = [
@@ -763,11 +766,13 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
   );
 };
 
-export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, learningType, onUpdateVisualTopic, onUpdateCourseContent, onOpenLearnerPreview }) => {
+export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, learningType, onUpdateVisualTopic, onUpdateCourseContent, onOpenLearnerPreview, manualInsertedVideos, onManualInsertedVideosChange }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [showPostPreviewDialog, setShowPostPreviewDialog] = useState(false);
-  const [insertedVideos, setInsertedVideos] = useState<InsertedVideo[]>([]);
+  const [localInsertedVideos, setLocalInsertedVideos] = useState<InsertedVideo[]>([]);
+  const insertedVideos = manualInsertedVideos ?? localInsertedVideos;
+  const setInsertedVideos = onManualInsertedVideosChange ?? setLocalInsertedVideos;
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState("");
   const [showScriptConfirm, setShowScriptConfirm] = useState(false);
