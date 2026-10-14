@@ -10,7 +10,7 @@ import { NarrativeFlipbook } from "./NarrativeFlipbook";
 import { VideoWithVisuals, type VisualOverlay } from "./VideoWithVisuals";
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
-import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
+import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix, buildAssessmentNarration } from "@/lib/textCleaningUtility";
 import { generateNarrationAudio } from "@/lib/narrationAudioService";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
@@ -1437,6 +1437,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlsRef = useRef<Record<number, string>>({});
+  const audioTextRef = useRef<Record<number, string>>({});
+  // Drop cached audio whose spoken text differs from the current narration (e.g. old question-only quiz audio).
+  const getCachedAudio = (idx: number, text: string): string | undefined => {
+    const url = audioUrlsRef.current[idx];
+    if (!url) return undefined;
+    const spoken = audioTextRef.current[idx];
+    if (spoken !== undefined ? spoken !== text : slides[idx]?.type === "assessment") { delete audioUrlsRef.current[idx]; return undefined; }
+    return url;
+  };
   const translatedNarrationRef = useRef<Record<string, string>>({});
   const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>(exportMedia?.introImages || learnerExportMedia.get(courseTitle)?.introImages || {});
   const moduleIntroPending = useRef<Set<number>>(new Set());
@@ -1534,6 +1543,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   useEffect(() => {
     Object.values(audioUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
     audioUrlsRef.current = { ...exportMedia?.audioBySlide };
+    audioTextRef.current = { ...exportMedia?.audioTextBySlide };
     visemeTimelinesRef.current = {};
 
     if (audioRef.current) {
@@ -1670,14 +1680,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
     // For assessment slides, narrate the question AND its options so the
     // audio matches what is on screen.
-    if (s.type === "assessment" && s.question) {
-      const q = s.question;
-      const questionText = String(q.question || "").replace(/Correct Answer:.*$/gi, "").replace(/Options:.*$/gi, "").trim();
-      const optionLines = Array.isArray(q.options)
-        ? q.options.map((opt: string, i: number) => `Option ${String.fromCharCode(65 + i)}. ${stripOptionPrefix(opt)}`)
-        : [];
-      return [questionText, ...optionLines].filter(Boolean).join(". ").replace(/\.\./g, ".").slice(0, 2500);
-    }
+    if (s.type === "assessment" && s.question) return buildAssessmentNarration(s.question);
 
     return "";
   }, [slides, narrationSections]);
@@ -1827,7 +1830,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     if (!narrationText) return;
 
     // If we already have audio for this slide, just play it
-    if (audioUrlsRef.current[currentSlide]) {
+    if (getCachedAudio(currentSlide, narrationText)) {
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
       wireAudio(audio);
       await audio.play().catch(() => {});
@@ -1887,7 +1890,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
       const url = result.audioDataUrl;
       audioUrlsRef.current[currentSlide] = url;
-      learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), audioBySlide: { ...audioUrlsRef.current } });
+      audioTextRef.current[currentSlide] = narrationText;
+      learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), audioBySlide: { ...audioUrlsRef.current }, audioTextBySlide: { ...audioTextRef.current } });
       const audio = new Audio(url);
       wireAudio(audio);
       await audio.play().catch((err) => {
@@ -1926,7 +1930,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     const narration = getNarrationForSlide(currentSlide);
     if (!narration) return;
     // If audio already cached for this slide, play it
-    if (audioUrlsRef.current[currentSlide]) {
+    if (getCachedAudio(currentSlide, narrationText)) {
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
       wireAudio(audio);
       audio.play().catch((err) => {

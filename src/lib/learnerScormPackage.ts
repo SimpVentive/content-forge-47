@@ -3,6 +3,7 @@ import type { LearnerPreviewProps } from "@/components/contentforge/LearnerPrevi
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId } from "@/lib/avatarTrainers";
 import { learnerExportMedia } from "@/lib/learnerExportData";
 import { generateNarrationAudio } from "@/lib/narrationAudioService";
+import { buildAssessmentNarration } from "@/lib/textCleaningUtility";
 import { generateManifest } from "@/lib/scormManifestGenerator";
 import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 
@@ -51,7 +52,7 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   const cached = learnerExportMedia.get(props.courseTitle);
   const trainerId = props.avatarTrainerId || AVATAR_TRAINERS[0].id;
   const trainerMedia = cached?.trainerMedia || getTrainerMedia(trainerId, import.meta.env as Record<string, string | undefined>);
-  const media = { ...cached, ...props.exportMedia, trainerMedia: { ...trainerMedia, ...props.exportMedia?.trainerMedia }, audioBySlide: { ...cached?.audioBySlide, ...props.exportMedia?.audioBySlide }, introImages: { ...cached?.introImages, ...props.exportMedia?.introImages } };
+  const media = { ...cached, ...props.exportMedia, trainerMedia: { ...trainerMedia, ...props.exportMedia?.trainerMedia }, audioBySlide: { ...cached?.audioBySlide, ...props.exportMedia?.audioBySlide }, introImages: { ...cached?.introImages, ...props.exportMedia?.introImages }, audioTextBySlide: { ...cached?.audioTextBySlide, ...props.exportMedia?.audioTextBySlide } };
   const { slides } = buildSlides(props.rawOutputs, props.insertedVideos, props.courseDuration, props.slideLayout?.maxLines, props.assessmentIntensity);
   const zip = new JSZip();
   const mediaCache = new Map<string, Promise<string>>();
@@ -112,10 +113,12 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
       const slide = slides[index];
       if (slide.type !== "content" && slide.type !== "assessment") continue;
       const section = slide.type === "content" ? sections[contentIndex++] : undefined;
+      const narration = slide.type === "assessment" ? buildAssessmentNarration(slide.question) : section?.narration_text || slide.content;
+      // Quiz audio must speak exactly the current question + options; discard stale clips.
+      if (slide.type === "assessment" && media.audioBySlide[index] && media.audioTextBySlide[index] !== narration) delete media.audioBySlide[index];
       if (media.audioBySlide[index]) continue;
       const recorded = section?.audioDataUrl || section?.audio_url;
       if (typeof recorded === "string") { media.audioBySlide[index] = await embed(recorded); continue; }
-      const narration = slide.type === "assessment" ? slide.question?.question : section?.narration_text || slide.content;
       if (typeof narration !== "string" || !narration.trim()) continue;
       report(`Including recorded narration ${index + 1} of ${slides.length}...`);
       const result = await withTimeout(generateNarrationAudio(narration.slice(0, 2500), getTrainerVoiceId(trainerId), props.narratorLanguage || props.textLanguage || "English"), 30_000).catch(() => null);
@@ -125,6 +128,7 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
         break;
       }
       media.audioBySlide[index] = result.audioDataUrl;
+      media.audioTextBySlide[index] = narration;
     }
   }
   learnerExportMedia.set(props.courseTitle, media);
