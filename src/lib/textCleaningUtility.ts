@@ -32,8 +32,12 @@ export function isPlaceholderToken(text: string): boolean {
   return false;
 }
 
+const AI_PLACEHOLDER = /\s*(\.{3}|…)?\s*\[[^\]]*(rest of|remaining|unchanged|original script|continues|truncated|same as above)[^\]]*\]\s*(\.{3}|…)?/gi;
+
 export function safeLearnerText(text: string, fallback = ""): string {
-  return isPlaceholderToken(text) ? fallback : stripNarratorMarkdown(text);
+  if (isPlaceholderToken(text)) return fallback;
+  const cleaned = stripNarratorMarkdown(text).replace(AI_PLACEHOLDER, "").trim();
+  return cleaned && !isPlaceholderToken(cleaned) ? cleaned : fallback;
 }
 
 export function stripOptionPrefix(opt: string): string {
