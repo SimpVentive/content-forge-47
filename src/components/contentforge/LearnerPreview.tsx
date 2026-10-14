@@ -1668,10 +1668,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
     }
 
-    // For assessment slides, use the question as narration
+    // For assessment slides, narrate the question AND its options so the
+    // audio matches what is on screen.
     if (s.type === "assessment" && s.question) {
       const q = s.question;
-      return q.question || "";
+      const questionText = String(q.question || "").replace(/Correct Answer:.*$/gi, "").replace(/Options:.*$/gi, "").trim();
+      const optionLines = Array.isArray(q.options)
+        ? q.options.map((opt: string, i: number) => `Option ${String.fromCharCode(65 + i)}. ${stripOptionPrefix(opt)}`)
+        : [];
+      return [questionText, ...optionLines].filter(Boolean).join(". ").replace(/\.\./g, ".").slice(0, 2500);
     }
 
     return "";
