@@ -608,6 +608,16 @@ function allocateQuestionsPerModule(modules: Module[], totalQuestions: number): 
   return counts;
 }
 
+/* Seeded Fisher-Yates shuffle — deterministic per question so preview, export and narration all share one option order */
+function shuffleQuestionOptions(options: string[], seedKey: string): string[] {
+  const arr = [...options];
+  let h = 2166136261;
+  for (const ch of seedKey) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  const rand = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; };
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+
 function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[] {
   const normalizedTitle = normalizeModuleKey(module.title);
   const normalizedTopics = new Set(module.topics.map((topic) => normalizeModuleKey(topic)));
@@ -886,13 +896,18 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
       selectedIndexes.forEach((questionIndex) => {
         const mcq = mcqs[questionIndex];
         if (!mcq) return;
+        // Shuffle answer options once at build time so the correct answer is
+        // randomly placed (not always option B) across preview, export and narration.
+        const shuffledMcq = Array.isArray(mcq.options) && mcq.options.length > 1
+          ? { ...mcq, options: shuffleQuestionOptions(mcq.options, `${questionIndex}|${mcq.question || ""}`) }
+          : mcq;
         // Determine template: scenario-based questions get "scenario", others get default
-        const isScenario = mcq.situation || mcq.scenario || mcq.context;
+        const isScenario = shuffledMcq.situation || shuffledMcq.scenario || shuffledMcq.context;
         slides.push({
           type: "assessment",
           moduleIndex: mi,
           moduleTitle: mod.title,
-          question: mcq,
+          question: shuffledMcq,
           contentTemplate: isScenario ? "scenario" : undefined,
         });
       });
@@ -1653,10 +1668,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
     }
 
-    // For assessment slides, use the question as narration
+    // For assessment slides, narrate the question AND its options so the
+    // audio matches what is on screen.
     if (s.type === "assessment" && s.question) {
       const q = s.question;
-      return q.question || "";
+      const questionText = String(q.question || "").replace(/Correct Answer:.*$/gi, "").replace(/Options:.*$/gi, "").trim();
+      const optionLines = Array.isArray(q.options)
+        ? q.options.map((opt: string, i: number) => `Option ${String.fromCharCode(65 + i)}. ${stripOptionPrefix(opt)}`)
+        : [];
+      return [questionText, ...optionLines].filter(Boolean).join(". ").replace(/\.\./g, ".").slice(0, 2500);
     }
 
     return "";
@@ -3172,17 +3192,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         let cleanQuestion = q.question || "";
         cleanQuestion = cleanQuestion.replace(/Correct Answer:.*$/gi, '').replace(/Options:.*$/gi, '').trim();
 
-        // Randomize option order each time this question loads (deterministic per question/slide)
+        // Options were already shuffled once at build time (buildSlides) so the
+        // correct answer is randomly placed; render them in that stable order.
         const optionsWithIndices = q.options.map((opt: string, idx: number) => ({ opt, originalIdx: idx }));
-        const shuffledOptions = [...optionsWithIndices];
-        {
-          let h = 2166136261;
-          for (const ch of `${currentSlide}|${q.question || ""}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-          const rand = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; };
-          for (let i = shuffledOptions.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]]; }
-        }
+        const shuffledOptions = optionsWithIndices;
 
         const getShuffledIndex = (originalIdx: number) => shuffledOptions.findIndex(item => item.originalIdx === originalIdx);
+
+        // Question numbering counts assessment slides only (not all screens),
+        // so "Question 2 of 3" reflects the actual quiz, not the slide position.
+        const assessmentSlideIndexes = slides.map((sl, i) => sl.type === "assessment" ? i : -1).filter(i => i >= 0);
+        const questionNumber = assessmentSlideIndexes.indexOf(currentSlide) + 1;
+        const questionTotal = assessmentSlideIndexes.length;
 
         return (
           <div className="w-full h-full flex flex-col" key={currentSlide}>
@@ -3191,7 +3212,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 {/* Header */}
                 <div className="mb-8">
                   <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">
-                    Q{currentSlide + 1}
+                    Q{questionNumber}
                   </span>
                   <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">
                     {cleanQuestion}
@@ -3280,7 +3301,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             {/* Footer with button */}
             <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-2 text-[13px] text-slate-600">
-                <span>Question {currentSlide + 1} of {totalSlides}</span>
+                <span>Question {questionNumber} of {questionTotal}</span>
               </div>
               <div className="flex gap-3">
                 {ans && !ans.submitted && (
