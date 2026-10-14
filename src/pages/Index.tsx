@@ -631,7 +631,7 @@ const Index = () => {
             </h2>
 
             <p className="text-center text-slate-600 mb-8">
-              <span className="font-semibold text-slate-900">"{courseTitle}"</span> is ready. Click on <span className="font-semibold">Course Output</span> to view your material.
+              <span className="font-semibold text-slate-900">"{courseTitle}"</span> is ready. You are now on <span className="font-semibold">Course Output</span> — preview it as a learner or export it.
             </p>
 
             <div className="space-y-3">
@@ -642,7 +642,7 @@ const Index = () => {
                 }}
                 className="w-full px-6 py-3 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
               >
-                Go to Course Output
+                Continue
               </button>
               <button
                 onClick={() => setShowGenerationComplete(false)}
@@ -822,8 +822,9 @@ const Index = () => {
             onComplete={(clips) => {
               setWorkflowClips(clips);
               setShowVideoWorkflow(false);
+              finishToOutput();
             }}
-            onSkip={() => setShowVideoWorkflow(false)}
+            onSkip={() => { setShowVideoWorkflow(false); finishToOutput(); }}
           />
         </Suspense>
       )}
