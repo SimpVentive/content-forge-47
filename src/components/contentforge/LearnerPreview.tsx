@@ -1849,7 +1849,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     } finally {
       setAudioLoading(false);
     }
-  }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio, narratorLanguage, standalone, courseTitle]);
+  }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio, narratorLanguage, standalone, courseTitle, playSpeechFallback]);
 
   // Auto-play narration when slide changes
   useEffect(() => {
