@@ -1203,13 +1203,22 @@ ZERO-REPETITION RULE — ABSOLUTE:
         addLog("Quality Reviewer: Scoring instructional quality and revising weak sections...");
         qualityResult = await runAgentWithLanguage(
           `${languageDirective}You are a Quality Reviewer for premium corporate eLearning. Review the architect plan and draft script with a ruthless instructional-design lens. Score the draft on instructional clarity, realism, interaction quality, learner engagement, assessment readiness, and duration alignment. Then rewrite any weak content so the output feels sharper, more teachable, more scenario-based, and less generic while still landing near the requested runtime. LANGUAGE REQUIREMENT: The entire revised_script must be written in ${textLanguage}. Narration text must be in ${narratorLanguage}. Do not revert content to English if ${textLanguage} is not English. Return JSON in this exact shape: { instructional_score, realism_score, interaction_score, engagement_score, assessment_readiness_score, duration_alignment_score, strengths: [], issues: [], revision_summary: [], revised_script }. The revised_script must preserve the same module and topic headings while improving the content beneath them.`,
-          `Course Title: ${courseTitle}\n\nArchitect Plan:\n${archResult}\n\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nDraft Script:\n${writerResult}\n\nCurrent Draft Word Count: ${countWords(writerResult)}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\n\nResearch Context:\n${researchResult}\n\nReview the draft against the architect schema. If a topic feels generic, lacks a decision point, ignores a misconception, misses a practical scenario, or materially under-runs or over-runs its word budget, fix it in revised_script. Also remove any repeated or paraphrased sentence within a topic (especially a Key Takeaway that restates the body, or a scenario and its analysis making the same points), and delete metadata lines like "Word Count:".`,
+          `Course Title: ${courseTitle}\n\nArchitect Plan:\n${archResult}\n\nDuration Plan:\n${JSON.stringify(durationPlan, null, 2)}\n\nDraft Script:\n${writerResult}\n\nCurrent Draft Word Count: ${countWords(writerResult)}\nTarget Narration Words: ${targetNarrationWords}\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\n\nResearch Context:\n${researchResult}\n\nReview the draft against the architect schema. If a topic feels generic, lacks a decision point, ignores a misconception, misses a practical scenario, or materially under-runs or over-runs its word budget, fix it in revised_script. Also remove any repeated or paraphrased sentence within a topic (especially a Key Takeaway that restates the body, or a scenario and its analysis making the same points), and delete metadata lines like "Word Count:". revised_script MUST be the COMPLETE script for every module and topic — never abbreviate, never use placeholders like "[rest of original script follows]", "...", or "(unchanged)".`,
           addLog, "Quality Reviewer"
         );
 
         const qualityParsed = tryParseJson(qualityResult);
         if (qualityParsed?.revised_script && typeof qualityParsed.revised_script === "string") {
-          writerResult = qualityParsed.revised_script;
+          const revised = qualityParsed.revised_script;
+          // Reject abbreviated rewrites ("[rest of original script follows]", "...remaining unchanged")
+          // or ones that dropped most of the content — keep the complete draft instead.
+          const abbreviated = /\[[^\]]*(rest of|remaining|unchanged|original script|continues|truncated|same as above)[^\]]*\]|\(\s*(rest of|remaining)[^)]*\)/i.test(revised);
+          const tooShort = countWords(revised) < countWords(writerResult) * 0.6;
+          if (abbreviated || tooShort) {
+            addLog(`Quality Reviewer: Revision was ${abbreviated ? "abbreviated" : "incomplete"}; keeping the full draft.`);
+          } else {
+            writerResult = revised;
+          }
         }
 
         setStatus("quality", "complete");
