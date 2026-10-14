@@ -285,6 +285,14 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
   const selectedTrainerImage = getTrainerMedia(selectedTrainer.id, avatarEnv).imageUrl;
 
+  // Warm the browser cache for every instructor so switching is instant.
+  useEffect(() => {
+    AVATAR_TRAINERS.forEach((t) => {
+      const url = getTrainerMedia(t.id, avatarEnv).imageUrl;
+      if (url) { const img = new Image(); img.decoding = "async"; img.src = url; }
+    });
+  }, [avatarEnv]);
+
   useEffect(() => {
     if (!trainerAutoMode) return;
     setAvatarTrainerId(getDefaultTrainerIdForLanguage(narratorLanguage));
