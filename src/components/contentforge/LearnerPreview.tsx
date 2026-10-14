@@ -3016,60 +3016,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   />
                 </div>
 
-                <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-5 shadow-sm">
-                  <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Tools</p>
-                  <div className="mt-3 flex flex-wrap gap-2.5">
-                    {[
-                      { key: "fact" as const, label: "Did You Know", available: !!safeLearnerText(quickFact).trim() },
-                      { key: "takeaway" as const, label: "Key Takeaway", available: !!safeLearnerText(parts.takeaway).trim() },
-                      { key: "objectives" as const, label: "Objectives", available: lessonObjectives.length > 0 },
-                    ].filter((tool) => tool.available).map((tool) => (
-                      <button
-                        key={tool.key}
-                        onClick={() => setActiveLearningTool((prev) => (prev === tool.key ? null : tool.key))}
-                        className={`rounded-full border px-3.5 py-1.5 text-[12px] font-[800] transition-all ${
-                          activeLearningTool === tool.key
-                            ? "border-[#1d4f93] bg-[#eaf2ff] text-[#1d4f93]"
-                            : "border-[#d8e2ef] bg-white text-[#4b6592] hover:border-[#9fb6d8]"
-                        }`}
-                        type="button"
-                      >
-                        {tool.label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {activeLearningTool === "objectives" ? (
-                    lessonObjectives.length > 0 ? (
-                      <div className="mt-3 rounded-xl border border-[#d8e2ef] bg-[#f8fbff] p-3.5">
-                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
-                        <div className="mt-2 space-y-2">
-                          {lessonObjectives.map((objective, index) => (
-                            <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
-                              <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
-                              <span>{objective}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    ) : null
-                  ) : null}
-
-                  {activeLearningTool === "takeaway" && safeLearnerText(parts.takeaway).trim() ? (
-                    <div className="mt-3 rounded-xl border border-[#f3d9a3] bg-[#fffaf3] p-3.5">
-                      <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Key Takeaway</p>
-                      <p className="mt-2 text-[13px] leading-relaxed text-[#6f5b35]">{safeLearnerText(parts.takeaway)}</p>
-                    </div>
-                  ) : null}
-
-                  {activeLearningTool === "fact" && safeLearnerText(quickFact).trim() ? (
-                    <div className="mt-3 rounded-xl border border-[#f2d089] bg-[#fff5d6] p-3.5">
-                      <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Did You Know?</p>
-                      <p className="mt-2 text-[13px] leading-relaxed text-[#6f5b35]">{safeLearnerText(quickFact)}</p>
-                    </div>
-                  ) : null}
-
-                </div>
 
                 {slide.infographicSvg?.trim() && (
                   <div style={{ animation: "infographicExpandIn 360ms cubic-bezier(0.22, 1, 0.36, 1) 180ms both" }}>
