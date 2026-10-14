@@ -1,18 +1,11 @@
 /**
- * Image Generation Edge Function - Black Forest Labs Flux 2
+ * Image Generation Edge Function — provider chain with hard time limits.
  *
- * RATIONALE:
- * - BFL Flux 2 is the primary image generation service for this project
- * - API key (BFL_API_KEY) is configured in .env
- * - Provides consistent, high-quality corporate training visuals
- * - Modern model actively maintained by Black Forest Labs
+ * 1. OpenAI Images API (OPENAI_API_KEY, model OPENAI_IMAGE_MODEL || gpt-image-1)
+ * 2. Black Forest Labs Flux (BFL_API_KEY) — async submit + poll API
  *
- * DECISION LOG:
- * - Chosen over OpenAI gpt-image-1 (model deprecated, key not configured)
- * - Chosen over DALL-E (requires separate API key, higher costs)
- * - This is a permanent architectural decision, not a temporary workaround
- *
- * @see https://docs.bfl.ml/ - Black Forest Labs API Documentation
+ * Each provider is bounded so the caller always gets an answer well inside the
+ * client's timeout. Response shape: { imageDataUrl, mimeType, provider }.
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
@@ -21,263 +14,113 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-// Configuration
-const BFL_API_ENDPOINT = "https://api.bfl.ml/v1/image";
-const REQUEST_TIMEOUT_MS = 120000; // 2 minutes for image generation
-const IMAGE_GENERATION_TIMEOUT_MS = 90000; // 90 seconds for Flux to complete
-const FETCH_RETRY_ATTEMPTS = 3;
-const FETCH_RETRY_DELAY_MS = 1000;
+const OPENAI_TIMEOUT_MS = 70_000;
+const BFL_TIMEOUT_MS = 40_000;
 
-/**
- * Convert ArrayBuffer to Base64 string
- */
-function arrayBufferToBase64(buffer: ArrayBuffer): string {
+function enhancePrompt(prompt: string, style: string, altText: string, moduleTitle: string, topicTitle: string): string {
+  const softened = String(prompt).replace(
+    /\b(violence|violent|blood|bloody|injury|weapon|weapons|gun|explosion|fight|attack|hazard|danger|accident|emergency)\b/gi,
+    "workplace safety concern",
+  );
+  return [
+    "Create an original, high-quality corporate training image.",
+    moduleTitle ? `Module: ${moduleTitle}.` : "",
+    topicTitle ? `Topic: ${topicTitle}.` : "",
+    `Visual style: ${style || "realistic-office"}.`,
+    altText ? `Accessibility description: ${altText}.` : "",
+    "No logos, no watermarks, no copyrighted characters, no visible trademarks, no text overlays.",
+    "Contemporary corporate training aesthetic: diverse people, realistic lighting, professional composition.",
+    softened,
+  ].filter(Boolean).join(" ");
+}
+
+function toBase64(buffer: ArrayBuffer): string {
   const bytes = new Uint8Array(buffer);
   let binary = "";
-  for (let index = 0; index < bytes.length; index++) {
-    binary += String.fromCharCode(bytes[index]);
-  }
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
   return btoa(binary);
 }
 
-/**
- * Fetch image from URL with retry logic and timeout
- */
-async function fetchImageAsDataUrl(
-  url: string,
-  maxRetries: number = FETCH_RETRY_ATTEMPTS
-): Promise<{ imageDataUrl: string; mimeType: string }> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), IMAGE_GENERATION_TIMEOUT_MS);
-
-      const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) {
-        throw new Error(`Image fetch failed: HTTP ${response.status}`);
-      }
-
-      const mimeType = response.headers.get("content-type") || "image/jpeg";
-      const imageBuffer = await response.arrayBuffer();
-      const imageBase64 = arrayBufferToBase64(imageBuffer);
-
-      return {
-        imageDataUrl: `data:${mimeType};base64,${imageBase64}`,
-        mimeType,
-      };
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      console.warn(`[Image Fetch] Attempt ${attempt + 1}/${maxRetries} failed:`, lastError.message);
-
-      if (attempt < maxRetries - 1) {
-        await new Promise((resolve) => setTimeout(resolve, FETCH_RETRY_DELAY_MS * (attempt + 1)));
-      }
-    }
-  }
-
-  throw new Error(`Image fetch failed after ${maxRetries} attempts: ${lastError?.message}`);
+async function fetchAsDataUrl(url: string, signal: AbortSignal): Promise<string> {
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`image download HTTP ${res.status}`);
+  const mime = res.headers.get("content-type") || "image/jpeg";
+  return `data:${mime};base64,${toBase64(await res.arrayBuffer())}`;
 }
 
-/**
- * Validate BFL API response and extract image URL
- */
-function extractImageUrlFromBFLResponse(data: any): string {
-  // BFL Flux 2 response structure: { result: { sample: "url" } }
-  const imageUrl = data?.result?.sample || data?.result?.images?.[0] || data?.sample;
-
-  if (!imageUrl || typeof imageUrl !== "string") {
-    console.error("[BFL Response] Unexpected response structure:", JSON.stringify(data).substring(0, 200));
-    throw new Error("BFL image generation returned no image URL in expected format");
-  }
-
-  if (!imageUrl.startsWith("http")) {
-    throw new Error(`BFL returned invalid image URL: ${imageUrl.substring(0, 50)}`);
-  }
-
-  return imageUrl;
+async function openAI(prompt: string, size: string): Promise<string> {
+  const key = Deno.env.get("OPENAI_API_KEY");
+  if (!key) throw new Error("OPENAI_API_KEY not set");
+  const model = Deno.env.get("OPENAI_IMAGE_MODEL") || "gpt-image-1";
+  const signal = AbortSignal.timeout(OPENAI_TIMEOUT_MS);
+  const body: Record<string, unknown> = { model, prompt, n: 1, size };
+  if (model.startsWith("gpt-image")) body.quality = "medium";
+  const res = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!res.ok) throw new Error(`OpenAI ${res.status}: ${(await res.text().catch(() => "")).slice(0, 200)}`);
+  const data = await res.json();
+  const first = data?.data?.[0];
+  if (first?.b64_json) return `data:image/png;base64,${first.b64_json}`;
+  if (first?.url) return fetchAsDataUrl(first.url, signal);
+  throw new Error("OpenAI returned no image");
 }
 
-/**
- * Enhance prompt for better corporate training imagery
- */
-function enhancePromptForTraining(
-  prompt: string,
-  style: string,
-  altText: string,
-  moduleTitle: string,
-  topicTitle: string
-): string {
-  // Safety: Remove potentially problematic keywords
-  const softened = prompt
-    .replace(/\b(violence|violent|blood|bloody|injury|weapon|weapons|gun|explosion|fight|attack|hazard|danger|accident|emergency)\b/gi, "workplace safety concern");
-
-  return [
-    "Create an original, high-quality AI-generated corporate training image.",
-    `Module: ${moduleTitle || "Untitled module"}.`,
-    `Topic: ${topicTitle || "Untitled topic"}.`,
-    `Visual style: ${style || "realistic-office"}.`,
-    `Accessibility description: ${altText || "AI-generated visual for workplace learning."}.`,
-    "⚠️ CRITICAL: No logos, no watermarks, no copyrighted characters, no branded products, no visible trademarks, no watermarks.",
-    "Use contemporary corporate training aesthetic: diverse people, realistic office lighting, professional composition, polished appearance.",
-    "Image should feel suitable for executive presentation or formal training material.",
-    "Avoid generic stock photo appearance - aim for authentic, realistic workplace scenario.",
-    softened,
-  ]
-    .filter(Boolean)
-    .join(" ");
+async function bfl(prompt: string): Promise<string> {
+  const key = Deno.env.get("BFL_API_KEY");
+  if (!key) throw new Error("BFL_API_KEY not set");
+  const deadline = Date.now() + BFL_TIMEOUT_MS;
+  const signal = AbortSignal.timeout(BFL_TIMEOUT_MS);
+  const submit = await fetch("https://api.bfl.ai/v1/flux-pro-1.1", {
+    method: "POST",
+    headers: { "x-key": key, "Content-Type": "application/json", accept: "application/json" },
+    body: JSON.stringify({ prompt, width: 1024, height: 768 }),
+    signal,
+  });
+  if (!submit.ok) throw new Error(`BFL submit ${submit.status}: ${(await submit.text().catch(() => "")).slice(0, 200)}`);
+  const { id, polling_url } = await submit.json();
+  const pollUrl = polling_url || `https://api.bfl.ai/v1/get_result?id=${id}`;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 1500));
+    const poll = await fetch(pollUrl, { headers: { "x-key": key, accept: "application/json" }, signal });
+    const data = await poll.json().catch(() => ({}));
+    if (data?.status === "Ready" && data?.result?.sample) return fetchAsDataUrl(data.result.sample, signal);
+    if (["Error", "Failed", "Request Moderated", "Content Moderated"].includes(data?.status)) throw new Error(`BFL ${data.status}`);
+  }
+  throw new Error("BFL timed out");
 }
 
-/**
- * Main handler
- */
 serve(async (req) => {
-  // CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  try {
-    // Request timeout wrapper
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  let body: any;
+  try { body = await req.json(); } catch { return json({ error: "Invalid JSON in request body" }, 400); }
+  const { prompt, style, altText, moduleTitle, topicTitle, size } = body ?? {};
+  if (!prompt || typeof prompt !== "string" || !prompt.trim()) return json({ error: "prompt is required" }, 400);
 
-    // Parse request
-    let requestBody: any;
+  const enhanced = enhancePrompt(prompt, style, altText, moduleTitle, topicTitle);
+  const errors: string[] = [];
+  const providers: Array<[string, () => Promise<string>]> = [
+    ["openai", () => openAI(enhanced, typeof size === "string" && size ? size : "1024x1024")],
+    ["bfl", () => bfl(enhanced)],
+  ];
+  for (const [name, run] of providers) {
     try {
-      requestBody = await req.json();
-    } catch {
-      clearTimeout(timeoutId);
-      return new Response(
-        JSON.stringify({ error: "Invalid JSON in request body" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      const imageDataUrl = await run();
+      console.log(`[Image Generation] ✓ ${name}`);
+      return json({ imageDataUrl, mimeType: imageDataUrl.slice(5, imageDataUrl.indexOf(";")), provider: name });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[Image Generation] ${name} failed: ${message}`);
+      errors.push(`${name}: ${message}`);
     }
-
-    const { prompt, style, altText, moduleTitle, topicTitle } = requestBody;
-
-    // Validate required fields
-    if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
-      clearTimeout(timeoutId);
-      return new Response(
-        JSON.stringify({ error: "prompt is required and must be a non-empty string" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Verify API key is configured
-    const apiKey = Deno.env.get("BFL_API_KEY");
-    if (!apiKey) {
-      clearTimeout(timeoutId);
-      console.error("[Image Generation] FATAL: BFL_API_KEY environment variable not set");
-      return new Response(
-        JSON.stringify({
-          error: "Image generation service not properly configured. BFL_API_KEY is missing. Please contact administrator.",
-        }),
-        { status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Enhance the prompt for better results
-    const enhancedPrompt = enhancePromptForTraining(prompt, style, altText, moduleTitle, topicTitle);
-
-    console.log(`[Image Generation] Starting Flux 2 generation for: "${topicTitle || "untitled"}"`);
-    console.log(`[Image Generation] Prompt length: ${enhancedPrompt.length} characters`);
-
-    // Call BFL Flux 2 API
-    const bflResponse = await fetch(BFL_API_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "X-API-Key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt: enhancedPrompt,
-        width: 1536,
-        height: 1024,
-        steps: 28,
-        guidance_scale: 7.5,
-      }),
-      signal: controller.signal,
-    });
-
-    // Handle specific HTTP errors
-    if (bflResponse.status === 429) {
-      clearTimeout(timeoutId);
-      console.warn("[Image Generation] Rate limited by BFL API");
-      return new Response(
-        JSON.stringify({
-          error: "Image generation rate limited. Please try again in a few moments.",
-          retryAfter: 30,
-        }),
-        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (bflResponse.status === 401 || bflResponse.status === 403) {
-      clearTimeout(timeoutId);
-      console.error("[Image Generation] FATAL: BFL API authentication failed (401/403)");
-      return new Response(
-        JSON.stringify({
-          error: "Image generation authentication failed. BFL_API_KEY is invalid or expired. Please contact administrator.",
-        }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (bflResponse.status === 402) {
-      clearTimeout(timeoutId);
-      console.error("[Image Generation] BFL account has insufficient credits");
-      return new Response(
-        JSON.stringify({
-          error: "Image generation service out of credits. Please contact administrator.",
-        }),
-        { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (!bflResponse.ok) {
-      clearTimeout(timeoutId);
-      const errorData = await bflResponse.json().catch(() => ({}));
-      console.error(`[Image Generation] BFL API error ${bflResponse.status}:`, errorData);
-      throw new Error(
-        errorData?.error?.message || errorData?.error || `BFL API returned ${bflResponse.status}`
-      );
-    }
-
-    // Parse BFL response
-    const bflData = await bflResponse.json();
-    console.log("[Image Generation] BFL API response received, extracting image URL");
-
-    // Extract image URL from response
-    const imageUrl = extractImageUrlFromBFLResponse(bflData);
-    console.log("[Image Generation] Image URL extracted, fetching image data");
-
-    // Fetch and convert image to base64 data URL
-    const imageResult = await fetchImageAsDataUrl(imageUrl);
-    console.log(`[Image Generation] ✓ Success - Image converted to base64 (${imageResult.mimeType})`);
-
-    clearTimeout(timeoutId);
-    return new Response(JSON.stringify(imageResult), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    const isTimeout = message.includes("AbortError") || message.includes("timeout");
-
-    console.error(`[Image Generation] ${isTimeout ? "TIMEOUT" : "ERROR"}:`, message);
-
-    return new Response(
-      JSON.stringify({
-        error: isTimeout
-          ? "Image generation timed out. The server took too long to respond. Please try again."
-          : `Image generation failed: ${message}`,
-      }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
   }
+  return json({ error: `Image generation failed — ${errors.join(" | ")}` }, 502);
 });
