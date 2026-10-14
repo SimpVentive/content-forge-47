@@ -1968,12 +1968,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   useEffect(() => {
     setVisited(prev => new Set(prev).add(currentSlide));
-    if (currentSlide === totalSlides - 1 && slides[currentSlide]?.type === "summary") {
-      const lastModuleIdx = modules.length - 1;
-      if (slide.moduleIndex === lastModuleIdx) {
-        setTimeout(() => setShowCompletion(true), 500);
-      }
-    }
+    // Note: the completion screen is NOT auto-shown here. The final
+    // "Module Complete" slide stays visible until the learner clicks
+    // "Complete Course" — auto-opening it hid the slide within seconds.
   }, [currentSlide]);
 
   // Keyboard nav
