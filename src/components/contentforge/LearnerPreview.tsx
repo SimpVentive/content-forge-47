@@ -2524,7 +2524,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   </div>
 
                   {/* What to Notice + Better Move side by side */}
-                  <div className="grid gap-4 sm:grid-cols-2">
+                  <div className={`grid gap-4 ${summaryBullets.length > 0 ? "sm:grid-cols-2" : ""}`}>
+                    {summaryBullets.length > 0 ? (
                     <div className="rounded-[20px] border border-[#d8e2ef] bg-white p-5 shadow-sm">
                       <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592] mb-3">What to Notice</p>
                       <div className="space-y-2.5">
@@ -2535,11 +2536,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                               <span>{bullet}</span>
                             </div>
                           ))
-                        ) : (
-                          <p className="text-[13px] text-[#7c8eb0] italic">Key observations will appear after the course has been fully generated.</p>
-                        )}
+                        ) : null}
                       </div>
                     </div>
+                    ) : null}
                     <div className="rounded-[20px] border border-[#f0d8a8] bg-[#fffbf0] p-5 shadow-sm">
                       <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#9a6a1a] mb-3">Better Move</p>
                       <p className="text-[15px] leading-relaxed text-[#6f5b35]">
@@ -4061,7 +4061,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
               <div className="flex items-center gap-2.5 self-end lg:self-auto">
                 {/* Quiz (hidden on the first slide so learners read the course first) */}
-                {currentSlide > 0 ? (
+                {false ? (
                   <button
                     onClick={() => {
                       if (currentModuleAssessmentSlide) {
