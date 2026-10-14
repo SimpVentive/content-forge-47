@@ -179,7 +179,7 @@ export const Dashboard = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex">
       {/* Left Sidebar */}
-      <div className="w-64 bg-white border-r border-slate-200 flex flex-col">
+      <div className="w-64 shrink-0 bg-white border-r border-slate-200 flex flex-col sticky top-0 h-screen max-h-screen">
         {/* Logo */}
         <div className="px-6 py-8 border-b border-slate-200">
           <div className="flex items-center gap-3">
@@ -194,7 +194,7 @@ export const Dashboard = () => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        <nav className="flex-1 min-h-0 overflow-y-auto px-4 py-6 space-y-2">
           {SIDEBAR_ITEMS.map((item) => {
             const Icon = item.icon;
             const isActive = item.id === activeView || (item.id === "help" && showHelpModal);
@@ -222,7 +222,7 @@ export const Dashboard = () => {
         </nav>
 
         {/* Bottom Actions */}
-        <div className="px-4 py-6 border-t border-slate-200 space-y-2">
+        <div className="shrink-0 px-4 py-4 border-t border-slate-200 space-y-2">
           <button
             onClick={handleNewCourse}
             className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-teal-600 text-white font-semibold hover:bg-teal-700 transition-all"
@@ -234,7 +234,7 @@ export const Dashboard = () => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 min-w-0 flex flex-col">
         {/* Top Bar */}
         <div className="bg-white border-b border-slate-200 px-8 py-4">
           <div className="flex items-center justify-between gap-6">
