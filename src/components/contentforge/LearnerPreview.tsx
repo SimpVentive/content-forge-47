@@ -2372,7 +2372,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const moduleLabel = `MODULE ${slide.moduleIndex + 1} - ${slide.moduleTitle}`.toUpperCase();
         const narratorSource = [parts.hook, ...parts.body].filter(Boolean).join(" ");
         const narratorExcerpt = getNarratorExcerpt(narratorSource || slide.content || "");
-        const chartLines = buildFlipChartLines(parts, slideRules.maxLines);
+        const takeawayKey = String(parts.takeaway || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+        const chartLines = buildFlipChartLines(parts, slideRules.maxLines).filter((line: any) => {
+          if (!takeawayKey || line.tone === "takeaway") return true;
+          const k = String(line.text || "").toLowerCase().replace(/^key takeaway:?\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
+          return !(k && (k === takeawayKey || takeawayKey.includes(k) || k.includes(takeawayKey)));
+        });
         const contentTextStyle = {
           fontSize: `${Math.max(14, slideRules.minFontSize)}px`,
           lineHeight: slideRules.lineSpacing,
