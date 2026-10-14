@@ -16,7 +16,7 @@ interface TabContainerProps {
 
 export const TabContainer: React.FC<TabContainerProps> = ({ tabs, activeTab, onTabChange, children }) => {
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+    <div className="h-full flex-1 min-h-0 flex flex-col bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
       {/* Tab Navigation */}
       <div className="bg-white border-b border-slate-200/50 px-8 py-0 flex items-center gap-0 shadow-sm backdrop-blur-sm">
         {tabs.map((tab, idx) => (
@@ -46,7 +46,7 @@ export const TabContainer: React.FC<TabContainerProps> = ({ tabs, activeTab, onT
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-hidden bg-white">
+      <div className="flex-1 min-h-0 overflow-hidden bg-white">
         {children}
       </div>
     </div>

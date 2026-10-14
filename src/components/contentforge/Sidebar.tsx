@@ -501,8 +501,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             />
           </div>
         )}
+      </div>
 
-        <div className="sticky bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-white/80 border-t border-slate-200/50 pt-5 -mx-6 px-6 pb-6 z-10 shadow-2xl backdrop-blur-sm">
+      {/* Action bar: flex sibling of the scroll area so it is always on screen at any zoom/screen size */}
+      <div className="shrink-0 bg-white border-t border-slate-200 px-6 py-4 z-10 shadow-[0_-8px_24px_-12px_rgba(15,23,42,0.25)]">
           {isRunning ? (
             <button
               onClick={onStop}
@@ -532,7 +534,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </button>
           )}
-        </div>
       </div>
     </div>
   );
