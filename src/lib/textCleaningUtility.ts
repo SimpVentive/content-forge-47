@@ -43,3 +43,14 @@ export function safeLearnerText(text: string, fallback = ""): string {
 export function stripOptionPrefix(opt: string): string {
   return String(opt ?? "").replace(/^\s*\(?[A-Da-d]\)?\s*[\.\):\-]\s*/, "");
 }
+
+/** Single source of truth for quiz narration: question followed by every option.
+ *  Used by the learner preview AND the exported package so audio always matches the screen. */
+export function buildAssessmentNarration(q: { question?: unknown; options?: unknown } | undefined | null): string {
+  if (!q) return "";
+  const questionText = String(q.question || "").replace(/Correct Answer:.*$/gi, "").replace(/Options:.*$/gi, "").trim();
+  const optionLines = Array.isArray(q.options)
+    ? q.options.map((opt: unknown, i: number) => `Option ${String.fromCharCode(65 + i)}. ${stripOptionPrefix(String(opt ?? ""))}`)
+    : [];
+  return [questionText, ...optionLines].filter(Boolean).join(". ").replace(/\.\./g, ".").slice(0, 2500);
+}
