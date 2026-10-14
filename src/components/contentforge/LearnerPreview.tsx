@@ -1930,7 +1930,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     const narration = getNarrationForSlide(currentSlide);
     if (!narration) return;
     // If audio already cached for this slide, play it
-    if (getCachedAudio(currentSlide, narrationText)) {
+    if (getCachedAudio(currentSlide, narration)) {
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
       wireAudio(audio);
       audio.play().catch((err) => {
@@ -4088,7 +4088,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <button
                     onClick={() => {
                       if (audioLoading) return;
-                      const cachedUrl = audioUrlsRef.current[currentSlide];
+                      const cachedUrl = getCachedAudio(currentSlide, currentNarration);
                       if (audioRef.current && isPlaying) {
                         audioRef.current.pause();
                         return;
