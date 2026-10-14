@@ -3187,15 +3187,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         let cleanQuestion = q.question || "";
         cleanQuestion = cleanQuestion.replace(/Correct Answer:.*$/gi, '').replace(/Options:.*$/gi, '').trim();
 
-        // Randomize option order each time this question loads (deterministic per question/slide)
+        // Options were already shuffled once at build time (buildSlides) so the
+        // correct answer is randomly placed; render them in that stable order.
         const optionsWithIndices = q.options.map((opt: string, idx: number) => ({ opt, originalIdx: idx }));
-        const shuffledOptions = [...optionsWithIndices];
-        {
-          let h = 2166136261;
-          for (const ch of `${currentSlide}|${q.question || ""}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
-          const rand = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; };
-          for (let i = shuffledOptions.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [shuffledOptions[i], shuffledOptions[j]] = [shuffledOptions[j], shuffledOptions[i]]; }
-        }
+        const shuffledOptions = optionsWithIndices;
 
         const getShuffledIndex = (originalIdx: number) => shuffledOptions.findIndex(item => item.originalIdx === originalIdx);
 
