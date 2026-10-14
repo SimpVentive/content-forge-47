@@ -1219,7 +1219,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
                   disabled={disabled}
                   onClick={() => {
                     if (isPreview && hasOutput) {
-                      setShowLearnerPreview(true);
+                      if (onOpenLearnerPreview) onOpenLearnerPreview(); else setShowLearnerPreview(true);
                     } else if (!isPreview) {
                       setActiveTab(tab.key);
                     }
