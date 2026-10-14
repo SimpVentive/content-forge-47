@@ -1835,7 +1835,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     }
 
     if (standalone) {
-      toast.error("No recorded narration is included for this slide.");
+      // Offline package: no voice service. Use the browser's built-in voice.
+      if (!playSpeechFallback(narrationText, narratorLanguage || "English")) {
+        toast.error("Narration is not available in this browser.");
+      }
       return;
     }
 
@@ -2327,7 +2330,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           <img src={repImage} alt={slide.moduleTitle} className="w-full h-full object-cover" />
                         ) : standalone || moduleIntroErrors[mi] ? (
                           <div role="status" className="flex flex-col items-center gap-3 p-8 text-center text-muted-foreground">
-                            <p>{moduleIntroErrors[mi] || "The introduction image was not included in this package. Please download the course again."}</p>
+                            {standalone ? (<><p className="text-[22px] font-bold text-blue-900">{slide.moduleTitle}</p><p className="text-[13px] text-blue-700">{courseTitle}</p></>) : <p>{moduleIntroErrors[mi]}</p>}
                             {!standalone && <Button variant="outline" onClick={() => setIntroRetry(prev => prev + 1)}><RefreshCw />Retry image</Button>}
                           </div>
                         ) : (

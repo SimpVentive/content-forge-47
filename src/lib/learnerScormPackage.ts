@@ -8,6 +8,10 @@ import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 
 export type PortableLearnerProps = Omit<LearnerPreviewProps, "onClose" | "onUpdateVisualTopic" | "onLearnerProgress">;
 
+function withTimeout<T>(task: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([task, new Promise<T>((_, reject) => setTimeout(() => reject(new Error("timeout")), ms))]);
+}
+
 export function serializeCourseData(data: unknown): string {
   return JSON.stringify(data).replace(/</g, "\\u003c").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
 }
@@ -85,8 +89,12 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   for (const slide of slides.filter(slide => slide.type === "title")) {
     const mi = slide.moduleIndex;
     const image = media.introImages[mi] || resolveIntroImage(slides, mi);
-    if (!image) report(`Preparing the introduction image for ${slide.moduleTitle}...`);
-    media.introImages[mi] = image || await generateIntroImage(slide.moduleTitle, props.courseTitle);
+    if (image) { media.introImages[mi] = image; continue; }
+    report(`Preparing the introduction image for ${slide.moduleTitle}...`);
+    // Optional media must never block the export: fall back to a title card.
+    const generated = await withTimeout(generateIntroImage(slide.moduleTitle, props.courseTitle), 45_000).catch(() => null);
+    if (generated) media.introImages[mi] = generated;
+    else report(`Introduction image unavailable for ${slide.moduleTitle} — using a title card.`);
   }
   const rawOutputs = await portableValue(props.rawOutputs) as PortableLearnerProps["rawOutputs"];
   for (const key of ["imageUrl", "videoUrl", "posterUrl"] as const) {
@@ -110,8 +118,12 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
       const narration = slide.type === "assessment" ? slide.question?.question : section?.narration_text || slide.content;
       if (typeof narration !== "string" || !narration.trim()) continue;
       report(`Including recorded narration ${index + 1} of ${slides.length}...`);
-      const result = await generateNarrationAudio(narration.slice(0, 2500), getTrainerVoiceId(trainerId), props.narratorLanguage || props.textLanguage || "English");
-      if (!result.success || !result.audioDataUrl) throw new Error(`Narration could not be included: ${result.error || "The voice service did not return audio."}`);
+      const result = await withTimeout(generateNarrationAudio(narration.slice(0, 2500), getTrainerVoiceId(trainerId), props.narratorLanguage || props.textLanguage || "English"), 30_000).catch(() => null);
+      if (!result?.success || !result.audioDataUrl) {
+        // Voice service down: stop calling it; the package uses the browser voice instead.
+        report("Voice service unavailable — the course will use the browser's built-in voice.");
+        break;
+      }
       media.audioBySlide[index] = result.audioDataUrl;
     }
   }
