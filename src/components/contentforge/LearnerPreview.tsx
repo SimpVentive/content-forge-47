@@ -3194,6 +3194,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
         const getShuffledIndex = (originalIdx: number) => shuffledOptions.findIndex(item => item.originalIdx === originalIdx);
 
+        // Question numbering counts assessment slides only (not all screens),
+        // so "Question 2 of 3" reflects the actual quiz, not the slide position.
+        const assessmentSlideIndexes = slides.map((sl, i) => sl.type === "assessment" ? i : -1).filter(i => i >= 0);
+        const questionNumber = assessmentSlideIndexes.indexOf(currentSlide) + 1;
+        const questionTotal = assessmentSlideIndexes.length;
+
         return (
           <div className="w-full h-full flex flex-col" key={currentSlide}>
             <div className="flex-1 overflow-y-auto px-6 py-8">
