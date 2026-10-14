@@ -466,7 +466,9 @@ function parseContentParts(text: string) {
     .split("\n")
     .filter((line) => !line.match(/^#{1,3}\s/))
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !isPlaceholderToken(line));
+    .filter((line) => line.length > 0 && !isPlaceholderToken(line))
+    // Drop generation metadata lines that leak into content (e.g. "Word Count: 398")
+    .filter((line) => !/^(word\s*count|wordcount|token\s*count|char(acter)?\s*count)\s*[:=]/i.test(line));
   const joined = lines.join("\n").trim();
   const paragraphs = joined
     .split(/\n\n+/)
@@ -1627,7 +1629,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       const contentSlides = slides.filter(sl => sl.type === "content");
       const contentIdx = contentSlides.indexOf(s);
       if (contentIdx >= 0 && narrationSections[contentIdx]) {
-        const txt = narrationSections[contentIdx].narration_text || "";
+        const txt = (narrationSections[contentIdx].narration_text || "")
+          // Strip generation metadata so the audio never says "Word Count: 398"
+          .replace(/(^|[.\n\r])\s*word\s*count\s*[:=]\s*\d+\s*[.\n\r]?/gi, "$1 ")
+          .trim();
         if (txt) return txt;
       }
     }
