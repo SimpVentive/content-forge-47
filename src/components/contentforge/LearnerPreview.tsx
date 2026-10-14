@@ -2234,7 +2234,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               <p className="text-[13px] text-white/50">Time Taken</p>
             </div>
           </div>
-          <button onClick={onClose} className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all">
+          <button onClick={() => { setShowCompletion(false); onClose(); }} className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all">
             Close Preview
           </button>
         </div>
