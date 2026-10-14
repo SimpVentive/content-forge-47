@@ -1455,7 +1455,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const courseDurationMinutes = (() => {
     const raw = String(courseDuration ?? "15");
     const match: RegExpMatchArray | null = raw.match(/\d+/);
-    return match ? `${match[0]} min` : `${raw} min`;
+    return match ? `${match[0]} mins` : `${raw} mins`;
   })();
   const progress = ((currentSlide + 1) / totalSlides) * 100;
   const slideAnimationName = slideMotion
@@ -1976,7 +1976,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     { id: "progress" as const, label: "Progress", icon: BarChart3 },
     { id: "objectives" as const, label: "Objectives", icon: BookOpenText },
     ...(learnerNotesEnabled ? [{ id: "notes" as const, label: "Notes", icon: NotebookPen }] : []),
-    ...(resourcesPanelEnabled ? [{ id: "resources" as const, label: "Resources", icon: FolderOpen }] : []),
   ];
   const utilityActions = [
     ...(discussionEnabled ? [{ label: "Discussion", icon: MessageSquareText, panel: "discussion" as const }] : []),
@@ -2182,7 +2181,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <div className="flex items-center gap-4">
                     <span className="inline-flex items-center gap-2 bg-blue-100 text-blue-700 text-[13px] font-semibold px-4 py-2 rounded-full">
                       <Clock className="w-4 h-4" />
-                      ~{courseDurationMinutes} minutes
+                      {courseDurationMinutes}
                     </span>
                   </div>
                 </div>
@@ -4060,33 +4059,24 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
               </div>
 
               <div className="flex items-center gap-2.5 self-end lg:self-auto">
-                {/* Notes */}
-                <button
-                  onClick={() => setActiveSidebarPanel(activeSidebarPanel === "notes" ? "home" : "notes")}
-                  className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${activeSidebarPanel === "notes" ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
-                  type="button"
-                  aria-label="Notes"
-                >
-                  <NotebookPen className="h-5 w-5" />
-                  <span>Notes</span>
-                </button>
-
-                {/* Quiz */}
-                <button
-                  onClick={() => {
-                    if (currentModuleAssessmentSlide) {
-                      navigateToSlide(currentModuleAssessmentSlide.idx);
-                    } else {
-                      setActiveLearningTool(activeLearningTool === "quiz" ? null : "quiz");
-                    }
-                  }}
-                  className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${activeLearningTool === "quiz" || slide.type === "assessment" ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
-                  type="button"
-                  aria-label="Quiz"
-                >
-                  <HelpCircle className="h-5 w-5" />
-                  <span>Quiz</span>
-                </button>
+                {/* Quiz (hidden on the first slide so learners read the course first) */}
+                {currentSlide > 0 ? (
+                  <button
+                    onClick={() => {
+                      if (currentModuleAssessmentSlide) {
+                        navigateToSlide(currentModuleAssessmentSlide.idx);
+                      } else {
+                        setActiveLearningTool(activeLearningTool === "quiz" ? null : "quiz");
+                      }
+                    }}
+                    className={`inline-flex h-12 items-center justify-center gap-2 rounded-xl border px-4 text-[13px] font-semibold transition-all ${activeLearningTool === "quiz" || slide.type === "assessment" ? "border-[#1d4f93] bg-[#eef4ff] text-[#1d4f93]" : "border-[#c9d8ea] bg-white text-[#123d78] hover:bg-[#f7fbff]"}`}
+                    type="button"
+                    aria-label="Quiz"
+                  >
+                    <HelpCircle className="h-5 w-5" />
+                    <span>Quiz</span>
+                  </button>
+                ) : null}
 
                 {/* Explain */}
                 {currentNarration && !hasAvatarVideoNarration ? (
