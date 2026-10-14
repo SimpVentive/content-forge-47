@@ -176,6 +176,12 @@ const Index = () => {
     localStorage.setItem("selectedLearningType", learningType);
   }, [learningType]);
 
+  // Single completion path for every course type: open Course Output and confirm.
+  const finishToOutput = () => {
+    setActiveTab("output");
+    setTimeout(() => setShowGenerationComplete(true), 300);
+  };
+
   useEffect(() => {
     if (prevIsRunning.current && !isRunning) {
       if (rawOutputs.heygenVideos) {
@@ -189,8 +195,8 @@ const Index = () => {
       } else if (rawOutputs.youtube && courseParams?.learningType !== "image") {
         setTimeout(() => setShowVideoWorkflow(true), 800);
       } else {
-        // Standard elearning completion — show completion dialog
-        setTimeout(() => setShowGenerationComplete(true), 500);
+        // Standard completion — land on Course Output automatically
+        finishToOutput();
       }
     }
     prevIsRunning.current = isRunning;
