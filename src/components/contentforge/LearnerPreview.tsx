@@ -1760,10 +1760,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   // Browser speech fallback: keeps narration + sentence highlight working when the TTS service fails
   const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
-  const playSpeechFallback = useCallback((text: string) => {
+  const playSpeechFallback = useCallback((text: string, language: string = "English") => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
     const sentences = narrationSentences;
     const utterance = new SpeechSynthesisUtterance(text);
+    const langCodes: Record<string, string> = { Hindi: "hi-IN", Telugu: "te-IN", Tamil: "ta-IN", Kannada: "kn-IN", Malayalam: "ml-IN", Bengali: "bn-IN", Marathi: "mr-IN", Gujarati: "gu-IN", Punjabi: "pa-IN", Urdu: "ur-PK", Spanish: "es-ES", French: "fr-FR", German: "de-DE", Italian: "it-IT", Portuguese: "pt-PT", Arabic: "ar-SA", Chinese: "zh-CN", Japanese: "ja-JP", Korean: "ko-KR", Russian: "ru-RU" };
+    if (langCodes[language]) utterance.lang = langCodes[language];
     utterance.onstart = () => setIsPlaying(true);
     utterance.onend = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); setHighlightWordIdx(-1); };
     utterance.onerror = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); };
@@ -1838,7 +1840,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       if (!result.success || !result.audioDataUrl) {
         const errorMsg = result.error || "Failed to generate audio";
         console.error("TTS error:", errorMsg);
-        if (playSpeechFallback(narrationText)) return;
+        if (playSpeechFallback(textToNarrate, targetLanguage)) return;
         toast.error("Failed to generate narration audio");
         return;
       }
@@ -1871,7 +1873,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     } catch (err) {
       console.error("TTS fetch failed:", err);
-      if (playSpeechFallback(narrationText)) return;
+      if (playSpeechFallback(textToNarrate, targetLanguage)) return;
       toast.error("Failed to generate narration audio");
     } finally {
       setAudioLoading(false);
