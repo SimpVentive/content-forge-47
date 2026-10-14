@@ -608,6 +608,16 @@ function allocateQuestionsPerModule(modules: Module[], totalQuestions: number): 
   return counts;
 }
 
+/* Seeded Fisher-Yates shuffle — deterministic per question so preview, export and narration all share one option order */
+function shuffleQuestionOptions(options: string[], seedKey: string): string[] {
+  const arr = [...options];
+  let h = 2166136261;
+  for (const ch of seedKey) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); }
+  const rand = () => { h ^= h << 13; h ^= h >>> 17; h ^= h << 5; return ((h >>> 0) % 100000) / 100000; };
+  for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+  return arr;
+}
+
 function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[] {
   const normalizedTitle = normalizeModuleKey(module.title);
   const normalizedTopics = new Set(module.topics.map((topic) => normalizeModuleKey(topic)));
