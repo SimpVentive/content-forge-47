@@ -1420,6 +1420,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlsRef = useRef<Record<number, string>>({});
+  const translatedNarrationRef = useRef<Record<string, string>>({});
   const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>(exportMedia?.introImages || learnerExportMedia.get(courseTitle)?.introImages || {});
   const moduleIntroPending = useRef<Set<number>>(new Set());
   const [moduleIntroErrors, setModuleIntroErrors] = useState<Record<number, string>>({});
@@ -1802,8 +1803,34 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     // Use generateNarrationAudio which routes based on language (Telugu → Google Cloud TTS, English → ElevenLabs, etc.)
     setAudioLoading(true);
     try {
+      // Translate the narration first when a non-English language is selected,
+      // otherwise the TTS voice reads English text with an accent.
+      let textToNarrate = narrationText.slice(0, 2500);
+      const targetLanguage = narratorLanguage || "English";
+      if (targetLanguage !== "English") {
+        const cacheKey = `${currentSlide}:${targetLanguage}`;
+        const cachedTranslation = translatedNarrationRef.current[cacheKey];
+        if (cachedTranslation) {
+          textToNarrate = cachedTranslation;
+        } else {
+          try {
+            const { supabase } = await import("@/integrations/supabase/client");
+            const { data: translationData, error: translationError } = await supabase.functions.invoke("translate-text", {
+              body: { text: textToNarrate, targetLanguage },
+            });
+            if (!translationError && translationData?.translatedText) {
+              textToNarrate = translationData.translatedText;
+              translatedNarrationRef.current[cacheKey] = textToNarrate;
+            } else {
+              console.error("Translation failed:", translationError || translationData?.error);
+            }
+          } catch (translationErr) {
+            console.error("Translation request failed, narrating original text:", translationErr);
+          }
+        }
+      }
       const result = await generateNarrationAudio(
-        narrationText.slice(0, 2500),
+        textToNarrate,
         trainerVoiceId,
         narratorLanguage
       );
