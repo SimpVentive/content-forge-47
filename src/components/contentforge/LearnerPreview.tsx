@@ -1756,6 +1756,30 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     };
   }, [currentSlide, muted, startLipSync, startWordHighlight, stopLipSync]);
 
+  // Browser speech fallback: keeps narration + sentence highlight working when the TTS service fails
+  const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const playSpeechFallback = useCallback((text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+    const sentences = narrationSentences;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onstart = () => setIsPlaying(true);
+    utterance.onend = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); setHighlightWordIdx(-1); };
+    utterance.onerror = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); };
+    utterance.onboundary = (event: SpeechSynthesisEvent) => {
+      if (typeof event.charIndex !== "number") return;
+      let cursor = 0;
+      for (let i = 0; i < sentences.length; i++) {
+        const end = cursor + sentences[i].length;
+        if (event.charIndex <= end) { setHighlightSentenceIdx(i); break; }
+        cursor = end + 1;
+      }
+    };
+    speechUtteranceRef.current = utterance;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    return true;
+  }, [narrationSentences]);
+
   // Fetch and play TTS on demand (user gesture)
   const playNarration = useCallback(async () => {
     const narrationText = getNarrationForSlide(currentSlide);
