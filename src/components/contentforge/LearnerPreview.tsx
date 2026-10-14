@@ -3017,7 +3017,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Tools</p>
                   <div className="mt-3 flex flex-wrap gap-2.5">
                     {[
-                      { key: "quiz" as const, label: "Quiz", available: !!currentModuleAssessment },
                       { key: "fact" as const, label: "Did You Know", available: !!safeLearnerText(quickFact).trim() },
                       { key: "takeaway" as const, label: "Key Takeaway", available: !!safeLearnerText(parts.takeaway).trim() },
                       { key: "objectives" as const, label: "Objectives", available: lessonObjectives.length > 0 },
@@ -3067,29 +3066,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     </div>
                   ) : null}
 
-                  {activeLearningTool === "quiz" && currentModuleAssessment ? (
-                    <div className="mt-3 rounded-xl border border-[#d8e2ef] bg-[#fbfdff] p-3.5">
-                      <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Interactive Quiz</p>
-                      <p className="mt-2 text-[14px] font-[800] leading-snug text-[#123d78]">{currentModuleAssessment.question}</p>
-                      <div className="mt-2 space-y-1.5">
-                        {currentModuleAssessment.options.slice(0, 3).map((option, index) => (
-                          <div key={`${option}-${index}`} className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-1.5 text-[12px] text-[#35506f]">
-                            <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
-                            {stripOptionPrefix(option)}
-                          </div>
-                        ))}
-                      </div>
-                      {currentModuleAssessmentSlide ? (
-                        <button
-                          onClick={() => navigateToSlide(currentModuleAssessmentSlide.idx)}
-                          className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-[#1d4f93] px-3 text-[12px] font-[800] text-white transition-all hover:bg-[#173f78]"
-                          type="button"
-                        >
-                          Open Quiz
-                        </button>
-                      ) : null}
-                    </div>
-                  ) : null}
                 </div>
 
                 {slide.infographicSvg?.trim() && (
