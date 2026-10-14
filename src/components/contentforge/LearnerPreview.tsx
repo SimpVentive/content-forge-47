@@ -2678,7 +2678,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                       <div>
                         <p className="text-[16px] font-[900] text-[#123d78] mb-5">Course Content:</p>
                         <div className="space-y-3">
-                          {parts.body.map((item, index) => (
+                          {parts.body.filter((item, index, arr) => arr.findIndex((other) => other.trim().toLowerCase() === item.trim().toLowerCase()) === index).map((item, index) => (
                             <div key={index} className="flex items-start gap-3 text-[15px] leading-[1.5] text-[#35506f]">
                               <span className="font-[800] text-[#4f46e5] shrink-0 mt-1">•</span>
                               <span>{item}</span>
@@ -3727,7 +3727,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   {mod.title}
                 </p>
                 <div className="space-y-1">
-                  {mod.slides.map((s) => (
+                  {mod.slides.map((s) => ({
+                    s,
+                    label: s.type === "title" ? "Introduction" :
+                      s.type === "assessment" ? "Knowledge Check" :
+                      s.type === "summary" ? "Summary" :
+                      s.type === "video" ? `Video: ${s.topicTitle?.slice(0, 20) || "Resource"}` :
+                      s.topicTitle || `Topic ${(s.topicIndex || 0) + 1}`,
+                  })).filter((entry, index, arr) => arr.findIndex((other) => other.label === entry.label) === index).map(({ s, label }) => (
                     <button
                       key={s.idx}
                       onClick={() => navigateToSlide(s.idx)}
