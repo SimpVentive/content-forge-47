@@ -877,9 +877,13 @@ const Index = () => {
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-start gap-3">
-                    <div className="mt-0.5 rounded-xl bg-[#e0ebff] p-2.5">
-                      <Loader2 className="h-5 w-5 animate-spin text-[#1d4ed8]" />
-                    </div>
+                    <img
+                      src="/orchestration-waiting.png"
+                      alt="Hang on tight — AI is orchestrating your course"
+                      className="h-16 w-24 shrink-0 rounded-xl object-cover border border-[#bfd3fb]"
+                      loading="eager"
+                      fetchPriority="high"
+                    />
                     <div>
                       <p className="text-[14px] font-[900] uppercase tracking-[0.16em] text-[#315a9b]">Orchestration In Progress</p>
                       <p className="mt-1 text-[14px] font-semibold leading-relaxed text-[#1f3557]">
