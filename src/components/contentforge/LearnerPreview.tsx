@@ -2220,14 +2220,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         </div>
                         <span className="text-[14px] text-slate-700">Comprehensive assessments</span>
                       </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
-                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <span className="text-[14px] text-slate-700">Professional certification ready</span>
-                      </div>
                     </div>
                   </div>
                 </div>
@@ -4017,6 +4009,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 </div>
               )}
               <div
+                key={`slide-anim-${currentSlide}-${flipStyle}`}
                 className="relative z-10 [transform-style:preserve-3d]"
                 style={{
                   animation: slideAnimationName

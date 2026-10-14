@@ -33,12 +33,18 @@ export function resolveIntroImage(slides: IntroImageSlide[], moduleIndex: number
 // Shared by the authoring preview and packaging; offline learners never call this.
 export async function generateIntroImage(moduleTitle: string, courseTitle: string): Promise<string> {
   const { supabase } = await import("@/integrations/supabase/client");
-  const { data, error } = await supabase.functions.invoke("generate-slide-image", {
-    body: {
-      prompt: `A photorealistic, professional workplace training scene representing "${moduleTitle}" in the context of ${courseTitle}. Modern, diverse, well-lit, editorial style.`,
-      moduleTitle, topicTitle: moduleTitle, altText: moduleTitle,
-    },
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error("Image generation timed out. Please retry.")), 120000);
   });
+  const { data, error } = await Promise.race([
+    supabase.functions.invoke("generate-slide-image", {
+      body: {
+        prompt: `A photorealistic, professional workplace training scene representing "${moduleTitle}" in the context of ${courseTitle}. Modern, diverse, well-lit, editorial style.`,
+        moduleTitle, topicTitle: moduleTitle, altText: moduleTitle,
+      },
+    }),
+    timeout,
+  ]);
   if (error || data?.error) throw new Error(data?.error || error?.message || "The introduction image could not be generated.");
   const image = findImage(data);
   if (!image) throw new Error("The image service did not return an introduction image.");
