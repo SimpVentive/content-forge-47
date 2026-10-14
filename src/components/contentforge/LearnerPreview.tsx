@@ -1804,11 +1804,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
     // Use generateNarrationAudio which routes based on language (Telugu → Google Cloud TTS, English → ElevenLabs, etc.)
     setAudioLoading(true);
+    let textToNarrate = narrationText.slice(0, 2500);
+    const targetLanguage = narratorLanguage || "English";
     try {
       // Translate the narration first when a non-English language is selected,
       // otherwise the TTS voice reads English text with an accent.
-      let textToNarrate = narrationText.slice(0, 2500);
-      const targetLanguage = narratorLanguage || "English";
       if (targetLanguage !== "English") {
         const cacheKey = `${currentSlide}:${targetLanguage}`;
         const cachedTranslation = translatedNarrationRef.current[cacheKey];
