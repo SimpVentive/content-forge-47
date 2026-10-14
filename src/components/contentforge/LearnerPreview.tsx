@@ -2562,14 +2562,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                         <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Featured Media</p>
                         <span className="rounded-full bg-white px-3 py-1 text-[11px] font-[800] text-[#355fa8] shadow-sm">Interactive asset zone</span>
                       </div>
-                      <div className="overflow-hidden rounded-[18px] border border-[#d8deea] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-                        <div className="aspect-[16/10] w-full bg-[#eef3f8]">
-                          {visualMarkup ? visualMarkup : <div className="flex h-full items-center justify-center px-6 text-center text-[14px] text-[#607896]">Hero media or animation placeholder for this lesson.</div>}
+                      {visualMarkup || introImage ? (
+                        <div className="overflow-hidden rounded-[18px] border border-[#d8deea] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
+                          <div className="aspect-[16/10] w-full bg-[#eef3f8]">
+                            {visualMarkup ? visualMarkup : (
+                              <img src={introImage} alt={slide.topicTitle || slide.moduleTitle} className="h-full w-full object-cover" />
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      ) : null}
                       <div className="mt-4 rounded-[18px] border border-[#d8e2ef] bg-white p-4">
-                        <p className="text-[11px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Key Explanation</p>
-                        <p className="mt-3 text-[14px] leading-relaxed text-[#35506f]">{parts.body[0] || parts.takeaway || narratorExcerpt}</p>
+                        <p className="text-[14px] leading-relaxed text-[#35506f]">{parts.body[0] || parts.takeaway || narratorExcerpt}</p>
                       </div>
                     </div>
 
