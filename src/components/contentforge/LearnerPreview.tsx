@@ -896,13 +896,18 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
       selectedIndexes.forEach((questionIndex) => {
         const mcq = mcqs[questionIndex];
         if (!mcq) return;
+        // Shuffle answer options once at build time so the correct answer is
+        // randomly placed (not always option B) across preview, export and narration.
+        const shuffledMcq = Array.isArray(mcq.options) && mcq.options.length > 1
+          ? { ...mcq, options: shuffleQuestionOptions(mcq.options, `${questionIndex}|${mcq.question || ""}`) }
+          : mcq;
         // Determine template: scenario-based questions get "scenario", others get default
-        const isScenario = mcq.situation || mcq.scenario || mcq.context;
+        const isScenario = shuffledMcq.situation || shuffledMcq.scenario || shuffledMcq.context;
         slides.push({
           type: "assessment",
           moduleIndex: mi,
           moduleTitle: mod.title,
-          question: mcq,
+          question: shuffledMcq,
           contentTemplate: isScenario ? "scenario" : undefined,
         });
       });
