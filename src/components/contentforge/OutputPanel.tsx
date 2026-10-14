@@ -564,7 +564,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
       <div className="space-y-3">
         <div className="grid grid-cols-2 gap-3">
           <button
-            onClick={() => (onOpenLearnerPreview ? onOpenLearnerPreview() : setShowLearnerPreview(true))}
+            onClick={() => setShowLearnerPreview(true)}
             className="h-14 rounded-xl text-[14px] font-bold flex items-center justify-center gap-2 border-2 border-blue-500 text-blue-600 bg-blue-50 hover:bg-blue-100 transition-all"
           >
             <Play className="w-5 h-5" />
