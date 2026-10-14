@@ -1690,6 +1690,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     });
     setAudioPlayingSlideId(null);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setHighlightWordIdx(-1);
     setHighlightSentenceIdx(-1);
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -1810,6 +1811,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       if (!result.success || !result.audioDataUrl) {
         const errorMsg = result.error || "Failed to generate audio";
         console.error("TTS error:", errorMsg);
+        if (playSpeechFallback(narrationText)) return;
         toast.error("Failed to generate narration audio");
         return;
       }
@@ -1842,6 +1844,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     } catch (err) {
       console.error("TTS fetch failed:", err);
+      if (playSpeechFallback(narrationText)) return;
       toast.error("Failed to generate narration audio");
     } finally {
       setAudioLoading(false);
@@ -1872,6 +1875,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     if (audioRef.current) {
       audioRef.current.muted = muted;
     }
+    if (muted && typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
   }, [muted]);
 
   useEffect(() => {
