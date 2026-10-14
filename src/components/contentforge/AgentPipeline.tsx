@@ -14,7 +14,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
   const enabledAgents = agents.filter((agent) => agentToggles[agent.id] ?? true).length;
 
   return (
-    <div className={`${isRunning ? "max-w-[1100px]" : "max-w-[720px]"} mx-auto relative`}>
+    <div className={`max-w-[720px] mx-auto relative`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div>
@@ -46,20 +46,8 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
         </p>
       </div>
 
-      {/* Responsive layout: waiting panel beside the agent list on wide screens,
-          compact banner above it on narrow ones — never overlaps the agents. */}
-      <div className={isRunning ? "grid gap-6 lg:grid-cols-[minmax(220px,300px)_1fr] items-start" : ""}>
-        {isRunning && (
-          <div className="mx-auto w-full max-w-[300px] lg:sticky lg:top-4 overflow-hidden rounded-[20px] shadow-[0_14px_34px_rgba(15,23,42,0.14)]">
-            <img
-              src="/orchestration-waiting.png"
-              alt="Hang on tight orchestration panel"
-              className="w-full max-h-[40vh] object-contain"
-            />
-          </div>
-        )}
-
-        {/* Agent cards */}
+      {/* Agent cards */}
+      <div>
         <div className="space-y-0 min-w-0">
           {agents.map((agent, i) => (
             <AgentCard
