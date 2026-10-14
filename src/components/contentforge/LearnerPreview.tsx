@@ -1721,24 +1721,30 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     const totalWords = narrationWords.length;
     if (!totalSentences || !totalWords) return;
 
-    // Pre-compute cumulative word counts per sentence to map audio progress to a sentence
-    const sentenceWordCounts = narrationSentences.map(s => s.split(/\s+/).length);
-    const cumulativeWords: number[] = [];
-    sentenceWordCounts.reduce((acc, count, i) => {
-      cumulativeWords[i] = acc + count;
+    // Weight sentences by character length (spoken time tracks characters better than
+    // word count) and trail the audio slightly so the highlight never races ahead.
+    const sentenceCharCounts = narrationSentences.map(s => Math.max(1, s.length));
+    const totalChars = sentenceCharCounts.reduce((a, b) => a + b, 0);
+    const cumulativeChars: number[] = [];
+    sentenceCharCounts.reduce((acc, count, i) => {
+      cumulativeChars[i] = acc + count;
       return acc + count;
     }, 0);
+    const LAG_SECONDS = 0.35;
 
     const tick = () => {
       if (audio.paused || audio.ended) return;
-      const progress = audio.duration > 0 ? audio.currentTime / audio.duration : 0;
-      const wordIdx = Math.floor(progress * totalWords);
-      // Find which sentence this word belongs to
+      const duration = Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : 0;
+      if (!duration) { animFrameRef.current = requestAnimationFrame(tick); return; }
+      const adjustedTime = Math.max(0, audio.currentTime - LAG_SECONDS);
+      const progress = Math.min(1, adjustedTime / duration);
+      const charPos = progress * totalChars;
       let sentIdx = 0;
-      for (let i = 0; i < cumulativeWords.length; i++) {
-        if (wordIdx < cumulativeWords[i]) { sentIdx = i; break; }
+      for (let i = 0; i < cumulativeChars.length; i++) {
+        if (charPos < cumulativeChars[i]) { sentIdx = i; break; }
         sentIdx = i;
       }
+      const wordIdx = Math.floor(progress * totalWords);
       setHighlightWordIdx(wordIdx);
       setHighlightSentenceIdx(sentIdx);
       animFrameRef.current = requestAnimationFrame(tick);
