@@ -46,7 +46,7 @@ export const TabContainer: React.FC<TabContainerProps> = ({ tabs, activeTab, onT
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-hidden bg-white">
+      <div className="flex-1 min-h-0 overflow-hidden bg-white">
         {children}
       </div>
     </div>
