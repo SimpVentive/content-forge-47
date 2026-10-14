@@ -4197,16 +4197,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         />
       )}
 
-      <PreviewActionBar
-        highlightEnabled={highlightEnabled}
-        highlightPalette={highlightPalette}
-        flipStyle={flipStyle}
-        onToggleHighlight={() => setHighlightEnabled(prev => !prev)}
-        onSelectPalette={setHighlightPalette}
-        onSelectFlipStyle={setFlipStyle}
-        onPlaceVideos={unassignedCount > 0 ? () => setShowPlacer(true) : undefined}
-        unassignedCount={unassignedCount}
-      />
+      {/* Floating Lesson Controls removed: highlight colour and flip style are chosen once in Course Setup. */}
 
       <HelpModal
         isOpen={showHelpModal}
