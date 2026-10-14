@@ -535,7 +535,7 @@ const Index = () => {
 
   const hasRun = logs.length > 0;
   const hasOutput = Object.values(rawOutputs).some((v) => v);
-  const previewVideos = useMemo<InsertedVideo[]>(() => workflowClips.map((clip) => ({
+  const previewVideos = useMemo<InsertedVideo[]>(() => workflowClips.map((clip): InsertedVideo => ({
     videoId: clip.videoId,
     title: clip.title,
     channelTitle: clip.channelTitle,
