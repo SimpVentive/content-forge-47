@@ -1690,6 +1690,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     });
     setAudioPlayingSlideId(null);
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     setHighlightWordIdx(-1);
     setHighlightSentenceIdx(-1);
     if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
@@ -1756,6 +1757,30 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     };
   }, [currentSlide, muted, startLipSync, startWordHighlight, stopLipSync]);
 
+  // Browser speech fallback: keeps narration + sentence highlight working when the TTS service fails
+  const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const playSpeechFallback = useCallback((text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
+    const sentences = narrationSentences;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onstart = () => setIsPlaying(true);
+    utterance.onend = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); setHighlightWordIdx(-1); };
+    utterance.onerror = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); };
+    utterance.onboundary = (event: SpeechSynthesisEvent) => {
+      if (typeof event.charIndex !== "number") return;
+      let cursor = 0;
+      for (let i = 0; i < sentences.length; i++) {
+        const end = cursor + sentences[i].length;
+        if (event.charIndex <= end) { setHighlightSentenceIdx(i); break; }
+        cursor = end + 1;
+      }
+    };
+    speechUtteranceRef.current = utterance;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+    return true;
+  }, [narrationSentences]);
+
   // Fetch and play TTS on demand (user gesture)
   const playNarration = useCallback(async () => {
     const narrationText = getNarrationForSlide(currentSlide);
@@ -1786,6 +1811,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       if (!result.success || !result.audioDataUrl) {
         const errorMsg = result.error || "Failed to generate audio";
         console.error("TTS error:", errorMsg);
+        if (playSpeechFallback(narrationText)) return;
         toast.error("Failed to generate narration audio");
         return;
       }
@@ -1818,11 +1844,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     } catch (err) {
       console.error("TTS fetch failed:", err);
+      if (playSpeechFallback(narrationText)) return;
       toast.error("Failed to generate narration audio");
     } finally {
       setAudioLoading(false);
     }
-  }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio, narratorLanguage, standalone, courseTitle]);
+  }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio, narratorLanguage, standalone, courseTitle, playSpeechFallback]);
 
   // Auto-play narration when slide changes
   useEffect(() => {
@@ -1848,6 +1875,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     if (audioRef.current) {
       audioRef.current.muted = muted;
     }
+    if (muted && typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
   }, [muted]);
 
   useEffect(() => {
@@ -2219,14 +2247,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                           </svg>
                         </div>
                         <span className="text-[14px] text-slate-700">Comprehensive assessments</span>
-                      </div>
-                      <div className="flex items-start gap-3">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center shrink-0 mt-0.5">
-                          <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </div>
-                        <span className="text-[14px] text-slate-700">Professional certification ready</span>
                       </div>
                     </div>
                   </div>
@@ -4017,6 +4037,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 </div>
               )}
               <div
+                key={`slide-anim-${currentSlide}-${flipStyle}`}
                 className="relative z-10 [transform-style:preserve-3d]"
                 style={{
                   animation: slideAnimationName
