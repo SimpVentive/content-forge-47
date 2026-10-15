@@ -32,11 +32,40 @@ export function isPlaceholderToken(text: string): boolean {
   return false;
 }
 
-const AI_PLACEHOLDER = /\s*(\.{3}|…)?\s*\[[^\]]*(rest of|remaining|unchanged|original script|continues|truncated|same as above)[^\]]*\]\s*(\.{3}|…)?/gi;
+const AI_PLACEHOLDER_SOURCE = "[ \\t]*(\\.{3}|…)?[ \\t]*[\\[(][^\\])\\n]*(rest of|remaining|unchanged|original script|continues|truncated|same as above|as before|omitted for brevity)[^\\])\\n]*[\\])][ \\t]*(\\.{3}|…)?";
+const AI_PLACEHOLDER = new RegExp(AI_PLACEHOLDER_SOURCE, "gi");
+
+/** True when an AI rewrite contains "[rest of original script follows]"-style abbreviation notes. */
+export function hasAiPlaceholder(text: string): boolean {
+  return new RegExp(AI_PLACEHOLDER_SOURCE, "i").test(String(text || ""));
+}
+
+/** Removes AI abbreviation notes while keeping line breaks / markdown structure intact. */
+export function stripAiPlaceholders(text: string): string {
+  return String(text || "").replace(AI_PLACEHOLDER, "").replace(/[ \t]+\n/g, "\n");
+}
+
+/**
+ * Single gate for every pipeline step that replaces the course script (reviewer, runtime
+ * calibration, Final QA). A rewrite is only accepted when it is complete — no abbreviation
+ * notes and not drastically shorter than the script it replaces.
+ */
+export function acceptScriptRewrite(
+  original: string,
+  revised: unknown,
+  opts: { minRatio?: number } = {},
+): { accepted: boolean; reason?: "empty" | "abbreviated" | "incomplete" } {
+  if (typeof revised !== "string" || !revised.trim()) return { accepted: false, reason: "empty" };
+  if (hasAiPlaceholder(revised)) return { accepted: false, reason: "abbreviated" };
+  const words = (s: string) => (s.trim().match(/\S+/g) || []).length;
+  const minRatio = opts.minRatio ?? 0.6;
+  if (original && words(revised) < words(original) * minRatio) return { accepted: false, reason: "incomplete" };
+  return { accepted: true };
+}
 
 export function safeLearnerText(text: string, fallback = ""): string {
   if (isPlaceholderToken(text)) return fallback;
-  const cleaned = stripNarratorMarkdown(text).replace(AI_PLACEHOLDER, "").trim();
+  const cleaned = stripNarratorMarkdown(stripAiPlaceholders(text)).replace(AI_PLACEHOLDER, "").trim();
   return cleaned && !isPlaceholderToken(cleaned) ? cleaned : fallback;
 }
 
