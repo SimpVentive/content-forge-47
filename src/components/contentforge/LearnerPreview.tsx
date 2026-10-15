@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+﻿import { createPortal } from "react-dom";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle, Maximize2, Minimize2 } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
@@ -1041,9 +1042,36 @@ function normalizeSvg(svg: string): string {
 
 const INFOGRAPHIC_SYSTEM_PROMPT = "You are an elite SVG infographic designer for polished corporate eLearning. Generate a sophisticated, presentation-quality SVG infographic that uses the full canvas confidently, with strong visual hierarchy, large readable headings, 3-5 clearly separated content zones, connectors, icons built only from SVG primitives, and disciplined whitespace. Avoid giant empty margins, tiny text, clip-art aesthetics, or toy layouts. The SVG must be self-contained, 1200x800, with no external fonts or images. Use only these colors: #0f172a, #123d78, #355fa8, #4f46e5, #7c3aed, #10b981, #f59e0b, #e8eef9, #f8fafc, #ffffff. Make it feel like a premium consulting slide, not a simple classroom handout. Return only SVG markup.";
 
-const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string }> = ({ description, moduleTitle }) => {
+/**
+ * The infographic agent sometimes stores finished SVG markup in the
+ * "description" field. Split it: markup is rendered as the image, and a
+ * plain-text summary (from the SVG's own labels) is used for explanations.
+ * Raw code must never reach learner-facing text.
+ */
+export function splitInfographicDescription(raw: string): { svg: string; text: string } {
+  const source = raw || "";
+  const match = source.match(/<svg[\s\S]*?<\/svg>/i);
+  if (!match) {
+    const text = source.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    return { svg: "", text };
+  }
+  const svgMarkup = match[0];
+  const labels = Array.from(svgMarkup.matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/gi))
+    .map((m) => m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const outside = source.replace(svgMarkup, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const text = [outside, labels.join(" · ")].filter(Boolean).join(" — ");
+  return { svg: svgMarkup.replace(/<script[\s\S]*?<\/script>/gi, ""), text };
+}
+
+const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string }> = ({ description: rawDescription, moduleTitle }) => {
+  const parsed = useMemo(() => splitInfographicDescription(rawDescription), [rawDescription]);
+  const description = parsed.text || moduleTitle;
   const [expanded, setExpanded] = useState(false);
-  const [svg, setSvg] = useState("");
+  const [svg, setSvg] = useState(() => (parsed.svg ? normalizeSvg(parsed.svg) : ""));
+  useEffect(() => {
+    if (parsed.svg) setSvg(normalizeSvg(parsed.svg));
+  }, [parsed.svg]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [showZoomed, setShowZoomed] = useState(false);
@@ -1102,7 +1130,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
       if (fnErr || data?.error) {
         setExplanation(`What this image shows: ${description}\nHow to read it: follow the visual flow from left to right and connect each block to the learning journey.\nWhy it matters: it gives the learner a quick mental map before they go deeper into the topic.`);
       } else {
-        setExplanation((data.text || "").trim() || `What this image shows: ${description}`);
+        setExplanation(splitInfographicDescription(data.text || "").text || `What this image shows: ${description}`);
       }
     } catch {
       setExplanation(`What this image shows: ${description}\nHow to read it: follow the visual flow from left to right and connect each block to the learning journey.\nWhy it matters: it gives the learner a quick mental map before they go deeper into the topic.`);
@@ -1163,6 +1191,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
               <button
                 onClick={() => {
                   updateZoomLevel(1.45);
+                  if (!svg && !loading) generateSvg();
                   setShowZoomed(true);
                 }}
                 className="inline-flex h-10 items-center gap-2 rounded-full border border-white/15 bg-white px-4 text-[12px] font-[900] text-[#123d78] transition-all hover:bg-slate-100"
@@ -1216,7 +1245,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
         </div>
       )}
 
-      {showZoomed && (
+      {showZoomed && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[10002] flex items-center justify-center" onClick={() => setShowZoomed(false)}>
           <div className="absolute inset-0 bg-[#020617]/84 backdrop-blur-md" />
           <div className="relative flex h-[min(92vh,980px)] w-[min(1380px,96vw)] flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[#e5edf7] p-5 shadow-[0_36px_120px_rgba(2,6,23,0.58)]"
@@ -1276,13 +1305,13 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
                 </div>
               ) : (
                 <div className="flex min-h-[320px] items-center justify-center text-[13px] text-muted-foreground">
-                  Generate the infographic first, then enlarge it here.
+                  {loading ? "Generating infographic..." : "Infographic not available yet."}
                 </div>
               )}
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 };
