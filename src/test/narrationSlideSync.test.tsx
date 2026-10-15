@@ -43,11 +43,15 @@ describe("narration always matches the screen", () => {
   it("never plays a late voice clip from the previous screen", async () => {
     const { LearnerPreview, buildSlides, buildSlideNarration } = await import("@/components/contentforge/LearnerPreview");
     const rawOutputs = { architect, writer, visual: "{}", assessment: "{}" };
+    console.log("A");
     const { slides } = buildSlides(rawOutputs);
+    console.log("B", slides.map(s=>s.type).join(","));
     const contentIdx = slides.map((s, i) => [s, i] as const).filter(([s]) => s.type === "content").map(([, i]) => i);
     expect(contentIdx.length).toBeGreaterThanOrEqual(2);
 
+    console.log("C");
     render(<LearnerPreview courseTitle="Sync Test" rawOutputs={rawOutputs} onClose={() => {}} />);
+    console.log("D");
     const next = () => fireEvent.click(screen.getAllByRole("button", { name: /next/i }).at(-1)!);
 
     // Go to the first content screen; its voice request starts but is slow.
