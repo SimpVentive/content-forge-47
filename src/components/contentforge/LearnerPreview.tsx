@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+﻿import { createPortal } from "react-dom";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle, Maximize2, Minimize2 } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
@@ -1129,7 +1130,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
       if (fnErr || data?.error) {
         setExplanation(`What this image shows: ${description}\nHow to read it: follow the visual flow from left to right and connect each block to the learning journey.\nWhy it matters: it gives the learner a quick mental map before they go deeper into the topic.`);
       } else {
-        setExplanation((data.text || "").trim() || `What this image shows: ${description}`);
+        setExplanation(splitInfographicDescription(data.text || "").text || `What this image shows: ${description}`);
       }
     } catch {
       setExplanation(`What this image shows: ${description}\nHow to read it: follow the visual flow from left to right and connect each block to the learning journey.\nWhy it matters: it gives the learner a quick mental map before they go deeper into the topic.`);
@@ -1190,6 +1191,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
               <button
                 onClick={() => {
                   updateZoomLevel(1.45);
+                  if (!svg && !loading) generateSvg();
                   setShowZoomed(true);
                 }}
                 className="inline-flex h-10 items-center gap-2 rounded-full border border-white/15 bg-white px-4 text-[12px] font-[900] text-[#123d78] transition-all hover:bg-slate-100"
@@ -1243,7 +1245,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
         </div>
       )}
 
-      {showZoomed && (
+      {showZoomed && typeof document !== "undefined" && createPortal(
         <div className="fixed inset-0 z-[10002] flex items-center justify-center" onClick={() => setShowZoomed(false)}>
           <div className="absolute inset-0 bg-[#020617]/84 backdrop-blur-md" />
           <div className="relative flex h-[min(92vh,980px)] w-[min(1380px,96vw)] flex-col overflow-hidden rounded-[32px] border border-white/10 bg-[#e5edf7] p-5 shadow-[0_36px_120px_rgba(2,6,23,0.58)]"
@@ -1303,13 +1305,13 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
                 </div>
               ) : (
                 <div className="flex min-h-[320px] items-center justify-center text-[13px] text-muted-foreground">
-                  Generate the infographic first, then enlarge it here.
+                  {loading ? "Generating infographic..." : "Infographic not available yet."}
                 </div>
               )}
             </div>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 };
