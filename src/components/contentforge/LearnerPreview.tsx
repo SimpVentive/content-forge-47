@@ -1338,7 +1338,10 @@ function getCourseNotesStorageKey(courseTitle: string): string {
   return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true, standalone = false, exportMedia, onLearnerProgress }) => {
+// Stable empty default: a fresh [] each render made the video-sync effect loop forever.
+const NO_VIDEOS: InsertedVideo[] = [];
+
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = NO_VIDEOS, courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true, standalone = false, exportMedia, onLearnerProgress }) => {
   // Prefer the explicit narrator language; fall back to text language; final fallback English.
   const effectiveNarratorLanguage = narratorLanguage || textLanguage || "English";
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
@@ -1523,7 +1526,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     : undefined;
   const showBinding = flipStyle === "bound";
   const showStageGlow = Boolean(slideMotion) && flipStyle !== "subtle";
-  const slideAnimationDuration = flipStyle === "dramatic" ? 900 : flipStyle === "bound" ? 620 : 480;
+  const slideAnimationDuration = flipStyle === "dramatic" ? 950 : flipStyle === "bound" ? 620 : 450;
 
   // Get narration sections
   const voiceParsed = tryParseJSON(rawOutputs.voice);
@@ -1691,8 +1694,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     setCurrentSlide(targetSlide);
   }, [currentSlide, totalSlides]);
 
+  // The slide the learner is on right now. Voice requests that finish after the learner
+  // has moved on must never play over a different screen.
+  const activeSlideRef = useRef(currentSlide);
+
   // Stop audio on slide change (BUG FIX #4: Stop ALL audio)
   useEffect(() => {
+    activeSlideRef.current = currentSlide;
+    setAudioLoading(false);
     // Stop primary audio
     if (audioRef.current) {
       audioRef.current.pause();
@@ -1717,9 +1726,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   useEffect(() => {
     if (!slideMotion) return;
-    const timeoutId = window.setTimeout(() => setSlideMotion(null), 520);
+    // Keep the motion flag for the full animation, otherwise longer flips are cut off mid-turn.
+    const timeoutId = window.setTimeout(() => setSlideMotion(null), slideAnimationDuration + 60);
     return () => window.clearTimeout(timeoutId);
-  }, [currentSlide, slideMotion]);
+  }, [currentSlide, slideMotion, slideAnimationDuration]);
 
   // Animate sentence highlight while playing
   const startWordHighlight = useCallback((audio: HTMLAudioElement) => {
@@ -1761,6 +1771,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   // Helper to wire up audio events
   const wireAudio = useCallback((audio: HTMLAudioElement) => {
     audio.muted = muted;
+    // Only one voice at a time: silence anything still playing before starting a new clip.
+    if (audioRef.current && audioRef.current !== audio) audioRef.current.pause();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     audioRef.current = audio;
     audio.onplay = () => {
       setIsPlaying(true);
@@ -1829,6 +1842,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     }
 
     // Use generateNarrationAudio which routes based on language (Telugu → Google Cloud TTS, English → ElevenLabs, etc.)
+    // The voice request is slow; remember which screen asked so a late reply never plays on another screen.
+    const requestSlide = currentSlide;
+    const isStale = () => activeSlideRef.current !== requestSlide;
     setAudioLoading(true);
     let textToNarrate = narrationText.slice(0, 2500);
     const targetLanguage = narratorLanguage || "English";
@@ -1836,7 +1852,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       // Translate the narration first when a non-English language is selected,
       // otherwise the TTS voice reads English text with an accent.
       if (targetLanguage !== "English") {
-        const cacheKey = `${currentSlide}:${targetLanguage}`;
+        const cacheKey = `${targetLanguage}:${narrationText}`;
         const cachedTranslation = translatedNarrationRef.current[cacheKey];
         if (cachedTranslation) {
           textToNarrate = cachedTranslation;
@@ -1857,6 +1873,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           }
         }
       }
+      if (isStale()) return;
       const result = await generateNarrationAudio(
         textToNarrate,
         trainerVoiceId,
@@ -1866,15 +1883,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       if (!result.success || !result.audioDataUrl) {
         const errorMsg = result.error || "Failed to generate audio";
         console.error("TTS error:", errorMsg);
+        if (isStale()) return;
         if (playSpeechFallback(textToNarrate, targetLanguage)) return;
         toast.error("Failed to generate narration audio");
         return;
       }
 
       const url = result.audioDataUrl;
-      audioUrlsRef.current[currentSlide] = url;
-      audioTextRef.current[currentSlide] = narrationText;
+      audioUrlsRef.current[requestSlide] = url;
+      audioTextRef.current[requestSlide] = narrationText;
       learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), audioBySlide: { ...audioUrlsRef.current }, audioTextBySlide: { ...audioTextRef.current } });
+      // Learner already moved on: keep the clip for when they come back, but don't play it here.
+      if (isStale()) return;
       const audio = new Audio(url);
       wireAudio(audio);
       await audio.play().catch((err) => {
@@ -1900,10 +1920,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     } catch (err) {
       console.error("TTS fetch failed:", err);
+      if (isStale()) return;
       if (playSpeechFallback(textToNarrate, targetLanguage)) return;
       toast.error("Failed to generate narration audio");
     } finally {
-      setAudioLoading(false);
+      // A late reply from an earlier screen must not clear the current screen's loading state.
+      if (!isStale()) setAudioLoading(false);
     }
   }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio, narratorLanguage, standalone, courseTitle, playSpeechFallback]);
 
@@ -3517,84 +3539,30 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           font-weight: 500;
         }
 
+        /* Physical Flip: a book page turning sideways around its spine. */
         @keyframes sheetFlipForward {
-          0% {
-            opacity: 0.8;
-            transform: perspective(2200px) rotateX(22deg) translateY(10px) scaleY(0.992);
-            transform-origin: top center;
-            box-shadow: 0 14px 24px rgba(15, 23, 42, 0.14);
-          }
-          58% {
-            opacity: 0.98;
-            transform: perspective(2200px) rotateX(-3deg) translateY(-7px) scaleY(1.005);
-            transform-origin: top center;
-            box-shadow: 0 8px 14px rgba(15, 23, 42, 0.1);
-          }
-          82% {
-            opacity: 1;
-            transform: perspective(2200px) rotateX(1deg) translateY(-1px) scaleY(1.001);
-            transform-origin: top center;
-            box-shadow: 0 4px 8px rgba(15, 23, 42, 0.06);
-          }
-          100% {
-            opacity: 1;
-            transform: perspective(2200px) rotateX(0deg) translateY(0) scaleY(1);
-            transform-origin: top center;
-            box-shadow: 0 0 0 rgba(15, 23, 42, 0);
-          }
+          0% { opacity: 0.35; transform: perspective(1800px) rotateY(-88deg); transform-origin: left center; box-shadow: -30px 0 50px rgba(15, 23, 42, 0.28); }
+          55% { opacity: 1; transform: perspective(1800px) rotateY(12deg); transform-origin: left center; box-shadow: -14px 0 28px rgba(15, 23, 42, 0.18); }
+          80% { transform: perspective(1800px) rotateY(-4deg); transform-origin: left center; box-shadow: -4px 0 10px rgba(15, 23, 42, 0.08); }
+          100% { opacity: 1; transform: perspective(1800px) rotateY(0deg); transform-origin: left center; box-shadow: 0 0 0 rgba(15, 23, 42, 0); }
         }
 
         @keyframes sheetFlipBackward {
-          0% {
-            opacity: 0.8;
-            transform: perspective(2200px) rotateX(20deg) translateY(9px) scaleY(0.994);
-            transform-origin: top center;
-            box-shadow: 0 12px 22px rgba(15, 23, 42, 0.12);
-          }
-          56% {
-            opacity: 0.98;
-            transform: perspective(2200px) rotateX(-2deg) translateY(-6px) scaleY(1.004);
-            transform-origin: top center;
-            box-shadow: 0 7px 12px rgba(15, 23, 42, 0.08);
-          }
-          80% {
-            opacity: 1;
-            transform: perspective(2200px) rotateX(1deg) translateY(-1px) scaleY(1.001);
-            transform-origin: top center;
-            box-shadow: 0 3px 6px rgba(15, 23, 42, 0.05);
-          }
-          100% {
-            opacity: 1;
-            transform: perspective(2200px) rotateX(0deg) translateY(0) scaleY(1);
-            transform-origin: top center;
-            box-shadow: 0 0 0 rgba(15, 23, 42, 0);
-          }
+          0% { opacity: 0.35; transform: perspective(1800px) rotateY(88deg); transform-origin: right center; box-shadow: 30px 0 50px rgba(15, 23, 42, 0.28); }
+          55% { opacity: 1; transform: perspective(1800px) rotateY(-12deg); transform-origin: right center; box-shadow: 14px 0 28px rgba(15, 23, 42, 0.18); }
+          80% { transform: perspective(1800px) rotateY(4deg); transform-origin: right center; box-shadow: 4px 0 10px rgba(15, 23, 42, 0.08); }
+          100% { opacity: 1; transform: perspective(1800px) rotateY(0deg); transform-origin: right center; box-shadow: 0 0 0 rgba(15, 23, 42, 0); }
         }
 
+        /* Subtle Flip: a calm slide-and-fade, no 3D turn. */
         @keyframes sheetFlipSubtleForward {
-          0% {
-            opacity: 0.78;
-            transform: perspective(1600px) rotateX(18deg) translateY(18px) scale(0.992);
-            transform-origin: top center;
-          }
-          100% {
-            opacity: 1;
-            transform: perspective(1600px) rotateX(0deg) translateY(0) scale(1);
-            transform-origin: top center;
-          }
+          0% { opacity: 0; transform: translateX(48px) scale(0.985); }
+          100% { opacity: 1; transform: translateX(0) scale(1); }
         }
 
         @keyframes sheetFlipSubtleBackward {
-          0% {
-            opacity: 0.82;
-            transform: perspective(1600px) rotateX(12deg) translateY(12px) scale(0.994);
-            transform-origin: top center;
-          }
-          100% {
-            opacity: 1;
-            transform: perspective(1600px) rotateX(0deg) translateY(0) scale(1);
-            transform-origin: top center;
-          }
+          0% { opacity: 0; transform: translateX(-48px) scale(0.985); }
+          100% { opacity: 1; transform: translateX(0) scale(1); }
         }
 
         @keyframes sheetFlipBoundForward {
