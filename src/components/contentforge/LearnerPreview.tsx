@@ -1041,9 +1041,36 @@ function normalizeSvg(svg: string): string {
 
 const INFOGRAPHIC_SYSTEM_PROMPT = "You are an elite SVG infographic designer for polished corporate eLearning. Generate a sophisticated, presentation-quality SVG infographic that uses the full canvas confidently, with strong visual hierarchy, large readable headings, 3-5 clearly separated content zones, connectors, icons built only from SVG primitives, and disciplined whitespace. Avoid giant empty margins, tiny text, clip-art aesthetics, or toy layouts. The SVG must be self-contained, 1200x800, with no external fonts or images. Use only these colors: #0f172a, #123d78, #355fa8, #4f46e5, #7c3aed, #10b981, #f59e0b, #e8eef9, #f8fafc, #ffffff. Make it feel like a premium consulting slide, not a simple classroom handout. Return only SVG markup.";
 
-const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string }> = ({ description, moduleTitle }) => {
+/**
+ * The infographic agent sometimes stores finished SVG markup in the
+ * "description" field. Split it: markup is rendered as the image, and a
+ * plain-text summary (from the SVG's own labels) is used for explanations.
+ * Raw code must never reach learner-facing text.
+ */
+export function splitInfographicDescription(raw: string): { svg: string; text: string } {
+  const source = raw || "";
+  const match = source.match(/<svg[\s\S]*?<\/svg>/i);
+  if (!match) {
+    const text = source.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+    return { svg: "", text };
+  }
+  const svgMarkup = match[0];
+  const labels = Array.from(svgMarkup.matchAll(/<text\b[^>]*>([\s\S]*?)<\/text>/gi))
+    .map((m) => m[1].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+  const outside = source.replace(svgMarkup, " ").replace(/<!--[\s\S]*?-->/g, " ").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  const text = [outside, labels.join(" · ")].filter(Boolean).join(" — ");
+  return { svg: svgMarkup.replace(/<script[\s\S]*?<\/script>/gi, ""), text };
+}
+
+const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string }> = ({ description: rawDescription, moduleTitle }) => {
+  const parsed = useMemo(() => splitInfographicDescription(rawDescription), [rawDescription]);
+  const description = parsed.text || moduleTitle;
   const [expanded, setExpanded] = useState(false);
-  const [svg, setSvg] = useState("");
+  const [svg, setSvg] = useState(() => (parsed.svg ? normalizeSvg(parsed.svg) : ""));
+  useEffect(() => {
+    if (parsed.svg) setSvg(normalizeSvg(parsed.svg));
+  }, [parsed.svg]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [showZoomed, setShowZoomed] = useState(false);
