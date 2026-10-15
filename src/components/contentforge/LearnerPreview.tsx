@@ -1691,8 +1691,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     setCurrentSlide(targetSlide);
   }, [currentSlide, totalSlides]);
 
+  // The slide the learner is on right now. Voice requests that finish after the learner
+  // has moved on must never play over a different screen.
+  const activeSlideRef = useRef(currentSlide);
+
   // Stop audio on slide change (BUG FIX #4: Stop ALL audio)
   useEffect(() => {
+    activeSlideRef.current = currentSlide;
     // Stop primary audio
     if (audioRef.current) {
       audioRef.current.pause();
@@ -1717,9 +1722,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
   useEffect(() => {
     if (!slideMotion) return;
-    const timeoutId = window.setTimeout(() => setSlideMotion(null), 520);
+    // Keep the motion flag for the full animation, otherwise longer flips are cut off mid-turn.
+    const timeoutId = window.setTimeout(() => setSlideMotion(null), slideAnimationDuration + 60);
     return () => window.clearTimeout(timeoutId);
-  }, [currentSlide, slideMotion]);
+  }, [currentSlide, slideMotion, slideAnimationDuration]);
 
   // Animate sentence highlight while playing
   const startWordHighlight = useCallback((audio: HTMLAudioElement) => {
