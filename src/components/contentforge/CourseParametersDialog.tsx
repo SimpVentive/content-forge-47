@@ -988,6 +988,27 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </button>
             </div>
 
+            {/* Infographic Visuals */}
+            <div className={surfaceCardClass + " flex items-center justify-between"}>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[13px] font-bold text-foreground">Infographic Visuals</p>
+                  <InfoHint text="Adds an AI-drawn infographic that summarises each module's main idea. Turn off for a cleaner, text-focused course." />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">AI summary graphic on module screens</p>
+              </div>
+              <button
+                onClick={() => setInfographicsEnabled(!infographicsEnabled)}
+                className={`w-12 h-6 rounded-full transition-all duration-200 ease-in-out relative ${
+                  infographicsEnabled ? "bg-[#34D399]" : "bg-[#D1D5DB]"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full bg-white shadow-sm absolute top-0.5 transition-all duration-200 ease-in-out ${
+                  infographicsEnabled ? "left-[26px]" : "left-[2px]"
+                }`} />
+              </button>
+            </div>
+
             {/* Voiceover Pace - Only for Static E-Learning */}
             {localLearningType !== "image" && (
               <div className={surfaceCardClass}>
