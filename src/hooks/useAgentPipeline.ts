@@ -1189,6 +1189,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
           writerResult = moduleResults.join("\n\n---\n\n");
         }
         
+        writerResult = stripAiPlaceholders(writerResult);
         setStatus("writer", "complete");
         setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
         setOutputData((prev) => ({ ...prev, script: writerResult }));

@@ -10,7 +10,7 @@ import { NarrativeFlipbook } from "./NarrativeFlipbook";
 import { VideoWithVisuals, type VisualOverlay } from "./VideoWithVisuals";
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
-import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix, buildAssessmentNarration } from "@/lib/textCleaningUtility";
+import { stripAiPlaceholders, stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix, buildAssessmentNarration } from "@/lib/textCleaningUtility";
 import { generateNarrationAudio } from "@/lib/narrationAudioService";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
@@ -694,7 +694,7 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
   const isModuleLikeHeading = (h: string) =>
     moduleTitleKeys.has(normalizeModuleKey(h)) || /^module\s*\d+\b/i.test(h.trim());
   const cleanBody = (s: string) => {
-    const c = (s || "").replace(/\r\n/g, "\n").replace(/^---+\s*$/gm, "").trim();
+    const c = stripAiPlaceholders((s || "").replace(/\r\n/g, "\n")).replace(/^---+\s*$/gm, "").trim();
     return c && !isPlaceholderToken(c) ? c : "";
   };
   const extractObjBody = (v: any): string => {
