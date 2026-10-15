@@ -635,6 +635,29 @@ function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[]
 }
 
 /* build slides from agent outputs */
+/** Single source of truth for what is spoken on a screen: exactly the lines the learner sees.
+ *  Used by the in-app preview AND the downloaded course so audio and text can never drift. */
+export function getOnScreenLines(content: string, maxLines = 10) {
+  const parts = parseContentParts(content || "");
+  const takeawayKey = String(parts.takeaway || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return buildFlipChartLines(parts, maxLines).filter((line: any) => {
+    if (!takeawayKey || line.tone === "takeaway") return true;
+    const k = String(line.text || "").toLowerCase().replace(/^key takeaway:?\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
+    return !(k && (k === takeawayKey || takeawayKey.includes(k) || k.includes(takeawayKey)));
+  });
+}
+
+export function buildSlideNarration(slide: { type: string; content?: string; question?: any } | undefined, maxLines = 10): string {
+  if (!slide) return "";
+  if (slide.type === "assessment") return slide.question ? buildAssessmentNarration(slide.question) : "";
+  if (slide.type !== "content") return "";
+  return getOnScreenLines(slide.content || "", maxLines)
+    .map((l: any) => String(l.text || "").trim().replace(/[.!?]*$/, "."))
+    .filter((t: string) => t.length > 1)
+    .join(" ")
+    .slice(0, 2500);
+}
+
 export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = rawOutputs.writer || "";
@@ -1443,7 +1466,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     const url = audioUrlsRef.current[idx];
     if (!url) return undefined;
     const spoken = audioTextRef.current[idx];
-    if (spoken !== undefined ? spoken !== text : slides[idx]?.type === "assessment") { delete audioUrlsRef.current[idx]; return undefined; }
+    if (spoken !== text) { delete audioUrlsRef.current[idx]; return undefined; }
     return url;
   };
   const translatedNarrationRef = useRef<Record<string, string>>({});
@@ -1642,48 +1665,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   }, [stopLipSync]);
 
   // Narration text for current slide - with fallback to slide content
-  const getNarrationForSlide = useCallback((slideIdx: number) => {
-    const s = slides[slideIdx];
-    if (!s) return "";
-
-    // Only get narration for content and assessment slides
-    if (s.type !== "content" && s.type !== "assessment") return "";
-
-    // Try voice agent output first (for content slides)
-    if (s.type === "content" && narrationSections.length) {
-      const contentSlides = slides.filter(sl => sl.type === "content");
-      const contentIdx = contentSlides.indexOf(s);
-      if (contentIdx >= 0 && narrationSections[contentIdx]) {
-        const txt = (narrationSections[contentIdx].narration_text || "")
-          // Strip generation metadata so the audio never says "Word Count: 398"
-          .replace(/(^|[.\n\r])\s*word\s*count\s*[:=]\s*\d+\s*[.\n\r]?/gi, "$1 ")
-          .trim();
-        if (txt) return txt;
-      }
-    }
-
-    // For content slides, fallback: build narration from slide content
-    if (s.type === "content") {
-      const parts = parseContentParts(s.content || "");
-      const lines: string[] = [];
-      if (parts.hook) lines.push(parts.hook);
-      const takeawayKey = String(parts.takeaway || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      parts.body.forEach(p => {
-        const pKey = String(p || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-        // Skip body lines that merely repeat the takeaway so the audio doesn't say it twice.
-        if (takeawayKey && pKey && (pKey.includes(takeawayKey) || takeawayKey.includes(pKey))) return;
-        lines.push(p);
-      });
-      if (parts.takeaway) lines.push(parts.takeaway);
-      return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
-    }
-
-    // For assessment slides, narrate the question AND its options so the
-    // audio matches what is on screen.
-    if (s.type === "assessment" && s.question) return buildAssessmentNarration(s.question);
-
-    return "";
-  }, [slides, narrationSections]);
+  // Narration = exactly the on-screen lines (shared with the downloaded course).
+  const getNarrationForSlide = useCallback((slideIdx: number) => buildSlideNarration(slides[slideIdx], slideRules.maxLines), [slides, slideRules.maxLines]);
 
   // Split narration into sentences for highlighting
   const narrationSentences = useMemo(() => {
@@ -2407,12 +2390,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         const moduleLabel = `MODULE ${slide.moduleIndex + 1} - ${slide.moduleTitle}`.toUpperCase();
         const narratorSource = [parts.hook, ...parts.body].filter(Boolean).join(" ");
         const narratorExcerpt = getNarratorExcerpt(narratorSource || slide.content || "");
-        const takeawayKey = String(parts.takeaway || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-        const chartLines = buildFlipChartLines(parts, slideRules.maxLines).filter((line: any) => {
-          if (!takeawayKey || line.tone === "takeaway") return true;
-          const k = String(line.text || "").toLowerCase().replace(/^key takeaway:?\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
-          return !(k && (k === takeawayKey || takeawayKey.includes(k) || k.includes(takeawayKey)));
-        });
+        const chartLines = getOnScreenLines(slide.content || "", slideRules.maxLines);
         const contentTextStyle = {
           fontSize: `${Math.max(14, slideRules.minFontSize)}px`,
           lineHeight: slideRules.lineSpacing,
