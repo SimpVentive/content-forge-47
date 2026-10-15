@@ -1698,6 +1698,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   // Stop audio on slide change (BUG FIX #4: Stop ALL audio)
   useEffect(() => {
     activeSlideRef.current = currentSlide;
+    setAudioLoading(false);
     // Stop primary audio
     if (audioRef.current) {
       audioRef.current.pause();
