@@ -35,6 +35,7 @@ export interface CourseParameters {
   imageAspectRatio?: "landscape" | "portrait" | "square";
   showAvatarNarrator?: boolean;
   captionsEnabled?: boolean;
+  infographicsEnabled?: boolean;
   voiceoverPace?: "slow" | "normal" | "fast";
   imageNarrativeSceneCount?: 3 | 4 | 5 | 6 | 7 | 8 | 10;
   flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal";
@@ -266,6 +267,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [imageAspectRatio, setImageAspectRatio] = useState<CourseParameters["imageAspectRatio"]>("landscape");
   const [showAvatarNarrator, setShowAvatarNarrator] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
+  const [infographicsEnabled, setInfographicsEnabled] = useState(true);
   const [voiceoverPace, setVoiceoverPace] = useState<CourseParameters["voiceoverPace"]>("normal");
   const [imageNarrativeSceneCount, setImageNarrativeSceneCount] = useState<CourseParameters["imageNarrativeSceneCount"]>(6);
   const [flipbookDisplayStyle, setFlipbookDisplayStyle] = useState<CourseParameters["flipbookDisplayStyle"]>("smooth-slide");
@@ -365,6 +367,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageAspectRatio,
       showAvatarNarrator,
       captionsEnabled,
+      infographicsEnabled,
       voiceoverPace,
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
@@ -409,6 +412,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageAspectRatio,
       showAvatarNarrator,
       captionsEnabled,
+      infographicsEnabled,
       voiceoverPace,
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
@@ -448,6 +452,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageAspectRatio,
       showAvatarNarrator,
       captionsEnabled,
+      infographicsEnabled,
       voiceoverPace,
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
