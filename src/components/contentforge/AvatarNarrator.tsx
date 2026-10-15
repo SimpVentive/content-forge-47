@@ -65,11 +65,13 @@ const MTH_H = 26 * SCALE_X;   // ~9.1px
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-function buildDefaultSpeech(topic: string, moduleContent: string, trainerName: string) {
-  const preview = moduleContent.trim().replace(/\s+/g, " ");
-  if (!preview) return `Tap the explain icon and ${trainerName} will walk you through ${topic}.`;
-  const short = preview.length > 180 ? `${preview.slice(0, 177).trimEnd()}...` : preview;
-  return `Tap the explain icon and ${trainerName} will break down ${topic}. Quick preview: ${short}`;
+// The trainer panel never repeats the on-screen text: it only invites the learner to ask,
+// and shows new explanations/examples from the tutor once requested.
+function buildDefaultSpeech(topic: string, _moduleContent: string, trainerName: string) {
+  if (typeof window !== "undefined" && window.__CONTENTFORGE_COURSE__?.standalone) {
+    return `${trainerName} is narrating this screen. Use the voice controls below to listen again.`;
+  }
+  return `Stuck on ${topic}? Tap "Ask trainer" and ${trainerName} will explain it in plain words, or ask for a real-world example.`;
 }
 
 /**
@@ -299,11 +301,7 @@ export function AvatarNarrator({
   // ── narration fetch ───────────────────────────────────────────────────────
   const runNarration = async (mode: RequestMode) => {
     if (isStreaming) return;
-    if (window.__CONTENTFORGE_COURSE__?.standalone) {
-      setSpeechText(moduleContent);
-      setHasSpoken(true);
-      return;
-    }
+    if (window.__CONTENTFORGE_COURSE__?.standalone) return;
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -394,7 +392,8 @@ export function AvatarNarrator({
     else { v.pause(); setVideoPlaying(false); }
   };
 
-  const captionText = speechText.trim().replace(/\s+/g, " ").slice(0, 80);
+  // Caption names the topic; it only quotes speech once the tutor has said something new.
+  const captionText = hasSpoken ? speechText.trim().replace(/\s+/g, " ").slice(0, 80) : topic;
 
   // Sprite URLs
   const blinkSpriteUrl       = `/trainers/${trainerId}-blink.png`;
@@ -644,8 +643,8 @@ export function AvatarNarrator({
           </p>
         </div>
 
-        {/* Trigger row */}
-        <div className="flex items-center justify-between border-t px-4 py-2" style={{ borderColor: BUBBLE_BORDER }}>
+        {/* Trigger row — needs the live tutor, so not shown in downloaded courses */}
+        {!window.__CONTENTFORGE_COURSE__?.standalone && <div className="flex items-center justify-between border-t px-4 py-2" style={{ borderColor: BUBBLE_BORDER }}>
           {isStreaming ? (
             <button type="button" onClick={stopStreaming}
               className="text-[12px] font-semibold text-red-400 hover:text-red-600 transition-colors">
