@@ -1523,7 +1523,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     : undefined;
   const showBinding = flipStyle === "bound";
   const showStageGlow = Boolean(slideMotion) && flipStyle !== "subtle";
-  const slideAnimationDuration = flipStyle === "dramatic" ? 900 : flipStyle === "bound" ? 620 : 480;
+  const slideAnimationDuration = flipStyle === "dramatic" ? 950 : flipStyle === "bound" ? 620 : 450;
 
   // Get narration sections
   const voiceParsed = tryParseJSON(rawOutputs.voice);
@@ -3536,84 +3536,30 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           font-weight: 500;
         }
 
+        /* Physical Flip: a book page turning sideways around its spine. */
         @keyframes sheetFlipForward {
-          0% {
-            opacity: 0.8;
-            transform: perspective(2200px) rotateX(22deg) translateY(10px) scaleY(0.992);
-            transform-origin: top center;
-            box-shadow: 0 14px 24px rgba(15, 23, 42, 0.14);
-          }
-          58% {
-            opacity: 0.98;
-            transform: perspective(2200px) rotateX(-3deg) translateY(-7px) scaleY(1.005);
-            transform-origin: top center;
-            box-shadow: 0 8px 14px rgba(15, 23, 42, 0.1);
-          }
-          82% {
-            opacity: 1;
-            transform: perspective(2200px) rotateX(1deg) translateY(-1px) scaleY(1.001);
-            transform-origin: top center;
-            box-shadow: 0 4px 8px rgba(15, 23, 42, 0.06);
-          }
-          100% {
-            opacity: 1;
-            transform: perspective(2200px) rotateX(0deg) translateY(0) scaleY(1);
-            transform-origin: top center;
-            box-shadow: 0 0 0 rgba(15, 23, 42, 0);
-          }
+          0% { opacity: 0.35; transform: perspective(1800px) rotateY(-88deg); transform-origin: left center; box-shadow: -30px 0 50px rgba(15, 23, 42, 0.28); }
+          55% { opacity: 1; transform: perspective(1800px) rotateY(12deg); transform-origin: left center; box-shadow: -14px 0 28px rgba(15, 23, 42, 0.18); }
+          80% { transform: perspective(1800px) rotateY(-4deg); transform-origin: left center; box-shadow: -4px 0 10px rgba(15, 23, 42, 0.08); }
+          100% { opacity: 1; transform: perspective(1800px) rotateY(0deg); transform-origin: left center; box-shadow: 0 0 0 rgba(15, 23, 42, 0); }
         }
 
         @keyframes sheetFlipBackward {
-          0% {
-            opacity: 0.8;
-            transform: perspective(2200px) rotateX(20deg) translateY(9px) scaleY(0.994);
-            transform-origin: top center;
-            box-shadow: 0 12px 22px rgba(15, 23, 42, 0.12);
-          }
-          56% {
-            opacity: 0.98;
-            transform: perspective(2200px) rotateX(-2deg) translateY(-6px) scaleY(1.004);
-            transform-origin: top center;
-            box-shadow: 0 7px 12px rgba(15, 23, 42, 0.08);
-          }
-          80% {
-            opacity: 1;
-            transform: perspective(2200px) rotateX(1deg) translateY(-1px) scaleY(1.001);
-            transform-origin: top center;
-            box-shadow: 0 3px 6px rgba(15, 23, 42, 0.05);
-          }
-          100% {
-            opacity: 1;
-            transform: perspective(2200px) rotateX(0deg) translateY(0) scaleY(1);
-            transform-origin: top center;
-            box-shadow: 0 0 0 rgba(15, 23, 42, 0);
-          }
+          0% { opacity: 0.35; transform: perspective(1800px) rotateY(88deg); transform-origin: right center; box-shadow: 30px 0 50px rgba(15, 23, 42, 0.28); }
+          55% { opacity: 1; transform: perspective(1800px) rotateY(-12deg); transform-origin: right center; box-shadow: 14px 0 28px rgba(15, 23, 42, 0.18); }
+          80% { transform: perspective(1800px) rotateY(4deg); transform-origin: right center; box-shadow: 4px 0 10px rgba(15, 23, 42, 0.08); }
+          100% { opacity: 1; transform: perspective(1800px) rotateY(0deg); transform-origin: right center; box-shadow: 0 0 0 rgba(15, 23, 42, 0); }
         }
 
+        /* Subtle Flip: a calm slide-and-fade, no 3D turn. */
         @keyframes sheetFlipSubtleForward {
-          0% {
-            opacity: 0.78;
-            transform: perspective(1600px) rotateX(18deg) translateY(18px) scale(0.992);
-            transform-origin: top center;
-          }
-          100% {
-            opacity: 1;
-            transform: perspective(1600px) rotateX(0deg) translateY(0) scale(1);
-            transform-origin: top center;
-          }
+          0% { opacity: 0; transform: translateX(48px) scale(0.985); }
+          100% { opacity: 1; transform: translateX(0) scale(1); }
         }
 
         @keyframes sheetFlipSubtleBackward {
-          0% {
-            opacity: 0.82;
-            transform: perspective(1600px) rotateX(12deg) translateY(12px) scale(0.994);
-            transform-origin: top center;
-          }
-          100% {
-            opacity: 1;
-            transform: perspective(1600px) rotateX(0deg) translateY(0) scale(1);
-            transform-origin: top center;
-          }
+          0% { opacity: 0; transform: translateX(-48px) scale(0.985); }
+          100% { opacity: 1; transform: translateX(0) scale(1); }
         }
 
         @keyframes sheetFlipBoundForward {
