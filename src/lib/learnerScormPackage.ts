@@ -3,7 +3,6 @@ import type { LearnerPreviewProps } from "@/components/contentforge/LearnerPrevi
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId } from "@/lib/avatarTrainers";
 import { learnerExportMedia } from "@/lib/learnerExportData";
 import { generateNarrationAudio } from "@/lib/narrationAudioService";
-import { buildAssessmentNarration } from "@/lib/textCleaningUtility";
 import { generateManifest } from "@/lib/scormManifestGenerator";
 import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 
@@ -48,7 +47,7 @@ async function readRuntime(): Promise<{ js: string; css: string }> {
 }
 
 export async function createLearnerScormPackage(props: PortableLearnerProps, passingScore: number, report: (message: string) => void): Promise<{ zip: JSZip; slides: number }> {
-  const { buildSlides } = await import("@/components/contentforge/LearnerPreview");
+  const { buildSlides, buildSlideNarration } = await import("@/components/contentforge/LearnerPreview");
   const cached = learnerExportMedia.get(props.courseTitle);
   const trainerId = props.avatarTrainerId || AVATAR_TRAINERS[0].id;
   const trainerMedia = cached?.trainerMedia || getTrainerMedia(trainerId, import.meta.env as Record<string, string | undefined>);
@@ -106,19 +105,13 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   for (const [index, url] of Object.entries(media.audioBySlide)) media.audioBySlide[Number(index)] = await embed(url);
 
   if (props.rawOutputs.voice) {
-    let sections: Array<Record<string, unknown>> = [];
-    try { sections = JSON.parse(props.rawOutputs.voice).sections || []; } catch { /* Narration may be plain text. */ }
-    let contentIndex = 0;
     for (let index = 0; index < slides.length; index++) {
       const slide = slides[index];
       if (slide.type !== "content" && slide.type !== "assessment") continue;
-      const section = slide.type === "content" ? sections[contentIndex++] : undefined;
-      const narration = slide.type === "assessment" ? buildAssessmentNarration(slide.question) : section?.narration_text || slide.content;
-      // Quiz audio must speak exactly the current question + options; discard stale clips.
-      if (slide.type === "assessment" && media.audioBySlide[index] && media.audioTextBySlide[index] !== narration) delete media.audioBySlide[index];
+      // Audio must speak exactly what is on screen; any clip recorded for other text is discarded.
+      const narration = buildSlideNarration(slide, props.slideLayout?.maxLines ?? 10);
+      if (media.audioBySlide[index] && media.audioTextBySlide[index] !== narration) delete media.audioBySlide[index];
       if (media.audioBySlide[index]) continue;
-      const recorded = section?.audioDataUrl || section?.audio_url;
-      if (typeof recorded === "string") { media.audioBySlide[index] = await embed(recorded); continue; }
       if (typeof narration !== "string" || !narration.trim()) continue;
       report(`Including recorded narration ${index + 1} of ${slides.length}...`);
       const result = await withTimeout(generateNarrationAudio(narration.slice(0, 2500), getTrainerVoiceId(trainerId), props.narratorLanguage || props.textLanguage || "English"), 30_000).catch(() => null);
