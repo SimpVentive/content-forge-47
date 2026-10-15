@@ -1916,10 +1916,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       }
     } catch (err) {
       console.error("TTS fetch failed:", err);
+      if (isStale()) return;
       if (playSpeechFallback(textToNarrate, targetLanguage)) return;
       toast.error("Failed to generate narration audio");
     } finally {
-      setAudioLoading(false);
+      // A late reply from an earlier screen must not clear the current screen's loading state.
+      if (!isStale()) setAudioLoading(false);
     }
   }, [currentSlide, getNarrationForSlide, trainerVoiceId, wireAudio, narratorLanguage, standalone, courseTitle, playSpeechFallback]);
 
