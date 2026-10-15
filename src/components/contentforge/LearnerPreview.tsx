@@ -1838,6 +1838,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     }
 
     // Use generateNarrationAudio which routes based on language (Telugu → Google Cloud TTS, English → ElevenLabs, etc.)
+    // The voice request is slow; remember which screen asked so a late reply never plays on another screen.
+    const requestSlide = currentSlide;
+    const isStale = () => activeSlideRef.current !== requestSlide;
     setAudioLoading(true);
     let textToNarrate = narrationText.slice(0, 2500);
     const targetLanguage = narratorLanguage || "English";
@@ -1845,7 +1848,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       // Translate the narration first when a non-English language is selected,
       // otherwise the TTS voice reads English text with an accent.
       if (targetLanguage !== "English") {
-        const cacheKey = `${currentSlide}:${targetLanguage}`;
+        const cacheKey = `${targetLanguage}:${narrationText}`;
         const cachedTranslation = translatedNarrationRef.current[cacheKey];
         if (cachedTranslation) {
           textToNarrate = cachedTranslation;
@@ -1866,6 +1869,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
           }
         }
       }
+      if (isStale()) return;
       const result = await generateNarrationAudio(
         textToNarrate,
         trainerVoiceId,
@@ -1875,15 +1879,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       if (!result.success || !result.audioDataUrl) {
         const errorMsg = result.error || "Failed to generate audio";
         console.error("TTS error:", errorMsg);
+        if (isStale()) return;
         if (playSpeechFallback(textToNarrate, targetLanguage)) return;
         toast.error("Failed to generate narration audio");
         return;
       }
 
       const url = result.audioDataUrl;
-      audioUrlsRef.current[currentSlide] = url;
-      audioTextRef.current[currentSlide] = narrationText;
+      audioUrlsRef.current[requestSlide] = url;
+      audioTextRef.current[requestSlide] = narrationText;
       learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), audioBySlide: { ...audioUrlsRef.current }, audioTextBySlide: { ...audioTextRef.current } });
+      // Learner already moved on: keep the clip for when they come back, but don't play it here.
+      if (isStale()) return;
       const audio = new Audio(url);
       wireAudio(audio);
       await audio.play().catch((err) => {
