@@ -27,6 +27,7 @@ interface OutputPanelProps {
   learnerNotesEnabled?: boolean;
   resourcesPanelEnabled?: boolean;
   glossaryEnabled?: boolean;
+  infographicsEnabled?: boolean;
   discussionEnabled?: boolean;
   assessmentIntensity?: "light" | "standard" | "deep";
   flipStylePreference?: "dramatic" | "subtle" | "bound";
@@ -241,7 +242,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 };
 
 /* Package Renderer */
-const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; avatarTrainerId?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; learnerNotesEnabled?: boolean; resourcesPanelEnabled?: boolean; glossaryEnabled?: boolean; discussionEnabled?: boolean; assessmentIntensity?: "light" | "standard" | "deep"; flipStylePreference?: "dramatic" | "subtle" | "bound"; textLanguage?: string; narratorLanguage?: string; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic }) => {
+const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; avatarTrainerId?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; learnerNotesEnabled?: boolean; resourcesPanelEnabled?: boolean; glossaryEnabled?: boolean; infographicsEnabled?: boolean; discussionEnabled?: boolean; assessmentIntensity?: "light" | "standard" | "deep"; flipStylePreference?: "dramatic" | "subtle" | "bound"; textLanguage?: string; narratorLanguage?: string; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
   const narrativeImages = getNarrativeImageItems(rawOutputs);
