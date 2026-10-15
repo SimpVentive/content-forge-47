@@ -104,7 +104,7 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   if (media.introImages) for (const [index, url] of Object.entries(media.introImages)) media.introImages[Number(index)] = await embed(url);
   for (const [index, url] of Object.entries(media.audioBySlide)) media.audioBySlide[Number(index)] = await embed(url);
 
-  if (props.rawOutputs.voice) {
+  {
     for (let index = 0; index < slides.length; index++) {
       const slide = slides[index];
       if (slide.type !== "content" && slide.type !== "assessment") continue;
