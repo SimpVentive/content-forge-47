@@ -798,6 +798,7 @@ const Index = () => {
             learnerNotesEnabled={courseParams?.learnerNotesEnabled}
             resourcesPanelEnabled={courseParams?.resourcesPanelEnabled}
             glossaryEnabled={courseParams?.glossaryEnabled}
+            infographicsEnabled={courseParams?.infographicsEnabled}
             discussionEnabled={courseParams?.discussionEnabled}
             assessmentIntensity={courseParams?.assessmentIntensity}
             avatarTrainerId={courseParams?.avatarTrainerId}
@@ -1041,6 +1042,7 @@ const Index = () => {
             learnerNotesEnabled={courseParams?.learnerNotesEnabled}
             resourcesPanelEnabled={courseParams?.resourcesPanelEnabled}
             glossaryEnabled={courseParams?.glossaryEnabled}
+            infographicsEnabled={courseParams?.infographicsEnabled}
             discussionEnabled={courseParams?.discussionEnabled}
             assessmentIntensity={courseParams?.assessmentIntensity}
             flipStylePreference={courseParams?.flipStyle}

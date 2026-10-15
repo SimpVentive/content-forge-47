@@ -35,6 +35,7 @@ export interface CourseParameters {
   imageAspectRatio?: "landscape" | "portrait" | "square";
   showAvatarNarrator?: boolean;
   captionsEnabled?: boolean;
+  infographicsEnabled?: boolean;
   voiceoverPace?: "slow" | "normal" | "fast";
   imageNarrativeSceneCount?: 3 | 4 | 5 | 6 | 7 | 8 | 10;
   flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal";
@@ -266,6 +267,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [imageAspectRatio, setImageAspectRatio] = useState<CourseParameters["imageAspectRatio"]>("landscape");
   const [showAvatarNarrator, setShowAvatarNarrator] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
+  const [infographicsEnabled, setInfographicsEnabled] = useState(true);
   const [voiceoverPace, setVoiceoverPace] = useState<CourseParameters["voiceoverPace"]>("normal");
   const [imageNarrativeSceneCount, setImageNarrativeSceneCount] = useState<CourseParameters["imageNarrativeSceneCount"]>(6);
   const [flipbookDisplayStyle, setFlipbookDisplayStyle] = useState<CourseParameters["flipbookDisplayStyle"]>("smooth-slide");
@@ -365,6 +367,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageAspectRatio,
       showAvatarNarrator,
       captionsEnabled,
+      infographicsEnabled,
       voiceoverPace,
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
@@ -409,6 +412,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageAspectRatio,
       showAvatarNarrator,
       captionsEnabled,
+      infographicsEnabled,
       voiceoverPace,
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
@@ -448,6 +452,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       imageAspectRatio,
       showAvatarNarrator,
       captionsEnabled,
+      infographicsEnabled,
       voiceoverPace,
       imageNarrativeSceneCount,
       flipbookDisplayStyle,
@@ -979,6 +984,27 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               >
                 <div className={`w-5 h-5 rounded-full bg-white shadow-sm absolute top-0.5 transition-all duration-200 ease-in-out ${
                   captionsEnabled ? "left-[26px]" : "left-[2px]"
+                }`} />
+              </button>
+            </div>
+
+            {/* Infographic Visuals */}
+            <div className={surfaceCardClass + " flex items-center justify-between"}>
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-[13px] font-bold text-foreground">Infographic Visuals</p>
+                  <InfoHint text="Adds an AI-drawn infographic that summarises each module's main idea. Turn off for a cleaner, text-focused course." />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1">AI summary graphic on module screens</p>
+              </div>
+              <button
+                onClick={() => setInfographicsEnabled(!infographicsEnabled)}
+                className={`w-12 h-6 rounded-full transition-all duration-200 ease-in-out relative ${
+                  infographicsEnabled ? "bg-[#34D399]" : "bg-[#D1D5DB]"
+                }`}
+              >
+                <div className={`w-5 h-5 rounded-full bg-white shadow-sm absolute top-0.5 transition-all duration-200 ease-in-out ${
+                  infographicsEnabled ? "left-[26px]" : "left-[2px]"
                 }`} />
               </button>
             </div>

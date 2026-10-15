@@ -27,6 +27,7 @@ interface OutputPanelProps {
   learnerNotesEnabled?: boolean;
   resourcesPanelEnabled?: boolean;
   glossaryEnabled?: boolean;
+  infographicsEnabled?: boolean;
   discussionEnabled?: boolean;
   assessmentIntensity?: "light" | "standard" | "deep";
   flipStylePreference?: "dramatic" | "subtle" | "bound";
@@ -241,7 +242,7 @@ const AssessmentView: React.FC<{ raw: string }> = ({ raw }) => {
 };
 
 /* Package Renderer */
-const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; avatarTrainerId?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; learnerNotesEnabled?: boolean; resourcesPanelEnabled?: boolean; glossaryEnabled?: boolean; discussionEnabled?: boolean; assessmentIntensity?: "light" | "standard" | "deep"; flipStylePreference?: "dramatic" | "subtle" | "bound"; textLanguage?: string; narratorLanguage?: string; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic }) => {
+const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; courseTitle: string; rawOutputs: RawAgentOutputs; insertedVideos: InsertedVideo[]; courseDuration?: string; avatarTrainerId?: string; slideLayout?: { maxLines: number; minFontSize: number; lineSpacing: number }; learnerNotesEnabled?: boolean; resourcesPanelEnabled?: boolean; glossaryEnabled?: boolean; infographicsEnabled?: boolean; discussionEnabled?: boolean; assessmentIntensity?: "light" | "standard" | "deep"; flipStylePreference?: "dramatic" | "subtle" | "bound"; textLanguage?: string; narratorLanguage?: string; onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void }> = ({ raw, archRaw, visualRaw, courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, infographicsEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, onUpdateVisualTopic }) => {
   const data = tryParseJSON(raw);
   const meta = data?.metadata || {};
   const narrativeImages = getNarrativeImageItems(rawOutputs);
@@ -289,6 +290,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
           learnerNotesEnabled={learnerNotesEnabled}
           resourcesPanelEnabled={resourcesPanelEnabled}
           glossaryEnabled={glossaryEnabled}
+          infographicsEnabled={infographicsEnabled}
           discussionEnabled={discussionEnabled}
           assessmentIntensity={assessmentIntensity}
           flipStylePreference={flipStylePreference}
@@ -623,6 +625,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
                       learnerNotesEnabled,
                       resourcesPanelEnabled,
                       glossaryEnabled,
+                      infographicsEnabled,
                       discussionEnabled,
                       assessmentIntensity,
                       flipStylePreference,
@@ -766,7 +769,7 @@ const OutlineView: React.FC<{ raw: string; archRaw: string; visualRaw: string }>
   );
 };
 
-export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, learningType, onUpdateVisualTopic, onUpdateCourseContent, onOpenLearnerPreview, manualInsertedVideos, onManualInsertedVideosChange }) => {
+export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs, courseTitle, workflowClips = [], courseDuration, avatarTrainerId, isRunning, slideLayout, learnerNotesEnabled, resourcesPanelEnabled, glossaryEnabled, infographicsEnabled, discussionEnabled, assessmentIntensity, flipStylePreference, textLanguage, narratorLanguage, learningType, onUpdateVisualTopic, onUpdateCourseContent, onOpenLearnerPreview, manualInsertedVideos, onManualInsertedVideosChange }) => {
   const [activeTab, setActiveTab] = useState<string>("script");
   const [showLearnerPreview, setShowLearnerPreview] = useState(false);
   const [showPostPreviewDialog, setShowPostPreviewDialog] = useState(false);
@@ -941,7 +944,7 @@ export const OutputPanel: React.FC<OutputPanelProps> = ({ outputData, rawOutputs
       case "assessment":
         return <AssessmentView raw={content} />;
       case "package":
-        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} insertedVideos={allInsertedVideos} courseDuration={courseDuration} avatarTrainerId={avatarTrainerId} slideLayout={slideLayout} learnerNotesEnabled={learnerNotesEnabled} resourcesPanelEnabled={resourcesPanelEnabled} glossaryEnabled={glossaryEnabled} discussionEnabled={discussionEnabled} assessmentIntensity={assessmentIntensity} flipStylePreference={flipStylePreference} textLanguage={textLanguage} narratorLanguage={narratorLanguage} onUpdateVisualTopic={onUpdateVisualTopic} />;
+        return <PackageView raw={content} archRaw={rawOutputs.architect} visualRaw={rawOutputs.visual} courseTitle={courseTitle} rawOutputs={rawOutputs} insertedVideos={allInsertedVideos} courseDuration={courseDuration} avatarTrainerId={avatarTrainerId} slideLayout={slideLayout} learnerNotesEnabled={learnerNotesEnabled} resourcesPanelEnabled={resourcesPanelEnabled} glossaryEnabled={glossaryEnabled} infographicsEnabled={infographicsEnabled} discussionEnabled={discussionEnabled} assessmentIntensity={assessmentIntensity} flipStylePreference={flipStylePreference} textLanguage={textLanguage} narratorLanguage={narratorLanguage} onUpdateVisualTopic={onUpdateVisualTopic} />;
       case "script":
         return <ScriptView raw={content} voiceRaw={rawOutputs.voice} />;
       case "outline":

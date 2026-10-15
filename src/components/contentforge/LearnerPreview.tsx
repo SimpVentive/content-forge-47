@@ -1342,6 +1342,7 @@ export interface LearnerPreviewProps {
   textLanguage?: string;
   /** Narration/voice language selected in the course parameters dialog. */
   narratorLanguage?: string;
+  infographicsEnabled?: boolean;
   onUpdateVisualTopic?: (moduleTitle: string, topicTitle: string, updates: Record<string, unknown>) => void;
   captionsEnabled?: boolean;
 }
@@ -1370,7 +1371,7 @@ function getCourseNotesStorageKey(courseTitle: string): string {
 // Stable empty default: a fresh [] each render made the video-sync effect loop forever.
 const NO_VIDEOS: InsertedVideo[] = [];
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = NO_VIDEOS, courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true, standalone = false, exportMedia, onLearnerProgress }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = NO_VIDEOS, courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true, infographicsEnabled = true, standalone = false, exportMedia, onLearnerProgress }) => {
   // Prefer the explicit narrator language; fall back to text language; final fallback English.
   const effectiveNarratorLanguage = narratorLanguage || textLanguage || "English";
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
@@ -2756,7 +2757,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                   </div>
                 </div>
 
-                {slide.infographicSvg?.trim() && (
+                {infographicsEnabled && slide.infographicSvg?.trim() && (
                   <div className="mt-5">
                     <InfographicVisualAid
                       description={slide.infographicSvg}
@@ -3086,7 +3087,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                 </div>
 
 
-                {slide.infographicSvg?.trim() && (
+                {infographicsEnabled && slide.infographicSvg?.trim() && (
                   <div style={{ animation: "infographicExpandIn 360ms cubic-bezier(0.22, 1, 0.36, 1) 180ms both" }}>
                     <InfographicVisualAid
                       description={slide.infographicSvg}

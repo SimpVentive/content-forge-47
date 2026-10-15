@@ -108,6 +108,7 @@ export class ScormExportOrchestrator {
         learnerNotesEnabled: options.learnerNotesEnabled,
         resourcesPanelEnabled: options.resourcesPanelEnabled,
         glossaryEnabled: options.glossaryEnabled,
+        infographicsEnabled: options.infographicsEnabled,
         discussionEnabled: options.discussionEnabled,
         assessmentIntensity: options.assessmentIntensity,
         flipStylePreference: options.flipStylePreference,

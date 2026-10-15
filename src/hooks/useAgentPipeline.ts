@@ -830,7 +830,7 @@ export function useAgentPipeline() {
     return diagrams;
   };
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentTypes?: ("mcq" | "match-the-following" | "true-false" | "scenario" | "fill-blanks")[]; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3 | 4 | 5; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; avatarTrainerId?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
+  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentTypes?: ("mcq" | "match-the-following" | "true-false" | "scenario" | "fill-blanks")[]; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3 | 4 | 5; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; avatarTrainerId?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; infographicsEnabled?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
     cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
@@ -1506,6 +1506,9 @@ ZERO-REPETITION RULE — ABSOLUTE:
             const topics = (am?.topics || am?.sections || []).map((t: any) => typeof t === "string" ? t : t.topic_title || t.title || t.name || "").filter(Boolean);
             const layoutType = vm.slide_layout || "Standard";
             
+            if (params?.infographicsEnabled === false) {
+              svgs.push("");
+            } else {
             addLog(`Visual Design Agent: Generating SVG ${si+1}/${visModules.length}...`);
             try {
               const svgText = await callClaude(
@@ -1517,6 +1520,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
               svgs.push(svgMatch ? svgMatch[0] : "");
             } catch {
               svgs.push("");
+            }
             }
 
             const topicVisuals = Array.isArray(vm?.topic_visuals) ? vm.topic_visuals : [];
