@@ -1767,6 +1767,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   // Helper to wire up audio events
   const wireAudio = useCallback((audio: HTMLAudioElement) => {
     audio.muted = muted;
+    // Only one voice at a time: silence anything still playing before starting a new clip.
+    if (audioRef.current && audioRef.current !== audio) audioRef.current.pause();
+    if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     audioRef.current = audio;
     audio.onplay = () => {
       setIsPlaying(true);
