@@ -6,7 +6,7 @@
 
 import type { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "@/components/contentforge/VideosTab";
-import { stripNarratorMarkdown, isPlaceholderToken } from "@/lib/textCleaningUtility";
+import { stripAiPlaceholders, stripNarratorMarkdown, isPlaceholderToken } from "@/lib/textCleaningUtility";
 
 /* Types */
 
@@ -440,7 +440,7 @@ export function buildSlides(
     moduleTitleKeys.has(normalizeModuleKey(h)) || /^module\s*\d+\b/i.test(h.trim());
 
   const cleanBody = (s: string) => {
-    const c = (s || "").replace(/\r\n/g, "\n").replace(/^---+\s*$/gm, "").trim();
+    const c = stripAiPlaceholders((s || "").replace(/\r\n/g, "\n")).replace(/^---+\s*$/gm, "").trim();
     return c && !isPlaceholderToken(c) ? c : "";
   };
 

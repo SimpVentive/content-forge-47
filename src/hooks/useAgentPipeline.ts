@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
+import { acceptScriptRewrite, stripAiPlaceholders } from "@/lib/textCleaningUtility";
 import { convertPngToJpeg, isPngImage } from "@/lib/imageConverter";
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
 import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, trimNarrationToDuration, DEFAULT_MAX_NARRATION_SECONDS, type TopicNarrative } from "@/lib/visualNarrativeService";
@@ -1188,6 +1189,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
           writerResult = moduleResults.join("\n\n---\n\n");
         }
         
+        writerResult = stripAiPlaceholders(writerResult);
         setStatus("writer", "complete");
         setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
         setOutputData((prev) => ({ ...prev, script: writerResult }));
@@ -1209,15 +1211,11 @@ ZERO-REPETITION RULE — ABSOLUTE:
 
         const qualityParsed = tryParseJson(qualityResult);
         if (qualityParsed?.revised_script && typeof qualityParsed.revised_script === "string") {
-          const revised = qualityParsed.revised_script;
-          // Reject abbreviated rewrites ("[rest of original script follows]", "...remaining unchanged")
-          // or ones that dropped most of the content — keep the complete draft instead.
-          const abbreviated = /\[[^\]]*(rest of|remaining|unchanged|original script|continues|truncated|same as above)[^\]]*\]|\(\s*(rest of|remaining)[^)]*\)/i.test(revised);
-          const tooShort = countWords(revised) < countWords(writerResult) * 0.6;
-          if (abbreviated || tooShort) {
-            addLog(`Quality Reviewer: Revision was ${abbreviated ? "abbreviated" : "incomplete"}; keeping the full draft.`);
+          const gate = acceptScriptRewrite(writerResult, qualityParsed.revised_script);
+          if (!gate.accepted) {
+            addLog(`Quality Reviewer: Revision was ${gate.reason}; keeping the full draft.`);
           } else {
-            writerResult = revised;
+            writerResult = qualityParsed.revised_script;
           }
         }
 
@@ -1833,7 +1831,11 @@ ZERO-REPETITION RULE — ABSOLUTE:
             );
 
             const parsedCalibration = tryParseJson(calibrationResult);
-            if (parsedCalibration?.calibrated_script && typeof parsedCalibration.calibrated_script === "string") {
+            const calibrationGate = acceptScriptRewrite(writerResult, parsedCalibration?.calibrated_script, { minRatio: adjustmentDirection === "compress" ? 0.35 : 0.6 });
+            if (parsedCalibration?.calibrated_script && !calibrationGate.accepted) {
+              addLog(`Voice Agent: Calibrated script was ${calibrationGate.reason}; keeping the full script.`);
+            }
+            if (calibrationGate.accepted) {
               writerResult = parsedCalibration.calibrated_script;
               setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
               setOutputData((prev) => ({ ...prev, script: writerResult }));
@@ -2194,17 +2196,23 @@ ${modeInstructions}`;
     try {
       addLog("Final QA Agent: Applying fixes to course output...");
 
-      // Apply revised outputs
+      // Apply revised outputs — the script is only replaced when the QA rewrite is complete.
+      const revisedScript = qaResult.revisedOutputs?.writer || qaResult.revisedOutputs?.script;
+      const scriptGate = revisedScript ? acceptScriptRewrite(rawOutputs.writer || "", revisedScript) : { accepted: false as const };
+      if (revisedScript && !scriptGate.accepted) {
+        addLog(`Final QA Agent: Script rewrite was ${scriptGate.reason}; keeping the full script.`);
+      }
+      const acceptedScript = scriptGate.accepted ? (revisedScript as string) : undefined;
       setRawOutputs((prev) => ({
         ...prev,
-        ...((qaResult.revisedOutputs?.writer || qaResult.revisedOutputs?.script) && { writer: qaResult.revisedOutputs.writer || qaResult.revisedOutputs.script }),
+        ...(acceptedScript && { writer: acceptedScript }),
         ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
       }));
 
       // Update output data
       setOutputData((prev) => ({
         ...prev,
-        ...((qaResult.revisedOutputs?.script || qaResult.revisedOutputs?.writer) && { script: qaResult.revisedOutputs.script || qaResult.revisedOutputs.writer }),
+        ...(acceptedScript && { script: acceptedScript }),
         ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
       }));
 
