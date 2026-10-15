@@ -32,7 +32,11 @@ export function isPlaceholderToken(text: string): boolean {
   return false;
 }
 
-const AI_PLACEHOLDER_SOURCE = "[ \\t]*(\\.{3}|…)?[ \\t]*[\\[(][^\\])\\n]*(rest of|remaining|unchanged|original script|continues|truncated|same as above|as before|omitted for brevity)[^\\])\\n]*[\\])][ \\t]*(\\.{3}|…)?";
+const AI_PLACEHOLDER_SOURCE =
+  "[ \\t]*(?:\\.{3}|…)?[ \\t]*(?:" +
+  "\\[[^\\]\\n]*(?:rest of|remaining|unchanged|original script|continues|truncated|same as above|omitted for brevity)[^\\]\\n]*\\]" +
+  "|\\(\\s*(?:rest of|remaining (?:content|script|sections?|topics?)|unchanged|content continues|truncated)[^)\\n]*\\)" +
+  ")[ \\t]*(?:\\.{3}|…)?";
 const AI_PLACEHOLDER = new RegExp(AI_PLACEHOLDER_SOURCE, "gi");
 
 /** True when an AI rewrite contains "[rest of original script follows]"-style abbreviation notes. */
