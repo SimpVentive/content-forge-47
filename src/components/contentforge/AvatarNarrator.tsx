@@ -664,7 +664,7 @@ export function AvatarNarrator({
               Give example ›
             </button>
           )}
-        </div>
+        </div>}
       </div>
     </section>
   );
