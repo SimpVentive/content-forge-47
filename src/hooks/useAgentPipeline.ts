@@ -1521,6 +1521,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
             } catch {
               svgs.push("");
             }
+            }
 
             const topicVisuals = Array.isArray(vm?.topic_visuals) ? vm.topic_visuals : [];
             if (topicVisuals.length > 0) {
