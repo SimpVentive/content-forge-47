@@ -1719,11 +1719,33 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   // Track current sentence index (not word)
   const [highlightSentenceIdx, setHighlightSentenceIdx] = useState(-1);
 
+  const submittedAssessments = useMemo(
+    () => new Set(Object.entries(assessmentAnswers).filter(([, a]) => a?.submitted).map(([k]) => Number(k))),
+    [assessmentAnswers],
+  );
+  // One progression rule for every control: no skipping ahead past unseen screens
+  // or unanswered knowledge checks.
+  const furthestReachable = useMemo(
+    () => getFurthestReachableSlide(slides, visited, currentSlide, submittedAssessments),
+    [slides, visited, currentSlide, submittedAssessments],
+  );
+  const completionBlockers = useMemo(
+    () => getCompletionBlockers(slides, visited, currentSlide, submittedAssessments),
+    [slides, visited, currentSlide, submittedAssessments],
+  );
+  const canCompleteCourse = completionBlockers.unseen.length === 0 && completionBlockers.unanswered.length === 0;
+
   const navigateToSlide = useCallback((targetSlide: number) => {
     if (targetSlide === currentSlide || targetSlide < 0 || targetSlide >= totalSlides) return;
+    if (targetSlide > furthestReachable) {
+      toast.info(slides[furthestReachable]?.type === "assessment" && !submittedAssessments.has(furthestReachable)
+        ? "Answer the knowledge check before moving ahead."
+        : "Please go through the screens in order to unlock this one.");
+      return;
+    }
     setSlideMotion(targetSlide > currentSlide ? "forward" : "backward");
     setCurrentSlide(targetSlide);
-  }, [currentSlide, totalSlides]);
+  }, [currentSlide, totalSlides, furthestReachable, slides, submittedAssessments]);
 
   // The slide the learner is on right now. Voice requests that finish after the learner
   // has moved on must never play over a different screen.
