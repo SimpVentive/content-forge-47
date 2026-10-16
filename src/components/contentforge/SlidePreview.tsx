@@ -292,21 +292,15 @@ const ContentSlide: React.FC<{ slide: SlideData; avatarTrainerId?: string; hasVo
             <p className="text-[10px] font-[900] uppercase tracking-[0.14em] text-muted-foreground">Situation</p>
             <p className="mt-1 text-[13px] leading-relaxed text-foreground/80 line-clamp-3">{situation}</p>
           </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            <div className="rounded-xl border border-border bg-card p-3">
-              <p className="text-[10px] font-[900] uppercase tracking-[0.14em] text-muted-foreground">What to Notice</p>
-              <div className="mt-2 space-y-1.5">
-                {(notice.length ? notice : [situation]).slice(0, 3).map((item, i) => (
-                  <div key={i} className="flex items-start gap-2 text-[12px] leading-snug text-foreground/80">
-                    <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                    <span className="line-clamp-2">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-xl border border-border bg-accent p-3">
-              <p className="text-[10px] font-[900] uppercase tracking-[0.14em] text-muted-foreground">Better Move</p>
-              <p className="mt-2 text-[12px] leading-relaxed text-accent-foreground line-clamp-4">{betterMove}</p>
+          <div className="mt-3 rounded-xl border border-border bg-card p-3">
+            <p className="text-[10px] font-[900] uppercase tracking-[0.14em] text-muted-foreground">What to Notice</p>
+            <div className="mt-2 space-y-1.5">
+              {(notice.length ? notice : [situation]).slice(0, 3).map((item, i) => (
+                <div key={i} className="flex items-start gap-2 text-[12px] leading-snug text-foreground/80">
+                  <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                  <span className="line-clamp-2">{item}</span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
