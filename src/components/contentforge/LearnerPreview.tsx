@@ -1322,6 +1322,7 @@ export interface LearnerPreviewProps {
   exportMedia?: LearnerExportMedia;
   onLearnerProgress?: (progress: { slide: number; total: number; score: number; answered: number; completed: boolean }) => void;
   courseTitle: string;
+  companyLogo?: string | null;
   rawOutputs: RawAgentOutputs;
   onClose: () => void;
   insertedVideos?: InsertedVideo[];
@@ -1371,7 +1372,7 @@ function getCourseNotesStorageKey(courseTitle: string): string {
 // Stable empty default: a fresh [] each render made the video-sync effect loop forever.
 const NO_VIDEOS: InsertedVideo[] = [];
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = NO_VIDEOS, courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true, infographicsEnabled = true, standalone = false, exportMedia, onLearnerProgress }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, companyLogo, rawOutputs, onClose, insertedVideos = NO_VIDEOS, courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true, infographicsEnabled = true, standalone = false, exportMedia, onLearnerProgress }) => {
   // Prefer the explicit narrator language; fall back to text language; final fallback English.
   const effectiveNarratorLanguage = narratorLanguage || textLanguage || "English";
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
@@ -2293,17 +2294,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
             {/* Header with Logo and Course Title */}
             <div className="border-b border-slate-200 px-8 py-6">
               <div className="max-w-[1200px] mx-auto">
-                {/* Company Logo */}
-                {(slide as any).courseLogoUrl && (
-                  <div className="mb-4">
-                    <img
-                      src={(slide as any).courseLogoUrl}
-                      alt="Company Logo"
-                      className="h-16 object-contain"
-                    />
-                  </div>
-                )}
-
                 {/* Title Section */}
                 <div>
                   <h1 className="text-[42px] font-[900] text-slate-900 leading-tight mb-2">
