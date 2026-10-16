@@ -10,6 +10,7 @@ interface SlidePreviewProps {
   writerRaw?: string;
   voiceRaw?: string;
   courseTitle: string;
+  companyLogo?: string | null;
   insertedVideos?: InsertedVideo[];
   avatarTrainerId?: string;
 }
@@ -355,7 +356,7 @@ const VideoSlide: React.FC<{ slide: SlideData }> = ({ slide }) => {
   );
 };
 
-export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, writerRaw, voiceRaw, courseTitle, insertedVideos = [], avatarTrainerId }) => {
+export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, writerRaw, voiceRaw, courseTitle, companyLogo, insertedVideos = [], avatarTrainerId }) => {
   const slides = buildSlides(archRaw, visualRaw, writerRaw, courseTitle, insertedVideos);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
@@ -371,7 +372,12 @@ export const SlidePreview: React.FC<SlidePreviewProps> = ({ archRaw, visualRaw, 
   }, [slides.length]);
   if (slides.length === 0) return null;
   const slide = slides[currentSlide];
-  const renderSlide = (s: SlideData) => s.type === "title" ? <TitleSlide slide={s} /> : s.type === "video" ? <VideoSlide slide={s} /> : <ContentSlide slide={s} avatarTrainerId={avatarTrainerId} hasVoice={hasVoice} />;
+  const renderSlide = (s: SlideData) => (
+    <div>
+      {companyLogo && <div className="border-b border-border bg-card px-4 py-2"><img src={companyLogo} alt="Client logo" className="h-10 w-28 object-contain" /></div>}
+      {s.type === "title" ? <TitleSlide slide={s} /> : s.type === "video" ? <VideoSlide slide={s} /> : <ContentSlide slide={s} avatarTrainerId={avatarTrainerId} hasVoice={hasVoice} />}
+    </div>
+  );
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
