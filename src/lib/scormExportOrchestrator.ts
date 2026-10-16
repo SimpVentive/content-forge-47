@@ -100,6 +100,7 @@ export class ScormExportOrchestrator {
       // animation and assessments and is not a valid substitute for the preview.
       const portable = await createLearnerScormPackage({
         courseTitle: options.courseTitle,
+        companyLogo: options.companyLogo,
         rawOutputs,
         avatarTrainerId: options.trainerId,
         courseDuration: options.courseDuration,

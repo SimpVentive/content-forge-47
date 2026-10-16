@@ -4,6 +4,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage } from "@/lib/avatarTrainers";
 
 export interface CourseParameters {
+  companyLogo?: string | null;
   level: "basic" | "intermediate" | "advanced";
   language: string;
   textLanguage: string;

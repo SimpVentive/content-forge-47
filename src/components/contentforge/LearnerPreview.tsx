@@ -2260,6 +2260,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
       <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: "#0f172a" }}>
         <Confetti />
         <div className="text-center z-20 animate-fade-in">
+          {companyLogo && <img src={companyLogo} alt="Client logo" className="mx-auto mb-6 h-12 w-32 object-contain" />}
           <div className="w-24 h-24 rounded-full bg-emerald-500 flex items-center justify-center mx-auto mb-6 animate-scale-in">
             <Check className="w-12 h-12 text-white" />
           </div>
@@ -3871,6 +3872,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         <div className="relative min-w-0 flex flex-1 flex-col overflow-hidden">
           <div className="shrink-0 border-b border-[#31598d] bg-[#1f4f8a] px-5 py-4 text-white md:px-7">
             <div className="flex items-center justify-between gap-4">
+              {companyLogo && <img src={companyLogo} alt="Client logo" className="h-10 w-20 shrink-0 object-contain md:h-12 md:w-28" />}
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-[12px] font-semibold text-white/70">
                   <span className="truncate font-[900] text-white">{courseTitle}</span>

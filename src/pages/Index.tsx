@@ -311,7 +311,7 @@ const Index = () => {
       id: draftId,
       title,
       inputText,
-      courseParams,
+      courseParams: courseParams ? { ...courseParams, companyLogo } : null,
       workflowClips,
       rawOutputs: rawOutputs as RawAgentOutputs,
       outputData: outputData as OutputData,
@@ -327,6 +327,7 @@ const Index = () => {
     setCourseTitle(draft.title || "");
     setInputText(draft.inputText || "");
     setCourseParams(draft.courseParams || null);
+    setCompanyLogo(draft.courseParams?.companyLogo || null);
     setWorkflowClips(Array.isArray(draft.workflowClips) ? draft.workflowClips : []);
     setManualVideos([]);
     loadPersistedState(draft.rawOutputs, draft.outputData, []);
@@ -350,6 +351,7 @@ const Index = () => {
     setCourseTitle("");
     setInputText("");
     setCourseParams(null);
+    setCompanyLogo(null);
     setWorkflowClips([]);
     clearPipelineState();
     toast.success("Started a new course");
@@ -791,6 +793,7 @@ const Index = () => {
         <Suspense fallback={null}>
           <LearnerPreview
             courseTitle={courseTitle}
+            companyLogo={companyLogo}
             rawOutputs={rawOutputs}
             onClose={() => setShowLearnerPreview(false)}
             insertedVideos={previewVideos}
@@ -1035,6 +1038,7 @@ const Index = () => {
             rawOutputs={rawOutputs}
             courseTitle={courseTitle}
             workflowClips={workflowClips}
+            companyLogo={companyLogo}
             courseDuration={courseParams?.duration}
             avatarTrainerId={courseParams?.avatarTrainerId}
             isRunning={isRunning}

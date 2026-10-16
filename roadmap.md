@@ -1,4 +1,5 @@
 # Static e-learning export parity
+- [ ] Restore client logos across all learner pages, output previews and offline exports; retain logos in saved course settings and verify navigation/export.
 - [x] Fix introduction image resolution and pre-export inclusion; preview/download image parity verified and 20 tests passed.
 - [x] Package the actual learner preview and its styles, rather than the separate static renderer.
 - [x] Preserve course settings, trainer, authored images, audio, and inserted videos in both export entry points.
