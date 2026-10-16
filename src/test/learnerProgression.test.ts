@@ -18,3 +18,28 @@ describe("learner progression rule", () => {
     expect(getCompletionBlockers(slides, new Set([0, 1, 2, 3]), 4, new Set([3]))).toEqual({ unseen: [], unanswered: [] });
   });
 });
+
+import { vi } from "vitest";
+import { act, fireEvent, render, screen, cleanup } from "@testing-library/react";
+import { LearnerPreview } from "@/components/contentforge/LearnerPreview";
+
+vi.mock("@/integrations/supabase/client", () => ({ supabase: { functions: { invoke: vi.fn() } } }));
+
+const rawOutputs = {
+  architect: JSON.stringify({ modules: [{ module_title: "Mac Strategy", topics: ["Legacy", "Silicon"] }] }),
+  writer: "# Module 1: Mac Strategy\n\n## Legacy\nPowerPC came first.\n\n## Silicon\nApple silicon followed.",
+  visual: "{}",
+  assessment: JSON.stringify({ quizzes: [{ module_title: "Mac Strategy", questions: [{ question: "Which came first?", options: ["PowerPC", "M1"], correct_answer: "A" }] }] }),
+};
+
+describe("learner screen cannot skip to completion", () => {
+  it("locks Jump to Module Summary on the cover page", async () => {
+    render(<LearnerPreview courseTitle="History of MAC Products" rawOutputs={rawOutputs} standalone onClose={() => {}} exportMedia={{ introImages: { 0: "data:image/png;base64,AA==" } }} />);
+    const jump = screen.getByRole("button", { name: /jump to module summary/i });
+    expect(jump).toBeDisabled();
+    await act(async () => { fireEvent.click(jump); });
+    expect(screen.queryByRole("button", { name: /complete course/i })).toBeNull();
+    expect(screen.getByText(/Slide 1 of/)).toBeInTheDocument();
+    cleanup();
+  });
+});
