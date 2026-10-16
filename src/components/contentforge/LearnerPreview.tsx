@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
 import { learnerExportMedia, type LearnerExportMedia } from "@/lib/learnerExportData";
 import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
+import { getCompletionBlockers, getFurthestReachableSlide } from "@/lib/learnerProgression";
 import { Button } from "@/components/ui/button";
 
 /* helpers */
