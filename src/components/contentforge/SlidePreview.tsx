@@ -255,7 +255,6 @@ const ContentSlide: React.FC<{ slide: SlideData; avatarTrainerId?: string; hasVo
   const hasRichContent = !!(parts.hook || parts.body.length || parts.takeaway || parts.challenge);
   const situation = parts.hook || parts.body[0] || slide.topicTitle || slide.moduleTitle;
   const notice = sentenceBullets([parts.hook, ...parts.body, parts.takeaway].filter(Boolean));
-  const betterMove = parts.challenge || parts.takeaway || parts.body[1] || parts.body[0] || situation;
   if (!hasRichContent) {
     return (
       <div className="w-full rounded-2xl bg-card border border-border overflow-hidden flex flex-col" style={{ height: 400 }}>
