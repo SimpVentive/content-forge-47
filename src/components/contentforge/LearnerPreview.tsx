@@ -1467,7 +1467,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
 
   useEffect(() => {
     if (!learnerNotesEnabled && activeSidebarPanel === "notes") {
-      setActiveSidebarPanel("home");
+      setActiveSidebarPanel("progress");
     }
   }, [activeSidebarPanel, learnerNotesEnabled]);
 
@@ -3739,50 +3739,16 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
             <div className="rounded-2xl bg-white/8 p-4">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-[12px] font-[800] text-white">
-                  {activeSidebarPanel === "home"
-                    ? "Preview Home"
-                    : activeSidebarPanel === "progress"
-                      ? "Progress Snapshot"
-                      : activeSidebarPanel === "objectives"
-                        ? "Learning Objectives"
-                        : activeSidebarPanel === "notes"
-                          ? "Learner Notes"
-                          : "Module Resources"}
+                  {activeSidebarPanel === "progress"
+                    ? "Progress Snapshot"
+                    : activeSidebarPanel === "objectives"
+                      ? "Learning Objectives"
+                      : activeSidebarPanel === "notes"
+                        ? "Learner Notes"
+                        : "Module Resources"}
                 </p>
                 <HelpCircle className="h-4 w-4 text-white/70" />
               </div>
-              {activeSidebarPanel === "home" ? (
-                <div className="space-y-3 text-[12px] leading-relaxed text-white/70">
-                  <p>This preview is focused on the current learning experience, not LMS-level course browsing.</p>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => navigateToSlide(0)}
-                      className="rounded-full bg-white px-3 py-1.5 text-[11px] font-[800] text-[#123d78] transition-all hover:bg-slate-100"
-                      type="button"
-                    >
-                      Restart Course
-                    </button>
-                    {currentModuleTitleSlide && currentSlide !== currentModuleTitleSlide.idx ? (
-                      <button
-                        onClick={() => navigateToSlide(currentModuleTitleSlide.idx)}
-                        className="rounded-full border border-white/18 bg-white/8 px-3 py-1.5 text-[11px] font-[800] text-white transition-all hover:bg-white/12"
-                        type="button"
-                      >
-                        Module Overview
-                      </button>
-                    ) : null}
-                    {firstContentSlide ? (
-                      <button
-                        onClick={() => navigateToSlide(firstContentSlide.idx)}
-                        className="rounded-full border border-white/18 bg-white/8 px-3 py-1.5 text-[11px] font-[800] text-white transition-all hover:bg-white/12"
-                        type="button"
-                      >
-                        {currentSlide === firstContentSlide.idx ? "Current Lesson" : "Start Lesson"}
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
               {activeSidebarPanel === "progress" ? (
                 <div className="space-y-3 text-[12px] leading-relaxed text-white/70">
                   <div className="rounded-xl bg-white/8 px-3 py-2">
