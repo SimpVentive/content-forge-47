@@ -2572,30 +2572,20 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     </p>
                   </div>
 
-                  {/* What to Notice + Better Move side by side */}
-                  <div className={`grid gap-4 ${summaryBullets.length > 0 ? "sm:grid-cols-2" : ""}`}>
-                    {summaryBullets.length > 0 ? (
+                  {/* What to Notice (Better Move removed: it only repeated the situation text) */}
+                  {summaryBullets.length > 0 ? (
                     <div className="rounded-[20px] border border-[#d8e2ef] bg-white p-5 shadow-sm">
                       <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592] mb-3">What to Notice</p>
                       <div className="space-y-2.5">
-                        {summaryBullets.length > 0 ? (
-                          summaryBullets.slice(0, 4).map((bullet, index) => (
-                            <div key={`${bullet}-${index}`} className="flex items-start gap-2.5 text-[14px] text-[#24486f]">
-                              <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#2b5fa4]" />
-                              <span>{bullet}</span>
-                            </div>
-                          ))
-                        ) : null}
+                        {summaryBullets.slice(0, 4).map((bullet, index) => (
+                          <div key={`${bullet}-${index}`} className="flex items-start gap-2.5 text-[14px] text-[#24486f]">
+                            <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[#2b5fa4]" />
+                            <span>{bullet}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    ) : null}
-                    <div className="rounded-[20px] border border-[#f0d8a8] bg-[#fffbf0] p-5 shadow-sm">
-                      <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#9a6a1a] mb-3">Better Move</p>
-                      <p className="text-[15px] leading-relaxed text-[#6f5b35]">
-                        {scenarioSupport || `A recommended approach for handling ${slide.topicTitle || "this situation"}.`}
-                      </p>
-                    </div>
-                  </div>
+                  ) : null}
 
                   {/* Scenario visual - only show if there's actual content */}
                   {visualMarkup ? (
