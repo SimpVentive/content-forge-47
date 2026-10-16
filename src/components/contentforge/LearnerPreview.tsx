@@ -1392,7 +1392,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const [flipStyle, setFlipStyle] = useState<FlipStyle>("dramatic");
   const [activeLearningTool, setActiveLearningTool] = useState<LearningToolPanel>(null);
   const [visualActionState, setVisualActionState] = useState<Record<string, { regenerating?: boolean; error?: string }>>({});
-  const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>("home");
+  const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>("progress");
   const [activeUtilityPanel, setActiveUtilityPanel] = useState<UtilityPanel>(null);
   const [learnerNotes, setLearnerNotes] = useState("");
 
@@ -2182,11 +2182,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   }, []);
 
   const handleSidebarSelect = useCallback((panel: SidebarPanel) => {
-    setActiveSidebarPanel(panel);
-
     if (panel === "home") {
+      // Home jumps straight to the course start; there is no separate home panel.
       navigateToSlide(0);
+      return;
     }
+    setActiveSidebarPanel(panel);
   }, [navigateToSlide]);
 
   const handleApproveVisual = useCallback(() => {
