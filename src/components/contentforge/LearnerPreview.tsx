@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
 import { learnerExportMedia, type LearnerExportMedia } from "@/lib/learnerExportData";
 import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
+import { getCompletionBlockers, getFurthestReachableSlide } from "@/lib/learnerProgression";
 import { Button } from "@/components/ui/button";
 
 /* helpers */
@@ -1719,11 +1720,33 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   // Track current sentence index (not word)
   const [highlightSentenceIdx, setHighlightSentenceIdx] = useState(-1);
 
+  const submittedAssessments = useMemo(
+    () => new Set(Object.entries(assessmentAnswers).filter(([, a]) => a?.submitted).map(([k]) => Number(k))),
+    [assessmentAnswers],
+  );
+  // One progression rule for every control: no skipping ahead past unseen screens
+  // or unanswered knowledge checks.
+  const furthestReachable = useMemo(
+    () => getFurthestReachableSlide(slides, visited, currentSlide, submittedAssessments),
+    [slides, visited, currentSlide, submittedAssessments],
+  );
+  const completionBlockers = useMemo(
+    () => getCompletionBlockers(slides, visited, currentSlide, submittedAssessments),
+    [slides, visited, currentSlide, submittedAssessments],
+  );
+  const canCompleteCourse = completionBlockers.unseen.length === 0 && completionBlockers.unanswered.length === 0;
+
   const navigateToSlide = useCallback((targetSlide: number) => {
     if (targetSlide === currentSlide || targetSlide < 0 || targetSlide >= totalSlides) return;
+    if (targetSlide > furthestReachable) {
+      toast.info(slides[furthestReachable]?.type === "assessment" && !submittedAssessments.has(furthestReachable)
+        ? "Answer the knowledge check before moving ahead."
+        : "Please go through the screens in order to unlock this one.");
+      return;
+    }
     setSlideMotion(targetSlide > currentSlide ? "forward" : "backward");
     setCurrentSlide(targetSlide);
-  }, [currentSlide, totalSlides]);
+  }, [currentSlide, totalSlides, furthestReachable, slides, submittedAssessments]);
 
   // The slide the learner is on right now. Voice requests that finish after the learner
   // has moved on must never play over a different screen.
@@ -3378,10 +3401,20 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                   Next Module -&gt;
                 </button>
               ) : (
-                <button onClick={() => setShowCompletion(true)}
-                  className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all">
-                  Complete Course
-                </button>
+                <div className="flex flex-col items-center gap-3">
+                  <button onClick={() => { if (canCompleteCourse) setShowCompletion(true); }}
+                    disabled={!canCompleteCourse}
+                    className="h-12 px-8 rounded-xl bg-white text-[#0f172a] text-[15px] font-bold hover:bg-white/90 transition-all disabled:cursor-not-allowed disabled:opacity-50">
+                    Complete Course
+                  </button>
+                  {!canCompleteCourse && (
+                    <p className="text-[13px] text-white/80" data-testid="completion-blockers">
+                      {completionBlockers.unseen.length > 0 && `${completionBlockers.unseen.length} screen${completionBlockers.unseen.length === 1 ? "" : "s"} not viewed yet`}
+                      {completionBlockers.unseen.length > 0 && completionBlockers.unanswered.length > 0 && " · "}
+                      {completionBlockers.unanswered.length > 0 && `${completionBlockers.unanswered.length} knowledge check${completionBlockers.unanswered.length === 1 ? "" : "s"} unanswered`}
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -3713,7 +3746,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     <button
                       key={s.idx}
                       onClick={() => navigateToSlide(s.idx)}
-                      className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-[12px] transition-all ${s.idx === currentSlide ? "bg-white text-[#143a6f] shadow-sm" : "text-white/72 hover:bg-white/10 hover:text-white"}`}
+                      aria-disabled={s.idx > furthestReachable}
+                      title={s.idx > furthestReachable ? "Complete the earlier screens to unlock" : undefined}
+                      className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-[12px] transition-all ${s.idx === currentSlide ? "bg-white text-[#143a6f] shadow-sm" : s.idx > furthestReachable ? "cursor-not-allowed text-white/40" : "text-white/72 hover:bg-white/10 hover:text-white"}`}
                       type="button"
                     >
                       {visited.has(s.idx) && s.idx !== currentSlide ? (
@@ -3761,10 +3796,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     <p className="mt-1 text-[18px] font-[900] text-white">{currentModuleCompletion}%</p>
                     <p>{currentModuleSlides.filter((moduleSlide) => visited.has(moduleSlide.idx)).length} of {currentModuleSlides.length} screens viewed.</p>
                   </div>
-                  {currentModuleSummarySlide ? (
+                  {currentModuleSummarySlide && currentModuleSummarySlide.idx !== currentSlide ? (
                     <button
                       onClick={() => navigateToSlide(currentModuleSummarySlide.idx)}
-                      className="rounded-full bg-white px-3 py-1.5 text-[11px] font-[800] text-[#123d78] transition-all hover:bg-slate-100"
+                      disabled={currentModuleSummarySlide.idx > furthestReachable}
+                      title={currentModuleSummarySlide.idx > furthestReachable ? "Finish this module's screens to unlock the summary" : undefined}
+                      className="rounded-full bg-white px-3 py-1.5 text-[11px] font-[800] text-[#123d78] transition-all hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
                       type="button"
                     >
                       Jump to Module Summary
@@ -3990,7 +4027,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     <button
                       key={s.idx}
                       onClick={() => navigateToSlide(s.idx)}
-                      className={`h-2.5 w-2.5 rounded-full transition-all ${s.idx === currentSlide ? "scale-125 bg-[#1d4f93]" : visited.has(s.idx) ? "bg-[#8ba8c9]" : "bg-[#d5deea]"}`}
+                      aria-disabled={s.idx > furthestReachable}
+                      className={`h-2.5 w-2.5 rounded-full transition-all ${s.idx > furthestReachable ? "cursor-not-allowed" : ""} ${s.idx === currentSlide ? "scale-125 bg-[#1d4f93]" : visited.has(s.idx) ? "bg-[#8ba8c9]" : "bg-[#d5deea]"}`}
                       type="button"
                     />
                   ))}
