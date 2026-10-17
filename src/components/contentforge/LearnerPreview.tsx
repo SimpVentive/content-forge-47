@@ -19,6 +19,7 @@ import { learnerExportMedia, type LearnerExportMedia } from "@/lib/learnerExport
 import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 import { getCompletionBlockers, getFurthestReachableSlide } from "@/lib/learnerProgression";
 import { Button } from "@/components/ui/button";
+import { normalizeAssessmentAnswer, resolveAssessmentAnswer } from "@/lib/assessmentAnswer";
 
 /* helpers */
 function tryParseJSON(raw: string | undefined | null): any | null {
@@ -919,8 +920,9 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
       }
 
       selectedIndexes.forEach((questionIndex) => {
-        const mcq = mcqs[questionIndex];
-        if (!mcq) return;
+        const authoredQuestion = mcqs[questionIndex];
+        if (!authoredQuestion) return;
+        const mcq = normalizeAssessmentAnswer(authoredQuestion);
         // Shuffle answer options once at build time so the correct answer is
         // randomly placed (not always option B) across preview, export and narration.
         const shuffledMcq = Array.isArray(mcq.options) && mcq.options.length > 1
@@ -2157,12 +2159,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     if (!ans || ans.submitted) return;
     const q = slides[slideIdx].question;
     if (!q) return;
-    const optClean = stripOptionPrefix(q.options[ans.selected] || "");
-    const correctClean = stripOptionPrefix(q.correct_answer || "");
-    const correct = optClean === correctClean ||
-      q.options[ans.selected] === q.correct_answer ||
-      String.fromCharCode(65 + ans.selected) === q.correct_answer ||
-      q.correct_answer?.includes(optClean);
+    const correctIndex = resolveAssessmentAnswer(q);
+    if (correctIndex === undefined) {
+      toast.error("This question has no valid answer key. Please ask the course author to correct it.");
+      return;
+    }
+    const correct = ans.selected === correctIndex;
     setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true } }));
     setScore(prev => ({ correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1 }));
   };
@@ -3117,6 +3119,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         const ans = assessmentAnswers[currentSlide];
         const q = slide.question as any;
         if (!q) return null;
+        const correctAnswerIndex = resolveAssessmentAnswer(q);
 
         // If this is a scenario-based assessment, render it with avatar and 2-column layout
         if (slide.contentTemplate === "scenario" && (q.situation || q.scenario)) {
@@ -3146,7 +3149,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                   <div className="space-y-3">
                     <p className="text-[11px] font-[900] uppercase tracking-[0.14em] text-[#4b6592]">Your Response Options</p>
                     {(q.options || []).map((option: string, optionIdx: number) => {
-                      const isCorrect = option === q.best_response || option === q.correct_answer;
+                      const isCorrect = optionIdx === correctAnswerIndex;
                       let style = "border-2 border-slate-200 bg-white hover:border-slate-300";
 
                       if (ans?.submitted) {
@@ -3262,14 +3265,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                 <div className="space-y-4 mb-8">
                   {shuffledOptions.map(({ opt: originalOpt, originalIdx }, displayIdx) => {
                     let style = "border-2 border-slate-200 bg-white hover:border-slate-300 hover:shadow-md";
-                    const optClean = stripOptionPrefix(originalOpt);
-                    const correctClean = stripOptionPrefix(q.correct_answer || "");
+                    const isCorrect = originalIdx === correctAnswerIndex;
 
                     if (ans?.submitted) {
-                      const isCorrect = optClean === correctClean ||
-                        originalOpt === q.correct_answer ||
-                        String.fromCharCode(65 + originalIdx) === q.correct_answer ||
-                        q.correct_answer?.includes(optClean);
                       if (isCorrect) style = "border-2 border-emerald-500 bg-emerald-50 shadow-md";
                       else if (originalIdx === ans.selected) style = "border-2 border-red-400 bg-red-50";
                     } else if (ans?.selected === originalIdx) {
@@ -3286,11 +3284,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                       >
                         <div className="flex items-start gap-4">
                           <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[14px] ${
-                            ans?.submitted && (
-                              optClean === correctClean || originalOpt === q.correct_answer ||
-                              String.fromCharCode(65 + originalIdx) === q.correct_answer ||
-                              q.correct_answer?.includes(optClean)
-                            ) ? 'bg-emerald-500 text-white' :
+                            ans?.submitted && isCorrect ? 'bg-emerald-500 text-white' :
                             ans?.submitted && originalIdx === ans.selected ? 'bg-red-400 text-white' :
                             ans?.selected === originalIdx ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
                           }`}>
@@ -3301,20 +3295,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                               {stripOptionPrefix(originalOpt)}
                             </p>
                           </div>
-                          {ans?.submitted && (
-                            optClean === correctClean || originalOpt === q.correct_answer ||
-                            String.fromCharCode(65 + originalIdx) === q.correct_answer ||
-                            q.correct_answer?.includes(optClean)
-                          ) && (
+                          {ans?.submitted && isCorrect && (
                             <div className="flex-shrink-0 text-emerald-600">
                               <Check className="w-5 h-5" />
                             </div>
                           )}
-                          {ans?.submitted && displayIdx === ans.selected && !(
-                            optClean === correctClean || originalOpt === q.correct_answer ||
-                            String.fromCharCode(65 + originalIdx) === q.correct_answer ||
-                            q.correct_answer?.includes(optClean)
-                          ) && (
+                          {ans?.submitted && originalIdx === ans.selected && !isCorrect && (
                             <div className="flex-shrink-0 text-red-400">
                               <X className="w-5 h-5" />
                             </div>
