@@ -34,7 +34,7 @@ describe("shared quiz answer resolution", () => {
   it.each([false, true])("scores exactly one of all four choices correctly (standalone=%s)", async standalone => {
     for (const selected of options) {
       render(<LearnerPreview courseTitle="Mac Strategy" rawOutputs={rawOutputs} standalone={standalone} onClose={() => {}} exportMedia={{ introImages: { 0: "data:image/png;base64,AA==" } }} />);
-      for (let step = 0; step < 12 && !screen.queryByText("What powers modern Macs?"); step++) {
+      for (let step = 0; step < 12 && !screen.queryByRole("button", { name: "Submit Answer" }); step++) {
         await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Next$/i })); });
       }
       await act(async () => { fireEvent.click(screen.getByRole("button", { name: new RegExp(selected + "$", "i") })); });
