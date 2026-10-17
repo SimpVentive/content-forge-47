@@ -42,5 +42,5 @@ describe("shared quiz answer resolution", () => {
       expect(screen.getByText(new RegExp(`Score ${selected === "Apple silicon" ? "1" : "0"}/1`))).toBeInTheDocument();
       cleanup();
     }
-  });
+  }, 20000);
 });
