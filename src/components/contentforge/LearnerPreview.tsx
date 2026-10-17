@@ -519,12 +519,14 @@ function parseContentParts(text: string) {
 type ContentTemplate = "dashboard" | "guided-notes" | "scenario" | "media-quiz" | "summary-panel";
 type AssessmentIntensity = "light" | "standard" | "deep";
 
-function inferContentTemplate(slide: Slide, hasVisual: boolean): ContentTemplate {
+export function inferContentTemplate(slide: Pick<Slide, "contentTemplate" | "topicIndex" | "topicPartIndex" | "topicPartCount">, hasVisual: boolean): ContentTemplate {
+  // Legacy authored media-quiz screens use the same full explanation and trainer
+  // as guided notes. Never resurrect duplicate quiz/fact/objective panels.
+  if (slide.contentTemplate === "media-quiz") return "guided-notes";
   if (
     slide.contentTemplate === "dashboard" ||
     slide.contentTemplate === "guided-notes" ||
     slide.contentTemplate === "scenario" ||
-    slide.contentTemplate === "media-quiz" ||
     slide.contentTemplate === "summary-panel"
   ) {
     return slide.contentTemplate;
@@ -2613,112 +2615,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     currentViseme={activeViseme}
                     narratorLanguage={effectiveNarratorLanguage}
                   />
-                </div>
-              </div>
-            </div>
-          );
-        }
-
-        if (contentTemplate === "media-quiz") {
-          return (
-            <div className="mx-auto max-w-[1180px]" key={currentSlide}>
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-                <div className="rounded-[30px] border border-[#d6e1ef] bg-white p-6 shadow-[0_22px_54px_rgba(15,23,42,0.1)]">
-                  <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <p className="text-[12px] font-[900] uppercase tracking-[0.18em] text-[#5f7b9e]">Media + Quiz Screen</p>
-                      <h2 className="mt-2 text-[34px] font-[900] leading-tight text-[#123d78]">{slide.topicTitle}</h2>
-                      <p className="mt-1 text-[15px] text-[#5f7898]">{parts.hook || narratorExcerpt}</p>
-                    </div>
-                    {visualControls}
-                  </div>
-
-                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_420px]">
-                    <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-[#f4f8fc] p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
-                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Featured Media</p>
-                        <span className="rounded-full bg-white px-3 py-1 text-[11px] font-[800] text-[#355fa8] shadow-sm">Interactive asset zone</span>
-                      </div>
-                      {visualMarkup || introImage ? (
-                        <div className="overflow-hidden rounded-[18px] border border-[#d8deea] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.08)]">
-                          <div className="aspect-[16/10] w-full bg-[#eef3f8]">
-                            {visualMarkup ? visualMarkup : (
-                              <img src={introImage} alt={slide.topicTitle || slide.moduleTitle} className="h-full w-full object-cover" />
-                            )}
-                          </div>
-                        </div>
-                      ) : null}
-                      <div className="mt-4 rounded-[18px] border border-[#d8e2ef] bg-white p-4">
-                        <p className="text-[14px] leading-relaxed text-[#35506f]">{parts.body[0] || parts.takeaway || narratorExcerpt}</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-                      <div className="overflow-hidden rounded-[24px] border border-[#d8e2ef] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.12)]">
-                        <div className="border-b border-[#e2e8f0] px-4 py-3">
-                          <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">{trainerName}'s Guide</p>
-                          <p className="mt-0.5 text-[12px] text-[#607896]">Presenter-led explanation and follow-up example</p>
-                        </div>
-                        <div className="p-4">
-                          <AvatarNarrator
-                            topic={slide.topicTitle || slide.moduleTitle}
-                            moduleContent={narratorExcerpt || `This section explains ${slide.topicTitle || slide.moduleTitle}.`}
-                            systemHint="Focus on the practical benefit to an office worker."
-                            trainerName={trainerName}
-                            avatarImageUrl={avatarImageUrl}
-                            avatarVideoUrl={avatarVideoUrl}
-                            avatarPosterUrl={avatarPosterUrl}
-                            trainerId={selectedTrainer.id}
-                            isVoiceActive={isPlaying}
-                            isVoiceLoading={audioLoading}
-                            currentViseme={activeViseme}
-                            narratorLanguage={effectiveNarratorLanguage}
-                          />
-                        </div>
-                      </div>
-
-                      {(slide.topicPartIndex || 0) === 0 && lessonObjectives.length > 0 && (
-                        <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f4f8fc] p-4 shadow-sm">
-                          <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Learning Objectives</p>
-                          <div className="mt-3 space-y-3">
-                            {lessonObjectives.map((objective, index) => (
-                              <div key={`${objective}-${index}`} className="flex items-start gap-2 text-[13px] text-[#24486f]">
-                                <div className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#f59e0b]" />
-                                <span>{objective}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="rounded-[22px] border border-[#d8e2ef] bg-white p-4 shadow-sm">
-                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Quick Check</p>
-                        <p className="mt-3 text-[15px] font-[800] leading-snug text-[#123d78]">{currentModuleAssessment?.question || parts.challenge || "Use this area for a quick embedded check."}</p>
-                        <div className="mt-3 space-y-2">
-                          {(currentModuleAssessment?.options || lessonObjectives).slice(0, 3).map((option, index) => (
-                            <div key={`${option}-${index}`} className="rounded-xl border border-[#e2e8f0] bg-[#fbfdff] px-3 py-2 text-[13px] text-[#35506f]">
-                              <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
-                              {stripOptionPrefix(option)}
-                            </div>
-                          ))}
-                        </div>
-                        {currentModuleAssessmentSlide ? (
-                          <button
-                            onClick={() => navigateToSlide(currentModuleAssessmentSlide.idx)}
-                            className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-[#1d4f93] px-4 text-[13px] font-[800] text-white transition-all hover:bg-[#173f78]"
-                            type="button"
-                          >
-                            Launch Knowledge Check
-                          </button>
-                        ) : null}
-                      </div>
-
-                      <div className="rounded-[22px] border border-[#f2d089] bg-[#fff5d6] p-4 shadow-sm">
-                        <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#9a6a1a]">Quick Fact</p>
-                        <p className="mt-3 text-[14px] leading-relaxed text-[#6f5b35]">{quickFact}</p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
