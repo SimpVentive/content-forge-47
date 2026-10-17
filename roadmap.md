@@ -1,4 +1,5 @@
 # Static e-learning export parity
+- [ ] Correct quiz answer resolution before shuffling and verify scoring/feedback in preview and standalone learners.
 - [x] Restore client logos across all learner pages, output previews and offline exports; retain logos in saved course settings. Six regression tests passed; browser verified all test-course pages and embedded logo in the exported learner. User's own course remains unverified without sign-in.
 - [x] Fix introduction image resolution and pre-export inclusion; preview/download image parity verified and 20 tests passed.
 - [x] Package the actual learner preview and its styles, rather than the separate static renderer.
