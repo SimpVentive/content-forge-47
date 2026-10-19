@@ -3,6 +3,8 @@
  * Analyzes user requirements and estimates credits needed for generation
  */
 
+import { countSourceWords, SOURCE_WORDS_PER_MINUTE } from "./contentDuration";
+
 export interface CreditEstimate {
   learningType: "image" | "video" | "static";
   totalCredits: number;
@@ -27,8 +29,7 @@ const CREDITS_PER_VIDEO_MINUTE = 83;
  * Counts actual words without artificial minimums that mask extraction failures
  */
 function estimateWordCount(text: string): number {
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  return Math.max(words, 0);
+  return countSourceWords(text);
 }
 
 /**
@@ -56,8 +57,7 @@ function estimateTopicCount(text: string): number {
  * Based on narration speed: 130 words per minute
  */
 function estimateDurationMinutes(wordCount: number): number {
-  const WORDS_PER_MINUTE = 130;
-  return Math.ceil(wordCount / WORDS_PER_MINUTE);
+  return Math.ceil(wordCount / SOURCE_WORDS_PER_MINUTE);
 }
 
 /**

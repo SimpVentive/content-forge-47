@@ -6,49 +6,7 @@ import { RichTitleEditor, type TitleSpan } from "./RichTitleEditor";
 import { LogoUploader } from "./LogoUploader";
 import { SOPFormatDialog } from "./SOPFormatDialog";
 
-/** Estimate e-learning minutes from word count (130 words/min narrated - normalized across system) */
-export function estimateMinutesFromText(text: string): number {
-  if (!text) return 0;
-  const words = text.trim().split(/\s+/).filter(Boolean).length;
-  if (words === 0) return 0;
-  const minutes = Math.ceil(words / 130);
-  return minutes;
-}
-
-/**
- * Fallback: estimate minutes from uploaded document size when text extraction
- * under-reports (e.g. Gemini summarises a large PDF instead of returning full text).
- * Empirical bytes-per-page heuristics × ~250 words/page ÷ 130 wpm.
- */
-export function estimateMinutesFromDocumentMeta(
-  fileSize: number | null | undefined,
-  fileName?: string | null,
-): number {
-  if (!fileSize || fileSize <= 0) return 0;
-  const name = (fileName || "").toLowerCase();
-  const dot = name.lastIndexOf(".");
-  const ext = dot >= 0 ? name.slice(dot) : "";
-  const bytesPerPage =
-    ext === ".pdf" ? 40_000 :
-    ext === ".pptx" || ext === ".ppt" ? 120_000 :
-    ext === ".docx" || ext === ".doc" ? 15_000 :
-    ext === ".xlsx" || ext === ".xls" ? 25_000 :
-    30_000;
-  const estPages = Math.max(1, Math.round(fileSize / bytesPerPage));
-  return Math.ceil((estPages * 250) / 130);
-}
-
-/** Use the larger of the text-based and document-size-based estimates. */
-export function estimateMinutesCombined(
-  text: string,
-  fileSize?: number | null,
-  fileName?: string | null,
-): number {
-  return Math.max(
-    estimateMinutesFromText(text),
-    estimateMinutesFromDocumentMeta(fileSize, fileName),
-  );
-}
+export { estimateMinutesFromText, estimateMinutesFromDocumentMeta, estimateMinutesCombined } from "@/lib/contentDuration";
 
 interface SidebarProps {
   courseTitle: string;
@@ -266,7 +224,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       }
     }
 
-    // Report meta for duration estimation (uses file size as fallback for weak text extraction)
+    // File size is upload metadata only; never infer duration from storage bytes.
     if (onDocumentMeta) {
       const words = extractedText.trim().split(/\s+/).filter(Boolean).length;
       onDocumentMeta({ fileName: file.name, fileSize: file.size, extractedWordCount: words });
