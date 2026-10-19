@@ -513,10 +513,10 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               </div>
 
               <p className="text-[14px] text-foreground leading-relaxed mb-6">
-                You have uploaded content that would require approximately{" "}
-                <span className="font-bold text-primary">{estimatedMinutes} min</span> of e-learning,
-                whereas you are asking for a{" "}
-                <span className="font-bold text-primary">{selectedMinutes} min</span> e-learning course.
+                The extracted text takes approximately{" "}
+                <span className="font-bold text-primary">{estimatedMinutes} min</span> to narrate, before explanations, practice, and quizzes.
+                Your selected course duration is{" "}
+                <span className="font-bold text-primary">{selectedMinutes} min</span>.
                 {mismatchType === "more"
                   ? " The selected duration is longer than what the content supports - the AI may need to add supplementary material."
                   : " The selected duration is shorter - the AI will need to condense and prioritize key topics."}
@@ -529,7 +529,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   className="w-full h-[52px] rounded-lg text-[14px] font-medium text-white transition-all duration-200 ease-in-out flex items-center justify-center gap-2 shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:brightness-110"
                   style={{ background: "#2563EB", fontFamily: buttonFont }}
                 >
-                  Use suggested duration based on content (~{estimatedMinutes} min)
+                  Use source narration duration (~{estimatedMinutes} min)
                 </button>
                 <button
                   onClick={handleProceedWithSelected}
@@ -1168,7 +1168,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
               <InfoHint text="Sets the overall learner seat-time target for the generated course." />
               {estimatedMinutes && estimatedMinutes > 0 && (
                 <span className="ml-1 text-[11px] font-normal text-muted-foreground">
-                  (Content estimate: ~{estimatedMinutes} min)
+                  (Source narration: ~{estimatedMinutes} min)
+                </span>
+              )}
+              {estimatedMinutes === 0 && (
+                <span className="ml-1 text-[11px] font-normal text-muted-foreground">
+                  Duration unavailable: no source text extracted. Paste notes or retry the upload.
                 </span>
               )}
             </div>

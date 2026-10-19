@@ -1,4 +1,5 @@
 # Static e-learning export parity
+- [ ] Replace file-size duration heuristics with shared source narration estimates; test image-heavy uploads and unavailable extraction, and verify course setup.
 - [x] Remove redundant media-quiz sections through the shared content layout; browser verified explanation retained and panels absent in preview and an actual downloaded learner; dedicated quiz reached and submitted without page errors.
 - [x] Correct quiz answer resolution before shuffling; all four choices tested in preview and standalone (exactly one correct), and downloaded-course answer submission browser verified.
 - [x] Restore client logos across all learner pages, output previews and offline exports; retain logos in saved course settings. Six regression tests passed; browser verified all test-course pages and embedded logo in the exported learner. User's own course remains unverified without sign-in.
