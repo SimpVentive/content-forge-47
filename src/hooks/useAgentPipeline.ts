@@ -1,3 +1,4 @@
+import { EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, assessInfographicSvg, buildInfographicUserPrompt } from "@/lib/infographicQuality";
 import { useState, useCallback, useRef } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
@@ -1511,13 +1512,16 @@ ZERO-REPETITION RULE — ABSOLUTE:
             } else {
             addLog(`Visual Design Agent: Generating SVG ${si+1}/${visModules.length}...`);
             try {
-              const svgText = await callClaude(
-                "You are an elite SVG designer for premium corporate learning. Generate a complete, self-contained SVG infographic (1200x800px). Use ONLY these colors: #0f172a, #123d78, #355fa8, #4f46e5, #7c3aed, #10b981, #f59e0b, #e8eef9, #f8fafc, #ffffff. No external fonts. Use font-family='system-ui, sans-serif'. No external images. Use only SVG primitives. The infographic must use the canvas fully, have strong hierarchy, large readable labels, deliberate spacing, and a polished consulting-slide feel. Avoid giant blank areas or tiny unreadable text. Return ONLY the SVG markup, nothing else.",
-                `Create an infographic for: ${modTitle}. Layout: ${layoutType}. Key points to visualise: ${topics.join(", ")}. Include the module title prominently. Build a sophisticated visual narrative rather than a simple checklist. Add a small 'ContentForge' label bottom-right in subtle text. ${buildSlideLayoutInstruction(params?.slideLayout)}`
-              );
-              // Extract SVG from response
-              const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i);
-              svgs.push(svgMatch ? svgMatch[0] : "");
+              const svgPrompt = buildInfographicUserPrompt({ moduleTitle: modTitle, points: topics }) + ` ${buildSlideLayoutInstruction(params?.slideLayout)}`;
+              let bestSvg = "";
+              for (let attempt = 0; attempt < 2; attempt++) {
+                const svgText = await callClaude(EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, attempt ? `${svgPrompt}\nYour previous diagram was too sparse. Fill the canvas with labelled parts and a worked example.` : svgPrompt);
+                const svgMatch = svgText.match(/<svg[\s\S]*?<\/svg>/i);
+                if (!svgMatch) continue;
+                bestSvg = svgMatch[0];
+                if (assessInfographicSvg(bestSvg).ok) break;
+              }
+              svgs.push(bestSvg);
             } catch {
               svgs.push("");
             }

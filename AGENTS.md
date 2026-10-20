@@ -10,3 +10,4 @@
 - Legacy media-quiz and dashboard content templates resolve to the shared guided-notes layout before rendering; their panels repeated one paragraph and must not return as a separate preview/export branch.
 - Browser speech fallback speaks one sentence per utterance; browsers cut off long single utterances mid-screen.
 - Quiz answer feedback is one shared rule in LearnerPreview: correct shows a tick and says "Correct answer"; wrong shows a cross and says "Incorrect", then after ANSWER_REVEAL_DELAY_MS reveals and speaks the right option, so preview and export behave the same.
+- Infographic generation, sparse-diagram detection and "Explain the image" prompts live in infographicQuality; pipeline and learner preview share it so weak widget-like diagrams are rejected and regenerated everywhere.
