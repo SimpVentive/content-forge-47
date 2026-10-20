@@ -43,4 +43,31 @@ describe("shared quiz answer resolution", () => {
       cleanup();
     }
   }, 20000);
+
+  async function answer(selected: string) {
+    render(<LearnerPreview courseTitle="Mac Strategy" rawOutputs={rawOutputs} onClose={() => {}} exportMedia={{ introImages: { 0: "data:image/png;base64,AA==" } }} />);
+    for (let step = 0; step < 12 && !screen.queryByRole("button", { name: /PowerPC$/i }); step++) {
+      await act(async () => { fireEvent.click(screen.getByRole("button", { name: /^Next$/i })); });
+    }
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: new RegExp(selected + "$", "i") })); });
+    await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Submit Answer" })); });
+  }
+
+  it("says Correct answer with a tick for the right choice", async () => {
+    await answer("Apple silicon");
+    expect(screen.getByRole("status")).toHaveTextContent("Correct answer");
+    expect(screen.getAllByLabelText("Correct").length).toBeGreaterThan(0);
+  }, 20000);
+
+  it("says Incorrect with a cross, then reveals the right option after the pause", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    await answer("Intel");
+    expect(screen.getByRole("status")).toHaveTextContent("Incorrect");
+    expect(screen.getAllByLabelText("Incorrect").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("Correct")).toBeNull();
+    await act(async () => { vi.advanceTimersByTime(1600); });
+    expect(screen.getByRole("status")).toHaveTextContent(/The correct answer is option [A-D]/);
+    expect(screen.getAllByLabelText("Correct").length).toBeGreaterThan(0);
+    vi.useRealTimers();
+  }, 20000);
 });

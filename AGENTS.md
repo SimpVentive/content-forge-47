@@ -9,3 +9,4 @@
 - Assessment keys are resolved against authored options before shuffling and stored as full option text; shared exact matching governs scoring and feedback so answer labels cannot drift or mark every option wrong.
 - Legacy media-quiz and dashboard content templates resolve to the shared guided-notes layout before rendering; their panels repeated one paragraph and must not return as a separate preview/export branch.
 - Browser speech fallback speaks one sentence per utterance; browsers cut off long single utterances mid-screen.
+- Quiz answer feedback is one shared rule in LearnerPreview: correct shows a tick and says "Correct answer"; wrong shows a cross and says "Incorrect", then after ANSWER_REVEAL_DELAY_MS reveals and speaks the right option, so preview and export behave the same.

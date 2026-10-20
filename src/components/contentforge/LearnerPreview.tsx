@@ -519,6 +519,20 @@ function parseContentParts(text: string) {
 type ContentTemplate = "dashboard" | "guided-notes" | "scenario" | "media-quiz" | "summary-panel";
 type AssessmentIntensity = "light" | "standard" | "deep";
 
+export const ANSWER_REVEAL_DELAY_MS = 1500;
+
+function AnswerFeedbackBanner({ correct, revealed, letter }: { correct: boolean; revealed: boolean; letter: string }) {
+  return (
+    <div role="status" aria-live="polite" className={`mb-4 flex flex-wrap items-center gap-3 rounded-lg border-2 px-4 py-3 text-[16px] font-bold ${correct ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-red-400 bg-red-50 text-red-700"}`}>
+      <span className={`flex h-7 w-7 items-center justify-center rounded-full text-white ${correct ? "bg-emerald-500" : "bg-red-500"}`}>
+        {correct ? <Check className="h-4 w-4 stroke-[3]" /> : <X className="h-4 w-4 stroke-[3]" />}
+      </span>
+      {correct ? "Correct answer" : "Incorrect"}
+      {!correct && revealed && <span className="font-semibold text-emerald-700">— The correct answer is option {letter}.</span>}
+    </div>
+  );
+}
+
 export function inferContentTemplate(slide: Pick<Slide, "contentTemplate" | "topicIndex" | "topicPartIndex" | "topicPartCount">, hasVisual: boolean): ContentTemplate {
   // Legacy media-quiz and dashboard screens repeated the same paragraph across
   // Objective/Canvas/Explanation/Coaching panels and showed an empty "Did you know".
@@ -1481,7 +1495,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set());
-  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean }>>({});
+  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean; revealed?: boolean }>>({});
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [startTime] = useState(Date.now());
   const [showCompletion, setShowCompletion] = useState(false);
@@ -2166,7 +2180,25 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
       return;
     }
     const correct = ans.selected === correctIndex;
-    setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true } }));
+    // Shared feedback rule: correct → "Correct answer"; wrong → "Incorrect", pause, then reveal the right option.
+    setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true, revealed: correct } }));
+    const opts: string[] = (q.options || []).map((o: unknown) => stripOptionPrefix(String(o ?? "")));
+    // Options are already in display order (shuffled once at build time).
+    const letter = String.fromCharCode(65 + correctIndex);
+    const speak = (text: string) => {
+      if (muted || typeof window === "undefined" || !("speechSynthesis" in window) || activeSlideRef.current !== slideIdx) return;
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    };
+    audioRef.current?.pause();
+    speak(correct ? "Correct answer." : "Incorrect.");
+    if (!correct) {
+      window.setTimeout(() => {
+        if (activeSlideRef.current !== slideIdx) return;
+        setAssessmentAnswers(prev => prev[slideIdx] ? ({ ...prev, [slideIdx]: { ...prev[slideIdx], revealed: true } }) : prev);
+        speak(`The correct answer is option ${letter}. ${opts[correctIndex] || ""}`);
+      }, ANSWER_REVEAL_DELAY_MS);
+    }
     setScore(prev => ({ correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1 }));
   };
 
@@ -3049,7 +3081,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                       let style = "border-2 border-slate-200 bg-white hover:border-slate-300";
 
                       if (ans?.submitted) {
-                        if (isCorrect) {
+                        if (isCorrect && ans.revealed) {
                           style = "border-2 border-emerald-500 bg-emerald-50";
                         } else if (optionIdx === ans.selected) {
                           style = "border-2 border-red-400 bg-red-50";
@@ -3067,7 +3099,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                         >
                           <div className="flex items-start gap-4">
                             <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[14px] ${
-                              ans?.submitted && isCorrect ? 'bg-emerald-500 text-white' :
+                              ans?.submitted && isCorrect && ans.revealed ? 'bg-emerald-500 text-white' :
                               ans?.submitted && optionIdx === ans.selected ? 'bg-red-400 text-white' :
                               ans?.selected === optionIdx ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
                             }`}>
@@ -3076,14 +3108,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                             <div className="flex-1">
                               <p className="text-[16px] font-medium text-slate-900">{option}</p>
                             </div>
-                            {ans?.submitted && isCorrect && (
-                              <div className="flex-shrink-0 text-emerald-600">
-                                <Check className="w-5 h-5" />
+                            {ans?.submitted && isCorrect && ans.revealed && (
+                              <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white" aria-label="Correct">
+                                <Check className="w-5 h-5 stroke-[3]" />
                               </div>
                             )}
                             {ans?.submitted && optionIdx === ans.selected && !isCorrect && (
-                              <div className="flex-shrink-0 text-red-400">
-                                <X className="w-5 h-5" />
+                              <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white" aria-label="Incorrect">
+                                <X className="w-5 h-5 stroke-[3]" />
                               </div>
                             )}
                           </div>
@@ -3092,8 +3124,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     })}
                   </div>
 
+                  {ans?.submitted && <AnswerFeedbackBanner correct={ans.selected === correctAnswerIndex} revealed={!!ans.revealed} letter={String.fromCharCode(65 + (correctAnswerIndex ?? 0))} />}
                   {/* Rationale/Explanation */}
-                  {ans?.submitted && (q.rationale || q.explanation) && (
+                  {ans?.submitted && ans.revealed && (q.rationale || q.explanation) && (
                     <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
                       <p className="text-[14px] text-slate-700">
                         <span className="font-semibold text-blue-700">Explanation: </span>
@@ -3164,7 +3197,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     const isCorrect = originalIdx === correctAnswerIndex;
 
                     if (ans?.submitted) {
-                      if (isCorrect) style = "border-2 border-emerald-500 bg-emerald-50 shadow-md";
+                      if (isCorrect && ans.revealed) style = "border-2 border-emerald-500 bg-emerald-50 shadow-md";
                       else if (originalIdx === ans.selected) style = "border-2 border-red-400 bg-red-50";
                     } else if (ans?.selected === originalIdx) {
                       style = "border-2 border-blue-500 bg-blue-50 shadow-md";
@@ -3180,7 +3213,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                       >
                         <div className="flex items-start gap-4">
                           <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-bold text-[14px] ${
-                            ans?.submitted && isCorrect ? 'bg-emerald-500 text-white' :
+                            ans?.submitted && isCorrect && ans.revealed ? 'bg-emerald-500 text-white' :
                             ans?.submitted && originalIdx === ans.selected ? 'bg-red-400 text-white' :
                             ans?.selected === originalIdx ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600'
                           }`}>
@@ -3191,14 +3224,14 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                               {stripOptionPrefix(originalOpt)}
                             </p>
                           </div>
-                          {ans?.submitted && isCorrect && (
-                            <div className="flex-shrink-0 text-emerald-600">
-                              <Check className="w-5 h-5" />
+                          {ans?.submitted && isCorrect && ans.revealed && (
+                            <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white" aria-label="Correct">
+                              <Check className="w-5 h-5 stroke-[3]" />
                             </div>
                           )}
                           {ans?.submitted && originalIdx === ans.selected && !isCorrect && (
-                            <div className="flex-shrink-0 text-red-400">
-                              <X className="w-5 h-5" />
+                            <div className="flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white" aria-label="Incorrect">
+                              <X className="w-5 h-5 stroke-[3]" />
                             </div>
                           )}
                         </div>
@@ -3208,7 +3241,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                 </div>
 
                 {/* Feedback after submission */}
-                {ans?.submitted && q.rationale && (
+                {ans?.submitted && <AnswerFeedbackBanner correct={ans.selected === correctAnswerIndex} revealed={!!ans.revealed} letter={String.fromCharCode(65 + Math.max(0, shuffledOptions.findIndex(o => o.originalIdx === correctAnswerIndex)))} />}
+                {ans?.submitted && ans.revealed && q.rationale && (
                   <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
                     <p className="text-[14px] text-slate-700">
                       <span className="font-semibold text-blue-700">Explanation: </span>
