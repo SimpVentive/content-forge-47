@@ -1856,25 +1856,25 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const speechUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const playSpeechFallback = useCallback((text: string, language: string = "English") => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return false;
-    const sentences = narrationSentences;
-    const utterance = new SpeechSynthesisUtterance(text);
+    // Browsers silently cut off a single long utterance after ~15 seconds, so speak
+    // one sentence per utterance; the whole screen's narration is always read to the end.
+    const chunks = text.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) || [text];
     const langCodes: Record<string, string> = { Hindi: "hi-IN", Telugu: "te-IN", Tamil: "ta-IN", Kannada: "kn-IN", Malayalam: "ml-IN", Bengali: "bn-IN", Marathi: "mr-IN", Gujarati: "gu-IN", Punjabi: "pa-IN", Urdu: "ur-PK", Spanish: "es-ES", French: "fr-FR", German: "de-DE", Italian: "it-IT", Portuguese: "pt-PT", Arabic: "ar-SA", Chinese: "zh-CN", Japanese: "ja-JP", Korean: "ko-KR", Russian: "ru-RU" };
-    if (langCodes[language]) utterance.lang = langCodes[language];
-    utterance.onstart = () => setIsPlaying(true);
-    utterance.onend = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); setHighlightWordIdx(-1); };
-    utterance.onerror = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); };
-    utterance.onboundary = (event: SpeechSynthesisEvent) => {
-      if (typeof event.charIndex !== "number") return;
-      let cursor = 0;
-      for (let i = 0; i < sentences.length; i++) {
-        const end = cursor + sentences[i].length;
-        if (event.charIndex <= end) { setHighlightSentenceIdx(i); break; }
-        cursor = end + 1;
-      }
-    };
-    speechUtteranceRef.current = utterance;
     window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(utterance);
+    const startSlide = activeSlideRef.current;
+    chunks.forEach((chunk, i) => {
+      const utterance = new SpeechSynthesisUtterance(chunk);
+      if (langCodes[language]) utterance.lang = langCodes[language];
+      utterance.onstart = () => {
+        if (activeSlideRef.current !== startSlide) { window.speechSynthesis.cancel(); return; }
+        setIsPlaying(true);
+        setHighlightSentenceIdx(Math.min(i, Math.max(0, narrationSentences.length - 1)));
+      };
+      utterance.onend = () => { if (i === chunks.length - 1) { setIsPlaying(false); setHighlightSentenceIdx(-1); setHighlightWordIdx(-1); } };
+      utterance.onerror = () => { setIsPlaying(false); setHighlightSentenceIdx(-1); };
+      speechUtteranceRef.current = utterance;
+      window.speechSynthesis.speak(utterance);
+    });
     return true;
   }, [narrationSentences]);
 
