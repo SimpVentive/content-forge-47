@@ -2462,7 +2462,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         const narratorExcerpt = getNarratorExcerpt(narratorSource || slide.content || "");
         const chartLines = getOnScreenLines(slide.content || "", slideRules.maxLines);
         const contentTextStyle = {
-          fontSize: `${Math.max(14, slideRules.minFontSize)}px`,
+          // Scale with the screen so wide displays are filled instead of leaving empty space.
+          fontSize: `clamp(${Math.max(14, slideRules.minFontSize)}px, 1.15vw, ${Math.max(22, slideRules.minFontSize)}px)`,
           lineHeight: slideRules.lineSpacing,
         } as React.CSSProperties;
         const clampSingleLine = {
@@ -2823,9 +2824,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         }
 
         return (
-          <div className="mx-auto max-w-[1140px]" key={currentSlide}>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
-              <div className="relative px-6 pt-8 pb-7 md:px-9 md:pt-10 md:pb-9"
+          <div className="mx-auto w-full" key={currentSlide}>
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-stretch">
+              <div className="relative flex flex-col px-6 pt-8 pb-7 md:px-9 md:pt-10 md:pb-9"
                 style={{
                   background: "#E5EAF1",
                   borderRadius: "32px",
@@ -2836,7 +2837,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                 />
                 <div className="pointer-events-none absolute left-[18%] top-[10px] h-10 w-4 -translate-x-1/2 rounded-full border-2 border-[#505867] bg-[#f8fafc] md:left-[22%]" />
                 <div className="pointer-events-none absolute right-[18%] top-[10px] h-10 w-4 translate-x-1/2 rounded-full border-2 border-[#505867] bg-[#f8fafc] md:right-[22%]" />
-                <div className="relative overflow-hidden rounded-[8px] border border-[#d8deea] bg-white px-6 py-6 md:px-8 md:py-7"
+                <div className="relative flex-1 overflow-hidden rounded-[8px] border border-[#d8deea] bg-white px-6 py-6 md:px-8 md:py-7"
                   style={{ boxShadow: "0 16px 30px rgba(15,23,42,0.08)" }}>
                   <div className="absolute inset-0 opacity-[0.12] bg-[#dbe4f0]" />
                   <div className="relative z-10">
@@ -3839,7 +3840,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
 
           <div className="flex-1 overflow-y-auto bg-[#eef3f9] px-5 py-6 md:px-8 md:py-8">
 
-            <div className="relative mx-auto max-w-[1280px] [perspective:2200px]">
+            <div className="relative mx-auto max-w-[1600px] [perspective:2200px]">
               {showStageGlow && (
                 <div
                   className="pointer-events-none absolute inset-x-10 top-10 z-0 h-24 rounded-full blur-3xl"
@@ -3849,7 +3850,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                   }}
                 />
               )}
-              {showBinding && (
+              {showBinding && slide?.type !== "content" && (
                 <div className="pointer-events-none absolute inset-x-12 top-1 z-20 hidden md:block">
                   <div className="mx-auto h-2 max-w-[980px] rounded-full bg-white/25" />
                   <div className="mx-auto mt-1 flex max-w-[900px] items-center justify-between px-10">
