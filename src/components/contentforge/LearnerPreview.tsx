@@ -520,20 +520,19 @@ type ContentTemplate = "dashboard" | "guided-notes" | "scenario" | "media-quiz" 
 type AssessmentIntensity = "light" | "standard" | "deep";
 
 export function inferContentTemplate(slide: Pick<Slide, "contentTemplate" | "topicIndex" | "topicPartIndex" | "topicPartCount">, hasVisual: boolean): ContentTemplate {
-  // Legacy authored media-quiz screens use the same full explanation and trainer
-  // as guided notes. Never resurrect duplicate quiz/fact/objective panels.
-  if (slide.contentTemplate === "media-quiz") return "guided-notes";
+  // Legacy media-quiz and dashboard screens repeated the same paragraph across
+  // Objective/Canvas/Explanation/Coaching panels and showed an empty "Did you know".
+  // Both resolve to guided notes: the narrated lines shown once, with the trainer.
+  if (slide.contentTemplate === "media-quiz" || slide.contentTemplate === "dashboard") return "guided-notes";
   if (
-    slide.contentTemplate === "dashboard" ||
     slide.contentTemplate === "guided-notes" ||
     slide.contentTemplate === "scenario" ||
     slide.contentTemplate === "summary-panel"
   ) {
     return slide.contentTemplate;
   }
-  const isModuleOpener = (slide.topicIndex || 0) === 0 && (slide.topicPartIndex || 0) === 0;
   if ((slide.topicPartCount || 1) > 1 && (slide.topicPartIndex || 0) === (slide.topicPartCount || 1) - 1) return "summary-panel";
-  if (isModuleOpener || hasVisual) return "dashboard";
+  void hasVisual;
   return "guided-notes";
 }
 
