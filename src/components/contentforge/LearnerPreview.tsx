@@ -1082,14 +1082,16 @@ export function splitInfographicDescription(raw: string): { svg: string; text: s
   return { svg: svgMarkup.replace(/<script[\s\S]*?<\/script>/gi, ""), text };
 }
 
-const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string }> = ({ description: rawDescription, moduleTitle }) => {
+const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string; topicTitle?: string; content?: string }> = ({ description: rawDescription, moduleTitle, topicTitle, content }) => {
   const parsed = useMemo(() => splitInfographicDescription(rawDescription), [rawDescription]);
   const description = parsed.text || moduleTitle;
+  // Stored SVGs that fail the shared quality rule are regenerated as teaching diagrams.
+  const storedOk = useMemo(() => (parsed.svg ? assessInfographicSvg(parsed.svg).ok : false), [parsed.svg]);
   const [expanded, setExpanded] = useState(false);
-  const [svg, setSvg] = useState(() => (parsed.svg ? normalizeSvg(parsed.svg) : ""));
+  const [svg, setSvg] = useState(() => (parsed.svg && storedOk ? normalizeSvg(parsed.svg) : ""));
   useEffect(() => {
-    if (parsed.svg) setSvg(normalizeSvg(parsed.svg));
-  }, [parsed.svg]);
+    setSvg(parsed.svg && storedOk ? normalizeSvg(parsed.svg) : "");
+  }, [parsed.svg, storedOk]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [showZoomed, setShowZoomed] = useState(false);
@@ -1103,25 +1105,28 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
     setError(false);
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { data, error: fnErr } = await supabase.functions.invoke("claude", {
-        body: {
-          systemPrompt: INFOGRAPHIC_SYSTEM_PROMPT,
-          userMessage: `Create an infographic for module: "${moduleTitle}". Visual description: ${description}. Requirements: fill the canvas with a confident layout, use large readable labels, keep copy concise, and make the output feel like a polished modern eLearning visual aid that can still be read clearly when expanded in a learner preview.`,
-        },
-      });
-      if (fnErr || data?.error) {
-        setError(true);
-      } else {
-        const result = normalizeSvg(extractSVG(data.text || ""));
-        if (result) setSvg(result);
-        else setError(true);
+      const userMessage = buildInfographicUserPrompt({ moduleTitle, topicTitle, content: content || description });
+      let best = "";
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { data, error: fnErr } = await supabase.functions.invoke("claude", {
+          body: { systemPrompt: EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, userMessage: attempt ? `${userMessage}\nYour previous diagram was too sparse. Fill the canvas with labelled parts and a worked example.` : userMessage },
+        });
+        if (fnErr || data?.error) continue;
+        const result = extractSVG(data.text || "");
+        if (!result) continue;
+        best = result;
+        if (assessInfographicSvg(result).ok) break;
       }
+      if (best) setSvg(normalizeSvg(best));
+      else if (parsed.svg) setSvg(normalizeSvg(parsed.svg));
+      else setError(true);
     } catch {
-      setError(true);
+      if (parsed.svg) setSvg(normalizeSvg(parsed.svg));
+      else setError(true);
     } finally {
       setLoading(false);
     }
-  }, [svg, loading, description, moduleTitle]);
+  }, [svg, loading, description, moduleTitle, topicTitle, content, parsed.svg]);
 
   const handleToggle = () => {
     if (!expanded && !svg && !loading) generateSvg();
@@ -1135,27 +1140,28 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
       return;
     }
 
+    const labels = extractSvgLabels(svg || parsed.svg);
+    const fallback = labels.length
+      ? `• This diagram covers: ${labels.slice(0, 6).join(", ")}.\n• Read the headline first, then each labelled part in order.`
+      : `• This diagram summarises ${topicTitle || moduleTitle}.`;
     setExplaining(true);
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const { data, error: fnErr } = await supabase.functions.invoke("claude", {
         body: {
-          systemPrompt: "You explain infographics for workplace learners. Be concise, practical, and easy to scan. Return plain text with 3 short bullet-style lines: what the image shows, how to read it, and why it matters.",
-          userMessage: `Module: ${moduleTitle}\nInfographic description: ${description}`,
+          systemPrompt: INFOGRAPHIC_EXPLAIN_SYSTEM_PROMPT,
+          userMessage: buildInfographicExplainPrompt({ moduleTitle, topicTitle, labels, content: content || description }),
         },
       });
-
-      if (fnErr || data?.error) {
-        setExplanation(`What this image shows: ${description}\nHow to read it: follow the visual flow from left to right and connect each block to the learning journey.\nWhy it matters: it gives the learner a quick mental map before they go deeper into the topic.`);
-      } else {
-        setExplanation(splitInfographicDescription(data.text || "").text || `What this image shows: ${description}`);
-      }
+      const text = !fnErr && !data?.error ? splitInfographicDescription(data?.text || "").text : "";
+      // splitInfographicDescription collapses newlines; keep bullets on separate lines.
+      setExplanation(text ? text.replace(/\s*•\s*/g, "\n• ").trim() : fallback);
     } catch {
-      setExplanation(`What this image shows: ${description}\nHow to read it: follow the visual flow from left to right and connect each block to the learning journey.\nWhy it matters: it gives the learner a quick mental map before they go deeper into the topic.`);
+      setExplanation(fallback);
     } finally {
       setExplaining(false);
     }
-  }, [description, explanation, explaining, moduleTitle]);
+  }, [description, explanation, explaining, moduleTitle, topicTitle, content, svg, parsed.svg]);
 
   const updateZoomLevel = (nextZoom: number) => {
     setZoomLevel(Math.max(1, Math.min(2.4, Number(nextZoom.toFixed(2)))));
