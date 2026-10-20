@@ -6,6 +6,11 @@ describe("shared legacy media-quiz migration", () => {
     expect(inferContentTemplate({ contentTemplate: "media-quiz", topicIndex: 1 }, hasVisual)).toBe("guided-notes");
   });
 
+  it.each([false, true])("never renders the repetitive dashboard layout (%s)", hasVisual => {
+    expect(inferContentTemplate({ contentTemplate: "dashboard", topicIndex: 0 }, hasVisual)).toBe("guided-notes");
+    expect(inferContentTemplate({ topicIndex: 0, topicPartIndex: 0 }, hasVisual)).toBe("guided-notes");
+  });
+
   it("keeps all displayed explanation lines in narration, without adding a module quiz", () => {
     const content = "Compare memory bandwidth before choosing a Mac. More bandwidth supports demanding workflows.";
     const lines = getOnScreenLines(content);
