@@ -2183,8 +2183,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     // Shared feedback rule: correct → "Correct answer"; wrong → "Incorrect", pause, then reveal the right option.
     setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true, revealed: correct } }));
     const opts: string[] = (q.options || []).map((o: unknown) => stripOptionPrefix(String(o ?? "")));
-    const displayOrder = slides[slideIdx].type === "assessment" && shuffledOptionOrderRef.current[slideIdx] ? shuffledOptionOrderRef.current[slideIdx] : opts.map((_, i) => i);
-    const letter = String.fromCharCode(65 + Math.max(0, displayOrder.indexOf(correctIndex)));
+    // Options are already in display order (shuffled once at build time).
+    const letter = String.fromCharCode(65 + correctIndex);
     const speak = (text: string) => {
       if (muted || typeof window === "undefined" || !("speechSynthesis" in window) || activeSlideRef.current !== slideIdx) return;
       window.speechSynthesis.cancel();
