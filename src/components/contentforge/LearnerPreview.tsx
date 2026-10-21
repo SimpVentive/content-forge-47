@@ -20,6 +20,7 @@ import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 import { getCompletionBlockers, getFurthestReachableSlide } from "@/lib/learnerProgression";
 import { Button } from "@/components/ui/button";
 import { normalizeAssessmentAnswer, resolveAssessmentAnswer } from "@/lib/assessmentAnswer";
+import { assessInfographicSvg, buildInfographicUserPrompt, EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, extractSvgLabels, INFOGRAPHIC_EXPLAIN_SYSTEM_PROMPT, buildInfographicExplainPrompt } from "@/lib/infographicQuality";
 
 /* helpers */
 function tryParseJSON(raw: string | undefined | null): any | null {
