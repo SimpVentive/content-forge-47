@@ -50,7 +50,7 @@ export const Hero = () => {
           <h1 className="mt-6 text-5xl font-semibold leading-[1.05] tracking-tight text-slate-900 md:text-6xl">
             Turn raw content into <br />
             <span className="relative inline-block">
-              <span className="relative z-10 text-amber-500">world-class courses</span>
+              <span className="relative z-10 text-amber-500">world-class digital courses</span>
               <span aria-hidden className="absolute inset-x-0 -bottom-1 h-3 rounded-full bg-amber-100/70" />
             </span>
             <br />in minutes.
