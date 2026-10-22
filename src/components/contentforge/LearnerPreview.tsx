@@ -218,18 +218,16 @@ async function parseTtsResponse(response: Response): Promise<ParsedTtsPayload> {
 
 function buildFlipChartLines(
   parts: { hook: string; body: string[]; takeaway: string; challenge: string },
-  maxLines: number
+  _maxLines: number
 ) {
-  const availableLines = Math.max(4, maxLines - 2);
   const lines: Array<{ text: string; tone: "lead" | "body" | "takeaway" | "challenge" }> = [];
 
   const pushSentences = (text: string, tone: "lead" | "body" | "takeaway" | "challenge") => {
-    if (!text || lines.length >= availableLines) return;
+    if (!text) return;
     const normalized = stripNarratorMarkdown(text);
     const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
 
     for (const sentence of sentences) {
-      if (lines.length >= availableLines) break;
       lines.push({
         text: sentence.replace(/^Key takeaway:\s*/i, "").replace(/^Challenge:\s*/i, "").trim(),
         tone,
@@ -240,15 +238,15 @@ function buildFlipChartLines(
   pushSentences(parts.hook, "lead");
   parts.body.forEach((paragraph) => pushSentences(paragraph, "body"));
 
-  if (parts.takeaway && lines.length < availableLines) {
+  if (parts.takeaway) {
     pushSentences(`Key takeaway: ${parts.takeaway}`, "takeaway");
   }
 
-  if (parts.challenge && lines.length < availableLines) {
+  if (parts.challenge) {
     pushSentences(`Challenge: ${parts.challenge}`, "challenge");
   }
 
-  return lines.slice(0, availableLines);
+  return lines;
 }
 
 type SlideType = "title" | "content" | "assessment" | "summary" | "video" | "narrative-flipbook";
@@ -315,16 +313,6 @@ function splitParagraphIntoSentenceChunks(paragraph: string, targetWordsPerChunk
   return chunks;
 }
 
-function truncateToWordLimit(text: string, maxWords: number): string {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return text.trim();
-  return `${words.slice(0, maxWords).join(" ").trim()}...`;
-}
-
-function isTruncatedByWordLimit(text: string, maxWords: number): boolean {
-  return text.split(/\s+/).filter(Boolean).length > maxWords;
-}
-
 type SlideContentChunk = {
   text: string;
   wasTrimmed: boolean;
@@ -340,20 +328,11 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxL
   if (paragraphs.length === 0) {
     const fallback = text.trim();
     return fallback
-      ? [{ text: truncateToWordLimit(fallback, Math.max(36, maxLines * 9)), wasTrimmed: isTruncatedByWordLimit(fallback, Math.max(36, maxLines * 9)) }]
+      ? [{ text: fallback, wasTrimmed: false }]
       : [];
   }
 
-  // Cap chunks-per-topic by duration so a 3-min course doesn't blow up to 12+ slides.
-  // For very short courses (<=3 min), allow up to 2 chunks to avoid excessive truncation
-  const maxChunksPerTopic = durationMinutes <= 2 ? 2
-    : durationMinutes <= 3 ? 2
-    : durationMinutes <= 5 ? 2
-    : durationMinutes <= 10 ? 3
-    : durationMinutes <= 20 ? 4
-    : durationMinutes <= 45 ? 5
-    : 6;
-
+  // Duration and line settings guide pagination, never deletion of authored content.
   const targetWordsByDuration = durationMinutes <= 5 ? 70 : durationMinutes <= 10 ? 85 : durationMinutes <= 20 ? 100 : 115;
   const approxWordsPerLine = 9;
   const lineBudgetWordLimit = Math.max(36, maxLines * approxWordsPerLine);
@@ -366,8 +345,8 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxL
     if (currentParagraphs.length === 0) return;
     const combined = currentParagraphs.join("\n\n").trim();
     chunks.push({
-      text: truncateToWordLimit(combined, lineBudgetWordLimit),
-      wasTrimmed: isTruncatedByWordLimit(combined, lineBudgetWordLimit),
+      text: combined,
+      wasTrimmed: false,
     });
     currentParagraphs = [];
     currentWordCount = 0;
@@ -381,8 +360,8 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxL
       splitParagraphIntoSentenceChunks(paragraph, targetWordsPerSlide).forEach((sentenceChunk) => {
         if (sentenceChunk) {
           chunks.push({
-            text: truncateToWordLimit(sentenceChunk, lineBudgetWordLimit),
-            wasTrimmed: isTruncatedByWordLimit(sentenceChunk, lineBudgetWordLimit),
+            text: sentenceChunk,
+            wasTrimmed: false,
           });
         }
       });
@@ -399,26 +378,13 @@ function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxL
 
   flushChunk();
 
-  // Enforce per-topic chunk cap: if we exceeded the cap, merge the trailing
-  // chunks into the last allowed slide (truncated to fit) rather than spawning
-  // extra slides that overshoot the course's target duration.
-  if (chunks.length > maxChunksPerTopic) {
-    const kept = chunks.slice(0, maxChunksPerTopic - 1);
-    const overflow = chunks.slice(maxChunksPerTopic - 1).map((c) => c.text).join(" ");
-    kept.push({
-      text: truncateToWordLimit(overflow, lineBudgetWordLimit),
-      wasTrimmed: true,
-    });
-    return kept;
-  }
-
   if (chunks.length > 0) return chunks;
 
   const fallback = text.trim();
   return fallback
     ? [{
-        text: truncateToWordLimit(fallback, lineBudgetWordLimit),
-        wasTrimmed: isTruncatedByWordLimit(fallback, lineBudgetWordLimit),
+        text: fallback,
+        wasTrimmed: false,
       }]
     : [];
 }
@@ -2501,15 +2467,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         const narratorExcerpt = getNarratorExcerpt(narratorSource || slide.content || "");
         const chartLines = getOnScreenLines(slide.content || "", slideRules.maxLines);
         const contentTextStyle = {
-          // Scale with the screen so wide displays are filled instead of leaving empty space.
-          fontSize: `clamp(${Math.max(14, slideRules.minFontSize)}px, 1.15vw, ${Math.max(22, slideRules.minFontSize)}px)`,
+          fontSize: `${Math.max(16, slideRules.minFontSize)}px`,
           lineHeight: slideRules.lineSpacing,
-        } as React.CSSProperties;
-        const clampSingleLine = {
-          display: "-webkit-box",
-          WebkitBoxOrient: "vertical",
-          WebkitLineClamp: 3,
-          overflow: "hidden",
         } as React.CSSProperties;
 
         const normalizedNarrationSentences = narrationSentences.map((sentence) => stripNarratorMarkdown(sentence));
@@ -2864,8 +2823,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
 
         return (
           <div className="mx-auto w-full" key={currentSlide}>
-            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_400px] lg:items-stretch">
-              <div className="relative flex flex-col px-6 pt-8 pb-7 md:px-9 md:pt-10 md:pb-9"
+            <div className="learner-lesson-grid grid gap-6 items-stretch">
+              <div className="relative flex min-w-0 flex-col px-6 pt-8 pb-7 md:px-9 md:pt-10 md:pb-9"
                 style={{
                   background: "#E5EAF1",
                   borderRadius: "32px",
@@ -2922,7 +2881,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                               style={{ background: line.tone === "takeaway" ? "#f59e0b" : line.tone === "challenge" ? "#7c3aed" : "#1d4ed8" }}
                             />
                             <p
-                              className="font-[700] tracking-[0.01em]"
+                              className="min-w-0 flex-1 whitespace-normal break-words font-[700] tracking-normal"
                               style={{
                                 color: isActive
                                   ? activeHighlightPalette.foreground
@@ -2934,7 +2893,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                                         ? "#1e3a8a"
                                         : "#2c5ea5",
                                 ...contentTextStyle,
-                                ...clampSingleLine,
                                 padding: "2px 8px",
                                 borderRadius: "10px",
                                 transition: "background 0.2s ease, box-shadow 0.2s ease, color 0.2s ease",
@@ -2963,7 +2921,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                 </div>
               </div>
 
-              <div className="space-y-5 lg:sticky lg:top-5 lg:self-start">
+              <div className="learner-lesson-guide min-w-0 space-y-5">
                 {showSideVisual && (
                   <div className="overflow-hidden rounded-[28px] border p-3 shadow-sm"
                     style={{
@@ -3403,7 +3361,17 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   return (
     <div ref={previewRootRef} className="fixed inset-0 z-[9999] flex flex-col overflow-hidden p-3 md:p-5 learner-preview-3d" style={{ background: "#DCE6F1" }}>
       <style>
-        {`/* ── 3D lift for buttons ─────────────────────────────────────── */
+        {`
+        .learner-stage { container-type: inline-size; }
+        .learner-lesson-grid { grid-template-columns: minmax(0, 1fr); }
+        @container (min-width: 900px) {
+          .learner-lesson-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+          .learner-lesson-guide { position: sticky; top: 20px; align-self: start; }
+        }
+        @container (min-width: 1200px) {
+          .learner-lesson-grid { grid-template-columns: minmax(0, 1fr) 400px; }
+        }
+        /* ── 3D lift for buttons ─────────────────────────────────────── */
         .learner-preview-3d button {
           box-shadow:
             0 2px 0 rgba(0,0,0,0.10),
@@ -3881,7 +3849,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
 
           <div className="flex-1 overflow-y-auto bg-[#eef3f9] px-5 py-6 md:px-8 md:py-8">
 
-            <div className="relative mx-auto max-w-[1600px] [perspective:2200px]">
+            <div className="learner-stage relative mx-auto max-w-[1600px] [perspective:2200px]">
               {showStageGlow && (
                 <div
                   className="pointer-events-none absolute inset-x-10 top-10 z-0 h-24 rounded-full blur-3xl"

@@ -1,4 +1,5 @@
 # Static e-learning export parity
+- [ ] Preserve full lesson text through pagination and narration; verify wrapped explanations and stage-width layout in preview and standalone learners.
 - [x] Correct all six missing infographic dependencies; 13 targeted tests passed, including navigation in preview/standalone and generation/explanation; browser reached content through Next with no page errors. The user's signed-in course and external testing-site deployment remain unverified.
 - [x] Replace file-size duration heuristics with shared source narration estimates; six regression tests passed and actual PDF text checked in the running app (364 words, 3 minutes; unchanged with larger image size).
 - [ ] Verify the PDF upload and Course Setup display signed in. Blocked: session minting failed; user must sign in through the preview.
