@@ -1764,6 +1764,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     const chunks = text.match(/[^.!?]+[.!?]+["')\]]*|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) || [text];
     const langCodes: Record<string, string> = { Hindi: "hi-IN", Telugu: "te-IN", Tamil: "ta-IN", Kannada: "kn-IN", Malayalam: "ml-IN", Bengali: "bn-IN", Marathi: "mr-IN", Gujarati: "gu-IN", Punjabi: "pa-IN", Urdu: "ur-PK", Spanish: "es-ES", French: "fr-FR", German: "de-DE", Italian: "it-IT", Portuguese: "pt-PT", Arabic: "ar-SA", Chinese: "zh-CN", Japanese: "ja-JP", Korean: "ko-KR", Russian: "ru-RU" };
     window.speechSynthesis.cancel();
+    // One voice per screen: a recorded clip must not keep talking under the browser voice.
+    audioRef.current?.pause();
     const startSlide = activeSlideRef.current;
     chunks.forEach((chunk, i) => {
       const utterance = new SpeechSynthesisUtterance(chunk);
@@ -1782,9 +1784,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   }, [narrationSentences]);
 
   // Fetch and play TTS on demand (user gesture)
+  const narrationRequestSlideRef = useRef<number | null>(null);
   const playNarration = useCallback(async () => {
     const narrationText = getNarrationForSlide(currentSlide);
     if (!narrationText) return;
+    // A voice request for this screen is already on its way (auto-play, unmute, Explain, or a
+    // double-mounted effect); a second request would read the same screen twice.
+    if (narrationRequestSlideRef.current === currentSlide) return;
 
     // If we already have audio for this slide, just play it
     if (getCachedAudio(currentSlide, narrationText)) {
@@ -1806,6 +1812,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     // The voice request is slow; remember which screen asked so a late reply never plays on another screen.
     const requestSlide = currentSlide;
     const isStale = () => activeSlideRef.current !== requestSlide;
+    narrationRequestSlideRef.current = requestSlide;
     setAudioLoading(true);
     let textToNarrate = narrationText.slice(0, 2500);
     const targetLanguage = narratorLanguage || "English";
@@ -1885,6 +1892,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
       if (playSpeechFallback(textToNarrate, targetLanguage)) return;
       toast.error("Failed to generate narration audio");
     } finally {
+      if (narrationRequestSlideRef.current === requestSlide) narrationRequestSlideRef.current = null;
       // A late reply from an earlier screen must not clear the current screen's loading state.
       if (!isStale()) setAudioLoading(false);
     }
@@ -3860,8 +3868,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     onClick={() => {
                       if (audioLoading) return;
                       const cachedUrl = getCachedAudio(currentSlide, currentNarration);
-                      if (audioRef.current && isPlaying) {
-                        audioRef.current.pause();
+                      if (isPlaying) {
+                        audioRef.current?.pause();
+                        if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+                        setIsPlaying(false);
                         return;
                       }
                       // If we already have a cached URL for this slide, (re)create the element and play it.
