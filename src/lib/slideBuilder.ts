@@ -7,6 +7,7 @@
 import type { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "@/components/contentforge/VideosTab";
 import { stripAiPlaceholders, stripNarratorMarkdown, isPlaceholderToken } from "@/lib/textCleaningUtility";
+import { collectAssessmentItems } from "@/lib/assessmentAnswer";
 
 /* Types */
 
@@ -100,12 +101,41 @@ export function getDurationMinutes(duration?: string): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
 }
 
+/** Sentences of a paragraph. A bare list number such as "1." stays with the text that follows it. */
+export function splitSentences(text: string): string[] {
+  const pieces = text.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [text.trim()];
+  const sentences: string[] = [];
+  for (const piece of pieces) {
+    const previous = sentences[sentences.length - 1];
+    if (previous !== undefined && /^\d+[.)]$/.test(previous)) {
+      sentences[sentences.length - 1] = `${previous} ${piece}`;
+    } else {
+      sentences.push(piece);
+    }
+  }
+  return sentences;
+}
+
+/**
+ * An answer key line such as "*Correct answer: 3" or "*సరైన సమాధానం: 3." belongs to the assessment,
+ * so it must not appear on the screen before the question. Takeaway, challenge and tip lines are kept.
+ */
+export function isAnswerKeyLine(line: string): boolean {
+  const text = line.trim();
+  if (/takeaway|challenge|remember|\btip\b|\bnote\b/i.test(text)) return false;
+  return /^\*(?!\*)[^:：\n]{1,60}[:：]/.test(text) || /^(correct answer|best response|answer)\s*[:：]/i.test(text);
+}
+
+/** Letters and digits only, lowercased, so text in any script compares equal regardless of punctuation. */
+export function normalizeForMatch(text: string): string {
+  return text.toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
+}
+
 export function splitParagraphIntoSentenceChunks(paragraph: string, targetWordsPerChunk: number): string[] {
   const normalized = paragraph.trim();
   if (!normalized) return [];
 
-  const sentences =
-    normalized.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+  const sentences = splitSentences(normalized);
   const chunks: string[] = [];
   let currentChunk: string[] = [];
   let currentWordCount = 0;
@@ -129,14 +159,15 @@ export function splitParagraphIntoSentenceChunks(paragraph: string, targetWordsP
   return chunks;
 }
 
-export function truncateToWordLimit(text: string, maxWords: number): string {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length <= maxWords) return text.trim();
-  return `${words.slice(0, maxWords).join(" ").trim()}...`;
-}
-
-export function isTruncatedByWordLimit(text: string, maxWords: number): boolean {
-  return text.split(/\s+/).filter(Boolean).length > maxWords;
+/** Splits text into pieces of at most maxWords, at sentence ends where possible. Words are never dropped. */
+export function splitToWordBudget(text: string, maxWords: number): string[] {
+  return splitParagraphIntoSentenceChunks(text, maxWords).flatMap((sentence) => {
+    const words = sentence.split(/\s+/).filter(Boolean);
+    if (words.length <= maxWords) return [sentence];
+    const pieces: string[] = [];
+    for (let i = 0; i < words.length; i += maxWords) pieces.push(words.slice(i, i + maxWords).join(" "));
+    return pieces;
+  });
 }
 
 export function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxLines = 10): SlideContentChunk[] {
@@ -144,7 +175,7 @@ export function splitTopicContentIntoSlides(text: string, durationMinutes: numbe
     .split("\n")
     .filter((line) => !line.match(/^#{1,3}\s/))
     .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.match(/^[-*#]+$/));
+    .filter((line) => line.length > 0 && !line.match(/^[-*#]+$/) && !isAnswerKeyLine(line));
   const paragraphs = lines
     .join("\n")
     .trim()
@@ -152,33 +183,15 @@ export function splitTopicContentIntoSlides(text: string, durationMinutes: numbe
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
 
-  if (paragraphs.length === 0) {
-    const fallback = text.trim();
-    return fallback ? [{
-      text: truncateToWordLimit(fallback, Math.max(36, maxLines * 9)),
-      wasTrimmed: isTruncatedByWordLimit(fallback, Math.max(36, maxLines * 9)),
-    }] : [];
-  }
-
-  const maxChunksPerTopic =
-    durationMinutes <= 2
-      ? 2
-      : durationMinutes <= 3
-        ? 2
-        : durationMinutes <= 5
-          ? 2
-          : durationMinutes <= 10
-            ? 3
-            : durationMinutes <= 20
-              ? 4
-              : durationMinutes <= 45
-                ? 5
-                : 6;
-
-  const targetWordsByDuration =
-    durationMinutes <= 5 ? 70 : durationMinutes <= 10 ? 85 : durationMinutes <= 20 ? 100 : 115;
+  // Every word the writer produced stays on a slide: long text becomes more slides, never a cut-off "...".
   const approxWordsPerLine = 9;
   const lineBudgetWordLimit = Math.max(36, maxLines * approxWordsPerLine);
+  const toChunks = (chunkText: string): SlideContentChunk[] =>
+    splitToWordBudget(chunkText, lineBudgetWordLimit).map((piece) => ({ text: piece, wasTrimmed: false }));
+
+  if (paragraphs.length === 0) return toChunks(text.trim());
+
+  const targetWordsByDuration = durationMinutes <= 5 ? 70 : durationMinutes <= 10 ? 85 : durationMinutes <= 20 ? 100 : 115;
   const targetWordsPerSlide = Math.min(targetWordsByDuration, lineBudgetWordLimit);
   const chunks: SlideContentChunk[] = [];
   let currentParagraphs: string[] = [];
@@ -186,11 +199,7 @@ export function splitTopicContentIntoSlides(text: string, durationMinutes: numbe
 
   const flushChunk = () => {
     if (currentParagraphs.length === 0) return;
-    const combined = currentParagraphs.join("\n\n").trim();
-    chunks.push({
-      text: truncateToWordLimit(combined, lineBudgetWordLimit),
-      wasTrimmed: isTruncatedByWordLimit(combined, lineBudgetWordLimit),
-    });
+    chunks.push(...toChunks(currentParagraphs.join("\n\n").trim()));
     currentParagraphs = [];
     currentWordCount = 0;
   };
@@ -201,12 +210,7 @@ export function splitTopicContentIntoSlides(text: string, durationMinutes: numbe
     if (paragraphWordCount > targetWordsPerSlide * 1.35) {
       flushChunk();
       splitParagraphIntoSentenceChunks(paragraph, targetWordsPerSlide).forEach((sentenceChunk) => {
-        if (sentenceChunk) {
-          chunks.push({
-            text: truncateToWordLimit(sentenceChunk, lineBudgetWordLimit),
-            wasTrimmed: isTruncatedByWordLimit(sentenceChunk, lineBudgetWordLimit),
-          });
-        }
+        if (sentenceChunk) chunks.push(...toChunks(sentenceChunk));
       });
       return;
     }
@@ -221,23 +225,8 @@ export function splitTopicContentIntoSlides(text: string, durationMinutes: numbe
 
   flushChunk();
 
-  if (chunks.length > maxChunksPerTopic) {
-    const kept = chunks.slice(0, maxChunksPerTopic - 1);
-    const overflow = chunks.slice(maxChunksPerTopic - 1).map((c) => c.text).join(" ");
-    kept.push({
-      text: truncateToWordLimit(overflow, lineBudgetWordLimit),
-      wasTrimmed: true,
-    });
-    return kept;
-  }
-
   if (chunks.length > 0) return chunks;
-
-  const fallback = text.trim();
-  return fallback ? [{
-    text: truncateToWordLimit(fallback, lineBudgetWordLimit),
-    wasTrimmed: isTruncatedByWordLimit(fallback, lineBudgetWordLimit),
-  }] : [];
+  return toChunks(text.trim());
 }
 
 export function getTopicVisual(moduleVisual: any, topicTitle: string) {
@@ -410,7 +399,7 @@ export function buildSlides(
   }
 
   // Extract MCQs
-  const mcqs = Array.isArray(assessData?.mcq) ? assessData.mcq : [];
+  const mcqs = collectAssessmentItems(assessData);
   const maxQuestionCount = Math.min(mcqs.length, getTargetCourseQuestionCount(durationMinutes, assessmentIntensity));
   const questionsPerModule = allocateQuestionsPerModule(modules, maxQuestionCount);
   const usedQuestionIndexes = new Set<number>();

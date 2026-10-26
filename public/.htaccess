@@ -1,0 +1,11 @@
+# Single-page app: serve index.html for any path that is not a real file,
+# so a refresh on /new-course loads the app instead of Apache's 404.
+# Requires AllowOverride FileInfo (or All) for this directory in the Apache vhost.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

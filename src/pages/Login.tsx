@@ -8,6 +8,13 @@ import { useAuth } from "@/hooks/useAuth";
 
 type LocationState = { from?: { pathname?: string } } | null;
 
+// A saved "from" pointing into the admin console (left behind when a non-admin was bounced there)
+// must not decide where a normal sign-in lands, so those fall back to the default.
+const returnPathFor = (state: LocationState) => {
+  const from = state?.from?.pathname;
+  return from && !from.startsWith("/admin") ? from : "/new-course";
+};
+
 const Login = () => {
   const { signIn, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -19,8 +26,7 @@ const Login = () => {
 
   // already signed in? bounce out
   if (!isLoading && isAuthenticated) {
-    const state = location.state as LocationState;
-    return <Navigate to={state?.from?.pathname ?? "/new-course"} replace />;
+    return <Navigate to={returnPathFor(location.state as LocationState)} replace />;
   }
 
   const handleSubmit = async (e: FormEvent) => {
@@ -33,8 +39,7 @@ const Login = () => {
       setError(signInError.message);
       return;
     }
-    const state = location.state as LocationState;
-    navigate(state?.from?.pathname ?? "/new-course", { replace: true });
+    navigate(returnPathFor(location.state as LocationState), { replace: true });
   };
 
   return (

@@ -150,6 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [showTitleConfirm, setShowTitleConfirm] = useState(false);
   const [suggestedTitle, setSuggestedTitle] = useState("");
   const [isTitleFocused, setIsTitleFocused] = useState(false);
+  const titleBlurTimer = useRef<ReturnType<typeof setTimeout>>();
   const [showFormatSelection, setShowFormatSelection] = useState(false);
   const [detectedSOP, setDetectedSOP] = useState(false);
   const [showCourseOutline, setShowCourseOutline] = useState(false);
@@ -157,6 +158,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const isStep1Complete = courseTitle.trim().length > 0;
   const isStep2Complete = contentMode !== null && inputText.trim().length > 0;
+
+  // Collapse the title panels after a short delay so a click on Upload File or the formatting controls lands before the layout shifts.
+  const cancelTitleCollapse = () => clearTimeout(titleBlurTimer.current);
+  const scheduleTitleCollapse = () => {
+    cancelTitleCollapse();
+    titleBlurTimer.current = setTimeout(() => setIsTitleFocused(false), 200);
+  };
 
   const handleFile = async (file: File) => {
     setUploadedFileName(file.name);
@@ -314,33 +322,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
             ref={titleInputRef}
             value={courseTitle}
             onChange={(e) => setCourseTitle(e.target.value)}
-            onFocus={() => setIsTitleFocused(true)}
-            onBlur={() => setIsTitleFocused(false)}
+            onFocus={() => {
+              cancelTitleCollapse();
+              setIsTitleFocused(true);
+            }}
+            onBlur={scheduleTitleCollapse}
             placeholder="Enter an engaging course title..."
             className={`w-full border-[1.5px] border-slate-300 rounded-lg px-4 py-3 text-[14px] text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 resize-none font-medium ${
               isTitleFocused ? "min-h-24" : "min-h-11"
             }`}
           />
 
-          {/* Title Formatting Panel */}
-          <TitleFormatter
-            title={courseTitle}
-            setTitle={setCourseTitle}
-            isOpen={isTitleFocused}
-          />
-
-          {/* Rich Text Editor for per-section formatting */}
-          {isTitleFocused && setTitleSpans && (
-            <RichTitleEditor
+          {/* Focus inside either panel (select, colour input) keeps them open */}
+          <div onFocus={cancelTitleCollapse}>
+            {/* Title Formatting Panel */}
+            <TitleFormatter
               title={courseTitle}
-              spans={titleSpans}
-              onTitleChange={(text, spans) => {
-                setCourseTitle(text);
-                setTitleSpans(spans);
-              }}
+              setTitle={setCourseTitle}
               isOpen={isTitleFocused}
             />
-          )}
+
+            {/* Rich Text Editor for per-section formatting */}
+            {isTitleFocused && setTitleSpans && (
+              <RichTitleEditor
+                title={courseTitle}
+                spans={titleSpans}
+                onTitleChange={(text, spans) => {
+                  setCourseTitle(text);
+                  setTitleSpans(spans);
+                }}
+                isOpen={isTitleFocused}
+              />
+            )}
+          </div>
         </div>
 
         {/* Step 2: Course Content */}

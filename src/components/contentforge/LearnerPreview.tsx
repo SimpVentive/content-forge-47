@@ -19,7 +19,8 @@ import { learnerExportMedia, type LearnerExportMedia } from "@/lib/learnerExport
 import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 import { getCompletionBlockers, getFurthestReachableSlide } from "@/lib/learnerProgression";
 import { Button } from "@/components/ui/button";
-import { normalizeAssessmentAnswer, resolveAssessmentAnswer } from "@/lib/assessmentAnswer";
+import { collectAssessmentItems, normalizeAssessmentAnswer, resolveAssessmentAnswer } from "@/lib/assessmentAnswer";
+import { normalizeForMatch, splitSentences, splitTopicContentIntoSlides } from "@/lib/slideBuilder";
 import { assessInfographicSvg, buildInfographicUserPrompt, EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, extractSvgLabels, INFOGRAPHIC_EXPLAIN_SYSTEM_PROMPT, buildInfographicExplainPrompt } from "@/lib/infographicQuality";
 
 /* helpers */
@@ -222,12 +223,16 @@ function buildFlipChartLines(
 ) {
   const lines: Array<{ text: string; tone: "lead" | "body" | "takeaway" | "challenge" }> = [];
 
+  // The takeaway and challenge are also shown in their own panel, so the same sentence must not appear as a body bullet too.
+  const reserved = new Set([parts.takeaway, parts.challenge].map((value) => normalizeForMatch(value || "")).filter(Boolean));
+
   const pushSentences = (text: string, tone: "lead" | "body" | "takeaway" | "challenge") => {
     if (!text) return;
     const normalized = stripNarratorMarkdown(text);
-    const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
+    const sentences = splitSentences(normalized);
 
     for (const sentence of sentences) {
+      if (tone !== "takeaway" && tone !== "challenge" && reserved.has(normalizeForMatch(sentence))) continue;
       lines.push({
         text: sentence.replace(/^Key takeaway:\s*/i, "").replace(/^Challenge:\s*/i, "").trim(),
         tone,
@@ -283,110 +288,6 @@ interface Slide {
 function getDurationMinutes(duration?: string): number {
   const parsed = Number.parseInt(duration || "15", 10);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : 15;
-}
-
-function splitParagraphIntoSentenceChunks(paragraph: string, targetWordsPerChunk: number): string[] {
-  const normalized = paragraph.trim();
-  if (!normalized) return [];
-
-  const sentences = normalized.match(/[^.!?]+[.!?]+[\])"'`]*|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [normalized];
-  const chunks: string[] = [];
-  let currentChunk: string[] = [];
-  let currentWordCount = 0;
-
-  for (const sentence of sentences) {
-    const sentenceWordCount = sentence.split(/\s+/).filter(Boolean).length;
-    if (currentChunk.length > 0 && currentWordCount + sentenceWordCount > targetWordsPerChunk) {
-      chunks.push(currentChunk.join(" ").trim());
-      currentChunk = [sentence];
-      currentWordCount = sentenceWordCount;
-    } else {
-      currentChunk.push(sentence);
-      currentWordCount += sentenceWordCount;
-    }
-  }
-
-  if (currentChunk.length > 0) {
-    chunks.push(currentChunk.join(" ").trim());
-  }
-
-  return chunks;
-}
-
-type SlideContentChunk = {
-  text: string;
-  wasTrimmed: boolean;
-};
-
-function splitTopicContentIntoSlides(text: string, durationMinutes: number, maxLines = 10): SlideContentChunk[] {
-  const lines = text
-    .split("\n")
-    .filter((line) => !line.match(/^#{1,3}\s/))
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0 && !line.match(/^[-*#]+$/));
-  const paragraphs = lines.join("\n").trim().split(/\n\n+/).map((paragraph) => paragraph.trim()).filter(Boolean);
-  if (paragraphs.length === 0) {
-    const fallback = text.trim();
-    return fallback
-      ? [{ text: fallback, wasTrimmed: false }]
-      : [];
-  }
-
-  // Duration and line settings guide pagination, never deletion of authored content.
-  const targetWordsByDuration = durationMinutes <= 5 ? 70 : durationMinutes <= 10 ? 85 : durationMinutes <= 20 ? 100 : 115;
-  const approxWordsPerLine = 9;
-  const lineBudgetWordLimit = Math.max(36, maxLines * approxWordsPerLine);
-  const targetWordsPerSlide = Math.min(targetWordsByDuration, lineBudgetWordLimit);
-  const chunks: SlideContentChunk[] = [];
-  let currentParagraphs: string[] = [];
-  let currentWordCount = 0;
-
-  const flushChunk = () => {
-    if (currentParagraphs.length === 0) return;
-    const combined = currentParagraphs.join("\n\n").trim();
-    chunks.push({
-      text: combined,
-      wasTrimmed: false,
-    });
-    currentParagraphs = [];
-    currentWordCount = 0;
-  };
-
-  paragraphs.forEach((paragraph) => {
-    const paragraphWordCount = paragraph.split(/\s+/).filter(Boolean).length;
-
-    if (paragraphWordCount > targetWordsPerSlide * 1.35) {
-      flushChunk();
-      splitParagraphIntoSentenceChunks(paragraph, targetWordsPerSlide).forEach((sentenceChunk) => {
-        if (sentenceChunk) {
-          chunks.push({
-            text: sentenceChunk,
-            wasTrimmed: false,
-          });
-        }
-      });
-      return;
-    }
-
-    if (currentParagraphs.length > 0 && currentWordCount + paragraphWordCount > targetWordsPerSlide) {
-      flushChunk();
-    }
-
-    currentParagraphs.push(paragraph);
-    currentWordCount += paragraphWordCount;
-  });
-
-  flushChunk();
-
-  if (chunks.length > 0) return chunks;
-
-  const fallback = text.trim();
-  return fallback
-    ? [{
-        text: fallback,
-        wasTrimmed: false,
-      }]
-    : [];
 }
 
 function getTopicVisual(moduleVisual: any, topicTitle: string) {
@@ -476,7 +377,7 @@ function parseContentParts(text: string) {
   // Key Takeaway panel doesn't render the "Content not available" filler.
   if (!takeaway) {
     const source = [...body, hook].find((value) => value && !isPlaceholderToken(value));
-    const lastSentence = source ? source.match(/[^.!?]+[.!?]+/g)?.slice(-1)[0]?.trim() : "";
+    const lastSentence = source ? splitSentences(source).slice(-1)[0] : "";
     if (lastSentence && !isPlaceholderToken(lastSentence)) takeaway = safeLearnerText(lastSentence);
   }
 
@@ -624,10 +525,10 @@ function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[]
  *  Used by the in-app preview AND the downloaded course so audio and text can never drift. */
 export function getOnScreenLines(content: string, maxLines = 10) {
   const parts = parseContentParts(content || "");
-  const takeawayKey = String(parts.takeaway || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  const takeawayKey = normalizeForMatch(String(parts.takeaway || ""));
   return buildFlipChartLines(parts, maxLines).filter((line: any) => {
     if (!takeawayKey || line.tone === "takeaway") return true;
-    const k = String(line.text || "").toLowerCase().replace(/^key takeaway:?\s*/, "").replace(/[^a-z0-9]+/g, " ").trim();
+    const k = normalizeForMatch(String(line.text || "").replace(/^key takeaway:?\s*/i, ""));
     return !(k && (k === takeawayKey || takeawayKey.includes(k) || k.includes(takeawayKey)));
   });
 }
@@ -669,7 +570,7 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
   }
 
   // Extract MCQs
-  const mcqs = Array.isArray(assessData?.mcq) ? assessData.mcq : [];
+  const mcqs = collectAssessmentItems(assessData);
   const maxQuestionCount = Math.min(mcqs.length, getTargetCourseQuestionCount(durationMinutes, assessmentIntensity));
   const questionsPerModule = allocateQuestionsPerModule(modules, maxQuestionCount);
   const usedQuestionIndexes = new Set<number>();
@@ -1061,6 +962,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string;
   }, [parsed.svg, storedOk]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [errorDetail, setErrorDetail] = useState("");
   const [showZoomed, setShowZoomed] = useState(false);
   const [explanation, setExplanation] = useState("");
   const [explaining, setExplaining] = useState(false);
@@ -1070,6 +972,8 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string;
     if (svg || loading) return;
     setLoading(true);
     setError(false);
+    setErrorDetail("");
+    let reason = "";
     try {
       const { supabase } = await import("@/integrations/supabase/client");
       const userMessage = buildInfographicUserPrompt({ moduleTitle, topicTitle, content: content || description });
@@ -1078,18 +982,30 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string;
         const { data, error: fnErr } = await supabase.functions.invoke("claude", {
           body: { systemPrompt: EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, userMessage: attempt ? `${userMessage}\nYour previous diagram was too sparse. Fill the canvas with labelled parts and a worked example.` : userMessage },
         });
-        if (fnErr || data?.error) continue;
+        if (fnErr || data?.error) {
+          reason = fnErr?.message || data?.error || "The AI service returned no response.";
+          continue;
+        }
         const result = extractSVG(data.text || "");
-        if (!result) continue;
+        if (!result) {
+          reason = "The AI reply did not contain a complete SVG diagram.";
+          continue;
+        }
         best = result;
         if (assessInfographicSvg(result).ok) break;
       }
       if (best) setSvg(normalizeSvg(best));
       else if (parsed.svg) setSvg(normalizeSvg(parsed.svg));
-      else setError(true);
-    } catch {
+      else {
+        setErrorDetail(reason);
+        setError(true);
+      }
+    } catch (err) {
       if (parsed.svg) setSvg(normalizeSvg(parsed.svg));
-      else setError(true);
+      else {
+        setErrorDetail(err instanceof Error ? err.message : "Unexpected error.");
+        setError(true);
+      }
     } finally {
       setLoading(false);
     }
@@ -1226,6 +1142,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string;
           ) : error ? (
             <div className="flex h-[240px] flex-col items-center justify-center gap-2 rounded-[24px] border border-red-400/30 bg-red-500/10">
               <p className="text-[13px] text-red-200">Failed to generate infographic</p>
+              {errorDetail && <p className="max-w-[80%] text-center text-[11px] text-red-200/80">{errorDetail}</p>}
               <button onClick={generateSvg} className="text-[12px] font-semibold text-[#cfe0ff] hover:underline" type="button">
                 Retry
               </button>

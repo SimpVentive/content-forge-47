@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { RotateCcw, Type } from "lucide-react";
+import { keepTitleFocus } from "./TitleFormatter";
 
 export interface TitleSpan {
   start: number;
@@ -84,11 +85,22 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
     onTitleChange(title, newSpans);
   };
 
+  // DOM offsets are relative to the span's own text node, so measure from the start of the editor to get a position in the title.
+  const getTitleOffset = (root: HTMLElement, node: Node, offset: number) => {
+    const range = document.createRange();
+    range.setStart(root, 0);
+    range.setEnd(node, offset);
+    return range.toString().length;
+  };
+
   const handleMouseUp = () => {
     const selection = window.getSelection();
-    if (selection && selection.toString().length > 0 && editorRef.current?.contains(selection.anchorNode)) {
-      setSelectionStart(selection.anchorOffset);
-      setSelectionEnd(selection.focusOffset);
+    const root = editorRef.current;
+    if (selection && root && selection.toString().length > 0 && selection.anchorNode && root.contains(selection.anchorNode)) {
+      const anchor = getTitleOffset(root, selection.anchorNode, selection.anchorOffset);
+      const focus = getTitleOffset(root, selection.focusNode!, selection.focusOffset);
+      setSelectionStart(Math.min(anchor, focus));
+      setSelectionEnd(Math.max(anchor, focus));
       setShowToolbar(true);
     } else {
       setShowToolbar(false);
@@ -162,7 +174,7 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
       </div>
 
       {showToolbar && (
-        <div className="border-t border-blue-200 pt-3">
+        <div className="border-t border-blue-200 pt-3" onMouseDown={keepTitleFocus}>
           {selectionStart !== selectionEnd && (
             <p className="text-[11px] font-semibold text-muted-foreground mb-2">
               Selected: "{title.slice(Math.min(selectionStart, selectionEnd), Math.max(selectionStart, selectionEnd))}"

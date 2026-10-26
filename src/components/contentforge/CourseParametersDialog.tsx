@@ -62,6 +62,8 @@ interface CourseParametersDialogProps {
   youtubeAgentEnabled?: boolean;
   /** Pre-selected learning mode (static, video, or image). Defaults to "static". */
   initialLearningType?: "static" | "video" | "image";
+  /** Assessment types already chosen for this course, so reopening the setup keeps them. */
+  initialAssessmentTypes?: CourseParameters["assessmentTypes"];
   /** Content type: learning course or work instruction. */
   contentType?: "learning-course" | "work-instruction";
   onConfirm: (params: CourseParameters) => void;
@@ -233,7 +235,7 @@ const InfoHint: React.FC<{ text: string }> = ({ text }) => (
 );
 
 export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
-  open, courseTitle, estimatedMinutes, youtubeAgentEnabled = true, initialLearningType = "static", contentType = "learning-course", onConfirm, onCancel,
+  open, courseTitle, estimatedMinutes, youtubeAgentEnabled = true, initialLearningType = "static", initialAssessmentTypes, contentType = "learning-course", onConfirm, onCancel,
 }) => {
   const headingFont = '"Poppins", sans-serif';
   const bodyFont = '"Inter", sans-serif';
@@ -248,7 +250,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [duration, setDuration] = useState("15min");
   const [videoDurationHandling, setVideoDurationHandling] = useState<CourseParameters["videoDurationHandling"]>("within-course");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
-  const [assessmentTypes, setAssessmentTypes] = useState<CourseParameters["assessmentTypes"]>(["mcq"]);
+  const [assessmentTypes, setAssessmentTypes] = useState<CourseParameters["assessmentTypes"]>(initialAssessmentTypes?.length ? initialAssessmentTypes : ["mcq"]);
   const [showAssessmentTypeSelector, setShowAssessmentTypeSelector] = useState(false);
   const [learnerNotesEnabled, setLearnerNotesEnabled] = useState(false);
   const [resourcesPanelEnabled, setResourcesPanelEnabled] = useState(true);

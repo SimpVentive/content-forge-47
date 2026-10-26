@@ -493,6 +493,7 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
   const [browseModule, setBrowseModule] = useState("all");
   const [searchQ, setSearchQ] = useState("");
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState("");
   const [youtubeData, setYoutubeData] = useState(() => tryParseJSON(youtubeRaw));
   const [refreshRound, setRefreshRound] = useState(0);
   const idCounter = useRef(0);
@@ -501,18 +502,31 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
 
   const handleRefresh = async () => {
     setRefreshing(true);
+    setRefreshError("");
     try {
       const moduleNames = modules.length > 0 ? modules : [courseTitle];
-      const excludeVideoIds = (youtubeData?.modules || []).flatMap((module: any) => (module.videos || []).map((video: any) => video.videoId));
+      const shownModules: any[] = youtubeData?.modules || [];
+      const excludeVideoIds = shownModules.flatMap((module: any) => (module.videos || []).map((video: any) => video.videoId));
+      // Ask for as many videos per module as are on screen, matching the original search
+      const maxVideos = Math.max(1, ...shownModules.map((module: any) => module.videos?.length || 0));
       const nextRefreshRound = refreshRound + 1;
       const { data, error } = await supabase.functions.invoke("youtube-search", {
-        body: { modules: moduleNames, courseTitle, language, level, duration, refreshRound: nextRefreshRound, excludeVideoIds },
+        body: { modules: moduleNames, courseTitle, language, level, duration, maxVideos, refreshRound: nextRefreshRound, excludeVideoIds },
       });
-      if (!error && data?.modules) {
-        setYoutubeData(data);
-        setRefreshRound(nextRefreshRound);
-      }
-    } catch {}
+      if (error || !data?.modules) throw new Error(data?.error || error?.message || "Refresh failed");
+      // A module with no new results keeps its current videos, so suggestions never disappear
+      const freshByModule = new Map<string, any[]>(data.modules.map((module: any) => [module.module_title, module.videos || []]));
+      setYoutubeData({
+        ...youtubeData,
+        modules: shownModules.map((module: any) => {
+          const fresh = freshByModule.get(module.module_title) || [];
+          return { ...module, videos: fresh.length > 0 ? fresh : module.videos };
+        }),
+      });
+      setRefreshRound(nextRefreshRound);
+    } catch (err) {
+      setRefreshError(err instanceof Error ? err.message : "Could not refresh suggestions. Try again.");
+    }
     setRefreshing(false);
   };
 
@@ -633,6 +647,9 @@ export const VideoClipWorkflow: React.FC<VideoClipWorkflowProps> = ({ youtubeRaw
                   ? "Video watch-time counts inside the selected course duration."
                   : "Video watch-time is additional and does not reduce the base course duration."}
               </p>
+              {refreshError && (
+                <p className="text-[11px] font-semibold text-destructive mt-1">Refresh failed: {refreshError}</p>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button

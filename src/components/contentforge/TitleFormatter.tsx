@@ -30,6 +30,12 @@ const COLOR_OPTIONS = [
   "#ea580c", // Orange
 ];
 
+// Stops a mousedown on the panel from moving focus off the title textarea, which would unmount the panel before the click lands.
+// Selects and colour inputs keep their default behaviour so they can still open.
+export const keepTitleFocus = (e: React.MouseEvent) => {
+  if (!(e.target as HTMLElement).closest("select, input")) e.preventDefault();
+};
+
 export const TitleFormatter: React.FC<TitleFormatterProps> = ({
   title,
   setTitle,
@@ -67,7 +73,10 @@ export const TitleFormatter: React.FC<TitleFormatterProps> = ({
   }
 
   return (
-    <div className="mt-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+    <div
+      className="mt-3 p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200"
+      onMouseDown={keepTitleFocus}
+    >
       {/* Preview */}
       <div className="mb-4 p-3 bg-white rounded-lg border border-gray-200">
         <p className="text-[11px] font-semibold text-gray-600 mb-2">Preview</p>

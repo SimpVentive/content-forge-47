@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
+import { collectAssessmentItems } from "@/lib/assessmentAnswer";
 
 /* ── helpers ── */
 function tryParseJSON(raw: string): any | null {
@@ -618,7 +619,8 @@ function parseAssessment(assessRaw: string): { question: string; options: string
   const data = tryParseJSON(assessRaw);
   if (!data) return [];
 
-  const quizzes = data.mcq || data.questions || data.quiz || data.assessments || data.items || [];
+  const authoredItems = collectAssessmentItems(data);
+  const quizzes = authoredItems.length > 0 ? authoredItems : data.questions || data.quiz || data.assessments || data.items || [];
   if (!Array.isArray(quizzes) || quizzes.length === 0) return [];
 
   return quizzes.map((q: any) => {

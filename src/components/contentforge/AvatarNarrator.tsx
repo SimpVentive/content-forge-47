@@ -57,6 +57,10 @@ const SCALE_X = STAGE_W / ORIG_W;                 // 0.3516
 const DISPLAYED_H = ORIG_H * SCALE_X;             // 540px
 const Y_CORRECT = DISPLAYED_H / STAGE_H;          // 1.125
 
+// Overlays are placed in percent of the stage, not fixed pixels, so they stay on the face at any rendered width.
+const pctOfStageW = (px: number) => `${(px / STAGE_W) * 100}%`;
+const pctOfStageH = (px: number) => `${(px / STAGE_H) * 100}%`;
+
 const EYE_W = 90 * SCALE_X;   // ~31.6px
 const EYE_H = 32 * SCALE_X;   // ~11.3px
 const MTH_W = 82 * SCALE_X;   // ~28.8px
@@ -536,15 +540,15 @@ export function AvatarNarrator({
                 */}
                 {hasBlinkSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
-                  const elx = (face.eyeLeft.x  / 100) * STAGE_W;
-                  const ely = (face.eyeLeft.y  / 100) * STAGE_H * Y_CORRECT;
-                  const erx = (face.eyeRight.x / 100) * STAGE_W;
-                  const ery = (face.eyeRight.y / 100) * STAGE_H * Y_CORRECT;
+                  const elx = `${face.eyeLeft.x}%`;
+                  const ely = `${face.eyeLeft.y * Y_CORRECT}%`;
+                  const erx = `${face.eyeRight.x}%`;
+                  const ery = `${face.eyeRight.y * Y_CORRECT}%`;
                   return (
                     <>
                       <div aria-hidden="true" className="pointer-events-none absolute" style={{
                         left: elx, top: ely,
-                        width: EYE_W, height: EYE_H, borderRadius: "50%", overflow: "hidden",
+                        width: pctOfStageW(EYE_W), height: pctOfStageH(EYE_H), borderRadius: "50%", overflow: "hidden",
                         transform: "translate(-50%, -50%)",
                       }}>
                         <div style={{
@@ -557,7 +561,7 @@ export function AvatarNarrator({
                       </div>
                       <div aria-hidden="true" className="pointer-events-none absolute" style={{
                         left: erx, top: ery,
-                        width: EYE_W, height: EYE_H, borderRadius: "50%", overflow: "hidden",
+                        width: pctOfStageW(EYE_W), height: pctOfStageH(EYE_H), borderRadius: "50%", overflow: "hidden",
                         transform: "translate(-50%, -50%)",
                       }}>
                         <div style={{
@@ -575,12 +579,12 @@ export function AvatarNarrator({
                 {/* LAYER 2b — CSS mouth overlay fallback (when no sprite PNG) */}
                 {hasMouthSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
-                  const mx = (face.mouth.x / 100) * STAGE_W;
-                  const my = (face.mouth.y / 100) * STAGE_H * Y_CORRECT;
+                  const mx = `${face.mouth.x}%`;
+                  const my = `${face.mouth.y * Y_CORRECT}%`;
                   return (
                     <div aria-hidden="true" className="pointer-events-none absolute" style={{
                       left: mx, top: my,
-                      width: MTH_W, height: MTH_H,
+                      width: pctOfStageW(MTH_W), height: pctOfStageH(MTH_H),
                       borderRadius: "50% 50% 60% 60%", overflow: "hidden",
                       transform: "translate(-50%, -50%)",
                     }}>

@@ -45,3 +45,21 @@ export function normalizeAssessmentAnswer<T extends AnswerQuestion>(q: T): T & {
   const options = Array.isArray(q.options) ? q.options : [];
   return { ...q, correct_answer: index === undefined ? "" : String(options[index]) };
 }
+
+/**
+ * Every authored assessment item that can render as a multiple-choice slide: MCQ, scenario and true/false.
+ * Match-the-following and fill-in-the-blank items have no renderer yet, so they are not included.
+ */
+export function collectAssessmentItems(assessData: any): any[] {
+  const mcq = Array.isArray(assessData?.mcq) ? assessData.mcq : [];
+  const scenarios = Array.isArray(assessData?.scenarios)
+    ? assessData.scenarios.map((s: any) => ({ ...s, question: s.question || "Choose the best response to this situation." }))
+    : [];
+  const trueFalse = Array.isArray(assessData?.true_false)
+    ? assessData.true_false.map((t: any) => {
+        const isTrue = t.correct_answer === true || /^t(rue)?$/i.test(String(t.correct_answer ?? "").trim());
+        return { ...t, options: ["True", "False"], correct_answer: isTrue ? "True" : "False" };
+      })
+    : [];
+  return [...mcq, ...scenarios, ...trueFalse].map((item) => normalizeAssessmentAnswer(item));
+}

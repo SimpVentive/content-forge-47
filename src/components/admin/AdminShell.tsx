@@ -146,6 +146,11 @@ const AdminShell = () => {
   const navigate = useNavigate();
   const initials = initialsFrom(profile?.full_name, profile?.email);
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate("/", { replace: true });
+  };
+
   return (
     <div className="cf-admin">
       <header className="topbar">
@@ -157,14 +162,10 @@ const AdminShell = () => {
         <div className="topbar-right">
           <Clock />
           <span className="pill pill-green">Admin</span>
-          <button
-            className="avatar"
-            title="Sign out"
-            onClick={async () => {
-              await signOut();
-              navigate("/login");
-            }}
-          >
+          <button className="btn" data-testid="admin-signout-btn" onClick={handleSignOut}>
+            Sign out
+          </button>
+          <button className="avatar" title={`Signed in as ${profile?.email ?? "admin"}`} aria-label="Account">
             {initials}
           </button>
         </div>

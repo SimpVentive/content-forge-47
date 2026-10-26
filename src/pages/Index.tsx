@@ -954,6 +954,7 @@ const Index = () => {
                   estimatedMinutes={estimateMinutesCombined(inputText, uploadedDocMeta?.fileSize, uploadedDocMeta?.fileName)}
                   youtubeAgentEnabled={agentToggles.youtube}
                   initialLearningType={learningType as "static" | "video" | "image"}
+                  initialAssessmentTypes={courseParams?.assessmentTypes}
                   contentType={contentType}
                   onConfirm={handleParamsConfirm}
                   onCancel={() => setShowParamsDialog(false)}
