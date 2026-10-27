@@ -1798,6 +1798,35 @@ ZERO-REPETITION RULE — ABSOLUTE:
           `Course Architecture:\n${archResult}\n\nScript:\n${writerResult}\n\nLearning Objectives:\n${researchResult}\n\nTarget Duration Minutes: ${durationMinutes}\nAssessment Intensity: ${assessmentIntensity}\nModule Count: ${moduleCount}\nTopic Count: ${topicCount}${hasMCQ ? `\nTarget MCQ Count: ${assessmentTargets.mcqCount}` : ""}${hasScenarios ? `\nTarget Scenario Count: ${assessmentTargets.scenarioCount}` : ""}\nTarget Embedded Interactions Range: ${assessmentTargets.interactionMin}-${assessmentTargets.interactionMax}\nSelected Assessment Types: ${selectedAssessmentTypes.join(", ")}`,
           addLog, "Assessment Agent"
         );
+
+        // Answer-key audit: the assessment agent can mark a plausible distractor
+        // as correct, and rendering can only trust the authored key. Verify every
+        // marked answer against the script and accept only corrections that
+        // resolve to exactly one option.
+        try {
+          const parsedAssessment = tryParseJson(assessmentResult);
+          const verifiableCount = collectVerifiableQuestions(parsedAssessment).length;
+          if (parsedAssessment && verifiableCount > 0) {
+            addLog(`Assessment Auditor: Verifying ${verifiableCount} answer keys against the script...`);
+            const auditResult = await runAgentWithLanguage(
+              `${languageDirective}${ANSWER_AUDIT_SYSTEM_PROMPT}`,
+              buildAnswerAuditUserMessage(parsedAssessment, writerResult),
+              addLog, "Assessment Auditor"
+            );
+            const parsedAudit = tryParseJson(auditResult);
+            const corrections = Array.isArray(parsedAudit?.corrections) ? parsedAudit.corrections : [];
+            const { data: correctedAssessment, applied } = applyAnswerCorrections(parsedAssessment, corrections);
+            if (applied > 0) {
+              assessmentResult = JSON.stringify(correctedAssessment);
+              addLog(`Assessment Auditor: Corrected ${applied} wrong answer key(s).`);
+            } else {
+              addLog("Assessment Auditor: All answer keys verified correct.");
+            }
+          }
+        } catch (auditErr) {
+          addLog(`Assessment Auditor: Skipped (${(auditErr as Error).message}). Using authored keys.`);
+        }
+
         setStatus("assessment", "complete");
         setRawOutputs((prev) => ({ ...prev, assessment: assessmentResult }));
         setOutputData((prev) => ({ ...prev, assessment: assessmentResult }));
