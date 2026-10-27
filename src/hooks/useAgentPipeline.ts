@@ -11,7 +11,7 @@ import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService
 import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, trimNarrationToDuration, DEFAULT_MAX_NARRATION_SECONDS, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { exportNarrativeToPDF, downloadPDF } from "@/lib/pdfExportService";
-import { logApiUsage } from "@/lib/edgeFunctions";
+import { functionErrorMessage, logApiUsage } from "@/lib/edgeFunctions";
 import { generateNarrationAudio, getVoiceIdForLanguage } from "@/lib/narrationAudioService";
 import { runFinalQACheck, storeQAAuditLog, type QAResult } from "@/lib/qaService";
 import { enhanceScriptGenerationPrompt, enhanceAssessmentGenerationPrompt, type AuditLogEntry } from "@/lib/feedbackIntegrationService";
@@ -1610,7 +1610,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
                         // Silently fail, don't interrupt pipeline
                       }
                     } else {
-                      const errorMsg = typeof imageError === "string" ? imageError : imageError?.message || "Unknown error";
+                      const errorMsg = typeof imageError === "string" ? imageError : await functionErrorMessage(imageError);
                       addLog(`Visual Design Agent: ⚠️ Image generation failed for topic "${topicTitle}": ${errorMsg} — Will use SVG fallback.`);
                     }
                   }

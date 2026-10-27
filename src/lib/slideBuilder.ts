@@ -127,6 +127,15 @@ export function isAnswerKeyLine(line: string): boolean {
   return /^\*(?!\*)[^:：\n]{1,60}[:：]/.test(text) || /^(correct answer|best response|answer)\s*[:：]/i.test(text);
 }
 
+/**
+ * Production notes from the writer, such as "[Interaction Point: Drag-and-Drop Categorization." (the closing
+ * bracket is often missing), are not learner content. Removes them; returns "" when nothing else is left.
+ */
+export function stripWriterMarkers(line: string): string {
+  const cleaned = line.replace(/\[\s*interaction\s*point\b[^\]\n]*\]?/gi, " ").replace(/\s{2,}/g, " ").trim();
+  return /^[\s.,;:]*$/.test(cleaned) ? "" : cleaned;
+}
+
 /** Letters and digits only, lowercased, so text in any script compares equal regardless of punctuation. */
 export function normalizeForMatch(text: string): string {
   return text.toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim();
@@ -176,6 +185,7 @@ export function splitTopicContentIntoSlides(text: string, durationMinutes: numbe
     .split("\n")
     .filter((line) => !line.match(/^#{1,3}\s/))
     .map((line) => line.trim())
+    .map((line) => stripWriterMarkers(line))
     .filter((line) => line.length > 0 && !line.match(/^[-*#]+$/) && !isAnswerKeyLine(line));
   const paragraphs = lines
     .join("\n")

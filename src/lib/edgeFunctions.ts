@@ -56,3 +56,16 @@ export async function verifyRazorpayPayment(orderId: string, paymentId: string, 
 export async function fetchProviderUsage() {
   return callEdgeFunction("fetch-provider-usage", {}, "GET");
 }
+
+/**
+ * supabase-js reports any non-2xx reply as "Edge Function returned a non-2xx status code" and keeps the
+ * function's own message in the response body. Read that message so the real cause reaches the user.
+ */
+export async function functionErrorMessage(error: unknown): Promise<string> {
+  const context = (error as { context?: Response } | null)?.context;
+  if (context && typeof context.json === "function") {
+    const body = await context.json().catch(() => null) as { error?: unknown } | null;
+    if (typeof body?.error === "string" && body.error) return body.error;
+  }
+  return error instanceof Error ? error.message : "Unknown error";
+}

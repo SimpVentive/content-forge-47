@@ -1214,6 +1214,10 @@ function getCourseNotesStorageKey(courseTitle: string): string {
 // Stable empty default: a fresh [] each render made the video-sync effect loop forever.
 const NO_VIDEOS: InsertedVideo[] = [];
 
+// Only one voice may play. Every open preview hears this event and silences itself, so a second
+// mounted preview (or a re-open) can never narrate the same screen over the first.
+const NARRATION_START_EVENT = "contentforge:narration-start";
+
 export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, companyLogo, rawOutputs, onClose, insertedVideos = NO_VIDEOS, courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true, infographicsEnabled = true, standalone = false, exportMedia, onLearnerProgress }) => {
   // Prefer the explicit narrator language; fall back to text language; final fallback English.
   const effectiveNarratorLanguage = narratorLanguage || textLanguage || "English";
@@ -1335,6 +1339,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const [activeViseme, setActiveViseme] = useState<VisemeKey>("rest");
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const narrationOwnerRef = useRef(`narration-${Math.random().toString(36).slice(2)}`);
+
+  useEffect(() => {
+    const silenceIfOtherOwner = (event: Event) => {
+      if ((event as CustomEvent<string>).detail === narrationOwnerRef.current) return;
+      audioRef.current?.pause();
+      if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
+      setIsPlaying(false);
+    };
+    window.addEventListener(NARRATION_START_EVENT, silenceIfOtherOwner);
+    return () => window.removeEventListener(NARRATION_START_EVENT, silenceIfOtherOwner);
+  }, []);
   const audioUrlsRef = useRef<Record<number, string>>({});
   const audioTextRef = useRef<Record<number, string>>({});
   // Drop cached audio whose spoken text differs from the current narration (e.g. old question-only quiz audio).
@@ -1666,7 +1682,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   // Helper to wire up audio events
   const wireAudio = useCallback((audio: HTMLAudioElement) => {
     audio.muted = muted;
-    // Only one voice at a time: silence anything still playing before starting a new clip.
+    // Only one voice at a time: tell every open preview to stop, then silence anything still playing here.
+    window.dispatchEvent(new CustomEvent(NARRATION_START_EVENT, { detail: narrationOwnerRef.current }));
     if (audioRef.current && audioRef.current !== audio) audioRef.current.pause();
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     audioRef.current = audio;
@@ -1700,6 +1717,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     window.speechSynthesis.cancel();
     // One voice per screen: a recorded clip must not keep talking under the browser voice.
     audioRef.current?.pause();
+    window.dispatchEvent(new CustomEvent(NARRATION_START_EVENT, { detail: narrationOwnerRef.current }));
     const startSlide = activeSlideRef.current;
     chunks.forEach((chunk, i) => {
       const utterance = new SpeechSynthesisUtterance(chunk);

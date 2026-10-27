@@ -22,9 +22,14 @@ export function resolveAssessmentAnswer(q: AnswerQuestion): number | undefined {
   const raw = stripNarratorMarkdown(String(key)).trim()
     .replace(/^(?:correct\s+answer|answer)\s*:\s*/i, "");
   if (!raw) return undefined;
-  const matches = options.map((option, index) => comparable(option) === comparable(raw) ? index : -1)
-    .filter(index => index >= 0);
-  if (matches.length === 1) return matches[0];
+  // Keys often repeat the option letter ("B. Routine maintenance", "Option B: Routine maintenance").
+  // Options are compared without their letters too, so the key is compared the same way.
+  const unlabelled = raw.replace(/^(?:option\s+)?\(?[a-z0-9]{1,2}\)?\s*[.):\-]\s+/i, "").trim();
+  for (const candidate of unlabelled && unlabelled !== raw ? [raw, unlabelled] : [raw]) {
+    const matches = options.map((option, index) => comparable(option) === comparable(candidate) ? index : -1)
+      .filter(index => index >= 0);
+    if (matches.length === 1) return matches[0];
+  }
   const label = raw.match(/^(?:option\s+)?\(?([a-z])\)?[.):\-]?$/i);
   if (label) {
     const index = label[1].toUpperCase().charCodeAt(0) - 65;
@@ -61,5 +66,7 @@ export function collectAssessmentItems(assessData: any): any[] {
         return { ...t, options: ["True", "False"], correct_answer: isTrue ? "True" : "False" };
       })
     : [];
-  return [...mcq, ...scenarios, ...trueFalse].map((item) => normalizeAssessmentAnswer(item));
+  // A question whose key matches no option cannot be scored. Leave it out rather than show a dead end.
+  const normalized = [...mcq, ...scenarios, ...trueFalse].map((item) => normalizeAssessmentAnswer(item));
+  return normalized.filter((item) => item.correct_answer !== "");
 }
