@@ -1,4 +1,5 @@
 import { EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, assessInfographicSvg, buildInfographicUserPrompt } from "@/lib/infographicQuality";
+import { ANSWER_AUDIT_SYSTEM_PROMPT, applyAnswerCorrections, buildAnswerAuditUserMessage, collectVerifiableQuestions } from "@/lib/assessmentVerification";
 import { useState, useCallback, useRef } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
