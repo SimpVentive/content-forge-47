@@ -27,6 +27,7 @@ export function stripNarratorMarkdown(text: string): string {
 export function isPlaceholderToken(text: string): boolean {
   const normalized = stripNarratorMarkdown(text).toLowerCase();
   if (!normalized) return true;
+  if (isAuthorDirective(text)) return true;
   if (/^[#*\-_.:;|/\\\[\](){}]+$/.test(normalized)) return true;
   if (normalized === "n/a" || normalized === "na" || normalized === "null" || normalized === "undefined") return true;
   return false;
@@ -44,9 +45,10 @@ const AI_PLACEHOLDER_SOURCE =
   "[ \\t]*(?:\\.{3}|…)?[ \\t]*(?:" +
   "\\[[^\\]\\n]*(?:rest of|remaining|unchanged|original script|continues|truncated|same as above|omitted for brevity)[^\\]\\n]*\\]" +
   "|\\(\\s*(?:rest of|remaining (?:content|script|sections?|topics?)|unchanged|content continues|truncated)[^)\\n]*\\)" +
-  "|" + AUTHOR_DIRECTIVE_SOURCE +
   ")[ \\t]*(?:\\.{3}|…)?";
-const AI_PLACEHOLDER = new RegExp(AI_PLACEHOLDER_SOURCE, "gim");
+const ABBREVIATION_SOURCE = AI_PLACEHOLDER_SOURCE;
+const CLEAN_SOURCE = "(?:" + AI_PLACEHOLDER_SOURCE + "|[ \\t]*" + AUTHOR_DIRECTIVE_SOURCE + ")";
+const AI_PLACEHOLDER = new RegExp(CLEAN_SOURCE, "gim");
 
 /** True when a line is only an author/production directive like "[Interaction Point: ...]". */
 export function isAuthorDirective(text: string): boolean {
@@ -56,7 +58,7 @@ export function isAuthorDirective(text: string): boolean {
 
 /** True when an AI rewrite contains "[rest of original script follows]"-style abbreviation notes. */
 export function hasAiPlaceholder(text: string): boolean {
-  return new RegExp(AI_PLACEHOLDER_SOURCE, "i").test(String(text || ""));
+  return new RegExp(ABBREVIATION_SOURCE, "i").test(String(text || ""));
 }
 
 /** Removes AI abbreviation notes while keeping line breaks / markdown structure intact. */
