@@ -7,6 +7,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
 import { acceptScriptRewrite, stripAiPlaceholders } from "@/lib/textCleaningUtility";
 import { convertPngToJpeg, isPngImage } from "@/lib/imageConverter";
+
+const IMAGE_PROVIDERS: Record<string, { label: string; costUsd: number }> = {
+  openai: { label: "OpenAI gpt-image-1", costUsd: 0.042 },
+  bfl: { label: "Black Forest Labs Flux Pro 1.1", costUsd: 0.04 },
+};
+
+function imageProviderInfo(provider: unknown) {
+  return IMAGE_PROVIDERS[String(provider)] ?? { label: "image provider", costUsd: 0.04 };
+}
 import { getAgentModeInstructions, type VideoMode } from "@/lib/videoModeService";
 import { buildNarrativeScenePrompt, buildImageGenerationPrompts, prependTitleSlideToNarratives, trimNarrationToDuration, DEFAULT_MAX_NARRATION_SECONDS, type TopicNarrative } from "@/lib/visualNarrativeService";
 import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
@@ -1408,7 +1417,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
 
         // ── Narrative Image Generation (image-based learning) ──
         if (learningMode === "image_based_learning" && narrativeScenes.length > 0) {
-          addLog("Visual Design Agent: Generating narrative scene images with OpenAI...");
+          addLog("Visual Design Agent: Generating narrative scene images...");
           try {
             for (let ni = 0; ni < narrativeScenes.length; ni++) {
               if (isCancelled()) break;
@@ -1462,12 +1471,14 @@ ZERO-REPETITION RULE — ABSOLUTE:
                       }
 
                       scene.imageDataUrl = finalImageUrl;
-                      // Log BFL Flux 2 image API usage
+                      scene.imageError = undefined;
+                      const provider = imageProviderInfo(imageData.provider);
+                      addLog(`Visual Design Agent: ✓ Scene ${scene.sceneNumber} image from ${provider.label}`);
                       try {
                         await logApiUsage(
-                          "Black Forest Labs Flux 2",
-                          1, // 1 image
-                          0.0125, // ~BRL $1 per image (1536x1024)
+                          provider.label,
+                          1,
+                          provider.costUsd,
                           `Narrative image generation: Scene ${scene.sceneNumber}`,
                           undefined
                         ).catch(() => {});
@@ -1476,11 +1487,13 @@ ZERO-REPETITION RULE — ABSOLUTE:
                       }
                     } else {
                       const errorMsg = await describeImageFailure(imageError, imageData);
+                      scene.imageError = errorMsg || "Image generation returned no image";
                       addLog(`Visual Design Agent: ⚠️ Image generation failed for scene ${scene.sceneNumber}: ${errorMsg}`);
                     }
                   }
                 } catch (imgErr) {
                   const errorMsg = imgErr instanceof Error ? imgErr.message : String(imgErr);
+                  scene.imageError = errorMsg;
                   addLog(`Visual Design Agent: ⚠️ Image generation exception for scene ${scene.sceneNumber}: ${errorMsg}`);
                 }
               }
@@ -1489,7 +1502,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
             setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
             const totalNarrativeScenes = narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0);
             const generatedScenes = narrativeScenes.reduce((sum, n) => sum + n.scenes.filter((s) => !!s.imageDataUrl).length, 0);
-            addLog(`Visual Design Agent: Narrative image generation — ${generatedScenes}/${totalNarrativeScenes} scenes with images.`);
+            addLog(`Visual Design Agent: ✓ Narrative image generation complete — ${generatedScenes}/${totalNarrativeScenes} scenes with images.`);
           } catch (narrativeImgErr) {
             addLog(`Visual Design Agent: ⚠️ Narrative image generation error — ${(narrativeImgErr as Error).message}`);
           }
@@ -1597,12 +1610,12 @@ ZERO-REPETITION RULE — ABSOLUTE:
                       topicVisual.generated_image_data_url = finalImageUrl;
                       topicVisual.generated_image_mime_type = finalMimeType;
                       topicVisual.image_approved = false;
-                      // Log BFL Flux 2 image API usage
+                      const provider = imageProviderInfo(imageData.provider);
                       try {
                         await logApiUsage(
-                          "Black Forest Labs Flux 2",
-                          1, // 1 image
-                          0.0125, // ~$0.0125 per image
+                          provider.label,
+                          1,
+                          provider.costUsd,
                           `Visual design image: ${topicTitle}`,
                           undefined
                         ).catch(() => {});

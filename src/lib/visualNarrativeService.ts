@@ -10,6 +10,7 @@ export interface NarrativeScene {
   narration: string; // Optional voiceover text
   imagePrompt: string; // Prompt for Flux 2 image generation
   imageDataUrl?: string; // Generated image as base64 data URL
+  imageError?: string; // Why image generation failed, when it did
   audioDataUrl?: string; // Audio narration as data URL for HTML5 audio player
   timelinePosition?: number; // Position in overall narrative (0-100%)
 }

@@ -270,12 +270,12 @@ export const NarrativeFlipbook: React.FC<NarrativeFlipbookProps> = ({
               className={`w-full h-auto max-h-[70vh] object-contain ${transitionClass} ${isTransitioning ? "opacity-75" : "opacity-100"}`}
             />
           ) : (
-            <div className="w-full aspect-video bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-white/30 rounded-full mx-auto mb-4 flex items-center justify-center">
-                  <div className="w-12 h-12 border-3 border-white/50 border-t-white rounded-full animate-spin" />
-                </div>
-                <p className="text-white/70 text-sm">Generating image...</p>
+            <div className="w-full aspect-video bg-gradient-to-br from-gray-200 to-gray-300 flex items-center justify-center p-6">
+              <div className="text-center max-w-md">
+                <p className="text-gray-700 text-sm font-semibold">Image unavailable for this scene</p>
+                {currentScene.imageError && (
+                  <p className="text-gray-600 text-xs mt-2 break-words">{currentScene.imageError}</p>
+                )}
               </div>
             </div>
           )}
