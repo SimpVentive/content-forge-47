@@ -1,4 +1,5 @@
 # Static e-learning export parity
+- [ ] Restore image-based generation: live service rejected gpt-image-1 and BFL reported insufficient credits; test the current OpenAI model and expose failed scene generation.
 - [x] Preserve full lesson text through pagination and narration; 14 targeted tests passed, and standalone browser checks at 900/1280/2023px confirmed complete coaxial-cable text and final DVR decision with no page errors. The user's signed-in course and external testing-site deployment remain unverified.
 - [x] Correct all six missing infographic dependencies; 13 targeted tests passed, including navigation in preview/standalone and generation/explanation; browser reached content through Next with no page errors. The user's signed-in course and external testing-site deployment remain unverified.
 - [x] Replace file-size duration heuristics with shared source narration estimates; six regression tests passed and actual PDF text checked in the running app (364 words, 3 minutes; unchanged with larger image size).

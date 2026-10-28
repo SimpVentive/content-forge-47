@@ -1,7 +1,7 @@
 /**
  * Image Generation Edge Function — provider chain with hard time limits.
  *
- * 1. OpenAI Images API (OPENAI_API_KEY, model OPENAI_IMAGE_MODEL || gpt-image-1)
+ * 1. OpenAI Images API (OPENAI_API_KEY, model OPENAI_IMAGE_MODEL || gpt-image-2)
  * 2. Black Forest Labs Flux (BFL_API_KEY) — async submit + poll API
  *
  * Each provider is bounded so the caller always gets an answer well inside the
@@ -55,7 +55,7 @@ async function fetchAsDataUrl(url: string, signal: AbortSignal): Promise<string>
 async function openAI(prompt: string, size: string): Promise<string> {
   const key = Deno.env.get("OPENAI_API_KEY");
   if (!key) throw new Error("OPENAI_API_KEY not set");
-  const model = Deno.env.get("OPENAI_IMAGE_MODEL") || "gpt-image-1";
+  const model = Deno.env.get("OPENAI_IMAGE_MODEL") || "gpt-image-2";
   const signal = AbortSignal.timeout(OPENAI_TIMEOUT_MS);
   const body: Record<string, unknown> = { model, prompt, n: 1, size };
   if (model.startsWith("gpt-image")) body.quality = "medium";
