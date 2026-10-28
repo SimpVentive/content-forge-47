@@ -15,6 +15,7 @@ import { generateNarrationAudio, getVoiceIdForLanguage } from "@/lib/narrationAu
 import { runFinalQACheck, storeQAAuditLog, type QAResult } from "@/lib/qaService";
 import { enhanceScriptGenerationPrompt, enhanceAssessmentGenerationPrompt, type AuditLogEntry } from "@/lib/feedbackIntegrationService";
 import { checkAndPrepareAsset, recordAssetUsage, type SelectedAsset } from "@/lib/pipelineAssetIntegration";
+import { describeImageFailure, requireNarrativeImages } from "@/lib/imageGenerationFailure";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -1404,7 +1405,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
 
         // ── Narrative Image Generation (image-based learning) ──
         if (learningMode === "image_based_learning" && narrativeScenes.length > 0) {
-          addLog("Visual Design Agent: Generating narrative scene images with OpenAI gpt-image-1...");
+          addLog("Visual Design Agent: Generating narrative scene images with OpenAI...");
           try {
             for (let ni = 0; ni < narrativeScenes.length; ni++) {
               if (isCancelled()) break;
@@ -1434,7 +1435,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
                       await recordAssetUsage(userId, assetCheck.assetId, courseId, si + 1, `${narrative.topicTitle} - Scene ${scene.sceneNumber}`);
                     }
                   } else {
-                    // Fallback to BFL Flux 2 image generation
+                    // Request the server's image provider chain.
                     const { data: imageData, error: imageError } = await supabase.functions.invoke("generate-slide-image", {
                       body: {
                         prompt: scene.imagePrompt,
@@ -1471,7 +1472,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
                         // Silently fail, don't interrupt pipeline
                       }
                     } else {
-                      const errorMsg = typeof imageError === "string" ? imageError : imageError?.message || "Unknown error";
+                      const errorMsg = await describeImageFailure(imageError, imageData);
                       addLog(`Visual Design Agent: ⚠️ Image generation failed for scene ${scene.sceneNumber}: ${errorMsg}`);
                     }
                   }
@@ -1485,9 +1486,16 @@ ZERO-REPETITION RULE — ABSOLUTE:
             setRawOutputs((prev) => ({ ...prev, narrativeScenes: JSON.stringify(narrativeScenes) }));
             const totalNarrativeScenes = narrativeScenes.reduce((sum, n) => sum + n.scenes.length, 0);
             const generatedScenes = narrativeScenes.reduce((sum, n) => sum + n.scenes.filter((s) => !!s.imageDataUrl).length, 0);
-            addLog(`Visual Design Agent: ✓ Narrative image generation complete — ${generatedScenes}/${totalNarrativeScenes} scenes with images (via BFL Flux 2).`);
+            addLog(`Visual Design Agent: Narrative image generation — ${generatedScenes}/${totalNarrativeScenes} scenes with images.`);
           } catch (narrativeImgErr) {
             addLog(`Visual Design Agent: ⚠️ Narrative image generation error — ${(narrativeImgErr as Error).message}`);
+          }
+          if (isCancelled()) { setIsRunning(false); return; }
+          try {
+            requireNarrativeImages(narrativeScenes);
+          } catch (error) {
+            setStatus("visual", "error");
+            throw error;
           }
         }
 
