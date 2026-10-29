@@ -1,3 +1,4 @@
+import { resolveLessonContent, sequenceLessonSlides } from "@/lib/lessonContent";
 /**
  * Shared slide building logic for both LearnerPreview and SCORM export
  * This utility extracts the common slide construction logic so both systems
@@ -384,7 +385,7 @@ export function buildSlides(
   let modules: Module[] = [];
   if (archData) {
     const mods = archData.modules || archData.course_structure?.modules || archData.course_modules || [];
-    modules = mods.map((m: any, mi: number) => ({
+    modules = (Array.isArray(mods) ? mods : []).map((m: any, mi: number) => ({
       title: m.module_title || m.title || m.name || `Module ${mi + 1}`,
       topics: (m.topics || m.sections || m.lessons || []).map((t: any, ti: number) =>
         typeof t === "string"
@@ -397,6 +398,8 @@ export function buildSlides(
   if (modules.length === 0) {
     modules = [{ title: "Module 1", topics: ["Introduction"] }];
   }
+
+  modules = modules.map(module => ({ ...module, topics: module.topics.length ? module.topics : [module.title] }));
 
   // Extract MCQs
   const mcqs = collectAssessmentItems(assessData);
@@ -421,86 +424,7 @@ export function buildSlides(
   // Build slides
   const slides: Slide[] = [];
 
-  // Parse writer content into topic sections
-  const writerSections: Record<string, string> = {};
-  const orderedTopicBodies: string[] = [];
-  const moduleTitleKeys = new Set(modules.map((m) => normalizeModuleKey(m.title)));
-  const isModuleLikeHeading = (h: string) =>
-    moduleTitleKeys.has(normalizeModuleKey(h)) || /^module\s*\d+\b/i.test(h.trim());
-
-  const cleanBody = (s: string) => {
-    const c = stripAiPlaceholders((s || "").replace(/\r\n/g, "\n")).replace(/^---+\s*$/gm, "").trim();
-    return c && !isPlaceholderToken(c) ? c : "";
-  };
-
-  const extractObjBody = (v: any): string => {
-    if (!v || typeof v !== "object") return "";
-    const keys = [
-      "content",
-      "body",
-      "text",
-      "narrative",
-      "narration",
-      "script",
-      "lesson_content",
-      "on_screen_text",
-      "screen_text",
-      "description",
-      "explanation",
-    ];
-    for (const k of keys) {
-      const val = v[k];
-      if (typeof val === "string") {
-        const c = cleanBody(val);
-        if (c) return c;
-      }
-      if (Array.isArray(val)) {
-        const joined = val.map((it) => (typeof it === "string" ? it : extractObjBody(it))).filter(Boolean).join("\n\n");
-        const c = cleanBody(joined);
-        if (c) return c;
-      }
-    }
-    return "";
-  };
-
-  const pushSection = (heading: string, body: string) => {
-    const h = (heading || "").trim();
-    const b = cleanBody(body);
-    if (!h || !b) return;
-    const key = h.toLowerCase();
-    if (!writerSections[key]) writerSections[key] = b;
-    if (!isModuleLikeHeading(h)) orderedTopicBodies.push(b);
-  };
-
-  const writerJson = tryParseJSON(writerText);
-  if (writerJson) {
-    const topLevel = writerJson.sections || writerJson.lessons || writerJson.slides || writerJson.topics;
-    if (Array.isArray(topLevel)) {
-      topLevel.forEach((s: any, i: number) =>
-        pushSection(String(s?.topic_title || s?.title || s?.heading || s?.name || `Section ${i + 1}`), extractObjBody(s))
-      );
-    }
-    const mods = writerJson.modules || writerJson.course_structure?.modules || writerJson.course_modules;
-    if (Array.isArray(mods)) {
-      mods.forEach((m: any, mi: number) => {
-        pushSection(String(m?.module_title || m?.title || m?.name || `Module ${mi + 1}`), extractObjBody(m));
-        const children = m?.topics || m?.sections || m?.lessons || m?.slides || m?.content;
-        if (Array.isArray(children)) {
-          children.forEach((t: any, ti: number) =>
-            pushSection(String(t?.topic_name || t?.topic_title || t?.title || t?.heading || t?.name || `Topic ${ti + 1}`), extractObjBody(t))
-          );
-        }
-      });
-    }
-  }
-
-  const normalizedWriter = (writerText || "").replace(/\r\n/g, "\n");
-  const headingMatches = Array.from(normalizedWriter.matchAll(/^(#{2,4})\s+(.+?)\s*$/gm));
-  headingMatches.forEach((hm, i) => {
-    const start = (hm.index || 0) + hm[0].length;
-    const end = i + 1 < headingMatches.length ? headingMatches[i + 1].index || normalizedWriter.length : normalizedWriter.length;
-    pushSection(stripNarratorMarkdown(hm[2]).trim(), normalizedWriter.slice(start, end));
-  });
+  const lessonBodies = resolveLessonContent(writerText, modules);
 
   let topicCounter = 0;
 
@@ -532,18 +456,7 @@ export function buildSlides(
 
     // 2. Content slides
     mod.topics.forEach((topic, ti) => {
-      const topicKey = topic.toLowerCase();
-      let sectionText = writerSections[topicKey] || "";
-      if (!sectionText) {
-        for (const [k, v] of Object.entries(writerSections)) {
-          if (k.length > 4 && (k.includes(topicKey) || topicKey.includes(k))) {
-            sectionText = v;
-            break;
-          }
-        }
-      }
-      if (!sectionText) sectionText = orderedTopicBodies[topicCounter] || "";
-      if (!sectionText) sectionText = "";
+      const sectionText = lessonBodies[mi]?.[ti] || "";
 
       let narrativeForTopic = null;
       if (narrativeScenesData) {
@@ -689,5 +602,5 @@ export function buildSlides(
     });
   });
 
-  return { modules, slides };
+  return { modules, slides: sequenceLessonSlides(slides) };
 }

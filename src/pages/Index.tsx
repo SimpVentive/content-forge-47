@@ -185,7 +185,7 @@ const Index = () => {
   };
 
   useEffect(() => {
-    if (prevIsRunning.current && !isRunning) {
+    if (prevIsRunning.current && !isRunning && rawOutputs.assembly) {
       if (rawOutputs.heygenVideos) {
         // Video mode complete — route to preview
         try {
@@ -202,7 +202,7 @@ const Index = () => {
       }
     }
     prevIsRunning.current = isRunning;
-  }, [isRunning, rawOutputs.youtube, rawOutputs.heygenVideos]);
+  }, [isRunning, rawOutputs.youtube, rawOutputs.heygenVideos, rawOutputs.assembly]);
 
   useEffect(() => {
     if (!isRunning) {
