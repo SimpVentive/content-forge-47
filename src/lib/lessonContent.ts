@@ -96,3 +96,15 @@ export function requireLessonContent(writer: string, modules: LessonModule[]): v
     throw new Error(`Lesson content is missing${missing.length ? ` for: ${missing.join(", ")}` : ""}. Course generation stopped before assessment and packaging; retry lesson generation.`);
   }
 }
+
+/** Keep all teaching/media before each module's questions; incomplete modules cannot expose a quiz. */
+export function sequenceLessonSlides<T extends { type: string; moduleIndex: number }>(slides: T[]): T[] {
+  return [...new Set(slides.map(slide => slide.moduleIndex))].flatMap(moduleIndex => {
+    const moduleSlides = slides.filter(slide => slide.moduleIndex === moduleIndex);
+    const hasLessons = moduleSlides.some(slide => ["content", "narrative-flipbook", "video"].includes(slide.type));
+    return [
+      ...moduleSlides.filter(slide => !["assessment", "summary"].includes(slide.type)),
+      ...(hasLessons ? moduleSlides.filter(slide => slide.type === "assessment" || slide.type === "summary") : []),
+    ];
+  });
+}

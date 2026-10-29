@@ -81,6 +81,11 @@ export function acceptScriptRewrite(
   const words = (s: string) => (s.trim().match(/\S+/g) || []).length;
   const minRatio = opts.minRatio ?? 0.6;
   if (original && words(revised) < words(original) * minRatio) return { accepted: false, reason: "incomplete" };
+  // A long response can still omit an entire lesson. Preserve authored heading coverage.
+  const headings = (text: string) => [...text.matchAll(/^#{1,6}\s+(.+?)\s*$/gm)]
+    .map(match => stripNarratorMarkdown(match[1]).toLocaleLowerCase().trim());
+  const revisedHeadings = new Set(headings(revised));
+  if (headings(original).some(heading => !revisedHeadings.has(heading))) return { accepted: false, reason: "incomplete" };
   return { accepted: true };
 }
 
