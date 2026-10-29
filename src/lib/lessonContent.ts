@@ -2,7 +2,7 @@ import { isPlaceholderToken, stripAiPlaceholders, stripNarratorMarkdown } from "
 
 export interface LessonModule { title: string; topics: string[] }
 interface Section { title: string; body: string; module?: string }
-const key = (text: string) => text.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+const key = (text: string) => text.toLocaleLowerCase().replace(/^module\s*\d+\s*[:.\-–—]?\s*/i, "").replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 const clean = (text: string) => {
   const body = stripAiPlaceholders(text).replace(/^---+\s*$/gm, "").trim();
   return body && !isPlaceholderToken(body) ? body : "";
