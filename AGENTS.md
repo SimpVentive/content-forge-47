@@ -1,4 +1,5 @@
 # Architecture rules
+- Lesson text recovery and lesson-before-assessment sequencing use lessonContent in both slide builders; generation requires teaching for every planned topic and failed runs cannot display successful completion, because valid questions alone are not a course.
 - Image-based assembly requires an image for every narrative scene; structured provider failures use safe summaries so missing pictures cannot silently produce a completed course.
 - Source-duration and credit word counts use the shared contentDuration module; file bytes and upload status messages cannot represent learning content because images and compression distort storage size.
 - Static SCORM exports must bundle the actual LearnerPreview runtime and compiled project styles; a separate presentation renderer causes preview/export drift.

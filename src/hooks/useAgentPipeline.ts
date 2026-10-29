@@ -1,3 +1,4 @@
+import { requireLessonContent } from "@/lib/lessonContent";
 import { EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, assessInfographicSvg, buildInfographicUserPrompt } from "@/lib/infographicQuality";
 import { ANSWER_AUDIT_SYSTEM_PROMPT, applyAnswerCorrections, buildAnswerAuditUserMessage, collectVerifiableQuestions } from "@/lib/assessmentVerification";
 import { useState, useCallback, useRef } from "react";
@@ -1050,7 +1051,9 @@ Do NOT create modules or topics based on production notes. All modules/topics mu
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 3: Writer (per-module calls to avoid truncation) ────
-      if (toggles["writer"] !== false) {
+      {
+        // Teaching content is mandatory, even when a saved toggle disables the writer.
+        if (toggles["writer"] === false) addLog("Writer Agent: Enabled because lessons are required before assessments.");
         setStatus("writer", "running");
 
         // Parse modules from architect output
@@ -1150,11 +1153,11 @@ ZERO-REPETITION RULE — ABSOLUTE:
         if (parsedModules.length === 0) {
           // Fallback: single call if we can't parse modules
           addLog("Writer Agent: Drafting all content...");
-          writerResult = await runAgentWithLanguage(
+          writerResult = sanitizeWriterOutput(await runAgentWithLanguage(
             writerSystemPromptWithMode,
             `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nPlanned Topic Count: ${totalTopics}\n\nDuration Plan:\n${summarizeDurationPlan(durationPlan)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"} and reach approximately ${targetNarrationWords} words in total.`,
             addLog, "Writer Agent"
-          );
+          ));
         } else {
           // Per-module calls to avoid truncation
           const moduleResults: string[] = [];
@@ -1182,6 +1185,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
               addLog, "Writer Agent"
             );
             const moduleContent = sanitizeWriterOutput(moduleContentRaw);
+            requireLessonContent(moduleContent, [{ title: modTitle, topics: (mod.topics || mod.sections || mod.lessons || []).map((topic: any) => typeof topic === "string" ? topic : topic.topic_title || topic.topic_name || topic.title || topic.name).filter(Boolean).length ? (mod.topics || mod.sections || mod.lessons || []).map((topic: any) => typeof topic === "string" ? topic : topic.topic_title || topic.topic_name || topic.title || topic.name).filter(Boolean) : [modTitle] }]);
             moduleResults.push(`# ${modTitle}\n\n${moduleContent}`);
             
             // Update output progressively
@@ -1193,12 +1197,11 @@ ZERO-REPETITION RULE — ABSOLUTE:
         }
         
         writerResult = stripAiPlaceholders(writerResult);
+        requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
         setStatus("writer", "complete");
         setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
         setOutputData((prev) => ({ ...prev, script: writerResult }));
         addLog(`Writer Agent: Complete. ${parsedModules.length || 1} modules written.`);
-      } else {
-        setStatus("writer", "idle");
       }
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
@@ -1759,6 +1762,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 7: Assessment ────
+      requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
       if (toggles["assessment"] !== false) {
         setStatus("assessment", "running");
         const parsedArch = tryParseJson(archResult) || {};
@@ -2026,6 +2030,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 9: Final Assembly ────
+      requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
       if (toggles["assembly"] !== false) {
         setStatus("assembly", "running");
         addLog(learningMode === "image_based_learning" ? "Final Assembly: Preparing image series..." : "Final Assembly: Packaging all outputs...");
@@ -2220,6 +2225,9 @@ ${modeInstructions}`;
         return false;
       });
       addLog(`Orchestrator: Pipeline error — ${(err as Error).message}`);
+      setStatus("assembly", "error");
+      setIsRunning(false);
+      return;
     }
 
     addLog("Orchestrator: Pipeline complete.");
