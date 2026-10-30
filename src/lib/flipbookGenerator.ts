@@ -849,6 +849,7 @@ export function generateFlipbookHTML(
         page-break-after: always;
       }
     }
+    #mcq-score-display[hidden] { display: none; }
     .page-text-html { text-align: left !important; white-space: normal; }
     .overview-block { display: flex; flex-direction: column; gap: 28px; padding: 8px 12px; }
     .overview-row { display: grid; grid-template-columns: 180px 1fr; gap: 24px; align-items: start; }
