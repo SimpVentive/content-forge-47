@@ -191,7 +191,7 @@ export function buildImageGenerationPrompts(
 export function createTitleSlide(courseTitle: string, courseObjective?: string): NarrativeScene {
   return {
     sceneNumber: 0,
-    title: "Course Title",
+    title: courseTitle,
     caption: courseTitle,
     narration: courseObjective || `Welcome to ${courseTitle}. This course will help you master the key concepts and skills you need to succeed.`,
     imagePrompt: `Create a professional, welcoming title slide image for corporate training.

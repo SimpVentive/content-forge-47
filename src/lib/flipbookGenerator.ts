@@ -45,6 +45,9 @@ export function generateFlipbookHTML(
     }
   }
 
+  // A synthetic title scene belongs on the cover, never on a second blank page.
+  const titleScene = narratives.flatMap(n => n.scenes).find(s => s.sceneNumber === 0);
+  const teachingNarratives = narratives.map(n => ({ ...n, scenes: n.scenes.filter(s => s.sceneNumber !== 0) }));
   // Pick the first available scene image to use as the cover hero image
   const firstSceneImage = narratives
     .flatMap((n) => n.scenes)
@@ -56,7 +59,8 @@ export function generateFlipbookHTML(
       title: courseTitle,
       content: `Professional Learning Guide\nCourse Level: ${courseLevel}`,
       images: firstSceneImage ? [firstSceneImage] : [],
-      speaker: "",
+      speaker: voiceoverEnabled ? (titleScene?.narration && !/^(beginner|intermediate|advanced)$/i.test(titleScene.narration.trim()) ? titleScene.narration : `Welcome to ${courseTitle}.`) : "",
+      audioDataUrl: voiceoverEnabled && titleScene?.narration && !/^(beginner|intermediate|advanced)$/i.test(titleScene.narration.trim()) ? titleScene.audioDataUrl : undefined,
       pageNumber: 0,
     },
   ];
@@ -174,15 +178,9 @@ export function generateFlipbookHTML(
   }
 
   // Convert narratives to flipbook pages with narration support
-  let firstImageSkipped = false;
-  const contentPages = narratives.flatMap((narrative, topicIdx) =>
+  const contentPages = teachingNarratives.flatMap((narrative, topicIdx) =>
     narrative.scenes.map((scene, sceneIdx) => {
-      // Skip the very first scene's image because we already show it on the cover
-      let images: string[] = scene.imageDataUrl ? [scene.imageDataUrl] : [];
-      if (!firstImageSkipped && scene.imageDataUrl && scene.imageDataUrl === firstSceneImage) {
-        images = [];
-        firstImageSkipped = true;
-      }
+      const images: string[] = scene.imageDataUrl ? [scene.imageDataUrl] : [];
       return {
         title: scene.title,
         // Only include caption if captionsEnabled is true
@@ -196,11 +194,6 @@ export function generateFlipbookHTML(
   );
 
   pages.push(...contentPages);
-
-  // Remove Page 3 (index 3 - the 4th page: title, overview, first content, second content to remove)
-  if (pages.length > 3) {
-    pages.splice(3, 1);
-  }
 
   // Add assessment pages if available
   if (assessmentData) {
@@ -856,10 +849,10 @@ export function generateFlipbookHTML(
         page-break-after: always;
       }
     }
-    .page-text-html { text-align: left !important; }
+    .page-text-html { text-align: left !important; white-space: normal; }
     .overview-block { display: flex; flex-direction: column; gap: 28px; padding: 8px 12px; }
     .overview-row { display: grid; grid-template-columns: 180px 1fr; gap: 24px; align-items: start; }
-    .overview-label { font-size: 15px; font-weight: 700; color: #0f172a; padding-top: 2px; }
+    .overview-label { font-size: 15px; font-weight: 700; font-style: italic; color: #0f172a; padding-top: 2px; }
     .overview-value { font-size: 15px; color: #1f2937; line-height: 1.55; }
     .overview-lead { margin-bottom: 8px; }
     .overview-list { list-style: disc; padding-left: 22px; margin: 6px 0 0; }
@@ -1161,7 +1154,7 @@ export function generateFlipbookHTML(
       <button class="btn btn-primary" id="prevBtn">&larr; Previous</button>
       <div class="page-info">
         Page <span id="currentPage">1</span> of <span id="totalPages">${pages.length}</span>
-        ${assessmentData && assessmentData.mcq && assessmentData.mcq.length > 0 ? `<span class="mcq-score-badge" id="mcq-score-display">0/${assessmentData.mcq.length}</span>` : ''}
+        ${assessmentData && assessmentData.mcq && assessmentData.mcq.length > 0 ? `<span class="mcq-score-badge" id="mcq-score-display" hidden>Correct: 0/${Math.min(assessmentData.mcq.length, 10)}</span>` : ''}
       </div>
       <button class="btn btn-primary" id="nextBtn">Next &rarr;</button>
       <button class="btn btn-secondary" id="fullscreenBtn">Fullscreen</button>
@@ -1186,7 +1179,7 @@ export function generateFlipbookHTML(
     function updateScoreDisplay() {
       var scoreEl = document.getElementById('mcq-score-display');
       if (scoreEl) {
-        scoreEl.textContent = window.__mcqScore.correct + '/' + window.__mcqScore.total;
+        scoreEl.textContent = 'Correct: ' + window.__mcqScore.correct + '/${Math.min(assessmentData?.mcq?.length || 0, 10)}';
       }
       // Also persist to session storage
       sessionStorage.setItem('mcqScore', JSON.stringify(window.__mcqScore));
@@ -1461,6 +1454,12 @@ export function generateFlipbookHTML(
       return pageEls[idx];
     }
 
+    function updateAssessmentVisibility() {
+      var badge = document.getElementById('mcq-score-display');
+      var current = getCurrentPageElement();
+      if (badge) badge.hidden = !current || !current.querySelector('.mcq-options, .results-container');
+    }
+
     function playCurrentPageAudio() {
       if (!window.__audioEnabled) return;
       try {
@@ -1520,7 +1519,7 @@ export function generateFlipbookHTML(
     window.addEventListener('DOMContentLoaded', function () {
       try {
         var PageFlipCtor = (window.St && window.St.PageFlip) || (window.pageFlip && window.pageFlip.PageFlip) || window.PageFlip;
-        if (!PageFlipCtor) { throw new Error('PageFlip library not loaded'); }
+        if (${JSON.stringify(displayStyle)} !== 'page-flip' || !PageFlipCtor) { throw new Error('Using single-page navigation'); }
         pageFlip = new PageFlipCtor(
           document.getElementById('flipbook'),
           {
@@ -1566,9 +1565,12 @@ export function generateFlipbookHTML(
         // Update page counter
         function updatePageInfo() {
           const currentPageNum = pageFlip.getCurrentPageIndex() + 1;
-          document.getElementById('currentPage').textContent = currentPageNum;
+          const portrait = pageFlip.getOrientation && pageFlip.getOrientation() === 'portrait';
+          const lastVisible = portrait || currentPageNum === 1 ? currentPageNum : Math.min(currentPageNum + 1, totalPages);
+          document.getElementById('currentPage').textContent = lastVisible > currentPageNum ? currentPageNum + '–' + lastVisible : currentPageNum;
           document.getElementById('prevBtn').disabled = currentPageNum <= 1;
-          document.getElementById('nextBtn').disabled = currentPageNum >= totalPages;
+          document.getElementById('nextBtn').disabled = lastVisible >= totalPages;
+          updateAssessmentVisibility();
         }
 
         // Button events
@@ -1673,7 +1675,7 @@ export function generateFlipbookHTML(
         restoreReflectionResponses();
 
       } catch (err) {
-        console.error('StPageFlip initialization error:', err);
+        if (${JSON.stringify(displayStyle)} === 'page-flip') console.warn('StPageFlip unavailable; using single-page navigation');
         console.log('Falling back to basic navigation...');
 
         // Fallback if StPageFlip fails to load
@@ -1693,7 +1695,7 @@ export function generateFlipbookHTML(
         }
 
         function showPage(idx) {
-          stopAllAudioFallback();
+          stopAllAudio();
           window.__fallbackCurrentPage = idx;
           pages.forEach(p => p.style.display = 'none');
           if (pages[idx]) {
@@ -1701,6 +1703,8 @@ export function generateFlipbookHTML(
             document.getElementById('currentPage').textContent = idx + 1;
             document.getElementById('prevBtn').disabled = idx <= 0;
             document.getElementById('nextBtn').disabled = idx >= pages.length - 1;
+            updateAssessmentVisibility();
+            if (idx > 0) playCurrentPageAudio();
           }
         }
 
