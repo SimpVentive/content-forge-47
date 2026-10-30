@@ -5,10 +5,18 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+/** Per-character timings from ElevenLabs, used to drive the avatar's mouth shapes. */
+export type NarrationAlignment = {
+  characters?: string[];
+  character_start_times_seconds?: number[];
+  character_end_times_seconds?: number[];
+};
+
 export interface AudioGenerationResult {
   success: boolean;
   audioBase64?: string;
   audioDataUrl?: string;
+  alignment?: NarrationAlignment | null;
   error?: string;
 }
 
@@ -97,6 +105,7 @@ export async function generateNarrationAudio(
       success: true,
       audioBase64: data.audioBase64,
       audioDataUrl,
+      alignment: data.alignment || data.normalizedAlignment || null,
     };
   } catch (err) {
     return {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { VisemeKey } from "@/lib/avatarTrainers";
+import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,13 +40,13 @@ const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "a
 // CSS-overlay facial coordinates — exact pctX/pctY from narrator_config.json
 // These are percentages of the original 1024×1536 image.
 const FACE_COORDS: Record<string, { eyeLeft: { x: number; y: number }; eyeRight: { x: number; y: number }; mouth: { x: number; y: number } }> = {
-  priya:      { eyeLeft: { x: 56.64, y: 27.99 }, eyeRight: { x: 43.65, y: 27.99 }, mouth: { x: 49.32, y: 35.81 } },
-  arjun:      { eyeLeft: { x: 54.98, y: 26.43 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 47.66, y: 34.64 } },
-  soumya:     { eyeLeft: { x: 55.66, y: 26.69 }, eyeRight: { x: 42.97, y: 26.89 }, mouth: { x: 48.63, y: 34.44 } },
-  vedprakash: { eyeLeft: { x: 54.30, y: 25.59 }, eyeRight: { x: 42.68, y: 25.59 }, mouth: { x: 48.34, y: 33.33 } },
-  atul:       { eyeLeft: { x: 53.71, y: 25.98 }, eyeRight: { x: 41.99, y: 25.98 }, mouth: { x: 47.36, y: 34.24 } },
-  irina:      { eyeLeft: { x: 55.37, y: 26.69 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 48.63, y: 34.64 } },
-  john:       { eyeLeft: { x: 53.32, y: 25.98 }, eyeRight: { x: 42.29, y: 25.98 }, mouth: { x: 46.97, y: 33.79 } },
+  priya:      { eyeLeft: { x: 56.64, y: 27.99 }, eyeRight: { x: 43.65, y: 27.99 }, mouth: { x: 49.30, y: 35.55 } },
+  arjun:      { eyeLeft: { x: 54.98, y: 26.43 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 48.13, y: 34.08 } },
+  soumya:     { eyeLeft: { x: 55.66, y: 26.69 }, eyeRight: { x: 42.97, y: 26.89 }, mouth: { x: 48.52, y: 33.98 } },
+  vedprakash: { eyeLeft: { x: 54.30, y: 25.59 }, eyeRight: { x: 42.68, y: 25.59 }, mouth: { x: 48.22, y: 32.85 } },
+  atul:       { eyeLeft: { x: 53.71, y: 25.98 }, eyeRight: { x: 41.99, y: 25.98 }, mouth: { x: 47.36, y: 33.48 } },
+  irina:      { eyeLeft: { x: 55.37, y: 26.69 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 48.46, y: 34.09 } },
+  john:       { eyeLeft: { x: 53.32, y: 25.98 }, eyeRight: { x: 42.29, y: 25.98 }, mouth: { x: 47.03, y: 33.32 } },
 };
 const DEFAULT_FACE = { eyeLeft: { x: 55, y: 27 }, eyeRight: { x: 43, y: 27 }, mouth: { x: 48.5, y: 34.5 } };
 
@@ -116,9 +116,6 @@ export function AvatarNarrator({
   const [hasMouthSprite, setHasMouthSprite] = useState<boolean | null>(null);
   const [hasBlinkSprite, setHasBlinkSprite] = useState<boolean | null>(null);
   const [isBlinking,     setIsBlinking]     = useState(false);
-  // CSS fallback lip-sync animation cycle (0–1 scale)
-  const [cssLipValue,    setCssLipValue]    = useState(0);
-  const cssLipIntervalRef = useRef<number | null>(null);
 
   const avatarVideoRef          = useRef<HTMLVideoElement | null>(null);
   const abortControllerRef      = useRef<AbortController | null>(null);
@@ -137,6 +134,7 @@ export function AvatarNarrator({
 
   const isTalking  = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
   const mouthState = getVisemeMouthState(effectiveViseme, isTalking);
+  const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
@@ -182,35 +180,6 @@ export function AvatarNarrator({
       if (blinkTimeoutRef.current !== null) window.clearTimeout(blinkTimeoutRef.current);
     };
   }, [scheduleNextBlink]);
-
-  // ── CSS fallback lip-sync loop ────────────────────────────────────────────
-  // Always runs when sprite PNGs are missing. Uses a naturalistic pattern
-  // so the avatar always looks alive — identical to narrator_animator.html.
-  const CSS_LIP_PATTERN = [0,0.2,0.6,0.4,0.1,0.8,0.5,0.15,0.7,0.35,
-                           0.05,0,0,0.3,0.75,0.5,0.25,0.9,0.4,0.1,
-                           0.6,0.2,0.85,0.45,0.05,0,0.3,0.65,0.4,0.1];
-  const cssLipIdxRef = useRef(0);
-
-  useEffect(() => {
-    if (hasMouthSprite !== false) return;  // only for CSS fallback
-    if (!isTalking) {
-      // Paused / idle → freeze lips closed, don't churn the interval
-      cssLipIdxRef.current = 0;
-      setCssLipValue(0);
-      return;
-    }
-    cssLipIntervalRef.current = window.setInterval(() => {
-      const val = CSS_LIP_PATTERN[cssLipIdxRef.current % CSS_LIP_PATTERN.length];
-      cssLipIdxRef.current += 1;
-      setCssLipValue(val);
-    }, 100);
-    return () => {
-      if (cssLipIntervalRef.current !== null) {
-        window.clearInterval(cssLipIntervalRef.current);
-        cssLipIntervalRef.current = null;
-      }
-    };
-  }, [hasMouthSprite, isTalking]);
 
   // ── stream helpers ────────────────────────────────────────────────────────
   const clearMouthHold = () => {
@@ -579,22 +548,20 @@ export function AvatarNarrator({
                 {/* LAYER 2b — CSS mouth overlay fallback (when no sprite PNG) */}
                 {hasMouthSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
-                  const mx = `${face.mouth.x}%`;
-                  const my = `${face.mouth.y * Y_CORRECT}%`;
+                  const shape = lipSyncProfile.visemes[effectiveViseme];
                   return (
                     <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                      left: mx, top: my,
-                      width: pctOfStageW(MTH_W), height: pctOfStageH(MTH_H),
+                      left: `${face.mouth.x}%`, top: `${face.mouth.y * Y_CORRECT}%`,
+                      width: pctOfStageW(MTH_W * shape.width), height: pctOfStageH(MTH_H * shape.height),
                       borderRadius: "50% 50% 60% 60%", overflow: "hidden",
+                      opacity: isTalking ? 1 : 0,
                       transform: "translate(-50%, -50%)",
+                      transition: "width 50ms ease-out, height 50ms ease-out, opacity 120ms ease-out",
                     }}>
                       <div style={{
                         width: "100%", height: "100%",
                         background: "rgba(20,3,3,0.75)",
                         borderRadius: "50% 50% 60% 60%",
-                        transform: `scaleY(${cssLipValue})`,
-                        transformOrigin: "top center",
-                        transition: "transform 60ms ease-out",
                       }} />
                     </div>
                   );

@@ -1370,6 +1370,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const mediaSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  // An audio element can only ever get one source node, so reuse it across pause/replay.
+  const mediaSourceByAudioRef = useRef(new WeakMap<HTMLAudioElement, MediaElementAudioSourceNode>());
   const lipSyncFrameRef = useRef<number>(0);
   const analyserDataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const visemeIndexRef = useRef(0);
@@ -1431,14 +1433,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
       lipSyncFrameRef.current = 0;
     }
 
-    if (mediaSourceRef.current) {
+    // Only remove the analyser tap: disconnecting the source entirely would silence the audio element.
+    if (mediaSourceRef.current && analyserRef.current) {
       try {
-        mediaSourceRef.current.disconnect();
+        mediaSourceRef.current.disconnect(analyserRef.current);
       } catch {
         // Ignore disconnect teardown errors.
       }
-      mediaSourceRef.current = null;
     }
+    mediaSourceRef.current = null;
 
     if (analyserRef.current) {
       try {
@@ -1492,13 +1495,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         await audioContext.resume();
       }
 
+      // The element's source always feeds the speakers; the analyser just taps it for mouth movement.
+      let mediaSource = mediaSourceByAudioRef.current.get(audio);
+      if (!mediaSource) {
+        mediaSource = audioContext.createMediaElementSource(audio);
+        mediaSource.connect(audioContext.destination);
+        mediaSourceByAudioRef.current.set(audio, mediaSource);
+      }
+
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 256;
       analyser.smoothingTimeConstant = 0.82;
-
-      const mediaSource = audioContext.createMediaElementSource(audio);
       mediaSource.connect(analyser);
-      analyser.connect(audioContext.destination);
 
       analyserRef.current = analyser;
       mediaSourceRef.current = mediaSource;
@@ -1812,6 +1820,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
       const url = result.audioDataUrl;
       audioUrlsRef.current[requestSlide] = url;
       audioTextRef.current[requestSlide] = narrationText;
+      visemeTimelinesRef.current[requestSlide] = buildVisemeTimeline(result.alignment);
       learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), audioBySlide: { ...audioUrlsRef.current }, audioTextBySlide: { ...audioTextRef.current } });
       // Learner already moved on: keep the clip for when they come back, but don't play it here.
       if (isStale()) return;
