@@ -51,6 +51,8 @@ const Welcome = lazy(() => import("./pages/Welcome"));
 const Login = lazy(() => import("./pages/Login"));
 const AdminLogin = lazy(() => import("./pages/AdminLogin"));
 const Signup = lazy(() => import("./pages/Signup"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 const TypeSelector = lazy(() => import("./components/TypeSelector"));
 const VideoPreviewPage = lazy(() => import("./pages/VideoPreviewPage"));
 const AdminShell = lazy(() => import("./components/admin/AdminShell"));
@@ -83,6 +85,8 @@ const App = () => (
                 <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
                 <Route path="/admin/login" element={<AdminLogin />} />
                 <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+                <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/help" element={<PublicRoute><Help /></PublicRoute>} />
                 <Route path="/welcome" element={<Welcome />} />
                 <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

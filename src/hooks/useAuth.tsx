@@ -90,6 +90,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       email,
       password,
       options: {
+        // Confirmation returns to the site the user signed up on, not whatever the project's Site URL is set to.
+        emailRedirectTo: `${window.location.origin}/login`,
         data: {
           full_name: fullName,
           account_type: accountType,
