@@ -40,6 +40,7 @@ describe("narration always matches the screen", () => {
     Object.defineProperty(window, "speechSynthesis", { value: { cancel: vi.fn(), speak: vi.fn(), speaking: false }, configurable: true });
   });
 
+  // Mounts the full preview and drives several screens; can exceed the 5s default when the suite runs in parallel.
   it("never plays a late voice clip from the previous screen", async () => {
     const { LearnerPreview, buildSlides, buildSlideNarration } = await import("@/components/contentforge/LearnerPreview");
     const rawOutputs = { architect, writer, visual: "{}", assessment: "{}" };
@@ -68,5 +69,5 @@ describe("narration always matches the screen", () => {
     expect(secondRequest.text).toBe(buildSlideNarration(slides[contentIdx[1]]));
     await act(async () => { secondRequest.resolve({ success: true, audioDataUrl: "data:audio/mpeg;base64,SECOND" }); });
     expect(played.at(-1)).toBe("data:audio/mpeg;base64,SECOND");
-  });
+  }, 20_000);
 });

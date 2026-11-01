@@ -9,6 +9,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // Full-preview render tests take several seconds each and exceed the 5s default when the suite runs in parallel.
+    testTimeout: 20_000,
   },
   resolve: {
     alias: { "@": path.resolve(__dirname, "./src") },

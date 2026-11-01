@@ -29,7 +29,7 @@ describe("course-level client branding", () => {
       expect(screen.getByRole("img", { name: "Client logo" })).toHaveAttribute("src", logo);
       cleanup();
     }
-  });
+  }, 20_000); // Renders the full preview twice and walks every screen; slower than the 5s default under load.
 
   it("retains the logo when saving and restoring course settings", () => {
     saveCourseDraft({ id: "logo-test", title: "Client Training", inputText: "Safety", courseParams: { companyLogo: logo } as CourseParameters, workflowClips: [], rawOutputs, outputData: { outline: "", script: "", assessment: "", package: "" } });

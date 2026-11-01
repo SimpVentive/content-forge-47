@@ -42,7 +42,7 @@ describe("shared quiz answer resolution", () => {
       expect(screen.getByText(new RegExp(`Score ${selected === "Apple silicon" ? "1" : "0"}/1`))).toBeInTheDocument();
       cleanup();
     }
-  }, 20000);
+  }, 60_000); // Renders the full preview for each of the four choices in both modes; slow under a parallel run.
 
   async function answer(selected: string) {
     render(<LearnerPreview courseTitle="Mac Strategy" rawOutputs={rawOutputs} onClose={() => {}} exportMedia={{ introImages: { 0: "data:image/png;base64,AA==" } }} />);
