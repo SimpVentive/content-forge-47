@@ -20,9 +20,11 @@ import { learnerExportMedia, type LearnerExportMedia } from "@/lib/learnerExport
 import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 import { getCompletionBlockers, getFurthestReachableSlide } from "@/lib/learnerProgression";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { collectAssessmentItems, normalizeAssessmentAnswer, resolveAssessmentAnswer } from "@/lib/assessmentAnswer";
 import { normalizeForMatch, splitSentences, splitTopicContentIntoSlides } from "@/lib/slideBuilder";
 import { assessInfographicSvg, buildInfographicUserPrompt, EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, extractSvgLabels, INFOGRAPHIC_EXPLAIN_SYSTEM_PROMPT, buildInfographicExplainPrompt } from "@/lib/infographicQuality";
+import { carryDiagramsForward, extractDiagramSpecs, findDiagramRevealIndex, isDiagramRevealed, renderDiagramSvg, type DiagramSpec } from "@/lib/diagramSpec";
 
 /* helpers */
 function tryParseJSON(raw: string | undefined | null): any | null {
@@ -269,6 +271,8 @@ interface Slide {
   infographicSvg?: string;
   visualImageDataUrl?: string;
   visualSvg?: string;
+  diagram?: DiagramSpec;
+  diagramImmediate?: boolean;
   visualPlacement?: "hero" | "side-panel" | "inline-card";
   visualAltText?: string;
   visualPrompt?: string;
@@ -551,6 +555,8 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
   const assessData = tryParseJSON(rawOutputs.assessment);
   const visualData = tryParseJSON(rawOutputs.visual);
   const narrativeScenesData = tryParseJSON(rawOutputs.narrativeScenes);
+  // Visuals drawn for diagrams, images or charts the script refers to, keyed by topic title.
+  const drawnDiagrams: Record<string, DiagramSpec> = tryParseJSON(rawOutputs.diagrams) || {};
   const heygenVideosData = tryParseJSON(rawOutputs.heygenVideos);
   const durationMinutes = getDurationMinutes(courseDuration);
 
@@ -652,7 +658,13 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
         } as any);
       } else {
         // Fallback to content chunks for non-image-based or when no narrative scenes
-        const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes, maxLines);
+        const { text: screenText, diagrams } = extractDiagramSpecs(sectionText);
+        const contentChunks = splitTopicContentIntoSlides(screenText, durationMinutes, maxLines);
+        // One diagram per topic. It goes on the screen whose narration first mentions it, or the first screen if none does.
+        const diagram: DiagramSpec | undefined = diagrams[0] ?? drawnDiagrams[topic];
+        const diagramChunkIndex = diagram
+          ? Math.max(0, contentChunks.findIndex((chunk) => findDiagramRevealIndex(splitSentences(chunk.text), diagram) >= 0))
+          : -1;
         const topicVisual = getTopicVisual(matchedVisualModule, topic);
 
         // Extract visual data with multiple fallback field names
@@ -702,6 +714,7 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
             content: chunk.text,
             wasTrimmedForLayout: chunk.wasTrimmed,
             infographicSvg: ti === 0 && chunkIndex === 0 ? infographicDescription : undefined,
+            diagram: chunkIndex === diagramChunkIndex ? diagram : undefined,
             visualImageDataUrl: chunkIndex === 0 ? generatedImageDataUrl : undefined,
             visualSvg: chunkIndex === 0 ? generatedSceneSvg : undefined,
             visualPlacement: chunkIndex === 0 ? topicVisual?.placement : undefined,
@@ -811,7 +824,7 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
     });
   });
 
-  return { modules, slides: sequenceLessonSlides(slides) };
+  return { modules, slides: carryDiagramsForward(sequenceLessonSlides(slides)) };
 }
 
 /* Confetti animation */
@@ -884,6 +897,18 @@ export function splitInfographicDescription(raw: string): { svg: string; text: s
   return { svg: svgMarkup.replace(/<script[\s\S]*?<\/script>/gi, ""), text };
 }
 
+// Same bound the pipeline uses for its own diagram calls, so a stalled request ends in an error, not a spinner.
+const INFOGRAPHIC_TIMEOUT_MS = 90_000;
+const INFOGRAPHIC_TIMEOUT_MESSAGE = "The diagram service did not respond in time. Try again.";
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string; topicTitle?: string; content?: string }> = ({ description: rawDescription, moduleTitle, topicTitle, content }) => {
   const parsed = useMemo(() => splitInfographicDescription(rawDescription), [rawDescription]);
   const description = parsed.text || moduleTitle;
@@ -913,9 +938,9 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string;
       const userMessage = buildInfographicUserPrompt({ moduleTitle, topicTitle, content: content || description });
       let best = "";
       for (let attempt = 0; attempt < 2; attempt++) {
-        const { data, error: fnErr } = await supabase.functions.invoke("claude", {
+        const { data, error: fnErr } = await withTimeout(supabase.functions.invoke("claude", {
           body: { systemPrompt: EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, userMessage: attempt ? `${userMessage}\nYour previous diagram was too sparse. Fill the canvas with labelled parts and a worked example.` : userMessage },
-        });
+        }), INFOGRAPHIC_TIMEOUT_MS, INFOGRAPHIC_TIMEOUT_MESSAGE);
         if (fnErr || data?.error) {
           reason = fnErr?.message || data?.error || "The AI service returned no response.";
           continue;
@@ -964,12 +989,12 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string;
     setExplaining(true);
     try {
       const { supabase } = await import("@/integrations/supabase/client");
-      const { data, error: fnErr } = await supabase.functions.invoke("claude", {
+      const { data, error: fnErr } = await withTimeout(supabase.functions.invoke("claude", {
         body: {
           systemPrompt: INFOGRAPHIC_EXPLAIN_SYSTEM_PROMPT,
           userMessage: buildInfographicExplainPrompt({ moduleTitle, topicTitle, labels, content: content || description }),
         },
-      });
+      }), INFOGRAPHIC_TIMEOUT_MS, INFOGRAPHIC_TIMEOUT_MESSAGE);
       const text = !fnErr && !data?.error ? splitInfographicDescription(data?.text || "").text : "";
       // splitInfographicDescription collapses newlines; keep bullets on separate lines.
       setExplanation(text ? text.replace(/\s*•\s*/g, "\n• ").trim() : fallback);
@@ -1239,6 +1264,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const [activeLearningTool, setActiveLearningTool] = useState<LearningToolPanel>(null);
   const [visualActionState, setVisualActionState] = useState<Record<string, { regenerating?: boolean; error?: string }>>({});
   const [activeSidebarPanel, setActiveSidebarPanel] = useState<SidebarPanel>("progress");
+  // Shown in the middle of the screen when the learner tries to skip ahead.
+  const [lockNotice, setLockNotice] = useState<string | null>(null);
   const [activeUtilityPanel, setActiveUtilityPanel] = useState<UtilityPanel>(null);
   const [learnerNotes, setLearnerNotes] = useState("");
 
@@ -1585,6 +1612,20 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   // Track current sentence index (not word)
   const [highlightSentenceIdx, setHighlightSentenceIdx] = useState(-1);
 
+  // Teaching diagrams appear when the trainer reaches the sentence that mentions them, and stay on for that screen.
+  const [revealedDiagramSlides, setRevealedDiagramSlides] = useState<Record<number, true>>({});
+  // A carried-forward diagram is already known to the learner, so it shows from the start of the screen.
+  const diagramRevealIndex = slide?.diagram && !slide.diagramImmediate ? findDiagramRevealIndex(narrationSentences, slide.diagram) : -1;
+  const diagramRevealed = Boolean(slide?.diagram) && (
+    Boolean(revealedDiagramSlides[currentSlide]) ||
+    isDiagramRevealed({ revealIndex: diagramRevealIndex, highlightIndex: highlightSentenceIdx, narrationOff: muted || narrationSentences.length === 0 })
+  );
+  useEffect(() => {
+    if (diagramRevealed && !revealedDiagramSlides[currentSlide]) {
+      setRevealedDiagramSlides((prev) => ({ ...prev, [currentSlide]: true }));
+    }
+  }, [diagramRevealed, currentSlide, revealedDiagramSlides]);
+
   const submittedAssessments = useMemo(
     () => new Set(Object.entries(assessmentAnswers).filter(([, a]) => a?.submitted).map(([k]) => Number(k))),
     [assessmentAnswers],
@@ -1604,7 +1645,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const navigateToSlide = useCallback((targetSlide: number) => {
     if (targetSlide === currentSlide || targetSlide < 0 || targetSlide >= totalSlides) return;
     if (targetSlide > furthestReachable) {
-      toast.info(slides[furthestReachable]?.type === "assessment" && !submittedAssessments.has(furthestReachable)
+      setLockNotice(slides[furthestReachable]?.type === "assessment" && !submittedAssessments.has(furthestReachable)
         ? "Answer the knowledge check before moving ahead."
         : "Please go through the screens in order to unlock this one.");
       return;
@@ -2376,7 +2417,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
             sentenceIndex: sentenceIndex >= 0 ? sentenceIndex : index,
           };
         });
-        const visualMarkup = slide.visualImageDataUrl ? (
+        const imageMarkup = slide.visualImageDataUrl ? (
           <img
             src={slide.visualImageDataUrl}
             alt={slide.visualAltText || `${slide.topicTitle} visual`}
@@ -2388,6 +2429,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
             dangerouslySetInnerHTML={{ __html: slide.visualSvg }}
           />
         ) : null;
+        const diagramMarkup = slide.diagram && diagramRevealed ? (
+          <div
+            className="h-full w-full [&_svg]:block [&_svg]:h-full [&_svg]:w-full"
+            dangerouslySetInnerHTML={{ __html: renderDiagramSvg(slide.diagram) }}
+          />
+        ) : null;
+        const visualMarkup = diagramMarkup ?? imageMarkup;
         const showHeroVisual = Boolean(visualMarkup) && slide.visualPlacement !== "side-panel";
         const showSideVisual = Boolean(visualMarkup) && slide.visualPlacement === "side-panel";
         const contentTemplate: ContentTemplate = inferContentTemplate(slide, Boolean(visualMarkup));
@@ -3457,6 +3505,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
       <div className="relative flex min-h-0 flex-1 overflow-hidden rounded-[30px] border border-[#c7d6ea] bg-[#edf3f9] shadow-[0_40px_120px_rgba(15,23,42,0.28)]">
         <div className="pointer-events-none absolute inset-0 bg-transparent" />
 
+        <Dialog open={lockNotice !== null} onOpenChange={(open) => { if (!open) setLockNotice(null); }}>
+          <DialogContent className="max-w-md text-center">
+            <DialogHeader>
+              <DialogTitle className="text-center">Not yet</DialogTitle>
+              <DialogDescription className="text-center text-[15px]">{lockNotice}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="sm:justify-center">
+              <Button onClick={() => setLockNotice(null)}>OK</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         <aside className="relative hidden w-[260px] shrink-0 flex-col border-r border-[#335f99]/40 bg-[#1d4f93] text-white md:flex">
           <div className="border-b border-white/10 px-5 py-5">
             <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-white/55">ContentForge LMS</p>
@@ -3471,9 +3531,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
               return (
                 <button
                   key={item.label}
-                  onClick={() => { handleSidebarSelect(item.id); setTimeout(() => document.getElementById("cf-sidebar-panel")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 50); }}
+                  onClick={() => handleSidebarSelect(item.id)}
                   type="button"
-                  className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-semibold transition-all ${isActive ? "bg-white/14 text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.12)]" : "text-white/72 hover:bg-white/8 hover:text-white"}`}
+                  className={`mb-1 flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-[13px] font-semibold transition-all ${isActive ? "bg-white/14 text-white shadow-[inset_3px_0_0_#8ec5ff,inset_0_0_0_1px_rgba(255,255,255,0.12)]" : "text-white/72 hover:bg-white/8 hover:text-white"}`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
                   {item.label}
@@ -3482,7 +3542,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
             })}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto border-t border-white/10 px-4 py-4">
+          <div className="order-2 min-h-0 flex-1 overflow-y-auto border-t border-white/10 px-4 py-4">
             <div className="mb-4 rounded-2xl bg-white/8 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
               <p className="text-[11px] font-[900] uppercase tracking-[0.18em] text-white/55">Current Module</p>
               <p className="mt-2 text-[15px] font-[900] leading-snug text-white">{currentModule?.title || "Course Overview"}</p>
@@ -3495,10 +3555,10 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
               </div>
             </div>
 
-            <p className="mb-3 text-[11px] font-[900] uppercase tracking-[0.18em] text-white/48">Lesson Map</p>
+            <p className="mb-3 text-[11px] font-[900] uppercase tracking-[0.2em] text-[#9fc3f0]">Lesson Map</p>
             {toc.map((mod, mi) => (
-              <div key={mi} className="mb-3 rounded-2xl border border-white/8 bg-white/4 p-2.5">
-                <p className={`mb-2 px-2 text-[13px] font-[800] ${slide.moduleIndex === mi ? "text-white" : "text-white/68"}`}>
+              <div key={mi} className={`mb-3 rounded-2xl border p-2.5 ${slide.moduleIndex === mi ? "border-[#8ec5ff]/45 bg-white/8" : "border-white/8 bg-white/4"}`}>
+                <p className={`mb-2 border-b border-white/15 px-2 pb-2 text-[14px] font-[900] leading-snug ${slide.moduleIndex === mi ? "text-[#8ec5ff]" : "text-white"}`}>
                   {mod.title}
                 </p>
                 <div className="space-y-1">
@@ -3515,7 +3575,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                       onClick={() => navigateToSlide(s.idx)}
                       aria-disabled={s.idx > furthestReachable}
                       title={s.idx > furthestReachable ? "Complete the earlier screens to unlock" : undefined}
-                      className={`flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-[12px] transition-all ${s.idx === currentSlide ? "bg-white text-[#143a6f] shadow-sm" : s.idx > furthestReachable ? "cursor-not-allowed text-white/40" : "text-white/72 hover:bg-white/10 hover:text-white"}`}
+                      className={`flex w-full items-center gap-2 rounded-lg py-1.5 pl-5 pr-2 text-left text-[12px] transition-all ${s.idx === currentSlide ? "bg-white font-[700] text-[#143a6f] shadow-sm" : s.idx > furthestReachable ? "cursor-not-allowed text-white/40" : "font-[500] text-white/80 hover:bg-white/10 hover:text-white"}`}
                       type="button"
                     >
                       {visited.has(s.idx) && s.idx !== currentSlide ? (
@@ -3537,7 +3597,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
             ))}
           </div>
 
-          <div id="cf-sidebar-panel" className="border-t border-white/10 px-4 py-4">
+          {/* Sits directly under the nav buttons, above the lesson list, so the panel a learner opens is where they look. */}
+          <div id="cf-sidebar-panel" className="order-1 max-h-[45%] shrink-0 overflow-y-auto border-t border-white/10 px-4 py-4">
             <div className="rounded-2xl bg-white/8 p-4">
               <div className="mb-2 flex items-center justify-between">
                 <p className="text-[12px] font-[800] text-white">

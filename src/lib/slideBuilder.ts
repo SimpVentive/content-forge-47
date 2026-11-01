@@ -9,6 +9,7 @@ import type { RawAgentOutputs } from "@/types/agents";
 import { InsertedVideo } from "@/components/contentforge/VideosTab";
 import { stripAiPlaceholders, stripNarratorMarkdown, isPlaceholderToken } from "@/lib/textCleaningUtility";
 import { collectAssessmentItems } from "@/lib/assessmentAnswer";
+import { carryDiagramsForward, extractDiagramSpecs, findDiagramRevealIndex, type DiagramSpec } from "@/lib/diagramSpec";
 
 /* Types */
 
@@ -47,6 +48,10 @@ export interface Slide {
   takeaways?: string[];
   video?: InsertedVideo;
   narrative?: any;
+  /** Teaching diagram shown when the trainer reaches the narration sentence that mentions it. */
+  diagram?: DiagramSpec;
+  /** True when the diagram is carried onto a later screen that already refers to it, so it shows from the start. */
+  diagramImmediate?: boolean;
 }
 
 type SlideContentChunk = {
@@ -389,6 +394,8 @@ export function buildSlides(
   const assessData = tryParseJSON(rawOutputs.assessment);
   const visualData = tryParseJSON(rawOutputs.visual);
   const narrativeScenesData = tryParseJSON(rawOutputs.narrativeScenes);
+  // Visuals drawn for diagrams, images or charts the script refers to, keyed by topic title.
+  const drawnDiagrams: Record<string, DiagramSpec> = tryParseJSON(rawOutputs.diagrams) || {};
   const durationMinutes = getDurationMinutes(courseDuration);
 
   // Extract modules
@@ -496,7 +503,13 @@ export function buildSlides(
         } as any);
       } else {
         // Fallback to content chunks
-        const contentChunks = splitTopicContentIntoSlides(sectionText, durationMinutes, maxLines);
+        const { text: screenText, diagrams } = extractDiagramSpecs(sectionText);
+        const contentChunks = splitTopicContentIntoSlides(screenText, durationMinutes, maxLines);
+        // One diagram per topic. It goes on the screen whose narration first mentions it, or the first screen if none does.
+        const diagram: DiagramSpec | undefined = diagrams[0] ?? drawnDiagrams[topic];
+        const diagramChunkIndex = diagram
+          ? Math.max(0, contentChunks.findIndex((chunk) => findDiagramRevealIndex(splitSentences(chunk.text), diagram) >= 0))
+          : -1;
         const topicVisual = getTopicVisual(matchedVisualModule, topic);
 
         let generatedImageDataUrl: string | undefined;
@@ -536,6 +549,7 @@ export function buildSlides(
             content: chunk.text,
             wasTrimmedForLayout: chunk.wasTrimmed,
             infographicSvg: ti === 0 && chunkIndex === 0 ? infographicDescription : undefined,
+            diagram: chunkIndex === diagramChunkIndex ? diagram : undefined,
             visualImageDataUrl: chunkIndex === 0 ? generatedImageDataUrl : undefined,
             visualSvg: chunkIndex === 0 ? generatedSceneSvg : undefined,
             visualPlacement: chunkIndex === 0 ? topicVisual?.placement : undefined,
@@ -612,5 +626,5 @@ export function buildSlides(
     });
   });
 
-  return { modules, slides: sequenceLessonSlides(slides) };
+  return { modules, slides: carryDiagramsForward(sequenceLessonSlides(slides)) };
 }

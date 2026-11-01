@@ -1,5 +1,6 @@
 import { requireLessonContent } from "@/lib/lessonContent";
 import { EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, assessInfographicSvg, buildInfographicUserPrompt } from "@/lib/infographicQuality";
+import { addMissingDiagramMarkers } from "@/lib/diagramSpec";
 import { ANSWER_AUDIT_SYSTEM_PROMPT, applyAnswerCorrections, buildAnswerAuditUserMessage, collectVerifiableQuestions } from "@/lib/assessmentVerification";
 import { useState, useCallback, useRef } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
@@ -480,7 +481,7 @@ const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
-const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", quality: "", voice: "", assembly: "", "final-qa": "" });
+const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", diagrams: "{}", animation: "", youtube: "", compliance: "", assessment: "", quality: "", voice: "", assembly: "", "final-qa": "" });
 
 /**
  * Strip JSON / code-fence leakage from Writer output.
@@ -1142,6 +1143,13 @@ OUTPUT FORMAT — ABSOLUTE:
 - You MUST respect the supplied runtime plan. Hit the requested word budgets closely so the narration lands within ${durationToleranceMinutes} minutes of the ${durationMinutes}-minute target.
 - NEVER output metadata lines such as "Word Count:", "Estimated time:", "Duration:", or "Read time:". The learner sees everything you write.
 
+DIAGRAMS (optional, use only when a 2×2 matrix teaches the idea better than prose):
+- Add at most ONE diagram per topic, as a single line on its own, placed right after the sentence that introduces it, in exactly this form:
+  [MATRIX2X2 | title: <short title> | columns: <left label>; <right label> | rows: <top label>; <bottom label> | cells: <top-left>; <top-right>; <bottom-left>; <bottom-right>]
+- Each label is 1–6 words. Use the same labels the narration uses.
+- In the narration, say "two-by-two grid" or "this grid" in the sentence that introduces the diagram, so the trainer points at it at that moment.
+- This line is production markup, not prose. Do not explain it, and do not put it inside a code block.
+
 ZERO-REPETITION RULE — ABSOLUTE:
 - Every sentence must add new information. Never restate a sentence, even reworded, anywhere in the same topic.
 - The "Key Takeaway:" line must be a NEW one-sentence synthesis. It must NOT copy or paraphrase any sentence from the hook, explanation, or scenario.
@@ -1207,8 +1215,21 @@ ZERO-REPETITION RULE — ABSOLUTE:
         
         writerResult = stripAiPlaceholders(writerResult);
         requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
+        // Diagrams, images and charts the script refers to get a visual: grids as markers, others as drawn SVGs.
+        // Failures only skip visuals; the course continues without them.
+        let drawnDiagrams: Record<string, unknown> = {};
+        try {
+          const withDiagrams = await addMissingDiagramMarkers(writerResult, (systemPrompt, userMessage) => callClaudeWithTimeout(systemPrompt, userMessage, 60000));
+          writerResult = withDiagrams.script;
+          drawnDiagrams = withDiagrams.diagrams;
+          if (withDiagrams.added > 0) {
+            addLog(`Writer Agent: Prepared ${withDiagrams.added} visual(s) for diagrams, images or grids the script refers to.`);
+          }
+        } catch (diagramErr) {
+          addLog(`Writer Agent: Visual detection skipped — ${(diagramErr as Error).message}`);
+        }
         setStatus("writer", "complete");
-        setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
+        setRawOutputs((prev) => ({ ...prev, writer: writerResult, diagrams: JSON.stringify(drawnDiagrams) }));
         setOutputData((prev) => ({ ...prev, script: writerResult }));
         addLog(`Writer Agent: Complete. ${parsedModules.length || 1} modules written.`);
       }

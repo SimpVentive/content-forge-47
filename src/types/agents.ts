@@ -19,6 +19,8 @@ export interface RawAgentOutputs {
   architect: string;
   writer: string;
   visual: string;
+  /** JSON map of topic title to a drawn SVG visual, produced from the script's references to diagrams and images. */
+  diagrams?: string;
   animation?: string;
   youtube?: string;
   compliance?: string;
