@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
-import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
+import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, safeLearnerInlineText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 import { collectAssessmentItems } from "@/lib/assessmentAnswer";
 
 /* ── helpers ── */
@@ -263,7 +263,9 @@ function extractTakeaway(markdown: string): { cleanedMarkdown: string; takeaway:
   return { cleanedMarkdown: normalized.trim(), takeaway: "" };
 }
 
-function parseContentPartsForExport(text: string) {
+function parseContentPartsForExport(text: string, keepInlineMarkup = false) {
+  // Templates that render inline markdown ask for markup-preserving text; the rest get plain text.
+  const clean = keepInlineMarkup ? safeLearnerInlineText : safeLearnerText;
   const lines = text
     .replace(/\r\n/g, "\n")
     .split("\n")
@@ -274,7 +276,7 @@ function parseContentPartsForExport(text: string) {
   const paragraphs = lines
     .join("\n")
     .split(/\n\n+/)
-    .map((paragraph) => safeLearnerText(paragraph))
+    .map((paragraph) => clean(paragraph))
     .filter(Boolean);
 
   let hook = "";
@@ -286,9 +288,9 @@ function parseContentPartsForExport(text: string) {
     if (index === 0) {
       hook = paragraph;
     } else if (/^(Key Takeaway|Takeaway|Remember|Tip)\s*:/i.test(paragraph)) {
-      takeaway = safeLearnerText(paragraph.replace(/^(Key Takeaway|Takeaway|Remember|Tip)\s*:\s*/i, ""));
+      takeaway = clean(paragraph.replace(/^(Key Takeaway|Takeaway|Remember|Tip)\s*:\s*/i, ""));
     } else if (/^(Challenge|Try this)\s*:/i.test(paragraph) || (index === paragraphs.length - 1 && paragraph.length < 120)) {
-      challenge = safeLearnerText(paragraph.replace(/^(Challenge|Try this)\s*:\s*/i, ""));
+      challenge = clean(paragraph.replace(/^(Challenge|Try this)\s*:\s*/i, ""));
     } else {
       body.push(paragraph);
     }
@@ -899,10 +901,10 @@ function buildModuleHtml(
 
   const renderDashboardSection = (section: ModuleSection, sectionIndex: number) => {
     const objectives = moduleTopics.slice(Math.max(0, sectionIndex - 1), Math.max(0, sectionIndex - 1) + 3);
-    const parts = parseContentPartsForExport(section.bodyMarkdown);
+    const parts = parseContentPartsForExport(section.bodyMarkdown, true);
     const objective = parts.hook || section.moduleContent || getFirstSentences(stripNarratorMarkdown(section.bodyMarkdown), 1) || section.heading;
     const courseContent = (parts.body.length > 0 ? parts.body : splitIntoSentences(stripNarratorMarkdown(section.bodyMarkdown)).slice(1, 5))
-      .map((item) => safeLearnerText(item))
+      .map((item) => safeLearnerInlineText(item))
       .filter((item) => item && !isPlaceholderToken(item))
       .slice(0, 6);
     const coreLines = buildScenarioNoticeLines(parts, 4);
@@ -917,13 +919,13 @@ function buildModuleHtml(
               <h2 class="course-overview-title">Course Overview</h2>
               <div class="course-objective-row">
                 <span>Course Objective:</span>
-                <p>${escapeHtml(objective)}</p>
+                <p>${renderInlineMarkdown(objective)}</p>
               </div>
               ${courseContent.length > 0 ? `
               <div class="course-content-row">
                 <p class="course-content-label">Course Content:</p>
                 <div class="course-content-list">
-                  ${courseContent.map((item) => `<div class="course-content-item"><span>•</span><p>${escapeHtml(item)}</p></div>`).join("")}
+                  ${courseContent.map((item) => `<div class="course-content-item"><span>•</span><p>${renderInlineMarkdown(item)}</p></div>`).join("")}
                 </div>
               </div>` : ""}
             </div>

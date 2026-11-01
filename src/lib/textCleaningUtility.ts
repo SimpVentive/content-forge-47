@@ -9,6 +9,8 @@ function stripStageDirections(text: string): string {
     .replace(/\[\*_]?\s*[\(\[]\s*Audio\s*:[^)\]\.\n]*(?:[\)\]]|(?=[\.\n])|$)\s*[\*_]?/gi, "")
     .replace(/\[\*_]?\s*[\(\[]\s*Caption\s*:[^)\]\.\n]*(?:[\)\]]|(?=[\.\n])|$)\s*[\*_]?/gi, "")
     .replace(/\[\*_]?\s*[\(\[]\s*Interaction\s*:[^)\]\.\n]*(?:[\)\]]|(?=[\.\n])|$)\s*[\*_]?/gi, "")
+    // Video-script production cues (writer output). They are instructions to the video maker, never learner text.
+    .replace(/\[\s*(?:(?:VIDEO CUE|ACTION|WHITEBOARD|DIAGRAM TYPE)\s*:[^\]]*|PAUSE\s*\d+\s*s[^\]]*)\]/gi, "")
     .replace(/(^|[\!\?\s])(?:Narration|Visual|Audio|Caption|On[- ]?screen)\s*:\s*/gi, "$1")
     .replace(/^\s*Topic\s+\d+\s*:\s*/i, "");
 }
@@ -92,6 +94,17 @@ export function acceptScriptRewrite(
 export function safeLearnerText(text: string, fallback = ""): string {
   if (isPlaceholderToken(text)) return fallback;
   const cleaned = stripNarratorMarkdown(stripAiPlaceholders(text)).replace(AI_PLACEHOLDER, "").trim();
+  return cleaned && !isPlaceholderToken(cleaned) ? cleaned : fallback;
+}
+
+/** Same cleaning as safeLearnerText, but keeps **bold** and *italic* so the renderer can style them. */
+export function safeLearnerInlineText(text: string, fallback = ""): string {
+  if (isPlaceholderToken(text)) return fallback;
+  const cleaned = stripStageDirections(stripAiPlaceholders(text))
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .replace(AI_PLACEHOLDER, "")
+    .trim();
   return cleaned && !isPlaceholderToken(cleaned) ? cleaned : fallback;
 }
 

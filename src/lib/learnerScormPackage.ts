@@ -129,8 +129,8 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   report("Packaging the same interactive learner preview...");
   const runtime = await readRuntime();
   const html = learnerDocument(props.courseTitle, { ...props, companyLogo, rawOutputs, exportMedia: media, standalone: true }, runtime, passingScore);
+  // One page only: the manifest launches module_0.html, so a second copy would just duplicate the course.
   zip.file("module_0.html", html);
-  zip.file("index.html", html);
-  zip.file("imsmanifest.xml", generateManifest({ courseId: `course_${Date.now()}`, courseTitle: props.courseTitle, passingScore, createdDate: new Date(), modifiedDate: new Date() }, { title: props.courseTitle, items: [{ identifier: "course", title: props.courseTitle, resourceId: "res_course" }] }, [{ id: "res_course", type: "webcontent", href: "module_0.html", scormType: "sco", files: [{ href: "module_0.html" }, { href: "index.html" }, ...Object.keys(zip.files).filter(name => name.startsWith("assets/") && !zip.files[name].dir).map(href => ({ href }))] }]));
+  zip.file("imsmanifest.xml", generateManifest({ courseId: `course_${Date.now()}`, courseTitle: props.courseTitle, passingScore, createdDate: new Date(), modifiedDate: new Date() }, { title: props.courseTitle, items: [{ identifier: "course", title: props.courseTitle, resourceId: "res_course" }] }, [{ id: "res_course", type: "webcontent", href: "module_0.html", scormType: "sco", files: [{ href: "module_0.html" }, ...Object.keys(zip.files).filter(name => name.startsWith("assets/") && !zip.files[name].dir).map(href => ({ href }))] }]));
   return { zip, slides: slides.length };
 }
