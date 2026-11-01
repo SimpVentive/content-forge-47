@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { Navbar } from "@/components/home/Navbar";
 import { Hero } from "@/components/home/Hero";
@@ -13,16 +13,9 @@ import { Footer } from "@/components/home/Footer";
 
 const HomePage = () => {
   const { hash } = useLocation();
-  const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
 
-  // Redirect authenticated users to dashboard
-  useEffect(() => {
-    if (!isLoading && user) {
-      navigate("/dashboard", { replace: true });
-    }
-  }, [user, isLoading, navigate]);
-
+  // The home page is always shown. Signed-in visitors get "Go to My Courses" in the hero and call-to-action instead of an automatic redirect.
   useEffect(() => {
     if (!hash) return;
     const el = document.querySelector(hash);
