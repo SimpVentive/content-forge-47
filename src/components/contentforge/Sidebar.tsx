@@ -1,4 +1,4 @@
-﻿import React, { useRef, useState } from "react";
+﻿import React, { useEffect, useRef, useState } from "react";
 import { Zap, Upload, Square, FileText, X, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { TitleFormatter } from "./TitleFormatter";
@@ -194,14 +194,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isTitleFocused, setIsTitleFocused] = useState(false);
   const [showFormatSelection, setShowFormatSelection] = useState(false);
   const [detectedSOP, setDetectedSOP] = useState(false);
+  const [formatConfirmed, setFormatConfirmed] = useState(false);
+  const [pendingGenerate, setPendingGenerate] = useState(false);
   const [showCourseOutline, setShowCourseOutline] = useState(false);
   const [contentMode, setContentMode] = useState<"upload" | "paste" | null>(null);
 
   const isStep1Complete = courseTitle.trim().length > 0;
   const isStep2Complete = contentMode !== null && inputText.trim().length > 0;
 
+  // Generate waits for the format choice when it was asked for at Generate time.
+  // Runs after the re-render so the new contentType reaches onGenerate.
+  useEffect(() => {
+    if (pendingGenerate && formatConfirmed) {
+      setPendingGenerate(false);
+      onGenerate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingGenerate, formatConfirmed, contentType]);
+
   const handleFile = async (file: File) => {
     setUploadedFileName(file.name);
+    setFormatConfirmed(false);
 
     // Auto-detect course title from filename
     const detectedTitle = titleFromFilename(file.name);
@@ -272,12 +285,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       onDocumentMeta({ fileName: file.name, fileSize: file.size, extractedWordCount: words });
     }
 
-    // Detect if this is an SOP and show format selection
-    const isSOP = detectSOP(extractedText);
-    if (isSOP) {
-      setDetectedSOP(true);
-      setShowFormatSelection(true);
-    }
+    // Every upload gets the format choice; SOP-looking content gets SOP wording
+    setDetectedSOP(detectSOP(extractedText));
+    setShowFormatSelection(true);
 
     // Always show title confirmation after file upload
     setSuggestedTitle(detectedTitle);
@@ -295,7 +305,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (setContentType) {
       setContentType(format);
     }
+    setFormatConfirmed(true);
     setShowFormatSelection(false);
+  };
+
+  const handleGenerateClick = () => {
+    if (!formatConfirmed && inputText.trim().length > 0) {
+      setDetectedSOP(detectSOP(inputText));
+      setPendingGenerate(true);
+      setShowFormatSelection(true);
+      return;
+    }
+    onGenerate();
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -350,14 +371,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
           Step 1: Course Title
         </p>
 
-        <div>
+        {/* Focus stays "on" while the user is anywhere inside this block, so the formatting
+            panels don't unmount when they click into them */}
+        <div
+          tabIndex={-1}
+          className="outline-none"
+          onFocus={() => setIsTitleFocused(true)}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setIsTitleFocused(false);
+          }}
+        >
           <label className="text-[13px] font-bold text-slate-900 mb-1.5 block">Course Title</label>
           <textarea
             ref={titleInputRef}
             value={courseTitle}
             onChange={(e) => setCourseTitle(e.target.value)}
-            onFocus={() => setIsTitleFocused(true)}
-            onBlur={() => setIsTitleFocused(false)}
             placeholder="Enter an engaging course title..."
             className={`w-full border-[1.5px] border-slate-300 rounded-lg px-4 py-3 text-[14px] text-slate-900 bg-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all duration-200 resize-none font-medium ${
               isTitleFocused ? "min-h-24" : "min-h-11"
@@ -397,6 +425,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               onClick={() => {
                 setContentMode("upload");
                 setShowCourseOutline(false);
+                setFormatConfirmed(false);
+                fileInputRef.current?.click();
               }}
               className={`p-3 rounded-lg border-2 transition-all font-semibold text-[12px] ${
                 contentMode === "upload"
@@ -420,11 +450,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
               ✏️ Enter Outline
             </button>
           </div>
+
+          {/* Always mounted so "Upload File" can open the picker directly */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.md,.csv,.json,.xml,.html,.htm,.doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx"
+            className="hidden"
+            onChange={handleFileSelect}
+          />
         </div>
 
-        {/* SOP Format Dialog - Modal */}
+        {/* Format Dialog - Modal */}
         <SOPFormatDialog
-          open={showFormatSelection && detectedSOP}
+          open={showFormatSelection}
+          detected={detectedSOP}
           onFormatSelect={handleFormatSelection}
         />
 
@@ -432,16 +472,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {isStep1Complete && contentMode && (
           <div>
             {contentMode === "upload" && (
-              <>
-                <p className="text-[12px] text-slate-500 mb-2">Upload your course materials</p>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept=".txt,.md,.csv,.json,.xml,.html,.htm,.doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx"
-                  className="hidden"
-                  onChange={handleFileSelect}
-                />
-              </>
+              <p className="text-[12px] text-slate-500 mb-2">Upload your course materials</p>
             )}
 
             {contentMode === "paste" && (
@@ -514,7 +545,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           ) : (
             <button
-              onClick={onGenerate}
+              onClick={handleGenerateClick}
               type="button"
               disabled={isExtracting || isStartingGeneration}
               className="w-full h-12 rounded-lg text-[14px] font-bold text-white flex items-center justify-center gap-2.5 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 transition-all duration-200 shadow-lg hover:shadow-xl"

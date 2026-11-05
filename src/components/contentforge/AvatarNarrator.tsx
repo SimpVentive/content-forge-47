@@ -50,17 +50,14 @@ const FACE_COORDS: Record<string, { eyeLeft: { x: number; y: number }; eyeRight:
 };
 const DEFAULT_FACE = { eyeLeft: { x: 55, y: 27 }, eyeRight: { x: 43, y: 27 }, mouth: { x: 48.5, y: 34.5 } };
 
-// Stage & scaling — matches narrator_animator.html logic
-const STAGE_W = 360, STAGE_H = 480;
+// Source image is 1024×1536 (2:3). The face layer keeps that ratio and every overlay
+// is positioned in % of it, so the eyes and mouth stay on the face at any width.
 const ORIG_W  = 1024, ORIG_H  = 1536;
-const SCALE_X = STAGE_W / ORIG_W;                 // 0.3516
-const DISPLAYED_H = ORIG_H * SCALE_X;             // 540px
-const Y_CORRECT = DISPLAYED_H / STAGE_H;          // 1.125
 
-const EYE_W = 90 * SCALE_X;   // ~31.6px
-const EYE_H = 32 * SCALE_X;   // ~11.3px
-const MTH_W = 82 * SCALE_X;   // ~28.8px
-const MTH_H = 26 * SCALE_X;   // ~9.1px
+const EYE_W = (90 / ORIG_W) * 100;   // % of face width
+const EYE_H = (32 / ORIG_H) * 100;   // % of face height
+const MTH_W = (82 / ORIG_W) * 100;
+const MTH_H = (40 / ORIG_H) * 100;
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -410,10 +407,10 @@ export function AvatarNarrator({
           50%       { box-shadow: 0 14px 32px rgba(60,52,137,0.16); }
         }
         @keyframes headTilt {
-          0%,  100% { transform: rotate(0deg)     translateX(0px);   }
-          20%        { transform: rotate(0.8deg)   translateX(1px);   }
-          55%        { transform: rotate(-0.5deg)  translateX(-0.5px);}
-          80%        { transform: rotate(0.6deg)   translateX(0.8px); }
+          0%,  100% { transform: scale(1.02) rotate(0deg)     translateX(0px);   }
+          20%        { transform: scale(1.02) rotate(0.8deg)   translateX(1px);   }
+          55%        { transform: scale(1.02) rotate(-0.5deg)  translateX(-0.5px);}
+          80%        { transform: scale(1.02) rotate(0.6deg)   translateX(0.8px); }
         }
       `}</style>
 
@@ -466,19 +463,26 @@ export function AvatarNarrator({
             {hasAvatarImage ? (
               <>
                 {/*
+                  Face layer — holds the base image and every overlay below. It has the
+                  source image's 2:3 ratio and the head tilt is applied here, so the
+                  overlays move with the face. Its bottom edge is cropped by the parent.
+                */}
+                <div
+                  className="absolute inset-x-0 top-0 aspect-[2/3]"
+                  style={{
+                    transform: "scale(1.02)",
+                    animation: isTalking ? "headTilt 9s ease-in-out infinite" : "none",
+                    transformOrigin: "50% 71%",
+                  }}
+                >
+                {/*
                   LAYER 0 — base head image
                   Subtle 9 s head-tilt animation gives life without being distracting.
-                  transform-origin "50% 80%" pivots around the shoulders so the tilt
-                  feels like a natural head movement, not a full-body rock.
                 */}
                 <img
                   src={avatarImageUrl || "/trainers/priya.png"}
                   alt={trainerName}
                   className="absolute inset-0 h-full w-full object-cover object-top"
-                  style={{
-                    animation: isTalking ? "headTilt 9s ease-in-out infinite" : "none",
-                    transformOrigin: "50% 80%",
-                  }}
                   onError={() => setHasAvatarImage(false)}
                 />
 
@@ -523,24 +527,13 @@ export function AvatarNarrator({
                 )}
 
                 {/* LAYER 1b — CSS blink overlay fallback (when no sprite PNG) */}
-                {/*
-                  Y-correction: container is aspect-[3/4] (0.75) but images are
-                  1024×1536 (0.667). With object-cover object-top the image is
-                  scaled to match container width; its rendered height exceeds
-                  the container, and the bottom is cropped.
-                  Scale factor = (1536/1024) / (4/3) = 1.125
-                */}
                 {hasBlinkSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
-                  const elx = (face.eyeLeft.x  / 100) * STAGE_W;
-                  const ely = (face.eyeLeft.y  / 100) * STAGE_H * Y_CORRECT;
-                  const erx = (face.eyeRight.x / 100) * STAGE_W;
-                  const ery = (face.eyeRight.y / 100) * STAGE_H * Y_CORRECT;
                   return (
                     <>
                       <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: elx, top: ely,
-                        width: EYE_W, height: EYE_H, borderRadius: "50%", overflow: "hidden",
+                        left: `${face.eyeLeft.x}%`, top: `${face.eyeLeft.y}%`,
+                        width: `${EYE_W}%`, height: `${EYE_H}%`, borderRadius: "50%", overflow: "hidden",
                         transform: "translate(-50%, -50%)",
                       }}>
                         <div style={{
@@ -552,8 +545,8 @@ export function AvatarNarrator({
                         }} />
                       </div>
                       <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: erx, top: ery,
-                        width: EYE_W, height: EYE_H, borderRadius: "50%", overflow: "hidden",
+                        left: `${face.eyeRight.x}%`, top: `${face.eyeRight.y}%`,
+                        width: `${EYE_W}%`, height: `${EYE_H}%`, borderRadius: "50%", overflow: "hidden",
                         transform: "translate(-50%, -50%)",
                       }}>
                         <div style={{
@@ -571,12 +564,10 @@ export function AvatarNarrator({
                 {/* LAYER 2b — CSS mouth overlay fallback (when no sprite PNG) */}
                 {hasMouthSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
-                  const mx = (face.mouth.x / 100) * STAGE_W;
-                  const my = (face.mouth.y / 100) * STAGE_H * Y_CORRECT;
                   return (
                     <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                      left: mx, top: my,
-                      width: MTH_W, height: MTH_H,
+                      left: `${face.mouth.x}%`, top: `${face.mouth.y}%`,
+                      width: `${MTH_W}%`, height: `${MTH_H}%`,
                       borderRadius: "50% 50% 60% 60%", overflow: "hidden",
                       transform: "translate(-50%, -50%)",
                     }}>
@@ -591,6 +582,7 @@ export function AvatarNarrator({
                     </div>
                   );
                 })()}
+                </div>
               </>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-[#3C3489]">

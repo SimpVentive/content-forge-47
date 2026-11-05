@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+﻿import React, { useState, useEffect, useCallback, useLayoutEffect, useRef, useMemo } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle, Maximize2, Minimize2 } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
@@ -10,6 +10,7 @@ import { NarrativeFlipbook } from "./NarrativeFlipbook";
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
 import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
+import { fitSvgToContent } from "@/lib/svgFit";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
 
@@ -960,7 +961,7 @@ function normalizeSvg(svg: string): string {
   });
 }
 
-const INFOGRAPHIC_SYSTEM_PROMPT = "You are an elite SVG infographic designer for polished corporate eLearning. Generate a sophisticated, presentation-quality SVG infographic that uses the full canvas confidently, with strong visual hierarchy, large readable headings, 3-5 clearly separated content zones, connectors, icons built only from SVG primitives, and disciplined whitespace. Avoid giant empty margins, tiny text, clip-art aesthetics, or toy layouts. The SVG must be self-contained, 1200x800, with no external fonts or images. Use only these colors: #0f172a, #123d78, #355fa8, #4f46e5, #7c3aed, #10b981, #f59e0b, #e8eef9, #f8fafc, #ffffff. Make it feel like a premium consulting slide, not a simple classroom handout. Return only SVG markup.";
+const INFOGRAPHIC_SYSTEM_PROMPT = "You are an elite SVG infographic designer for polished corporate eLearning. Generate a sophisticated, presentation-quality SVG infographic that uses the full canvas confidently, with strong visual hierarchy, large readable headings, 3-5 clearly separated content zones, connectors, icons built only from SVG primitives, and disciplined whitespace. Avoid giant empty margins, tiny text, clip-art aesthetics, or toy layouts. The SVG must be self-contained, 1200x800, with no external fonts or images. Keep every element inside the canvas with at least 40px margin, keep titles under 60 characters, keep each label within its box so no text runs past the edges, and use body text of at least 22px so it stays legible when scaled. Use only these colors: #0f172a, #123d78, #355fa8, #4f46e5, #7c3aed, #10b981, #f59e0b, #e8eef9, #f8fafc, #ffffff. Make it feel like a premium consulting slide, not a simple classroom handout. Return only SVG markup.";
 
 const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string }> = ({ description, moduleTitle }) => {
   const [expanded, setExpanded] = useState(false);
@@ -971,6 +972,12 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
   const [explanation, setExplanation] = useState("");
   const [explaining, setExplaining] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1.45);
+  const inlineSvgRef = useRef<HTMLDivElement>(null);
+  const focusSvgRef = useRef<HTMLDivElement>(null);
+
+  // Make sure generated text isn't clipped by the SVG's own viewBox
+  useLayoutEffect(() => { fitSvgToContent(inlineSvgRef.current); }, [svg, expanded]);
+  useLayoutEffect(() => { fitSvgToContent(focusSvgRef.current); }, [svg, showZoomed]);
 
   const generateSvg = useCallback(async () => {
     if (svg || loading) return;
@@ -1119,6 +1126,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
               </div>
               <div className="overflow-hidden rounded-[18px] border border-[#d8deea] bg-white p-3 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
                 <div
+                  ref={inlineSvgRef}
                   className="mx-auto aspect-[3/2] w-full max-w-[860px] [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:max-h-full [&_svg]:max-w-full"
                   dangerouslySetInnerHTML={{ __html: svg }}
                 />
@@ -1189,6 +1197,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
                 <div className="mx-auto min-w-fit">
                   <div className="rounded-[26px] border border-[#d8deea] bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
                     <div
+                      ref={focusSvgRef}
                       className="aspect-[3/2] [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:max-h-full [&_svg]:max-w-none"
                       style={{ width: `${Math.round(900 * zoomLevel)}px` }}
                       dangerouslySetInnerHTML={{ __html: svg }}
