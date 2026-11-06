@@ -348,6 +348,22 @@ export function allocateQuestionsPerModule(modules: Module[], totalQuestions: nu
   return counts;
 }
 
+/**
+ * How many quiz items the finished course carries. The runtime target is the
+ * ceiling, but a course never ships with fewer than one item per module when the
+ * bank can supply it — that shortfall is what left whole modules quiz-free.
+ */
+export function resolveCourseQuestionBudget(
+  itemCount: number,
+  modules: Module[],
+  durationMinutes: number,
+  intensity: AssessmentIntensity,
+): number {
+  const target = getTargetCourseQuestionCount(durationMinutes, intensity);
+  const onePerModule = Math.min(itemCount, modules.length);
+  return Math.max(onePerModule, Math.min(itemCount, target));
+}
+
 export function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[] {
   const normalizedTitle = normalizeModuleKey(module.title);
   const normalizedTopics = new Set(module.topics.map((topic) => normalizeModuleKey(topic)));
@@ -420,7 +436,7 @@ export function buildSlides(
 
   // Extract MCQs
   const mcqs = collectAssessmentItems(assessData);
-  const maxQuestionCount = Math.min(mcqs.length, getTargetCourseQuestionCount(durationMinutes, assessmentIntensity));
+  const maxQuestionCount = resolveCourseQuestionBudget(mcqs.length, modules, durationMinutes, assessmentIntensity);
   const questionsPerModule = allocateQuestionsPerModule(modules, maxQuestionCount);
   const usedQuestionIndexes = new Set<number>();
 
