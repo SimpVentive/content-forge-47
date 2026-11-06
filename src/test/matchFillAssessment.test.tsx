@@ -35,7 +35,7 @@ const renderCourse = () => render(
 );
 
 const advanceButton = () =>
-  screen.queryByRole("button", { name: /^Next$/i })
+  screen.queryByRole("button", { name: /^Next/i })
   || screen.queryByRole("button", { name: /start lesson|start course|begin/i });
 
 /** Walk the course forward until the screen we want is on screen. */
