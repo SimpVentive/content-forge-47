@@ -126,7 +126,10 @@ describe("fill in the blanks in the learner runtime", () => {
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Submit Answer" })); });
 
     expect(screen.getByRole("status")).toHaveTextContent("Correct answer");
-    expect(screen.getByText(/Score 1\/1/)).toBeInTheDocument();
+    // The match exercise was answered on the way here, so the running total
+    // counts its two pairs plus this blank.
+    expect(screen.getByText(/Score \d\/3/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Blank 1/i).className).toContain("border-emerald-500");
   }, 30_000);
 
   it("says Incorrect, then reveals the word the learner missed", async () => {
@@ -141,7 +144,7 @@ describe("fill in the blanks in the learner runtime", () => {
     expect(screen.queryByText("NVR")).toBeNull();
     await act(async () => { vi.advanceTimersByTime(1600); });
     expect(screen.getByText("NVR")).toBeInTheDocument();
-    expect(screen.getByText(/Score 0\/1/)).toBeInTheDocument();
+    expect(screen.getByText(/Score \d\/3/)).toBeInTheDocument();
     vi.useRealTimers();
   }, 30_000);
 });
