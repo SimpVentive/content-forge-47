@@ -35,8 +35,8 @@ const renderCourse = () => render(
 );
 
 const advanceButton = () =>
-  screen.queryByRole("button", { name: /^Next/i })
-  || screen.queryByRole("button", { name: /start lesson|start course|begin/i });
+  screen.queryAllByRole("button", { name: /^Next/i })[0]
+  || screen.queryAllByRole("button", { name: /start lesson|start course|begin/i })[0];
 
 /** A quiz screen only moves on once it has been answered, so answer whatever is showing. */
 async function answerWhatIsShowing() {
