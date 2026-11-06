@@ -2783,7 +2783,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                           <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Interactive Quiz</p>
                           <p className="mt-3 text-[15px] font-[800] leading-snug text-[#123d78]">{currentModuleAssessment.question}</p>
                           <div className="mt-3 space-y-2">
-                            {currentModuleAssessment.options.slice(0, 3).map((option, index) => (
+                            {(currentModuleAssessment.options || []).slice(0, 3).map((option, index) => (
                               <div key={`${option}-${index}`} className="rounded-xl border border-[#e2e8f0] bg-[#fbfdff] px-3 py-2 text-[13px] text-[#35506f]">
                                 <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
                                 {stripOptionPrefix(option)}
@@ -3349,12 +3349,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         const shuffledOptions = optionsWithIndices;
 
         const getShuffledIndex = (originalIdx: number) => shuffledOptions.findIndex(item => item.originalIdx === originalIdx);
-
-        // Question numbering counts assessment slides only (not all screens),
-        // so "Question 2 of 3" reflects the actual quiz, not the slide position.
-        const assessmentSlideIndexes = slides.map((sl, i) => sl.type === "assessment" ? i : -1).filter(i => i >= 0);
-        const questionNumber = assessmentSlideIndexes.indexOf(currentSlide) + 1;
-        const questionTotal = assessmentSlideIndexes.length;
 
         return (
           <div className="w-full h-full flex flex-col" key={currentSlide}>
