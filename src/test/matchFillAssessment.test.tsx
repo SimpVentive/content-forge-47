@@ -38,9 +38,31 @@ const advanceButton = () =>
   screen.queryByRole("button", { name: /^Next/i })
   || screen.queryByRole("button", { name: /start lesson|start course|begin/i });
 
+/** A quiz screen only moves on once it has been answered, so answer whatever is showing. */
+async function answerWhatIsShowing() {
+  const selects = screen.queryAllByLabelText(/Partner for/i);
+  if (selects.length) {
+    for (const select of selects) {
+      const firstValue = Array.from(select.options).map((option) => option.value).find((value) => value !== "");
+      await act(async () => { fireEvent.change(select, { target: { value: firstValue ?? "" } }); });
+    }
+    return;
+  }
+  const inputs = screen.queryAllByLabelText(/Blank \d+/i);
+  for (const input of inputs) {
+    await act(async () => { fireEvent.change(input, { target: { value: "x" } }); });
+  }
+}
+
 /** Walk the course forward until the screen we want is on screen. */
-async function advanceUntil(found: () => boolean, maxSteps = 15) {
+async function advanceUntil(found: () => boolean, maxSteps = 20) {
   for (let step = 0; step < maxSteps && !found(); step++) {
+    const submit = screen.queryByRole("button", { name: "Submit Answer" });
+    if (submit) {
+      await answerWhatIsShowing();
+      await act(async () => { fireEvent.click(submit); });
+      continue;
+    }
     const button = advanceButton();
     if (!button) break;
     await act(async () => { fireEvent.click(button); });
