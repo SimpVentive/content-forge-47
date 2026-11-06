@@ -759,7 +759,11 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
       selectedIndexes.forEach((questionIndex) => {
         const authoredQuestion = mcqs[questionIndex];
         if (!authoredQuestion) return;
-        const mcq = normalizeAssessmentAnswer(authoredQuestion);
+        // Only choice questions carry an option-text key; match and fill items
+        // keep their own authored key (pairings / per-blank answers) untouched.
+        const mcq = assessmentKindOf(authoredQuestion) === "mcq"
+          ? normalizeAssessmentAnswer(authoredQuestion)
+          : authoredQuestion;
         // Shuffle answer options once at build time so the correct answer is
         // randomly placed (not always option B) across preview, export and narration.
         const shuffledMcq = Array.isArray(mcq.options) && mcq.options.length > 1
