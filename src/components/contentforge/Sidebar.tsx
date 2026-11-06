@@ -421,21 +421,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <p className="text-[13px] text-slate-700 font-medium mb-3">How would you like to provide the course content?</p>
 
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <button
-              onClick={() => {
-                setContentMode("upload");
-                setShowCourseOutline(false);
-                setFormatConfirmed(false);
-                fileInputRef.current?.click();
-              }}
-              className={`p-3 rounded-lg border-2 transition-all font-semibold text-[12px] ${
+            {/* A <label> bound to the file input opens the picker in the same click, with no
+                second click. The input's onClick updates the mode state. */}
+            <label
+              htmlFor="course-file-input"
+              className={`flex cursor-pointer items-center justify-center p-3 rounded-lg border-2 transition-all font-semibold text-[12px] ${
                 contentMode === "upload"
                   ? "border-blue-600 bg-blue-50 text-blue-700"
                   : "border-slate-300 bg-white text-slate-700 hover:border-blue-300"
               }`}
             >
               📤 Upload File
-            </button>
+            </label>
             <button
               onClick={() => {
                 setContentMode("paste");
@@ -453,10 +450,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
           {/* Always mounted so "Upload File" can open the picker directly */}
           <input
+            id="course-file-input"
             ref={fileInputRef}
             type="file"
             accept=".txt,.md,.csv,.json,.xml,.html,.htm,.doc,.docx,.ppt,.pptx,.pdf,.xls,.xlsx"
             className="hidden"
+            onClick={() => {
+              // Only on the first switch into upload mode, so re-opening the picker keeps the format choice.
+              if (contentMode !== "upload") {
+                setContentMode("upload");
+                setShowCourseOutline(false);
+                setFormatConfirmed(false);
+              }
+            }}
             onChange={handleFileSelect}
           />
         </div>

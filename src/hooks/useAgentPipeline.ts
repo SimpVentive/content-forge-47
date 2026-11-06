@@ -2063,12 +2063,13 @@ ${modeInstructions}`;
       }
 
     } catch (err) {
-      // Find which agent was running and mark it as error
-      const runningAgent = AGENTS.find((a) => {
-        // We can't read state here, so just log the error
-        return false;
-      });
       addLog(`Orchestrator: Pipeline error — ${(err as Error).message}`);
+      // Any agent still marked "running" has failed; without this its card stays "Running" forever.
+      setAgentStatuses((prev) => Object.fromEntries(
+        Object.entries(prev).map(([id, status]) => [id, status === "running" ? "error" : status]),
+      ) as Record<string, AgentStatus>);
+      setIsRunning(false);
+      return;
     }
 
     addLog("Orchestrator: Pipeline complete.");
