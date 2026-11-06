@@ -2069,11 +2069,89 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { selected: optionIdx, submitted: false } }));
   };
 
+  /** One pairing on a match screen: this Column A item now sits beside this Column B item. */
+  const handleSelectPair = (slideIdx: number, aIndex: number, bIndex: number) => {
+    if (assessmentAnswers[slideIdx]?.submitted) return;
+    setAssessmentAnswers(prev => ({
+      ...prev,
+      [slideIdx]: { ...prev[slideIdx], pairs: { ...(prev[slideIdx]?.pairs || {}), [aIndex]: bIndex }, submitted: false },
+    }));
+  };
+
+  /** One blank on a fill-in-the-blank screen. */
+  const handleFillText = (slideIdx: number, blankIndex: number, value: string) => {
+    if (assessmentAnswers[slideIdx]?.submitted) return;
+    setAssessmentAnswers(prev => {
+      const texts = [...(prev[slideIdx]?.texts || [])];
+      texts[blankIndex] = value;
+      return { ...prev, [slideIdx]: { ...prev[slideIdx], texts, submitted: false } };
+    });
+  };
+
+  /** Shared feedback voice: correct -> "Correct answer"; wrong -> "Incorrect", then the right answer. */
+  const speakFeedback = (text: string, slideIdx: number) => {
+    if (muted || typeof window === "undefined" || !("speechSynthesis" in window) || activeSlideRef.current !== slideIdx) return;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  };
+
+  /** Wrong answer: hold for a beat, then reveal and speak the authored key. */
+  const revealAnswerLater = (slideIdx: number, text: string) => {
+    window.setTimeout(() => {
+      if (activeSlideRef.current !== slideIdx) return;
+      setAssessmentAnswers(prev => prev[slideIdx] ? ({ ...prev, [slideIdx]: { ...prev[slideIdx], revealed: true } }) : prev);
+      speakFeedback(text, slideIdx);
+    }, ANSWER_REVEAL_DELAY_MS);
+  };
+
   const handleSubmitAnswer = (slideIdx: number) => {
     const ans = assessmentAnswers[slideIdx];
     if (!ans || ans.submitted) return;
-    const q = slides[slideIdx].question;
+    const q = slides[slideIdx].question as any;
     if (!q) return;
+    audioRef.current?.pause();
+
+    const kind = assessmentKindOf(q);
+
+    if (kind === "match") {
+      const authored = resolveMatchPairings(q);
+      const chosen = ans.pairs || {};
+      const authoredKeys = Object.keys(authored).map(Number);
+      if (!authoredKeys.length) {
+        toast.error("This match exercise has no answer key. Please ask the course author to correct it.");
+        return;
+      }
+      const correctPairs = authoredKeys.filter((aIndex) => chosen[aIndex] === authored[aIndex]).length;
+      const allCorrect = correctPairs === authoredKeys.length;
+      setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true, revealed: allCorrect } }));
+      speakFeedback(allCorrect ? "Correct answer." : "Incorrect.", slideIdx);
+      if (!allCorrect) {
+        const columnA = (q.column_a || []).map(String);
+        const columnB = (q.column_b || []).map(String);
+        const missed = authoredKeys
+          .filter((aIndex) => chosen[aIndex] !== authored[aIndex])
+          .slice(0, 3)
+          .map((aIndex) => `${columnA[aIndex]} goes with ${columnB[authored[aIndex]]}`);
+        revealAnswerLater(slideIdx, `The correct pairings are: ${missed.join("; ")}.`);
+      }
+      setScore(prev => ({ correct: prev.correct + correctPairs, total: prev.total + authoredKeys.length }));
+      return;
+    }
+
+    if (kind === "fill") {
+      const authored = fillBlankAnswers(q);
+      const chosen = ans.texts || [];
+      const correctBlanks = authored.filter((answer, index) =>
+        normalizeBlankAnswer(chosen[index] || "") === normalizeBlankAnswer(answer),
+      ).length;
+      const allCorrect = authored.length > 0 && correctBlanks === authored.length;
+      setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true, revealed: allCorrect } }));
+      speakFeedback(allCorrect ? "Correct answer." : "Incorrect.", slideIdx);
+      if (!allCorrect) revealAnswerLater(slideIdx, `The correct answers are ${authored.join(", ")}.`);
+      setScore(prev => ({ correct: prev.correct + correctBlanks, total: prev.total + authored.length }));
+      return;
+    }
+
     const correctIndex = resolveAssessmentAnswer(q);
     if (correctIndex === undefined) {
       toast.error("This question has no valid answer key. Please ask the course author to correct it.");
@@ -2085,19 +2163,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     const opts: string[] = (q.options || []).map((o: unknown) => stripOptionPrefix(String(o ?? "")));
     // Options are already in display order (shuffled once at build time).
     const letter = String.fromCharCode(65 + correctIndex);
-    const speak = (text: string) => {
-      if (muted || typeof window === "undefined" || !("speechSynthesis" in window) || activeSlideRef.current !== slideIdx) return;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-    };
-    audioRef.current?.pause();
-    speak(correct ? "Correct answer." : "Incorrect.");
+    speakFeedback(correct ? "Correct answer." : "Incorrect.", slideIdx);
     if (!correct) {
-      window.setTimeout(() => {
-        if (activeSlideRef.current !== slideIdx) return;
-        setAssessmentAnswers(prev => prev[slideIdx] ? ({ ...prev, [slideIdx]: { ...prev[slideIdx], revealed: true } }) : prev);
-        speak(`The correct answer is option ${letter}. ${opts[correctIndex] || ""}`);
-      }, ANSWER_REVEAL_DELAY_MS);
+      revealAnswerLater(slideIdx, `The correct answer is option ${letter}. ${opts[correctIndex] || ""}`);
     }
     setScore(prev => ({ correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1 }));
   };
