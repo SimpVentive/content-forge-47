@@ -21,7 +21,7 @@ import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 import { getCompletionBlockers, getFurthestReachableSlide } from "@/lib/learnerProgression";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { collectAssessmentItems, normalizeAssessmentAnswer, resolveAssessmentAnswer } from "@/lib/assessmentAnswer";
+import { assessmentKindOf, collectAssessmentItems, fillBlankAnswers, normalizeAssessmentAnswer, normalizeBlankAnswer, resolveAssessmentAnswer, resolveMatchPairings } from "@/lib/assessmentAnswer";
 import { normalizeForMatch, resolveCourseQuestionBudget, splitSentences, splitTopicContentIntoSlides } from "@/lib/slideBuilder";
 import { assessInfographicSvg, buildInfographicUserPrompt, EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, extractSvgLabels, INFOGRAPHIC_EXPLAIN_SYSTEM_PROMPT, buildInfographicExplainPrompt } from "@/lib/infographicQuality";
 import { carryDiagramsForward, extractDiagramSpecs, findDiagramRevealIndex, isDiagramRevealed, renderDiagramSvg, type DiagramSpec } from "@/lib/diagramSpec";

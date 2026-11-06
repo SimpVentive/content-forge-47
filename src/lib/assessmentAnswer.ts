@@ -13,6 +13,15 @@ function comparable(value: string): string {
     .replace(/\s+/g, " ").replace(/[.!?]+$/, "").trim().toLowerCase();
 }
 
+/** Learner typing is compared without case, quotes or trailing punctuation. */
+export function normalizeBlankAnswer(value: string): string {
+  return String(value ?? "").normalize("NFKC").toLowerCase()
+    .replace(/["'“”‘’]/g, "")
+    .replace(/\s+/g, " ")
+    .replace(/[.,!?;:]+$/g, "")
+    .trim();
+}
+
 /** Resolve against the authored order, BEFORE any shuffle. Never guess from substrings. */
 export function resolveAssessmentAnswer(q: AnswerQuestion): number | undefined {
   if (!Array.isArray(q.options)) return undefined;
