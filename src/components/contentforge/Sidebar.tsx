@@ -425,6 +425,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 second click. The input's onClick updates the mode state. */}
             <label
               htmlFor="course-file-input"
+              // Stop the press from moving focus. If the course title is focused, leaving it
+              // collapses the title editor, which moves this button before the click lands.
+              onMouseDown={(e) => e.preventDefault()}
               className={`flex cursor-pointer items-center justify-center p-3 rounded-lg border-2 transition-all font-semibold text-[12px] ${
                 contentMode === "upload"
                   ? "border-blue-600 bg-blue-50 text-blue-700"
