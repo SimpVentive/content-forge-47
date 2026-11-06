@@ -3022,6 +3022,212 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         const q = slide.question as any;
         if (!q) return null;
         const correctAnswerIndex = resolveAssessmentAnswer(q);
+        const assessmentKind = assessmentKindOf(q);
+
+        // Question numbering counts assessment slides only (not all screens),
+        // so "Question 2 of 3" reflects the actual quiz, not the slide position.
+        const assessmentSlideIndexes = slides.map((sl, i) => sl.type === "assessment" ? i : -1).filter(i => i >= 0);
+        const questionNumber = assessmentSlideIndexes.indexOf(currentSlide) + 1;
+        const questionTotal = assessmentSlideIndexes.length;
+
+        /* ── Match the following ── */
+        if (assessmentKind === "match") {
+          const columnA: string[] = (q.column_a || []).map(String);
+          const columnB: string[] = (q.column_b || []).map(String);
+          const authoredPairs = resolveMatchPairings(q);
+          const authoredKeys = Object.keys(authoredPairs).map(Number);
+          const chosenPairs = ans?.pairs || {};
+          const bOrder = shuffleQuestionOptions(columnB.map((_, i) => String(i)), `${currentSlide}|match`).map(Number);
+          const allCorrect = authoredKeys.length > 0 && authoredKeys.every((aIndex) => chosenPairs[aIndex] === authoredPairs[aIndex]);
+          const complete = authoredKeys.every((aIndex) => chosenPairs[aIndex] !== undefined);
+
+          return (
+            <div className="w-full h-full flex flex-col" key={currentSlide}>
+              <div className="flex-1 overflow-y-auto px-6 py-8">
+                <div className="max-w-[900px] mx-auto">
+                  <div className="mb-8">
+                    <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">
+                      Q{questionNumber}
+                    </span>
+                    <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">{q.question}</h2>
+                  </div>
+
+                  <div className="space-y-3 mb-8">
+                    {columnA.map((item, aIndex) => {
+                      const chosen = chosenPairs[aIndex];
+                      const isCorrect = ans?.submitted && chosen === authoredPairs[aIndex];
+                      const isWrong = ans?.submitted && !isCorrect;
+                      return (
+                        <div
+                          key={`${item}-${aIndex}`}
+                          className={`rounded-lg border-2 px-5 py-4 transition-all anim-fade-in-up ${isCorrect ? "border-emerald-500 bg-emerald-50" : isWrong ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"}`}
+                          style={{ animationDelay: `${0.1 + aIndex * 0.08}s` }}
+                        >
+                          <div className="flex flex-wrap items-center gap-4">
+                            <div className="flex-1 min-w-[220px] text-[17px] font-medium text-slate-900">{item}</div>
+                            <select
+                              aria-label={`Partner for ${item}`}
+                              value={chosen === undefined ? "" : String(chosen)}
+                              disabled={ans?.submitted}
+                              onChange={(event) => handleSelectPair(currentSlide, aIndex, Number(event.target.value))}
+                              className="rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-[15px] text-slate-800 disabled:opacity-70"
+                            >
+                              <option value="">Choose a partner…</option>
+                              {bOrder.map((bIndex) => (
+                                <option key={bIndex} value={String(bIndex)}>{columnB[bIndex]}</option>
+                              ))}
+                            </select>
+                            {isCorrect && (
+                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white" aria-label="Correct">
+                                <Check className="w-5 h-5 stroke-[3]" />
+                              </span>
+                            )}
+                            {isWrong && (
+                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white" aria-label="Incorrect">
+                                <X className="w-5 h-5 stroke-[3]" />
+                              </span>
+                            )}
+                          </div>
+                          {isWrong && ans?.revealed && authoredPairs[aIndex] !== undefined && (
+                            <p className="mt-2 text-[14px] font-semibold text-emerald-700">Correct partner: {columnB[authoredPairs[aIndex]]}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {ans?.submitted && <AnswerFeedbackBanner correct={allCorrect} revealed={!!ans.revealed} />}
+                  {ans?.submitted && ans.revealed && (q.rationale || q.explanation) && (
+                    <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                      <p className="text-[14px] text-slate-700">
+                        <span className="font-semibold text-blue-700">Explanation: </span>
+                        {q.rationale || q.explanation}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[13px] text-slate-600">
+                  <span>Question {questionNumber} of {questionTotal}</span>
+                </div>
+                <div className="flex gap-3">
+                  {ans && !ans.submitted && (
+                    <button
+                      onClick={() => handleSubmitAnswer(currentSlide)}
+                      disabled={!complete}
+                      className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50"
+                    >
+                      Submit Answer
+                    </button>
+                  )}
+                  {ans?.submitted && (
+                    <button
+                      onClick={goNext}
+                      disabled={currentSlide === totalSlides - 1}
+                      className="px-6 py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all disabled:opacity-50"
+                    >
+                      {currentSlide === totalSlides - 1 ? "Finish" : "Next Question"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        /* ── Fill in the blanks ── */
+        if (assessmentKind === "fill") {
+          const authoredAnswers = fillBlankAnswers(q);
+          const segments = splitPassageAtBlanks(q.passage);
+          const typed = ans?.texts || [];
+          const blankCount = Math.max(0, segments.length - 1);
+          const allCorrect = authoredAnswers.length > 0
+            && authoredAnswers.every((answer, index) => normalizeBlankAnswer(typed[index] || "") === normalizeBlankAnswer(answer));
+          const complete = typed.length >= blankCount && blankCount > 0;
+
+          return (
+            <div className="w-full h-full flex flex-col" key={currentSlide}>
+              <div className="flex-1 overflow-y-auto px-6 py-8">
+                <div className="max-w-[900px] mx-auto">
+                  <div className="mb-8">
+                    <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">
+                      Q{questionNumber}
+                    </span>
+                    <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">{q.question}</h2>
+                  </div>
+
+                  <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f8fbff] p-6 text-[19px] leading-[2.6] text-slate-800">
+                    {segments.map((segment, index) => {
+                      const isLastSegment = index === segments.length - 1;
+                      const authored = authoredAnswers[index];
+                      const isCorrect = ans?.submitted && normalizeBlankAnswer(typed[index] || "") === normalizeBlankAnswer(authored || "");
+                      const isWrong = ans?.submitted && !isCorrect;
+                      return (
+                        <React.Fragment key={index}>
+                          <span>{segment}</span>
+                          {!isLastSegment && (
+                            <span className="mx-1 inline-flex flex-col align-middle">
+                              <input
+                                aria-label={`Blank ${index + 1}`}
+                                value={typed[index] || ""}
+                                disabled={ans?.submitted}
+                                onChange={(event) => handleFillText(currentSlide, index, event.target.value)}
+                                className={`w-[160px] rounded-lg border-2 px-3 py-1 text-[17px] text-slate-900 outline-none disabled:opacity-80 ${isCorrect ? "border-emerald-500 bg-emerald-50" : isWrong ? "border-red-400 bg-red-50" : "border-slate-300 bg-white focus:border-blue-500"}`}
+                              />
+                              {isWrong && authored && (
+                                <span className="mt-1 text-[13px] font-semibold text-emerald-700">{authored}</span>
+                              )}
+                            </span>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-8">
+                    {ans?.submitted && <AnswerFeedbackBanner correct={allCorrect} revealed={!!ans.revealed} />}
+                    {ans?.submitted && ans.revealed && (q.rationale || q.explanation) && (
+                      <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                        <p className="text-[14px] text-slate-700">
+                          <span className="font-semibold text-blue-700">Explanation: </span>
+                          {q.rationale || q.explanation}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[13px] text-slate-600">
+                  <span>Question {questionNumber} of {questionTotal}</span>
+                </div>
+                <div className="flex gap-3">
+                  {ans && !ans.submitted && (
+                    <button
+                      onClick={() => handleSubmitAnswer(currentSlide)}
+                      disabled={!complete}
+                      className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50"
+                    >
+                      Submit Answer
+                    </button>
+                  )}
+                  {ans?.submitted && (
+                    <button
+                      onClick={goNext}
+                      disabled={currentSlide === totalSlides - 1}
+                      className="px-6 py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all disabled:opacity-50"
+                    >
+                      {currentSlide === totalSlides - 1 ? "Finish" : "Next Question"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
 
         // If this is a scenario-based assessment, render it with avatar and 2-column layout
         if (slide.contentTemplate === "scenario" && (q.situation || q.scenario)) {
