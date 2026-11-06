@@ -53,6 +53,19 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const action = body?.action;
 
+    if (action === "list_avatars") {
+      const res = await fetch("https://api.heygen.com/v2/avatars", { headers: authHeaders() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return json({ error: data?.error?.message || data?.message || `List failed (${res.status})` }, res.status);
+      const avatars = (data?.data?.avatars ?? []).map((a: Record<string, unknown>) => ({
+        avatar_id: a.avatar_id, avatar_name: a.avatar_name, gender: a.gender, premium: a.premium,
+      }));
+      const talking_photos = (data?.data?.talking_photos ?? []).map((t: Record<string, unknown>) => ({
+        talking_photo_id: t.talking_photo_id, talking_photo_name: t.talking_photo_name,
+      }));
+      return json({ avatars, talking_photos });
+    }
+
     if (action === "status") {
       const videoId = body?.videoId;
       if (!videoId) return json({ error: "videoId is required" }, 400);
