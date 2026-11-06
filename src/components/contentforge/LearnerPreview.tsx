@@ -394,14 +394,14 @@ type AssessmentIntensity = "light" | "standard" | "deep";
 
 export const ANSWER_REVEAL_DELAY_MS = 1500;
 
-function AnswerFeedbackBanner({ correct, revealed, letter }: { correct: boolean; revealed: boolean; letter: string }) {
+function AnswerFeedbackBanner({ correct, revealed, letter }: { correct: boolean; revealed: boolean; letter?: string }) {
   return (
     <div role="status" aria-live="polite" className={`mb-4 flex flex-wrap items-center gap-3 rounded-lg border-2 px-4 py-3 text-[16px] font-bold ${correct ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-red-400 bg-red-50 text-red-700"}`}>
       <span className={`flex h-7 w-7 items-center justify-center rounded-full text-white ${correct ? "bg-emerald-500" : "bg-red-500"}`}>
         {correct ? <Check className="h-4 w-4 stroke-[3]" /> : <X className="h-4 w-4 stroke-[3]" />}
       </span>
       {correct ? "Correct answer" : "Incorrect"}
-      {!correct && revealed && <span className="font-semibold text-emerald-700">— The correct answer is option {letter}.</span>}
+      {!correct && revealed && letter && <span className="font-semibold text-emerald-700">— The correct answer is option {letter}.</span>}
     </div>
   );
 }
@@ -510,7 +510,6 @@ function shuffleQuestionOptions(options: string[], seedKey: string): string[] {
 }
 
 function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[] {
-  const normalizedTitle = normalizeModuleKey(module.title);
   const normalizedTopics = new Set(module.topics.map((topic) => normalizeModuleKey(topic)));
 
   return mcqs
