@@ -1350,7 +1350,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set());
-  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean; revealed?: boolean }>>({});
+  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected?: number; pairs?: Record<number, number>; texts?: string[]; submitted: boolean; revealed?: boolean }>>({});
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [startTime] = useState(Date.now());
   const [showCompletion, setShowCompletion] = useState(false);
