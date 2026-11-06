@@ -100,8 +100,8 @@ export function resolveMatchPairings(item: any): Record<number, number> {
   const pairs: Record<number, number> = {};
   if (!columnA.length || !columnB.length || !pairings) return pairs;
 
-  const key = (value: string) => stripNarratorMarkdown(stripOptionPrefix(value)).normalize("NFKC")
-    .replace(/\s+/g, " ").replace(/[.!?]+$/, "").trim().toLowerCase();
+  const key = (value: string) => stripNarratorMarkdown(stripOptionPrefix(value)).replace(/^\d+[\.\)]\s*/, "")
+    .normalize("NFKC").replace(/\s+/g, " ").replace(/[.!?]+$/, "").trim().toLowerCase();
   const bByText = new Map<string, number>();
   columnB.forEach((value, index) => bByText.set(key(value), index));
   const aByText = new Map<string, number>();
