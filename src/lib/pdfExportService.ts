@@ -4,6 +4,7 @@
  */
 
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
+import { fillBlankAnswers, resolveMatchPairings } from "@/lib/assessmentAnswer";
 
 export interface PDFExportResult {
   success: boolean;
@@ -301,6 +302,102 @@ export async function exportNarrativeToPDF(
               pdf.setFontSize(9);
               pdf.setTextColor(150);
               pdf.text(`Assessment Q${qIdx + 1}`, margin, pageHeight - margin);
+            });
+          }
+
+          // Match-the-following, fill-in-the-blank and true/false items belong in the printable assessment too.
+          if (Array.isArray(assessmentData.match_the_following)) {
+            assessmentData.match_the_following.slice(0, 10).forEach((m: any, mIdx: number) => {
+              pdf.addPage();
+              let mY = margin;
+
+              pdf.setFontSize(12);
+              pdf.setFont(undefined, "bold");
+              pdf.setTextColor(0);
+              const matchTitle = `Match ${mIdx + 1}: ${m.question || "Match each item"}`;
+              const matchTitleLines = pdf.splitTextToSize(matchTitle, contentWidth);
+              pdf.text(matchTitleLines, margin, mY);
+              mY += matchTitleLines.length * 5 + 5;
+
+              const columnA: string[] = Array.isArray(m.column_a) ? m.column_a.map(String) : [];
+              const columnB: string[] = Array.isArray(m.column_b) ? m.column_b.map(String) : [];
+              const pairs = resolveMatchPairings(m);
+              pdf.setFontSize(11);
+              pdf.setFont(undefined, "normal");
+              columnA.forEach((item, aIndex) => {
+                const partner = pairs[aIndex] !== undefined ? columnB[pairs[aIndex]] : "";
+                const matchLine = `${item}  ->  ${partner || "?"}`;
+                const matchLines = pdf.splitTextToSize(matchLine, contentWidth);
+                pdf.text(matchLines, margin + 5, mY);
+                mY += matchLines.length * 4 + 2;
+              });
+
+              pdf.setFontSize(9);
+              pdf.setTextColor(150);
+              pdf.text(`Assessment Match ${mIdx + 1}`, margin, pageHeight - margin);
+            });
+          }
+
+          if (Array.isArray(assessmentData.fill_blanks)) {
+            assessmentData.fill_blanks.slice(0, 10).forEach((f: any, fIdx: number) => {
+              pdf.addPage();
+              let fY = margin;
+
+              pdf.setFontSize(12);
+              pdf.setFont(undefined, "bold");
+              pdf.setTextColor(0);
+              const fillTitle = `Fill in the blanks ${fIdx + 1}: ${f.question || "Complete the sentence"}`;
+              const fillTitleLines = pdf.splitTextToSize(fillTitle, contentWidth);
+              pdf.text(fillTitleLines, margin, fY);
+              fY += fillTitleLines.length * 5 + 5;
+
+              pdf.setFontSize(11);
+              pdf.setFont(undefined, "normal");
+              const passageLines = pdf.splitTextToSize(String(f.passage || ""), contentWidth);
+              pdf.text(passageLines, margin + 5, fY);
+              fY += passageLines.length * 5 + 5;
+
+              const answers = fillBlankAnswers(f);
+              if (answers.length) {
+                pdf.setFontSize(10);
+                pdf.setTextColor(22, 163, 74);
+                pdf.setFont(undefined, "bold");
+                pdf.text(`Answer: ${answers.join(", ")}`, margin, fY);
+              }
+
+              pdf.setFontSize(9);
+              pdf.setTextColor(150);
+              pdf.text(`Assessment Fill ${fIdx + 1}`, margin, pageHeight - margin);
+            });
+          }
+
+          if (Array.isArray(assessmentData.true_false)) {
+            assessmentData.true_false.slice(0, 10).forEach((t: any, tIdx: number) => {
+              pdf.addPage();
+              let tY = margin;
+
+              pdf.setFontSize(12);
+              pdf.setFont(undefined, "bold");
+              pdf.setTextColor(0);
+              const tfLines = pdf.splitTextToSize(`${tIdx + 1}. ${t.question || "True or false?"}`, contentWidth);
+              pdf.text(tfLines, margin, tY);
+              tY += tfLines.length * 5 + 5;
+
+              pdf.setFontSize(11);
+              pdf.setFont(undefined, "normal");
+              pdf.text("• True", margin + 5, tY);
+              tY += 6;
+              pdf.text("• False", margin + 5, tY);
+              tY += 8;
+
+              pdf.setFontSize(10);
+              pdf.setTextColor(22, 163, 74);
+              pdf.setFont(undefined, "bold");
+              pdf.text(`Answer: ${t.correct_answer ?? t.answer ?? ""}`, margin, tY);
+
+              pdf.setFontSize(9);
+              pdf.setTextColor(150);
+              pdf.text(`Assessment True/False ${tIdx + 1}`, margin, pageHeight - margin);
             });
           }
 
