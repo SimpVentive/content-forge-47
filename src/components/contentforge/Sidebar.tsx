@@ -184,8 +184,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
       setInputText(`[Document] Extracting content from ${file.name}...`);
 
       try {
-        const base64 = await readFileAsBase64(file);
         const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+        // Text PDFs are read in the browser first: no size limit or service timeout.
+        if (ext === ".pdf") {
+          try {
+            const { extractPdfTextInBrowser } = await import("@/lib/pdfText");
+            const local = await extractPdfTextInBrowser(file);
+            const words = local.text.trim().split(/\s+/).filter(Boolean).length;
+            if (words >= Math.max(30, local.pages * 5)) {
+              extractedText = local.text;
+              setInputText(extractedText);
+              throw { __done: true };
+            }
+          } catch (e) {
+            if ((e as { __done?: boolean })?.__done) throw e;
+            console.warn("[Sidebar] Browser PDF read failed, using extraction service:", e);
+          }
+        }
+        const base64 = await readFileAsBase64(file);
         const mimeType = MIME_MAP[ext] || file.type || "application/octet-stream";
 
         const { data, error } = await withTimeout(
@@ -215,9 +231,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
           console.warn(`[Sidebar] Document extraction failed or empty: ${file.name}`);
         }
       } catch (err) {
+        if ((err as { __done?: boolean })?.__done) {
+          // Local PDF text already applied.
+        } else {
         console.error("Document extraction error:", err);
         extractedText = `[Document] Uploaded: ${file.name} (${(file.size / 1024).toFixed(0)} KB)\n\nWarning: Could not extract content automatically. Please paste the key topics and notes manually below.`;
         setInputText(extractedText);
+        }
       } finally {
         setIsExtracting(false);
       }
