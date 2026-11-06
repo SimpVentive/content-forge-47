@@ -40,7 +40,7 @@ const advanceButton = () =>
 
 /** A quiz screen only moves on once it has been answered, so answer whatever is showing. */
 async function answerWhatIsShowing() {
-  const selects = screen.queryAllByLabelText(/Partner for/i);
+  const selects = screen.queryAllByLabelText(/Partner for/i) as HTMLSelectElement[];
   if (selects.length) {
     for (const select of selects) {
       const firstValue = Array.from(select.options).map((option) => option.value).find((value) => value !== "");
