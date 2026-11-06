@@ -915,10 +915,10 @@ const Index = () => {
               </div>
             )}
             {!hasRun ? (
-              <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} />
+              <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} onStop={stopPipeline} />
             ) : (
               <div className="space-y-6 max-w-[720px] mx-auto">
-                <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} />
+                <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} onStop={stopPipeline} />
                 <OrchestratorLog logs={logs} />
               </div>
             )}
