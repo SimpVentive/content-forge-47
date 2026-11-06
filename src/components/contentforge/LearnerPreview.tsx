@@ -509,7 +509,15 @@ function shuffleQuestionOptions(options: string[], seedKey: string): string[] {
   return arr;
 }
 
+/* The blanks an authored passage asks the learner to fill, in reading order. */
+const PASSAGE_BLANK_PATTERN = /_{2,}|\.{3,}|\[[\s_]{1,}\]|\{\s*\}/g;
+
+function splitPassageAtBlanks(passage: string): string[] {
+  return String(passage || "").split(PASSAGE_BLANK_PATTERN);
+}
+
 function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[] {
+  const normalizedTitle = normalizeModuleKey(module.title);
   const normalizedTopics = new Set(module.topics.map((topic) => normalizeModuleKey(topic)));
 
   return mcqs
