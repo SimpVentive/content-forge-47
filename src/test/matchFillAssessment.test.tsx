@@ -108,7 +108,12 @@ describe("match the following in the learner runtime", () => {
   it("will not submit until every row has a partner", async () => {
     renderCourse();
     expect(await advanceUntil(matchScreen)).toBe(true);
+
     expect(screen.getByRole("button", { name: "Submit Answer" })).toBeDisabled();
+    await act(async () => { fireEvent.change(screen.getByLabelText(/Partner for Bullet camera/i), { target: { value: "0" } }); });
+    expect(screen.getByRole("button", { name: "Submit Answer" })).toBeDisabled();
+    await act(async () => { fireEvent.change(screen.getByLabelText(/Partner for Dome camera/i), { target: { value: "1" } }); });
+    expect(screen.getByRole("button", { name: "Submit Answer" })).toBeEnabled();
   }, 30_000);
 });
 
