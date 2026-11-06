@@ -18,7 +18,8 @@ export function normalizeBlankAnswer(value: string): string {
   return String(value ?? "").normalize("NFKC").toLowerCase()
     .replace(/["'“”‘’]/g, "")
     .replace(/\s+/g, " ")
-    .replace(/[.,!?;:]+$/g, "")
+    .trim()
+    .replace(/[.,!?;:]+$/, "")
     .trim();
 }
 

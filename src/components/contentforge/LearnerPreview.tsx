@@ -3180,7 +3180,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                                 onChange={(event) => handleFillText(currentSlide, index, event.target.value)}
                                 className={`w-[160px] rounded-lg border-2 px-3 py-1 text-[17px] text-slate-900 outline-none disabled:opacity-80 ${isCorrect ? "border-emerald-500 bg-emerald-50" : isWrong ? "border-red-400 bg-red-50" : "border-slate-300 bg-white focus:border-blue-500"}`}
                               />
-                              {isWrong && authored && (
+                              {isWrong && ans?.revealed && authored && (
                                 <span className="mt-1 text-[13px] font-semibold text-emerald-700">{authored}</span>
                               )}
                             </span>
