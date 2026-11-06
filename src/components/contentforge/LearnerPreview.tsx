@@ -21,8 +21,8 @@ import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
 import { getCompletionBlockers, getFurthestReachableSlide } from "@/lib/learnerProgression";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { collectAssessmentItems, normalizeAssessmentAnswer, resolveAssessmentAnswer } from "@/lib/assessmentAnswer";
-import { normalizeForMatch, splitSentences, splitTopicContentIntoSlides } from "@/lib/slideBuilder";
+import { assessmentKindOf, collectAssessmentItems, fillBlankAnswers, normalizeAssessmentAnswer, normalizeBlankAnswer, resolveAssessmentAnswer, resolveMatchPairings } from "@/lib/assessmentAnswer";
+import { normalizeForMatch, resolveCourseQuestionBudget, splitSentences, splitTopicContentIntoSlides } from "@/lib/slideBuilder";
 import { assessInfographicSvg, buildInfographicUserPrompt, EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, extractSvgLabels, INFOGRAPHIC_EXPLAIN_SYSTEM_PROMPT, buildInfographicExplainPrompt } from "@/lib/infographicQuality";
 import { carryDiagramsForward, extractDiagramSpecs, findDiagramRevealIndex, isDiagramRevealed, renderDiagramSvg, type DiagramSpec } from "@/lib/diagramSpec";
 
@@ -394,14 +394,14 @@ type AssessmentIntensity = "light" | "standard" | "deep";
 
 export const ANSWER_REVEAL_DELAY_MS = 1500;
 
-function AnswerFeedbackBanner({ correct, revealed, letter }: { correct: boolean; revealed: boolean; letter: string }) {
+function AnswerFeedbackBanner({ correct, revealed, letter }: { correct: boolean; revealed: boolean; letter?: string }) {
   return (
     <div role="status" aria-live="polite" className={`mb-4 flex flex-wrap items-center gap-3 rounded-lg border-2 px-4 py-3 text-[16px] font-bold ${correct ? "border-emerald-500 bg-emerald-50 text-emerald-700" : "border-red-400 bg-red-50 text-red-700"}`}>
       <span className={`flex h-7 w-7 items-center justify-center rounded-full text-white ${correct ? "bg-emerald-500" : "bg-red-500"}`}>
         {correct ? <Check className="h-4 w-4 stroke-[3]" /> : <X className="h-4 w-4 stroke-[3]" />}
       </span>
       {correct ? "Correct answer" : "Incorrect"}
-      {!correct && revealed && <span className="font-semibold text-emerald-700">— The correct answer is option {letter}.</span>}
+      {!correct && revealed && letter && <span className="font-semibold text-emerald-700">— The correct answer is option {letter}.</span>}
     </div>
   );
 }
@@ -509,6 +509,13 @@ function shuffleQuestionOptions(options: string[], seedKey: string): string[] {
   return arr;
 }
 
+/* The blanks an authored passage asks the learner to fill, in reading order. */
+const PASSAGE_BLANK_PATTERN = /_{2,}|\.{3,}|\[[\s_]{1,}\]|\{\s*\}/g;
+
+function splitPassageAtBlanks(passage: string): string[] {
+  return String(passage || "").split(PASSAGE_BLANK_PATTERN);
+}
+
 function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[] {
   const normalizedTitle = normalizeModuleKey(module.title);
   const normalizedTopics = new Set(module.topics.map((topic) => normalizeModuleKey(topic)));
@@ -580,7 +587,7 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
 
   // Extract MCQs
   const mcqs = collectAssessmentItems(assessData);
-  const maxQuestionCount = Math.min(mcqs.length, getTargetCourseQuestionCount(durationMinutes, assessmentIntensity));
+  const maxQuestionCount = resolveCourseQuestionBudget(mcqs.length, modules, durationMinutes, assessmentIntensity);
   const questionsPerModule = allocateQuestionsPerModule(modules, maxQuestionCount);
   const usedQuestionIndexes = new Set<number>();
 
@@ -752,7 +759,11 @@ export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: Inserte
       selectedIndexes.forEach((questionIndex) => {
         const authoredQuestion = mcqs[questionIndex];
         if (!authoredQuestion) return;
-        const mcq = normalizeAssessmentAnswer(authoredQuestion);
+        // Only choice questions carry an option-text key; match and fill items
+        // keep their own authored key (pairings / per-blank answers) untouched.
+        const mcq = assessmentKindOf(authoredQuestion) === "mcq"
+          ? normalizeAssessmentAnswer(authoredQuestion)
+          : authoredQuestion;
         // Shuffle answer options once at build time so the correct answer is
         // randomly placed (not always option B) across preview, export and narration.
         const shuffledMcq = Array.isArray(mcq.options) && mcq.options.length > 1
@@ -1350,7 +1361,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   );
   const [currentSlide, setCurrentSlide] = useState(0);
   const [visited, setVisited] = useState<Set<number>>(new Set());
-  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected: number; submitted: boolean; revealed?: boolean }>>({});
+  const [assessmentAnswers, setAssessmentAnswers] = useState<Record<number, { selected?: number; pairs?: Record<number, number>; texts?: string[]; submitted: boolean; revealed?: boolean }>>({});
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [startTime] = useState(Date.now());
   const [showCompletion, setShowCompletion] = useState(false);
@@ -2069,11 +2080,89 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { selected: optionIdx, submitted: false } }));
   };
 
+  /** One pairing on a match screen: this Column A item now sits beside this Column B item. */
+  const handleSelectPair = (slideIdx: number, aIndex: number, bIndex: number) => {
+    if (assessmentAnswers[slideIdx]?.submitted) return;
+    setAssessmentAnswers(prev => ({
+      ...prev,
+      [slideIdx]: { ...prev[slideIdx], pairs: { ...(prev[slideIdx]?.pairs || {}), [aIndex]: bIndex }, submitted: false },
+    }));
+  };
+
+  /** One blank on a fill-in-the-blank screen. */
+  const handleFillText = (slideIdx: number, blankIndex: number, value: string) => {
+    if (assessmentAnswers[slideIdx]?.submitted) return;
+    setAssessmentAnswers(prev => {
+      const texts = [...(prev[slideIdx]?.texts || [])];
+      texts[blankIndex] = value;
+      return { ...prev, [slideIdx]: { ...prev[slideIdx], texts, submitted: false } };
+    });
+  };
+
+  /** Shared feedback voice: correct -> "Correct answer"; wrong -> "Incorrect", then the right answer. */
+  const speakFeedback = (text: string, slideIdx: number) => {
+    if (muted || typeof window === "undefined" || !("speechSynthesis" in window) || activeSlideRef.current !== slideIdx) return;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+  };
+
+  /** Wrong answer: hold for a beat, then reveal and speak the authored key. */
+  const revealAnswerLater = (slideIdx: number, text: string) => {
+    window.setTimeout(() => {
+      if (activeSlideRef.current !== slideIdx) return;
+      setAssessmentAnswers(prev => prev[slideIdx] ? ({ ...prev, [slideIdx]: { ...prev[slideIdx], revealed: true } }) : prev);
+      speakFeedback(text, slideIdx);
+    }, ANSWER_REVEAL_DELAY_MS);
+  };
+
   const handleSubmitAnswer = (slideIdx: number) => {
     const ans = assessmentAnswers[slideIdx];
     if (!ans || ans.submitted) return;
-    const q = slides[slideIdx].question;
+    const q = slides[slideIdx].question as any;
     if (!q) return;
+    audioRef.current?.pause();
+
+    const kind = assessmentKindOf(q);
+
+    if (kind === "match") {
+      const authored = resolveMatchPairings(q);
+      const chosen = ans.pairs || {};
+      const authoredKeys = Object.keys(authored).map(Number);
+      if (!authoredKeys.length) {
+        toast.error("This match exercise has no answer key. Please ask the course author to correct it.");
+        return;
+      }
+      const correctPairs = authoredKeys.filter((aIndex) => chosen[aIndex] === authored[aIndex]).length;
+      const allCorrect = correctPairs === authoredKeys.length;
+      setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true, revealed: allCorrect } }));
+      speakFeedback(allCorrect ? "Correct answer." : "Incorrect.", slideIdx);
+      if (!allCorrect) {
+        const columnA = (q.column_a || []).map(String);
+        const columnB = (q.column_b || []).map(String);
+        const missed = authoredKeys
+          .filter((aIndex) => chosen[aIndex] !== authored[aIndex])
+          .slice(0, 3)
+          .map((aIndex) => `${columnA[aIndex]} goes with ${columnB[authored[aIndex]]}`);
+        revealAnswerLater(slideIdx, `The correct pairings are: ${missed.join("; ")}.`);
+      }
+      setScore(prev => ({ correct: prev.correct + correctPairs, total: prev.total + authoredKeys.length }));
+      return;
+    }
+
+    if (kind === "fill") {
+      const authored = fillBlankAnswers(q);
+      const chosen = ans.texts || [];
+      const correctBlanks = authored.filter((answer, index) =>
+        normalizeBlankAnswer(chosen[index] || "") === normalizeBlankAnswer(answer),
+      ).length;
+      const allCorrect = authored.length > 0 && correctBlanks === authored.length;
+      setAssessmentAnswers(prev => ({ ...prev, [slideIdx]: { ...ans, submitted: true, revealed: allCorrect } }));
+      speakFeedback(allCorrect ? "Correct answer." : "Incorrect.", slideIdx);
+      if (!allCorrect) revealAnswerLater(slideIdx, `The correct answers are ${authored.join(", ")}.`);
+      setScore(prev => ({ correct: prev.correct + correctBlanks, total: prev.total + authored.length }));
+      return;
+    }
+
     const correctIndex = resolveAssessmentAnswer(q);
     if (correctIndex === undefined) {
       toast.error("This question has no valid answer key. Please ask the course author to correct it.");
@@ -2085,19 +2174,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     const opts: string[] = (q.options || []).map((o: unknown) => stripOptionPrefix(String(o ?? "")));
     // Options are already in display order (shuffled once at build time).
     const letter = String.fromCharCode(65 + correctIndex);
-    const speak = (text: string) => {
-      if (muted || typeof window === "undefined" || !("speechSynthesis" in window) || activeSlideRef.current !== slideIdx) return;
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-    };
-    audioRef.current?.pause();
-    speak(correct ? "Correct answer." : "Incorrect.");
+    speakFeedback(correct ? "Correct answer." : "Incorrect.", slideIdx);
     if (!correct) {
-      window.setTimeout(() => {
-        if (activeSlideRef.current !== slideIdx) return;
-        setAssessmentAnswers(prev => prev[slideIdx] ? ({ ...prev, [slideIdx]: { ...prev[slideIdx], revealed: true } }) : prev);
-        speak(`The correct answer is option ${letter}. ${opts[correctIndex] || ""}`);
-      }, ANSWER_REVEAL_DELAY_MS);
+      revealAnswerLater(slideIdx, `The correct answer is option ${letter}. ${opts[correctIndex] || ""}`);
     }
     setScore(prev => ({ correct: prev.correct + (correct ? 1 : 0), total: prev.total + 1 }));
   };
@@ -2708,7 +2787,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                           <p className="text-[12px] font-[900] uppercase tracking-[0.16em] text-[#4b6592]">Interactive Quiz</p>
                           <p className="mt-3 text-[15px] font-[800] leading-snug text-[#123d78]">{currentModuleAssessment.question}</p>
                           <div className="mt-3 space-y-2">
-                            {currentModuleAssessment.options.slice(0, 3).map((option, index) => (
+                            {(currentModuleAssessment.options || []).slice(0, 3).map((option, index) => (
                               <div key={`${option}-${index}`} className="rounded-xl border border-[#e2e8f0] bg-[#fbfdff] px-3 py-2 text-[13px] text-[#35506f]">
                                 <span className="mr-2 font-[800] text-[#123d78]">{String.fromCharCode(65 + index)}.</span>
                                 {stripOptionPrefix(option)}
@@ -2947,6 +3026,212 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         const q = slide.question as any;
         if (!q) return null;
         const correctAnswerIndex = resolveAssessmentAnswer(q);
+        const assessmentKind = assessmentKindOf(q);
+
+        // Question numbering counts assessment slides only (not all screens),
+        // so "Question 2 of 3" reflects the actual quiz, not the slide position.
+        const assessmentSlideIndexes = slides.map((sl, i) => sl.type === "assessment" ? i : -1).filter(i => i >= 0);
+        const questionNumber = assessmentSlideIndexes.indexOf(currentSlide) + 1;
+        const questionTotal = assessmentSlideIndexes.length;
+
+        /* ── Match the following ── */
+        if (assessmentKind === "match") {
+          const columnA: string[] = (q.column_a || []).map(String);
+          const columnB: string[] = (q.column_b || []).map(String);
+          const authoredPairs = resolveMatchPairings(q);
+          const authoredKeys = Object.keys(authoredPairs).map(Number);
+          const chosenPairs = ans?.pairs || {};
+          const bOrder = shuffleQuestionOptions(columnB.map((_, i) => String(i)), `${currentSlide}|match`).map(Number);
+          const allCorrect = authoredKeys.length > 0 && authoredKeys.every((aIndex) => chosenPairs[aIndex] === authoredPairs[aIndex]);
+          const complete = authoredKeys.every((aIndex) => chosenPairs[aIndex] !== undefined);
+
+          return (
+            <div className="w-full h-full flex flex-col" key={currentSlide}>
+              <div className="flex-1 overflow-y-auto px-6 py-8">
+                <div className="max-w-[900px] mx-auto">
+                  <div className="mb-8">
+                    <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">
+                      Q{questionNumber}
+                    </span>
+                    <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">{q.question}</h2>
+                  </div>
+
+                  <div className="space-y-3 mb-8">
+                    {columnA.map((item, aIndex) => {
+                      const chosen = chosenPairs[aIndex];
+                      const isCorrect = ans?.submitted && chosen === authoredPairs[aIndex];
+                      const isWrong = ans?.submitted && !isCorrect;
+                      return (
+                        <div
+                          key={`${item}-${aIndex}`}
+                          className={`rounded-lg border-2 px-5 py-4 transition-all anim-fade-in-up ${isCorrect ? "border-emerald-500 bg-emerald-50" : isWrong ? "border-red-400 bg-red-50" : "border-slate-200 bg-white"}`}
+                          style={{ animationDelay: `${0.1 + aIndex * 0.08}s` }}
+                        >
+                          <div className="flex flex-wrap items-center gap-4">
+                            <div className="flex-1 min-w-[220px] text-[17px] font-medium text-slate-900">{item}</div>
+                            <select
+                              aria-label={`Partner for ${item}`}
+                              value={chosen === undefined ? "" : String(chosen)}
+                              disabled={ans?.submitted}
+                              onChange={(event) => handleSelectPair(currentSlide, aIndex, Number(event.target.value))}
+                              className="rounded-lg border-2 border-slate-200 bg-white px-3 py-2 text-[15px] text-slate-800 disabled:opacity-70"
+                            >
+                              <option value="">Choose a partner…</option>
+                              {bOrder.map((bIndex) => (
+                                <option key={bIndex} value={String(bIndex)}>{columnB[bIndex]}</option>
+                              ))}
+                            </select>
+                            {isCorrect && (
+                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-500 text-white" aria-label="Correct">
+                                <Check className="w-5 h-5 stroke-[3]" />
+                              </span>
+                            )}
+                            {isWrong && (
+                              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500 text-white" aria-label="Incorrect">
+                                <X className="w-5 h-5 stroke-[3]" />
+                              </span>
+                            )}
+                          </div>
+                          {isWrong && ans?.revealed && authoredPairs[aIndex] !== undefined && (
+                            <p className="mt-2 text-[14px] font-semibold text-emerald-700">Correct partner: {columnB[authoredPairs[aIndex]]}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {ans?.submitted && <AnswerFeedbackBanner correct={allCorrect} revealed={!!ans.revealed} />}
+                  {ans?.submitted && ans.revealed && (q.rationale || q.explanation) && (
+                    <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                      <p className="text-[14px] text-slate-700">
+                        <span className="font-semibold text-blue-700">Explanation: </span>
+                        {q.rationale || q.explanation}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[13px] text-slate-600">
+                  <span>Question {questionNumber} of {questionTotal}</span>
+                </div>
+                <div className="flex gap-3">
+                  {!ans?.submitted && (
+                    <button
+                      onClick={() => handleSubmitAnswer(currentSlide)}
+                      disabled={!complete}
+                      className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50"
+                    >
+                      Submit Answer
+                    </button>
+                  )}
+                  {ans?.submitted && (
+                    <button
+                      onClick={goNext}
+                      disabled={currentSlide === totalSlides - 1}
+                      className="px-6 py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all disabled:opacity-50"
+                    >
+                      {currentSlide === totalSlides - 1 ? "Finish" : "Next Question"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        /* ── Fill in the blanks ── */
+        if (assessmentKind === "fill") {
+          const authoredAnswers = fillBlankAnswers(q);
+          const segments = splitPassageAtBlanks(q.passage);
+          const typed = ans?.texts || [];
+          const blankCount = Math.max(0, segments.length - 1);
+          const allCorrect = authoredAnswers.length > 0
+            && authoredAnswers.every((answer, index) => normalizeBlankAnswer(typed[index] || "") === normalizeBlankAnswer(answer));
+          const complete = typed.length >= blankCount && blankCount > 0;
+
+          return (
+            <div className="w-full h-full flex flex-col" key={currentSlide}>
+              <div className="flex-1 overflow-y-auto px-6 py-8">
+                <div className="max-w-[900px] mx-auto">
+                  <div className="mb-8">
+                    <span className="inline-block px-3 py-1 rounded-full bg-amber-100 text-amber-700 text-[12px] font-bold uppercase tracking-wider mb-4">
+                      Q{questionNumber}
+                    </span>
+                    <h2 className="text-[28px] font-bold text-slate-900 leading-relaxed text-left">{q.question}</h2>
+                  </div>
+
+                  <div className="rounded-[22px] border border-[#d8e2ef] bg-[#f8fbff] p-6 text-[19px] leading-[2.6] text-slate-800">
+                    {segments.map((segment, index) => {
+                      const isLastSegment = index === segments.length - 1;
+                      const authored = authoredAnswers[index];
+                      const isCorrect = ans?.submitted && normalizeBlankAnswer(typed[index] || "") === normalizeBlankAnswer(authored || "");
+                      const isWrong = ans?.submitted && !isCorrect;
+                      return (
+                        <React.Fragment key={index}>
+                          <span>{segment}</span>
+                          {!isLastSegment && (
+                            <span className="mx-1 inline-flex flex-col align-middle">
+                              <input
+                                aria-label={`Blank ${index + 1}`}
+                                value={typed[index] || ""}
+                                disabled={ans?.submitted}
+                                onChange={(event) => handleFillText(currentSlide, index, event.target.value)}
+                                className={`w-[160px] rounded-lg border-2 px-3 py-1 text-[17px] text-slate-900 outline-none disabled:opacity-80 ${isCorrect ? "border-emerald-500 bg-emerald-50" : isWrong ? "border-red-400 bg-red-50" : "border-slate-300 bg-white focus:border-blue-500"}`}
+                              />
+                              {isWrong && ans?.revealed && authored && (
+                                <span className="mt-1 text-[13px] font-semibold text-emerald-700">{authored}</span>
+                              )}
+                            </span>
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </div>
+
+                  <div className="mt-8">
+                    {ans?.submitted && <AnswerFeedbackBanner correct={allCorrect} revealed={!!ans.revealed} />}
+                    {ans?.submitted && ans.revealed && (q.rationale || q.explanation) && (
+                      <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
+                        <p className="text-[14px] text-slate-700">
+                          <span className="font-semibold text-blue-700">Explanation: </span>
+                          {q.rationale || q.explanation}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-200 bg-white px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-[13px] text-slate-600">
+                  <span>Question {questionNumber} of {questionTotal}</span>
+                </div>
+                <div className="flex gap-3">
+                  {!ans?.submitted && (
+                    <button
+                      onClick={() => handleSubmitAnswer(currentSlide)}
+                      disabled={!complete}
+                      className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50"
+                    >
+                      Submit Answer
+                    </button>
+                  )}
+                  {ans?.submitted && (
+                    <button
+                      onClick={goNext}
+                      disabled={currentSlide === totalSlides - 1}
+                      className="px-6 py-2.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800 transition-all disabled:opacity-50"
+                    >
+                      {currentSlide === totalSlides - 1 ? "Finish" : "Next Question"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        }
 
         // If this is a scenario-based assessment, render it with avatar and 2-column layout
         if (slide.contentTemplate === "scenario" && (q.situation || q.scenario)) {
@@ -3069,12 +3354,6 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
 
         const getShuffledIndex = (originalIdx: number) => shuffledOptions.findIndex(item => item.originalIdx === originalIdx);
 
-        // Question numbering counts assessment slides only (not all screens),
-        // so "Question 2 of 3" reflects the actual quiz, not the slide position.
-        const assessmentSlideIndexes = slides.map((sl, i) => sl.type === "assessment" ? i : -1).filter(i => i >= 0);
-        const questionNumber = assessmentSlideIndexes.indexOf(currentSlide) + 1;
-        const questionTotal = assessmentSlideIndexes.length;
-
         return (
           <div className="w-full h-full flex flex-col" key={currentSlide}>
             <div className="flex-1 overflow-y-auto px-6 py-8">
@@ -3158,10 +3437,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                 <span>Question {questionNumber} of {questionTotal}</span>
               </div>
               <div className="flex gap-3">
-                {ans && !ans.submitted && (
+                {!ans?.submitted && (
                   <button
                     onClick={() => handleSubmitAnswer(currentSlide)}
-                    className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
+                    disabled={ans?.selected === undefined}
+                    className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50"
                   >
                     Submit Answer
                   </button>

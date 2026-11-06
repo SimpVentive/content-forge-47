@@ -14,3 +14,6 @@
 - [x] Preserve course settings, trainer, authored images, audio, and inserted videos in both export entry points.
 - [x] Verify exported navigation, assessments, animation, images, trainer, fullscreen, and LMS score/completion using a downloaded test course; 14 export tests passed.
 - [ ] Verify the user's existing course and recorded narration. Blocked: no usable preview session or saved course is available; user must sign in and export their course.
+
+# Every module keeps a quiz, every asked-for question type works
+- [x] Collect every authored assessment type (match the following, fill in the blanks, true/false, scenario, MCQ), report unscorable items instead of dropping them, and never budget fewer questions than there are modules; match and fill now render, score and speak in the shared learner runtime used by preview and SCORM, and the printable assessment pages include them. Seventeen targeted tests passed (11 coverage/answer-key, 5 learner screens, 1 printable pages) plus the full suite of 171 and a clean typecheck. The user's own saved course and exported SCORM package remain unverified without a sign-in.

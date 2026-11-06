@@ -114,9 +114,19 @@ export function stripOptionPrefix(opt: string): string {
 
 /** Single source of truth for quiz narration: question followed by every option.
  *  Used by the learner preview AND the exported package so audio always matches the screen. */
-export function buildAssessmentNarration(q: { question?: unknown; options?: unknown } | undefined | null): string {
+export function buildAssessmentNarration(q: { question?: unknown; options?: unknown; column_a?: unknown; passage?: unknown } | undefined | null): string {
   if (!q) return "";
   const questionText = String(q.question || "").replace(/Correct Answer:.*$/gi, "").replace(/Options:.*$/gi, "").trim();
+  // Match-the-following: name the items to pair, never the answers.
+  if (Array.isArray(q.column_a)) {
+    const items = q.column_a.map((item: unknown) => String(item ?? "").trim()).filter(Boolean).join("; ");
+    return [questionText, items ? `Match these: ${items}` : ""].filter(Boolean).join(". ").replace(/\.\./g, ".").slice(0, 2500);
+  }
+  // Fill-in-the-blank: read the passage and say "blank" where the learner types.
+  if (typeof q.passage === "string" && q.passage.trim()) {
+    const passage = q.passage.replace(/_{2,}|\.{3,}|\[[\s_]{1,}\]|\{\s*\}/g, " blank ");
+    return [questionText, passage].filter(Boolean).join(". ").replace(/\.\./g, ".").slice(0, 2500);
+  }
   const optionLines = Array.isArray(q.options)
     ? q.options.map((opt: unknown, i: number) => `Option ${String.fromCharCode(65 + i)}. ${stripOptionPrefix(String(opt ?? ""))}`)
     : [];
