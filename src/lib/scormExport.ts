@@ -806,6 +806,15 @@ function scormFinish() {
   var api = getAPI();
   if (api) api.LMSFinish("");
 }
+function exitCourse() {
+  if (window.__scormExited) return;
+  window.__scormExited = true;
+  var api = getAPI();
+  if (api) api.LMSCommit("");
+  scormFinish();
+  window.close();
+  document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;font-family:sans-serif;color:#1f2937"><p>You have left the course. Your progress has been saved. You can close this tab.</p></div>';
+}
 function scormSetComplete() {
   var api = getAPI();
   if (api) {
@@ -1294,6 +1303,8 @@ function buildModuleHtml(
     .header { position: relative; background: linear-gradient(135deg, var(--header-start, #4f46e5), var(--header-end, #7c3aed)); color: var(--text-inverse, #fff); padding: 32px 40px 27px; }
     .header h1 { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
     .header .meta { font-size: 13px; opacity: 0.85; }
+    .header .exit-btn { position: absolute; top: 14px; right: 16px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.12); color: inherit; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .header .exit-btn:hover { background: rgba(255,255,255,0.22); }
     .progress-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--progress-track, rgba(255,255,255,0.25)); }
     .progress-fill { height: 100%; background: var(--progress-fill, #fbbf24); transition: width 0.3s; }
     .container { max-width: 780px; margin: 0 auto; padding: 32px 24px; }
@@ -1455,6 +1466,7 @@ function buildModuleHtml(
 <body onload="scormInit()">
   <div class="header">
     <div class="meta">${escapeHtml(courseTitle)}</div>
+    <button type="button" class="exit-btn" onclick="exitCourse()">Exit course</button>
     <h1>Module ${moduleIndex + 1}: ${escapeHtml(mod.title)}</h1>
     <div class="progress-bar"><div class="progress-fill" style="width:${Math.round(((moduleIndex + 1) / totalModules) * 100)}%"></div></div>
   </div>
