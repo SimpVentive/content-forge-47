@@ -1,7 +1,7 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
-import { TRAINER_FACE_POINTS } from "@/lib/trainerFacePoints";
+import { TRAINER_FACE_POINTS, type TrainerFacePoints } from "@/lib/trainerFacePoints";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 
 /* ── helpers ── */
@@ -884,34 +884,35 @@ async function computeMouthTrack(base64: string): Promise<string | null> {
   }
 }
 
-/* ── Speaker card: the trainer picture with the drawn mouth and blink, driven by the narration ── */
-function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack: string | null, points: { eyeLeft: { x: number; y: number }; eyeRight: { x: number; y: number }; mouth: { x: number; y: number } } | undefined): string {
+/* ── Speaker card: the trainer picture with a narrow drawn mouth and a skin-coloured blink ── */
+function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack: string | null, points: TrainerFacePoints | undefined): string {
   if (!mouthTrack || !points) {
     return `<div class="speaker-card"><img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/></div>`;
   }
-  // Lip box and eye boxes match the app's sizes (% of the picture), centred on the measured points.
-  const lipW = 11.5, lipH = 9.52, eyeW = 8.79, eyeH = 2.08;
-  const mx = points.mouth.x - lipW / 2, my = points.mouth.y - lipH / 2;
-  const eye = (e: { x: number; y: number }) => `<svg x="${(e.x - eyeW / 2).toFixed(2)}" y="${(e.y - eyeH / 2).toFixed(2)}" width="${eyeW}" height="${eyeH}" viewBox="0 0 100 100" preserveAspectRatio="none" overflow="visible"><ellipse class="eyelid" cx="50" cy="50" rx="50" ry="0" fill="rgba(20,10,5,0.82)"/></svg>`;
+  // Everything is in % of the picture. The painted lips stay as they are; the overlay adds only the
+  // opening, a thin strip of upper teeth, and an eyelid in the trainer's skin tone for blinks.
+  const m = points.mouth;
+  const eyeRx = 4.4, eyeRy = 1.1, openRx = 3.7;
+  const eye = (e: { x: number; y: number }) => `<ellipse class="eyelid" cx="${e.x}" cy="${e.y}" rx="${eyeRx}" ry="0" fill="${points.skin}"/>`;
+  // Zoom on the face like the app's narrator: the stage holds the picture and the overlay together,
+  // so the mouth stays on the painted mouth at any zoom.
+  const zoom = 1.6;
+  const stageLeft = (50 - m.x * zoom).toFixed(2), stageTop = (40 - m.y * zoom).toFixed(2);
   return `<div class="speaker-card" id="speakerCard">
+    <div class="speaker-stage" style="left:${stageLeft}%;top:${stageTop}%;width:${zoom * 100}%;height:${zoom * 100}%">
     <img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/>
     <svg class="speaker-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      <defs><clipPath id="mouthClip"><ellipse id="mouthClipEllipse" cx="50" cy="50" rx="42" ry="1.5"/></clipPath></defs>
+      <defs><clipPath id="mouthClip"><ellipse id="mouthClipEllipse" cx="${m.x}" cy="${m.y}" rx="${openRx}" ry="0.3"/></clipPath></defs>
       ${eye(points.eyeLeft)}
       ${eye(points.eyeRight)}
-      <svg x="${mx.toFixed(2)}" y="${my.toFixed(2)}" width="${lipW}" height="${lipH}" viewBox="0 0 100 100" preserveAspectRatio="none" overflow="visible">
-        <g id="mouth" opacity="0">
-          <ellipse id="mouthLips" cx="50" cy="50" rx="47" ry="10.5" fill="#A8524A" stroke="#5E2622" stroke-width="2" vector-effect="non-scaling-stroke"/>
-          <ellipse id="mouthOpening" cx="50" cy="50" rx="42" ry="1.5" fill="#2B0F0C"/>
-          <g clip-path="url(#mouthClip)">
-            <ellipse id="mouthTongue" cx="50" cy="51" rx="24" ry="1" fill="#C9646D"/>
-            <rect id="mouthTeeth" x="8" y="48.5" width="84" height="10" fill="#FFFFFF" opacity="0"/>
-          </g>
-        </g>
-      </svg>
+      <g id="mouth" opacity="0">
+        <ellipse id="mouthOpening" cx="${m.x}" cy="${m.y}" rx="${openRx}" ry="0.3" fill="#2e1210" fill-opacity="0.85" stroke="#8a4a42" stroke-width="0.6" vector-effect="non-scaling-stroke"/>
+        <rect id="mouthTeeth" clip-path="url(#mouthClip)" x="${(m.x - openRx).toFixed(2)}" y="${m.y}" width="${(openRx * 2).toFixed(2)}" height="0.2" fill="#ffffff" opacity="0"/>
+      </g>
     </svg>
+    </div>
   </div>
-  <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_FPS = ${MOUTH_TRACK_FPS};</script>`;
+  <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_FPS = ${MOUTH_TRACK_FPS}; var EYE_RY = ${eyeRy};</script>`;
 }
 
 /* ── Module HTML page builder ── */
@@ -1489,6 +1490,7 @@ function buildModuleHtml(
     .audio-player::-webkit-media-controls-current-time-display,
     .audio-player::-webkit-media-controls-time-remaining-display { color: var(--text); }
     .speaker-card { position: relative; width: 360px; max-width: 100%; aspect-ratio: 2 / 3; margin: 0 auto 16px; border-radius: 20px; overflow: hidden; background: #eef2ff; box-shadow: 0 12px 28px rgba(15,23,42,0.18); }
+    .speaker-stage { position: absolute; }
     .speaker-image { display: block; width: 100%; height: 100%; object-fit: cover; }
     .speaker-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
     .audio-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
@@ -1717,25 +1719,22 @@ function buildModuleHtml(
     (function () {
       var audioEl = document.getElementById('moduleAudio');
       var mouth = document.getElementById('mouth');
-      var lips = document.getElementById('mouthLips');
       var opening = document.getElementById('mouthOpening');
       var clip = document.getElementById('mouthClipEllipse');
-      var tongue = document.getElementById('mouthTongue');
       var teeth = document.getElementById('mouthTeeth');
       var lids = document.querySelectorAll('#speakerCard .eyelid');
       if (!audioEl || !mouth || typeof MOUTH_TRACK === 'undefined' || !MOUTH_TRACK) return;
+      var cy = parseFloat(opening.getAttribute('cy'));
       var rafId = 0;
       function setOpen(v) {
         var openness = Math.max(0, Math.min(1, v / 9));
-        var openRy = openness > 0.01 ? 1.5 + 15 * openness : 1.5;
-        mouth.setAttribute('opacity', openness > 0.02 ? '1' : '0');
-        lips.setAttribute('ry', (openRy + 9).toFixed(2));
-        opening.setAttribute('ry', openRy.toFixed(2));
-        clip.setAttribute('ry', openRy.toFixed(2));
-        tongue.setAttribute('cy', (50 + openRy * 0.7).toFixed(2));
-        tongue.setAttribute('ry', (openRy * 0.6).toFixed(2));
-        teeth.setAttribute('y', (50 - openRy).toFixed(2));
-        teeth.setAttribute('opacity', openness > 0.15 ? '1' : '0');
+        var ry = openness > 0.02 ? 0.2 + 0.8 * openness : 0;   // narrow: at most about 2% of the picture height
+        mouth.setAttribute('opacity', ry > 0 ? '1' : '0');
+        opening.setAttribute('ry', ry.toFixed(2));
+        clip.setAttribute('ry', Math.max(ry, 0.01).toFixed(2));
+        teeth.setAttribute('y', (cy - ry).toFixed(2));
+        teeth.setAttribute('height', (ry * 0.4).toFixed(2));
+        teeth.setAttribute('opacity', openness > 0.5 ? '0.95' : '0');
       }
       function frame() {
         if (audioEl.paused || audioEl.ended) { setOpen(0); rafId = 0; return; }
@@ -1747,10 +1746,11 @@ function buildModuleHtml(
       audioEl.addEventListener('pause', function () { setOpen(0); });
       audioEl.addEventListener('ended', function () { setOpen(0); });
       setOpen(0);
+      // Blink: the eyelid (skin colour) covers the eye only for about 140 ms.
       function setLids(ry) { for (var i = 0; i < lids.length; i++) lids[i].setAttribute('ry', String(ry)); }
       function blinkLater() {
         setTimeout(function () {
-          setLids(50);
+          setLids(EYE_RY);
           setTimeout(function () { setLids(0); blinkLater(); }, 140);
         }, 2000 + Math.random() * 4000);
       }
