@@ -1478,6 +1478,31 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
     stopLipSync();
   }, [trainerVoiceId, rawOutputs.writer, rawOutputs.voice, stopLipSync]);
 
+  // Drives the mouth from audio.currentTime and the narration's viseme timing in its own
+  // frame loop. Used whenever audio analysis is unavailable (blocked AudioContext, LMS sandbox),
+  // so the mouth keeps moving and closes at pauses instead of freezing open.
+  const runTimelineLipSync = useCallback((audio: HTMLAudioElement, visemeTimeline: VisemeCue[]) => {
+    const fallbackCycle: VisemeKey[] = ["aa", "oh", "ee", "rest", "ih", "aa", "mbp", "oh"];
+    const tick = () => {
+      if (audio.paused || audio.ended) {
+        setVoiceActivityLevel(0);
+        setActiveViseme("rest");
+        lipSyncFrameRef.current = 0;
+        return;
+      }
+      const nowMs = audio.currentTime * 1000;
+      setVoiceActivityLevel(0.35);
+      if (visemeTimeline.length > 0) {
+        const cue = visemeTimeline.find((c) => nowMs >= c.startMs && nowMs < c.endMs);
+        setActiveViseme(cue ? cue.viseme : "rest");
+      } else {
+        setActiveViseme(fallbackCycle[Math.floor(nowMs / 160) % fallbackCycle.length]);
+      }
+      lipSyncFrameRef.current = requestAnimationFrame(tick);
+    };
+    lipSyncFrameRef.current = requestAnimationFrame(tick);
+  }, []);
+
   const startLipSync = useCallback(async (audio: HTMLAudioElement, visemeTimeline: VisemeCue[] = []) => {
     stopLipSync();
     visemeIndexRef.current = 0;
@@ -1487,8 +1512,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
         || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
       if (!AudioContextCtor) {
-        setVoiceActivityLevel(audio.paused ? 0 : 0.35);
-        setActiveViseme(audio.paused ? "rest" : "aa");
+        runTimelineLipSync(audio, visemeTimeline);
         return;
       }
 
@@ -1558,10 +1582,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
       lipSyncFrameRef.current = requestAnimationFrame(tick);
     } catch {
-      setVoiceActivityLevel(audio.paused ? 0 : 0.35);
-      setActiveViseme(audio.paused ? "rest" : "aa");
+      runTimelineLipSync(audio, visemeTimeline);
     }
-  }, [stopLipSync]);
+  }, [stopLipSync, runTimelineLipSync]);
 
   // Narration text for current slide - with fallback to slide content
   const getNarrationForSlide = useCallback((slideIdx: number) => {
