@@ -17,8 +17,10 @@ import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
 import { mouthFrameAt, type MouthFrame } from "@/lib/trainerMouth";
 
 /* helpers */
-function tryParseJSON(raw: string | undefined | null): any | null {
-  if (!raw) return null;
+function tryParseJSON(raw: unknown): any | null {
+  // Some agent outputs arrive already parsed. Use them as they are; anything that isn't text or an object is ignored.
+  if (raw && typeof raw === "object") return raw;
+  if (typeof raw !== "string" || !raw) return null;
   try { return JSON.parse(raw); } catch {
     const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (m) { try { return JSON.parse(m[1].trim()); } catch { return null; } }
@@ -617,7 +619,7 @@ function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[]
 /* build slides from agent outputs */
 function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
-  const writerText = rawOutputs.writer || "";
+  const writerText = typeof rawOutputs.writer === "string" ? rawOutputs.writer : rawOutputs.writer ? JSON.stringify(rawOutputs.writer) : "";
   const assessData = tryParseJSON(rawOutputs.assessment);
   const visualData = tryParseJSON(rawOutputs.visual);
   const narrativeScenesData = tryParseJSON(rawOutputs.narrativeScenes);
