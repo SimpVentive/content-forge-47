@@ -14,7 +14,7 @@ import { fitSvgToContent } from "@/lib/svgFit";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
 import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
-import { mouthFrameAt, type MouthFrame } from "@/lib/trainerMouth";
+import { mouthFrameAt, stepMouth, type MouthFrame } from "@/lib/trainerMouth";
 
 /* helpers */
 function tryParseJSON(raw: unknown): any | null {
@@ -1718,10 +1718,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   useEffect(() => {
     if (!isPlaying) { setActiveMouth(null); return; }
     let frameId = 0;
+    let smoothed: MouthFrame = { open: 0, spread: 0.5, flag: 2 };
     const tick = () => {
       const a = audioRef.current;
       const track = mouthTracksRef.current[currentSlide];
-      setActiveMouth(a && track && !a.paused ? mouthFrameAt(track, a.currentTime) : null);
+      if (a && track && !a.paused) {
+        // the team's timing: look 0.06 s ahead, then smooth once per frame
+        smoothed = stepMouth(smoothed, mouthFrameAt(track, a.currentTime + 0.06));
+        setActiveMouth(smoothed);
+      } else {
+        smoothed = { open: 0, spread: 0.5, flag: 2 };
+        setActiveMouth(null);
+      }
       frameId = requestAnimationFrame(tick);
     };
     frameId = requestAnimationFrame(tick);

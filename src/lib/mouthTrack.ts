@@ -73,29 +73,59 @@ function levinson(r: Float64Array, order: number): Float64Array | null {
 }
 
 /**
- * First two formants from the LPC envelope 1/|A(f)|: the first two spectral peaks between 200 and 3600 Hz.
- * (The Python tool took polynomial roots; spectral peaks of the same envelope give the same two formants.)
+ * Roots of a monic polynomial (coefficients from the highest power down), by Durand–Kerner iteration.
+ * Same job as numpy.roots in the team's make_lipsync.py.
+ */
+function polynomialRoots(c: number[]): Array<{ re: number; im: number }> {
+  const n = c.length - 1;
+  let z = Array.from({ length: n }, (_, k) => {
+    const ang = 0.4 + (2 * Math.PI * k) / n;
+    return { re: 0.9 * Math.cos(ang), im: 0.9 * Math.sin(ang) };
+  });
+  for (let iter = 0; iter < 500; iter++) {
+    let maxStep = 0;
+    const next = z.map((zi, i) => {
+      // p(zi) by Horner
+      let pr = c[0], pi = 0;
+      for (let k = 1; k <= n; k++) {
+        const nr = pr * zi.re - pi * zi.im + c[k];
+        const ni = pr * zi.im + pi * zi.re;
+        pr = nr; pi = ni;
+      }
+      // product of (zi - zj), j != i
+      let dr = 1, di = 0;
+      for (let j = 0; j < n; j++) {
+        if (j === i) continue;
+        const ar = zi.re - z[j].re, ai = zi.im - z[j].im;
+        const nr = dr * ar - di * ai, ni = dr * ai + di * ar;
+        dr = nr; di = ni;
+      }
+      const den = dr * dr + di * di || 1e-30;
+      const qr = (pr * dr + pi * di) / den, qi = (pi * dr - pr * di) / den;
+      const step = Math.hypot(qr, qi);
+      if (step > maxStep) maxStep = step;
+      return { re: zi.re - qr, im: zi.im - qi };
+    });
+    z = next;
+    if (maxStep < 1e-10) break;
+  }
+  return z;
+}
+
+/**
+ * First two formants, as in make_lipsync.py: roots of the LPC polynomial, keep the upper-half-plane roots,
+ * frequency = angle × sr / 2π, bandwidth = −ln|z| × sr / π, keep 200–3600 Hz with bandwidth under 450 Hz.
  */
 function formantsFromLpc(a: Float64Array, sampleRate: number): number[] {
-  const re = new Float64Array(FFT_N), im = new Float64Array(FFT_N);
-  re[0] = 1;
-  for (let j = 1; j < a.length; j++) re[j] = a[j];
-  fftInPlace(re, im);
-  const logEnv = new Float64Array(FFT_N / 2 + 1);
-  for (let k = 0; k <= FFT_N / 2; k++) logEnv[k] = -10 * Math.log10(Math.hypot(re[k], im[k]) ** 2 + 1e-12);
-  const binHz = sampleRate / FFT_N;
-  const lo = Math.ceil(200 / binHz), hi = Math.floor(3600 / binHz);
-  const peaks: number[] = [];
-  for (let k = Math.max(lo, 4); k <= Math.min(hi, FFT_N / 2 - 4); k++) {
-    const v = logEnv[k];
-    let isPeak = true;
-    for (let d = -4; d <= 4 && isPeak; d++) if (d !== 0 && logEnv[k + d] > v) isPeak = false;
-    if (!isPeak) continue;
-    const floor = Math.min(logEnv[k - 4], logEnv[k + 4]);
-    if (v - floor < 3) continue; // ignore shallow ripples
-    peaks.push(k * binHz);
+  const roots = polynomialRoots(Array.from(a));
+  const fs: number[] = [];
+  for (const z of roots) {
+    if (z.im <= 0.01) continue;
+    const f = (Math.atan2(z.im, z.re) * sampleRate) / (2 * Math.PI);
+    const bw = (-Math.log(Math.hypot(z.re, z.im) + 1e-9) * sampleRate) / Math.PI;
+    if (f > 200 && f < 3600 && bw < 450) fs.push(f);
   }
-  return peaks;
+  return fs.sort((p, q) => p - q);
 }
 
 /** Median filter with edge padding (the Python tool's med(x, k=5)). */

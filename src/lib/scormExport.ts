@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
 import { TRAINER_FACE_POINTS, type TrainerFacePoints } from "@/lib/trainerFacePoints";
-import { mouthFrameAt, renderMouthFrame, trainerSpriteUrls, trainerStageStyle, type TrainerSprites } from "@/lib/trainerMouth";
+import { mouthFrameAt, renderMouthFrame, stepMouth, trainerSpriteUrls, trainerStageStyle, type TrainerSprites } from "@/lib/trainerMouth";
 import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 
@@ -861,6 +861,7 @@ function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack
   </div>
   <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_POINTS = ${JSON.stringify(points)}; var MOUTH_SPRITES = ${JSON.stringify(sprites)};
   ${mouthFrameAt.toString()}
+  ${stepMouth.toString()}
   ${renderMouthFrame.toString()}
   </script>`;
 }
@@ -1689,11 +1690,14 @@ function buildModuleHtml(
       if (!audioEl || !overlay || typeof MOUTH_TRACK === 'undefined' || !MOUTH_TRACK) return;
       var rafId = 0, blinking = false;
       var CLOSED = { open: 0, spread: 0.5, flag: 2 };
-      function current() { return (audioEl.paused || audioEl.ended) ? CLOSED : mouthFrameAt(MOUTH_TRACK, audioEl.currentTime); }
+      var smoothed = CLOSED;
+      function current() { return (audioEl.paused || audioEl.ended) ? CLOSED : smoothed; }
       function draw(fr) { renderMouthFrame(overlay, fr, MOUTH_POINTS, 'scorm', blinking, MOUTH_SPRITES); }
       function frame() {
-        if (audioEl.paused || audioEl.ended) { draw(CLOSED); rafId = 0; return; }
-        draw(mouthFrameAt(MOUTH_TRACK, audioEl.currentTime));
+        if (audioEl.paused || audioEl.ended) { smoothed = CLOSED; draw(CLOSED); rafId = 0; return; }
+        // the team's timing: look 0.06 s ahead, then smooth once per frame
+        smoothed = stepMouth(smoothed, mouthFrameAt(MOUTH_TRACK, audioEl.currentTime + 0.06));
+        draw(smoothed);
         rafId = requestAnimationFrame(frame);
       }
       audioEl.addEventListener('play', function () { if (!rafId) rafId = requestAnimationFrame(frame); });
