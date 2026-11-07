@@ -13,6 +13,8 @@ import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOption
 import { fitSvgToContent } from "@/lib/svgFit";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
+import { computeMouthTrackFromAudio } from "@/lib/mouthTrack";
+import { mouthFrameAt, type MouthFrame } from "@/lib/trainerMouth";
 
 /* helpers */
 function tryParseJSON(raw: string | undefined | null): any | null {
@@ -1384,6 +1386,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const audioRefMap = useRef<Record<number, HTMLAudioElement | null>>({});
   const [voiceActivityLevel, setVoiceActivityLevel] = useState(0);
   const [activeViseme, setActiveViseme] = useState<VisemeKey>("rest");
+  // Mouth from the narration track (computed once per clip); null means the viseme (ElevenLabs timing) is used.
+  const [activeMouth, setActiveMouth] = useState<MouthFrame | null>(null);
+  const mouthTracksRef = useRef<Record<number, string>>({});
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlsRef = useRef<Record<number, string>>({});
@@ -1707,6 +1712,20 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   }, [narrationSentences, narrationWords]);
 
   // Helper to wire up audio events
+  // While narration plays, read the track at the audio's current time. No AudioContext is needed.
+  useEffect(() => {
+    if (!isPlaying) { setActiveMouth(null); return; }
+    let frameId = 0;
+    const tick = () => {
+      const a = audioRef.current;
+      const track = mouthTracksRef.current[currentSlide];
+      setActiveMouth(a && track && !a.paused ? mouthFrameAt(track, a.currentTime) : null);
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [isPlaying, currentSlide]);
+
   const wireAudio = useCallback((audio: HTMLAudioElement) => {
     audio.muted = muted;
     audioRef.current = audio;
@@ -1769,6 +1788,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       visemeTimelinesRef.current[currentSlide] = visemeTimeline;
       const url = audioUrl;
       audioUrlsRef.current[currentSlide] = url;
+      // Measure the mouth track from this narration clip (in the browser, once per clip).
+      const slideForTrack = currentSlide;
+      void fetch(url)
+        .then((r) => r.arrayBuffer())
+        .then((bytes) => computeMouthTrackFromAudio(bytes))
+        .then((track) => { if (track) mouthTracksRef.current[slideForTrack] = track; })
+        .catch(() => {});
       const audio = new Audio(url);
       wireAudio(audio);
       await audio.play().catch((err) => {
@@ -2464,7 +2490,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
-                    currentViseme={activeViseme}
+                    currentViseme={activeViseme} mouthFrame={activeMouth}
                     narratorLanguage={effectiveNarratorLanguage}
                   />
                 </div>
@@ -2522,7 +2548,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                             trainerId={selectedTrainer.id}
                             isVoiceActive={isPlaying}
                             isVoiceLoading={audioLoading}
-                            currentViseme={activeViseme}
+                            currentViseme={activeViseme} mouthFrame={activeMouth}
                             narratorLanguage={effectiveNarratorLanguage}
                           />
                         </div>
@@ -2923,7 +2949,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
                     
-                    currentViseme={activeViseme}
+                    currentViseme={activeViseme} mouthFrame={activeMouth}
                     narratorLanguage={effectiveNarratorLanguage}
                   />
                 </div>
@@ -3132,7 +3158,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
-                    currentViseme={activeViseme}
+                    currentViseme={activeViseme} mouthFrame={activeMouth}
                     narratorLanguage={effectiveNarratorLanguage}
                   />
                 </div>

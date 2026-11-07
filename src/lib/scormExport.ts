@@ -2,7 +2,8 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
 import { TRAINER_FACE_POINTS, type TrainerFacePoints } from "@/lib/trainerFacePoints";
-import { MOUTH_SPEC, applyMouthOpenness, setTrainerBlink, trainerOverlayMarkup, trainerSpriteUrls, trainerStageStyle, type TrainerSprites } from "@/lib/trainerMouth";
+import { mouthFrameAt, renderMouthFrame, trainerSpriteUrls, trainerStageStyle, type TrainerSprites } from "@/lib/trainerMouth";
+import { computeMouthTrackFromAudio } from "@/lib/mouthTrack";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 
 /* ── helpers ── */
@@ -847,45 +848,7 @@ function scormSetScore(score) {
 const PASS_MARK_PERCENT = 70;
 
 
-// Mouth track: one digit (0–9) per frame, 25 frames per second, from the narration audio.
-const MOUTH_TRACK_FPS = 25;
-
-/** Measures how loud the narration is in each frame. Pauses come out as 0 (closed mouth). */
-async function computeMouthTrack(base64: string): Promise<string | null> {
-  try {
-    const AudioCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioCtor) return null;
-    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const ctx = new AudioCtor();
-    const buffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
-    void ctx.close();
-    const data = buffer.getChannelData(0);
-    const hop = Math.max(1, Math.round(buffer.sampleRate / MOUTH_TRACK_FPS));
-    const frames = Math.floor(data.length / hop);
-    const levelDb = new Float32Array(frames);
-    for (let f = 0; f < frames; f++) {
-      let sum = 0;
-      const start = f * hop;
-      for (let i = 0; i < hop; i++) sum += data[start + i] * data[start + i];
-      levelDb[f] = 10 * Math.log10(sum / hop + 1e-10);
-    }
-    const sorted = Array.from(levelDb).sort((a, b) => a - b);
-    const peak = sorted[Math.floor(sorted.length * 0.95)] ?? -60;
-    const floor = peak - 32;
-    let track = "";
-    for (let f = 0; f < frames; f++) {
-      if (levelDb[f] < floor) { track += "0"; continue; }
-      const level = Math.max(0, Math.min(1, (levelDb[f] - floor) / (peak - floor)));
-      track += String(Math.round(level * 9));
-    }
-    return track;
-  } catch (err) {
-    console.warn("Mouth track could not be measured:", err);
-    return null;
-  }
-}
-
-/* ── Speaker card: the shared trainer mouth and blink (see lib/trainerMouth.ts) ── */
+/* ── Speaker card: the shared trainer mouth and blink (lib/trainerMouth.ts), driven by the narration track (lib/mouthTrack.ts) ── */
 function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack: string | null, points: TrainerFacePoints | undefined, sprites: TrainerSprites | null = null): string {
   if (!mouthTrack || !points) {
     return `<div class="speaker-card"><img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/></div>`;
@@ -893,12 +856,12 @@ function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack
   return `<div class="speaker-card" id="speakerCard">
     <div class="speaker-stage" style="${trainerStageStyle(points)}">
       <img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/>
-      <div id="speakerOverlay">${trainerOverlayMarkup(points, "scorm", sprites || undefined)}</div>
+      <div id="speakerOverlay" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></div>
     </div>
   </div>
-  <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_FPS = ${MOUTH_TRACK_FPS}; var MOUTH_SPEC = ${JSON.stringify(MOUTH_SPEC)};
-  ${applyMouthOpenness.toString()}
-  ${setTrainerBlink.toString()}
+  <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_POINTS = ${JSON.stringify(points)}; var MOUTH_SPRITES = ${JSON.stringify(sprites)};
+  ${mouthFrameAt.toString()}
+  ${renderMouthFrame.toString()}
   </script>`;
 }
 
@@ -1494,7 +1457,8 @@ function buildModuleHtml(
     .audio-player::-webkit-media-controls-current-time-display,
     .audio-player::-webkit-media-controls-time-remaining-display { color: var(--text); }
     .speaker-card { position: relative; width: 360px; max-width: 100%; aspect-ratio: 2 / 3; margin: 0 auto 16px; border-radius: 20px; overflow: hidden; background: #eef2ff; box-shadow: 0 12px 28px rgba(15,23,42,0.18); }
-    .speaker-stage { position: absolute; }
+    .speaker-stage { position: absolute; animation: trainerBob 8.8s ease-in-out infinite; }
+    @keyframes trainerBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.1px); } }
     .speaker-image { display: block; width: 100%; height: 100%; object-fit: cover; }
     .speaker-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
     .audio-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
@@ -1718,27 +1682,28 @@ function buildModuleHtml(
       if (!hlEnabled) clearHighlights();
     }
 
-    // Drawn mouth: follows the narration's precomputed track using audio.currentTime only.
-    // It needs no AudioContext, so it still moves when the LMS blocks audio analysis.
+    // Drawn mouth: follows the narration's track using audio.currentTime only (no AudioContext).
     (function () {
       var audioEl = document.getElementById('moduleAudio');
       var overlay = document.getElementById('speakerOverlay');
       if (!audioEl || !overlay || typeof MOUTH_TRACK === 'undefined' || !MOUTH_TRACK) return;
-      var rafId = 0;
+      var rafId = 0, blinking = false;
+      var CLOSED = { open: 0, spread: 0.5, flag: 2 };
+      function current() { return (audioEl.paused || audioEl.ended) ? CLOSED : mouthFrameAt(MOUTH_TRACK, audioEl.currentTime); }
+      function draw(fr) { renderMouthFrame(overlay, fr, MOUTH_POINTS, 'scorm', blinking, MOUTH_SPRITES); }
       function frame() {
-        if (audioEl.paused || audioEl.ended) { applyMouthOpenness(overlay, 0); rafId = 0; return; }
-        var idx = Math.floor(audioEl.currentTime * MOUTH_FPS);
-        applyMouthOpenness(overlay, (idx < MOUTH_TRACK.length ? MOUTH_TRACK.charCodeAt(idx) - 48 : 0) / 9);
+        if (audioEl.paused || audioEl.ended) { draw(CLOSED); rafId = 0; return; }
+        draw(mouthFrameAt(MOUTH_TRACK, audioEl.currentTime));
         rafId = requestAnimationFrame(frame);
       }
       audioEl.addEventListener('play', function () { if (!rafId) rafId = requestAnimationFrame(frame); });
-      audioEl.addEventListener('pause', function () { applyMouthOpenness(overlay, 0); });
-      audioEl.addEventListener('ended', function () { applyMouthOpenness(overlay, 0); });
-      applyMouthOpenness(overlay, 0);
+      audioEl.addEventListener('pause', function () { draw(CLOSED); });
+      audioEl.addEventListener('ended', function () { draw(CLOSED); });
+      draw(CLOSED);
       function blinkLater() {
         setTimeout(function () {
-          setTrainerBlink(overlay, true);
-          setTimeout(function () { setTrainerBlink(overlay, false); blinkLater(); }, 140);
+          blinking = true; draw(current());
+          setTimeout(function () { blinking = false; draw(current()); blinkLater(); }, 140);
         }, 2000 + Math.random() * 4000);
       }
       blinkLater();
@@ -2047,7 +2012,7 @@ export async function exportScormPackage(
   // so the package carries the timing and needs no audio analysis when it runs in an LMS.
   const mouthTrackMap = new Map<number, string>();
   for (const [idx, base64] of audioBase64Map) {
-    const track = await computeMouthTrack(base64);
+    const track = await computeMouthTrackFromAudio(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer);
     if (track) mouthTrackMap.set(idx, track);
   }
 

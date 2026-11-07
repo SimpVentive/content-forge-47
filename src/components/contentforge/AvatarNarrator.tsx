@@ -4,7 +4,7 @@ import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 import { DEFAULT_FACE, TRAINER_FACE_POINTS } from "@/lib/trainerFacePoints";
-import { applyMouthOpenness, setTrainerBlink, trainerOverlayMarkup, trainerSpriteUrls, trainerStageBox, type TrainerSprites } from "@/lib/trainerMouth";
+import { renderMouthFrame, trainerSpriteUrls, trainerStageBox, type MouthFrame, type TrainerSprites } from "@/lib/trainerMouth";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -23,6 +23,8 @@ interface AvatarNarratorProps {
   currentViseme?: VisemeKey;
   /** Language for the narrator's spoken reply (also used for the on-screen bubble). */
   narratorLanguage?: string;
+  /** Mouth from the narration track (lib/mouthTrack.ts). When absent, the mouth follows the viseme. */
+  mouthFrame?: MouthFrame | null;
 }
 
 type RequestMode = "initial" | "example";
@@ -84,6 +86,7 @@ export function AvatarNarrator({
   isVoiceActive, isVoiceLoading,
   currentViseme = "rest",
   narratorLanguage = "English",
+  mouthFrame = null,
 }: AvatarNarratorProps) {
   const [speechText,    setSpeechText]    = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
   const [isStreaming,   setIsStreaming]   = useState(false);
@@ -138,9 +141,13 @@ export function AvatarNarrator({
     });
     return () => { alive = false; };
   }, [trainerId]);
-  const faceOverlayMarkup = trainerOverlayMarkup(faceFacePoints, `narrator-${trainerId}`, paintedSprites || undefined);
-  useEffect(() => { applyMouthOpenness(faceOverlayRef.current, mouthOpenness); }, [mouthOpenness]);
-  useEffect(() => { setTrainerBlink(faceOverlayRef.current, isBlinking); }, [isBlinking]);
+  // The mouth frame: from the narration track when there is one, otherwise from the viseme (ElevenLabs timing).
+  const frameOpen = mouthFrame ? mouthFrame.open : mouthOpenness;
+  const frameSpread = mouthFrame ? mouthFrame.spread : 0.5;
+  const frameFlag = mouthFrame ? mouthFrame.flag : 0;
+  useEffect(() => {
+    renderMouthFrame(faceOverlayRef.current, { open: frameOpen, spread: frameSpread, flag: frameFlag }, faceFacePoints, `narrator-${trainerId}`, isBlinking, paintedSprites);
+  }, [frameOpen, frameSpread, frameFlag, isBlinking, paintedSprites, faceFacePoints, trainerId]);
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
@@ -388,6 +395,7 @@ export function AvatarNarrator({
           0%, 100% { box-shadow: 0 10px 24px rgba(60,52,137,0.08); }
           50%       { box-shadow: 0 14px 32px rgba(60,52,137,0.16); }
         }
+        @keyframes trainerBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.1px); } }
         @keyframes headTilt {
           0%,  100% { transform: scale(1.02) rotate(0deg)     translateX(0px);   }
           20%        { transform: scale(1.02) rotate(0.8deg)   translateX(1px);   }
@@ -458,14 +466,14 @@ export function AvatarNarrator({
                   }}
                 >
                 {/* Zoomed stage: the picture and the drawn mouth/blink share one coordinate system (lib/trainerMouth.ts) */}
-                <div className="absolute" style={trainerStageBox(faceFacePoints)}>
+                <div className="absolute" style={{ ...trainerStageBox(faceFacePoints), animation: "trainerBob 8.8s ease-in-out infinite" }}>
                   <img
                     src={avatarImageUrl}
                     alt={trainerName}
                     className="absolute inset-0 h-full w-full object-cover object-top"
                     onError={() => setHasAvatarImage(false)}
                   />
-                  <div ref={faceOverlayRef} className="absolute inset-0" dangerouslySetInnerHTML={{ __html: faceOverlayMarkup }} />
+                  <div ref={faceOverlayRef} className="absolute inset-0" />
                 </div>
                 </div>
               </>

@@ -1,24 +1,18 @@
 import type { FacePoint, TrainerFacePoints } from "@/lib/trainerFacePoints";
 
-// One mouth and blink for the app narrator AND the SCORM card. Both import this file, so they look the same.
-// Every size is in % of the trainer picture (1024×1536), so it scales with the card.
+// One mouth and blink for the app narrator AND the SCORM card. Both call renderMouthFrame below, so they look the same.
+// Drawing approach follows the team's lipsync-trainer (drawMouth): skin covers the painted lips, new lips are drawn
+// with teeth inside, and the mouth follows a track computed from the narration (lib/mouthTrack.ts).
+// Geometry is written in picture units of the 512×768 trainer picture (same 2:3 ratio as the 1024×1536 pictures).
+
 export const MOUTH_SPEC = {
-  zoom: 1.6,            // face zoom, so the card frames the face like the target video
-  openRx: 3.7,          // opening half-width: narrower than the painted lips
-  ryMin: 0.2,           // opening half-height when just opening
-  ryRange: 0.8,         // added at full openness (opening at most about 2% of the picture height)
-  interior: "#6b3a2a",  // warm brown, softer than near-black
-  interiorOpacity: 0.9,
-  teethShowFrom: 0.5,   // openness at which the upper teeth appear
-  teethMin: 0.6,        // teeth strip height, minimum (% of picture height)
-  teethShare: 0.8,      // teeth strip height as a share of the opening height
-  teeth: "#ffffff",
-  eyeRx: 4.4,           // eyelid half-width (% of picture width)
-  eyeRy: 1.1,           // eyelid half-height when the eye is open-size (% of picture height)
-  blinkRy: 1.1,         // eyelid half-height while blinking
+  zoom: 1.6,              // face zoom, so the card frames the face like the target video
   spriteSlightFrom: 0.02, // painted-image mode: "slight" image from this openness
   spriteOpenFrom: 0.5,    // painted-image mode: "open" image from this openness
 };
+
+/** One frame of the track: opening and spread 0..1, flag 0 voiced, 1 fricative, 2 silence. */
+export type MouthFrame = { open: number; spread: number; flag: number };
 
 /**
  * Painted mouth and blink images for a trainer: {id}-mouth-slight.png, {id}-mouth-open.png, {id}-blink.png,
@@ -52,68 +46,117 @@ export function trainerStageStyle(points: TrainerFacePoints): string {
 }
 
 /**
- * Overlay for the stage. With sprites it holds the three painted images (all hidden until used);
- * without them it holds the drawn mouth and skin-coloured eyelids. Numbers and trusted URLs only.
+ * Draws one frame into the overlay container. Closed mouth draws nothing, so the painted lips show.
+ * Painted-image mode (all three images present) swaps the images instead of drawing.
+ * Idempotent: a frame that looks the same as the last one is skipped.
+ * Self-contained on purpose: the SCORM package embeds this function's source, so it may only use its arguments.
  */
-export function trainerOverlayMarkup(points: TrainerFacePoints, idPrefix: string, sprites?: TrainerSprites): string {
+export function renderMouthFrame(
+  container: Element | null,
+  frame: MouthFrame,
+  points: TrainerFacePoints,
+  idPrefix: string,
+  blink: boolean,
+  sprites: TrainerSprites | null,
+): void {
+  if (!container) return;
+  const op = Math.max(0, Math.min(1, frame.open));
+  const sp = Math.max(0, Math.min(1, frame.spread));
+  const flag = frame.flag;
+
   if (sprites) {
-    const img = (role: string, src: string) =>
-      `<img data-role="${role}" src="${src}" alt="" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none"/>`;
-    return img("sprite-slight", sprites.slight) + img("sprite-open", sprites.open) + img("sprite-blink", sprites.blink);
-  }
-  const m = points.mouth;
-  const lid = (e: FacePoint) => `<ellipse data-role="lid" cx="${e.x}" cy="${e.y}" rx="${MOUTH_SPEC.eyeRx}" ry="0" fill="${points.skin}"/>`;
-  return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible">`
-    + `<defs><clipPath id="${idPrefix}-mouth-clip"><ellipse data-role="clip" cx="${m.x}" cy="${m.y}" rx="${MOUTH_SPEC.openRx}" ry="0.3"/></clipPath></defs>`
-    + lid(points.eyeLeft) + lid(points.eyeRight)
-    + `<g data-role="mouth" data-cy="${m.y}" opacity="0">`
-    + `<ellipse data-role="opening" cx="${m.x}" cy="${m.y}" rx="${MOUTH_SPEC.openRx}" ry="0.3" fill="${MOUTH_SPEC.interior}" fill-opacity="${MOUTH_SPEC.interiorOpacity}" stroke="#8a4a42" stroke-opacity="0.6" stroke-width="0.6" vector-effect="non-scaling-stroke"/>`
-    + `<rect data-role="teeth" clip-path="url(#${idPrefix}-mouth-clip)" x="${(m.x - MOUTH_SPEC.openRx).toFixed(2)}" y="${m.y}" width="${(MOUTH_SPEC.openRx * 2).toFixed(2)}" height="${MOUTH_SPEC.teethMin}" fill="${MOUTH_SPEC.teeth}" opacity="0"/>`
-    + `</g></svg>`;
-}
-
-/**
- * Sets the mouth from openness (0 closed, 1 fully open), in either mode.
- * Closed always shows the painted lips (nothing drawn on top).
- * Self-contained on purpose: the SCORM template embeds this function's source, so it may only use
- * MOUTH_SPEC and its arguments.
- */
-export function applyMouthOpenness(root: ParentNode | null, openness: number): void {
-  if (!root) return;
-  const o = Math.max(0, Math.min(1, openness));
-  const slight = root.querySelector('[data-role="sprite-slight"]');
-  if (slight) {
-    const open = root.querySelector('[data-role="sprite-open"]');
-    if (!open) return;
-    slight.setAttribute("style", slight.getAttribute("style").replace(/opacity:[^;]*/, "opacity:" + (o >= MOUTH_SPEC.spriteSlightFrom && o < MOUTH_SPEC.spriteOpenFrom ? "1" : "0")));
-    open.setAttribute("style", open.getAttribute("style").replace(/opacity:[^;]*/, "opacity:" + (o >= MOUTH_SPEC.spriteOpenFrom ? "1" : "0")));
+    const band = op >= 0.5 ? 2 : op >= 0.02 ? 1 : 0;
+    if (container.getAttribute("data-mode") !== "sprites") {
+      const img = (role: string, src: string) =>
+        `<img data-role="${role}" src="${src}" alt="" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none"/>`;
+      container.innerHTML = img("sprite-slight", sprites.slight) + img("sprite-open", sprites.open) + img("sprite-blink", sprites.blink);
+      container.setAttribute("data-mode", "sprites");
+    }
+    const show = (role: string, on: boolean) => {
+      const el = container.querySelector('[data-role="' + role + '"]') as HTMLElement | null;
+      if (el) el.style.opacity = on ? "1" : "0";
+    };
+    show("sprite-slight", band === 1);
+    show("sprite-open", band === 2);
+    show("sprite-blink", blink);
     return;
   }
-  const group = root.querySelector('[data-role="mouth"]');
-  const opening = root.querySelector('[data-role="opening"]');
-  const clip = root.querySelector('[data-role="clip"]');
-  const teeth = root.querySelector('[data-role="teeth"]');
-  if (!group || !opening || !clip || !teeth) return;
-  const cy = parseFloat(group.getAttribute("data-cy") || "0");
-  const ry = o > 0.02 ? MOUTH_SPEC.ryMin + MOUTH_SPEC.ryRange * o : 0;
-  group.setAttribute("opacity", ry > 0 ? "1" : "0");
-  opening.setAttribute("ry", ry.toFixed(2));
-  clip.setAttribute("ry", Math.max(ry, 0.01).toFixed(2));
-  teeth.setAttribute("y", (cy - ry).toFixed(2));
-  teeth.setAttribute("height", Math.max(MOUTH_SPEC.teethMin, ry * MOUTH_SPEC.teethShare).toFixed(2));
-  teeth.setAttribute("opacity", o >= MOUTH_SPEC.teethShowFrom ? "1" : "0");
-}
 
-/** Blink: closes the eyelids (drawn: skin colour; painted: the blink image) or opens them. Same self-contained rule. */
-export function setTrainerBlink(root: ParentNode | null, closed: boolean): void {
-  if (!root) return;
-  const blink = root.querySelector('[data-role="sprite-blink"]');
+  const sig = [Math.round(op * 100), Math.round(sp * 100), flag, blink ? 1 : 0, points.mouth.x, points.mouth.y].join("|");
+  if (container.getAttribute("data-sig") === sig) return;
+  container.setAttribute("data-sig", sig);
+  container.setAttribute("data-mode", "drawn");
+
+  // picture units: the 512×768 picture
+  const cx = points.mouth.x * 5.12;
+  const yLine = points.mouth.y * 7.68;
+  const lipW = points.lipWidth * 5.12;
+  const skin = points.skin;
+  const lip = points.lip;
+  // darker shades of the painted lip colour for the lower lip and the outline (same mix as the team's reds)
+  const mix = (hex: string, k: number) => {
+    const n = parseInt(hex.slice(1), 16);
+    const ch = (v: number) => Math.max(0, Math.min(255, Math.round(v * k))).toString(16).padStart(2, "0");
+    return "#" + ch((n >> 16) & 255) + ch((n >> 8) & 255) + ch(n & 255);
+  };
+  const loLipCol = mix(lip, 0.86), outline = mix(lip, 0.45);
+  const cavity = "#4f0d0c", tongue = "#c4463b", teethCol = "#f7eee6";
+
+  let inner = "";
+  if (op >= 0.05 || flag === 1) {
+    const opD = Math.max(op, flag === 1 ? 0.13 : 0);
+    const y0 = yLine - opD * 1.3;
+    const w = lipW * (0.72 + 0.28 * sp) + opD * lipW * 0.06;
+    const hh = Math.max(0.9 + 10.5 * Math.pow(opD, 1.15), flag === 1 ? 3 : 0);
+    const x0 = cx - w / 2, x1 = cx + w / 2;
+    const round = 1 - Math.min(1, sp * 2.2);
+    const upT = 12 + round * 2, loT = 15 + round * 3;
+    const cav = "M" + x0 + " " + y0 + "Q" + cx + " " + (y0 - 3.5) + " " + x1 + " " + y0 + "Q" + cx + " " + (y0 + 2 * hh) + " " + x0 + " " + y0 + "Z";
+    const upLipP = "M" + (x0 - 1) + " " + y0 + "Q" + cx + " " + (y0 - upT) + " " + (x1 + 1) + " " + y0 + "Q" + cx + " " + (y0 - 3.5) + " " + (x0 - 1) + " " + y0 + "Z";
+    const loLipP = "M" + (x0 - 1) + " " + y0 + "Q" + cx + " " + (y0 + 2 * hh) + " " + (x1 + 1) + " " + y0 + "Q" + cx + " " + (y0 + 2 * hh + loT) + " " + (x0 - 1) + " " + y0 + "Z";
+    const bottom = y0 + hh;
+    const upTeeth = hh >= 2.2 ? Math.min(hh * 0.45, 4.2) : 0;
+    const loTeeth = flag === 1 ? 1.8 : (hh > 7.5 ? Math.min((hh - 7) * 0.6, 2.2) : 0);
+    const tw = w * (flag === 1 || sp > 0.65 ? 0.8 : 0.62);
+    inner +=
+      '<ellipse cx="' + cx + '" cy="' + (y0 + 4.2 + hh * 0.5) + '" rx="' + (w * 0.62) + '" ry="' + (14 + hh * 1.1) + '" fill="' + skin + '"/>' +
+      '<path d="' + loLipP + '" fill="' + loLipCol + '"/>' +
+      '<path d="' + cav + '" fill="' + cavity + '"/>' +
+      '<clipPath id="' + idPrefix + '-mc"><path d="' + cav + '"/></clipPath><g clip-path="url(#' + idPrefix + '-mc)">' +
+      (hh > 4.5 ? '<ellipse cx="' + cx + '" cy="' + (bottom + 0.3) + '" rx="' + (w * 0.33) + '" ry="' + (hh * 0.58) + '" fill="' + tongue + '"/>' : "") +
+      (loTeeth ? '<path d="M' + (cx - tw * 0.42) + " " + (bottom + 4) + "L" + (cx + tw * 0.42) + " " + (bottom + 4) + "L" + (cx + tw * 0.42) + " " + (bottom - loTeeth * 0.5) + "Q" + cx + " " + (bottom - loTeeth * 1.6) + " " + (cx - tw * 0.42) + " " + (bottom - loTeeth * 0.5) + 'Z" fill="' + teethCol + '"/>' : "") +
+      (upTeeth ? '<path d="M' + (cx - tw / 2) + " " + (y0 - 4) + "L" + (cx + tw / 2) + " " + (y0 - 4) + "L" + (cx + tw / 2) + " " + (y0 + upTeeth * 0.55) + "Q" + cx + " " + (y0 + upTeeth * 1.5) + " " + (cx - tw / 2) + " " + (y0 + upTeeth * 0.55) + 'Z" fill="' + teethCol + '"/>' : "") +
+      "</g>" +
+      '<path d="' + upLipP + '" fill="' + lip + '"/>' +
+      '<path d="M' + (x0 + 2) + " " + (y0 - 1.6) + "Q" + cx + " " + (y0 - 5.2) + " " + (x1 - 2) + " " + (y0 - 1.6) + '" fill="none" stroke="#e0584a" stroke-width="1.1" stroke-linecap="round" opacity=".5"/>' +
+      '<path d="' + cav + '" fill="none" stroke="' + outline + '" stroke-width="0.9" stroke-linejoin="round"/>' +
+      '<circle cx="' + x0 + '" cy="' + y0 + '" r="1.5" fill="' + outline + '"/><circle cx="' + x1 + '" cy="' + y0 + '" r="1.5" fill="' + outline + '"/>';
+  }
+
+  // blink: skin-coloured eyelids with a lash line, shown only while blinking
   if (blink) {
-    blink.setAttribute("style", blink.getAttribute("style").replace(/opacity:[^;]*/, "opacity:" + (closed ? "1" : "0")));
-    return;
+    const eye = (e: FacePoint) => {
+      const ex = e.x * 5.12, ey = e.y * 7.68;
+      return '<ellipse cx="' + ex + '" cy="' + ey + '" rx="19" ry="8.5" fill="' + skin + '"/>' +
+        '<path d="M' + (ex - 18) + " " + (ey - 2) + "Q" + ex + " " + (ey + 6) + " " + (ex + 18) + " " + (ey - 2) + '" fill="none" stroke="#080303" stroke-width="3" stroke-linecap="round"/>';
+    };
+    inner += eye(points.eyeLeft) + eye(points.eyeRight);
   }
-  const lids = root.querySelectorAll('[data-role="lid"]');
-  for (let i = 0; i < lids.length; i++) {
-    lids[i].setAttribute("ry", closed ? String(MOUTH_SPEC.blinkRy) : "0");
-  }
+
+  container.innerHTML = '<svg viewBox="0 0 512 768" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible">' + inner + "</svg>";
+}
+
+/** The mouth frame for a time in the track: opening and spread are interpolated, the flag is the nearest frame. */
+export function mouthFrameAt(track: string, t: number): MouthFrame {
+  const n = Math.floor(track.length / 3);
+  if (n === 0) return { open: 0, spread: 0.5, flag: 2 };
+  const pos = Math.max(0, t) * 50;
+  const k = Math.floor(pos);
+  const a = pos - k;
+  const at = (m: number) => {
+    const j = Math.max(0, Math.min(n - 1, m));
+    return [track.charCodeAt(3 * j) - 48, track.charCodeAt(3 * j + 1) - 48, track.charCodeAt(3 * j + 2) - 48];
+  };
+  const A = at(k), B = at(k + 1);
+  return { open: (A[0] + (B[0] - A[0]) * a) / 9, spread: (A[1] + (B[1] - A[1]) * a) / 9, flag: a < 0.5 ? A[2] : B[2] };
 }
