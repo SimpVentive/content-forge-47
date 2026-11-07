@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { VisemeKey } from "@/lib/avatarTrainers";
+import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -56,8 +56,11 @@ const ORIG_W  = 1024, ORIG_H  = 1536;
 
 const EYE_W = (90 / ORIG_W) * 100;   // % of face width
 const EYE_H = (32 / ORIG_H) * 100;   // % of face height
-const MTH_W = (82 / ORIG_W) * 100;
-const MTH_H = (40 / ORIG_H) * 100;
+// Lip size, measured on the trainer art: the dark lip line is 51–59 px wide on a 512 px image,
+// and the lips are about 2.8% of the image height. Percent of the image, so the overlay
+// scales with the face at any render width.
+const MOUTH_LIP_W_PCT = 11.5; // % of image width
+const MOUTH_LIP_H_PCT = 2.8;  // % of image height
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -104,12 +107,11 @@ export function AvatarNarrator({
   const [streamingViseme, setStreamingViseme] = useState<VisemeKey>("rest");
 
   // Sprite readiness: null = probing, true = PNG found, false = not found → CSS fallback
-  const [hasMouthSprite, setHasMouthSprite] = useState<boolean | null>(null);
-  const [hasBlinkSprite, setHasBlinkSprite] = useState<boolean | null>(null);
+  // No sprite PNGs ship with the app. The mouth is drawn (SVG) and eyes blink with a CSS lid,
+  // and sprite files are never requested, so nothing is fetched from /trainers/ inside an LMS.
+  const hasMouthSprite = false;
+  const hasBlinkSprite = false;
   const [isBlinking,     setIsBlinking]     = useState(false);
-  // CSS fallback lip-sync animation cycle (0–1 scale)
-  const [cssLipValue,    setCssLipValue]    = useState(0);
-  const cssLipIntervalRef = useRef<number | null>(null);
 
   const avatarVideoRef          = useRef<HTMLVideoElement | null>(null);
   const abortControllerRef      = useRef<AbortController | null>(null);
@@ -127,32 +129,14 @@ export function AvatarNarrator({
     (isStreaming || isMouthHold) && currentViseme === "rest" ? streamingViseme : currentViseme;
 
   const isTalking  = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
+  const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
   const mouthState = getVisemeMouthState(effectiveViseme, isTalking);
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
     .map((p) => p[0]?.toUpperCase() || "").join("") || "AV";
 
-  // ── sprite probing ────────────────────────────────────────────────────────
-  // Probe once per trainer so we know whether PNG files exist.
-  // Uses Image() instead of fetch — silent failure with onError, no console 404.
-  useEffect(() => {
-    setHasMouthSprite(null);
-    const probe = new Image();
-    probe.onload  = () => setHasMouthSprite(true);
-    probe.onerror = () => setHasMouthSprite(false);
-    probe.src = `/trainers/${trainerId}-mouth-slight.png`;
-  }, [trainerId]);
-
-  useEffect(() => {
-    setHasBlinkSprite(null);
-    const probe = new Image();
-    probe.onload  = () => setHasBlinkSprite(true);
-    probe.onerror = () => setHasBlinkSprite(false);
-    probe.src = `/trainers/${trainerId}-blink.png`;
-  }, [trainerId]);
-
-  // ── random eye blink ──────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────
   // Schedules itself recursively with a random 2–6 s interval.
   // Blink lasts 140 ms. Works with a sprite PNG or is silently skipped
   // if hasBlinkSprite === false.
@@ -173,35 +157,6 @@ export function AvatarNarrator({
       if (blinkTimeoutRef.current !== null) window.clearTimeout(blinkTimeoutRef.current);
     };
   }, [scheduleNextBlink]);
-
-  // ── CSS fallback lip-sync loop ────────────────────────────────────────────
-  // Always runs when sprite PNGs are missing. Uses a naturalistic pattern
-  // so the avatar always looks alive — identical to narrator_animator.html.
-  const CSS_LIP_PATTERN = [0,0.2,0.6,0.4,0.1,0.8,0.5,0.15,0.7,0.35,
-                           0.05,0,0,0.3,0.75,0.5,0.25,0.9,0.4,0.1,
-                           0.6,0.2,0.85,0.45,0.05,0,0.3,0.65,0.4,0.1];
-  const cssLipIdxRef = useRef(0);
-
-  useEffect(() => {
-    if (hasMouthSprite !== false) return;  // only for CSS fallback
-    if (!isTalking) {
-      // Paused / idle → freeze lips closed, don't churn the interval
-      cssLipIdxRef.current = 0;
-      setCssLipValue(0);
-      return;
-    }
-    cssLipIntervalRef.current = window.setInterval(() => {
-      const val = CSS_LIP_PATTERN[cssLipIdxRef.current % CSS_LIP_PATTERN.length];
-      cssLipIdxRef.current += 1;
-      setCssLipValue(val);
-    }, 100);
-    return () => {
-      if (cssLipIntervalRef.current !== null) {
-        window.clearInterval(cssLipIntervalRef.current);
-        cssLipIntervalRef.current = null;
-      }
-    };
-  }, [hasMouthSprite, isTalking]);
 
   // ── stream helpers ────────────────────────────────────────────────────────
   const clearMouthHold = () => {
@@ -372,12 +327,35 @@ export function AvatarNarrator({
 
   useEffect(() => { setHasAvatarImage(true); }, [avatarImageUrl, trainerName]);
 
+  // The talking-head video follows the narration: it plays while the narration plays, and
+  // when the narration pauses or ends it stops on the first frame (the closed-mouth pose).
+  const narrationActiveRef = useRef(false);
   useEffect(() => {
-    if (!avatarVideoUrl || !avatarVideoRef.current) return;
+    narrationActiveRef.current = Boolean(isVoiceActive);
     const v = avatarVideoRef.current;
-    v.currentTime = 0;
-    v.play().then(() => setVideoPlaying(true)).catch(() => setVideoPlaying(false));
-  }, [avatarVideoUrl, topic, moduleContent]);
+    if (!avatarVideoUrl || !v) return;
+    if (isVoiceActive) {
+      v.play().then(() => setVideoPlaying(true)).catch(() => setVideoPlaying(false));
+    } else {
+      v.pause();
+      v.currentTime = 0;
+      setVideoPlaying(false);
+    }
+  }, [avatarVideoUrl, isVoiceActive]);
+
+  // Browsers block video playback until the learner clicks. If the narration started before
+  // that, the video is retried on the first click so it doesn't stay frozen mid-speech.
+  useEffect(() => {
+    if (!avatarVideoUrl) return;
+    const resumeOnClick = () => {
+      const v = avatarVideoRef.current;
+      if (narrationActiveRef.current && v && v.paused) {
+        v.play().then(() => setVideoPlaying(true)).catch(() => setVideoPlaying(false));
+      }
+    };
+    document.addEventListener("pointerdown", resumeOnClick);
+    return () => document.removeEventListener("pointerdown", resumeOnClick);
+  }, [avatarVideoUrl]);
 
   const toggleVideoPlayback = () => {
     const v = avatarVideoRef.current;
@@ -387,12 +365,6 @@ export function AvatarNarrator({
   };
 
   const captionText = speechText.trim().replace(/\s+/g, " ").slice(0, 80);
-
-  // Sprite URLs
-  const blinkSpriteUrl       = `/trainers/${trainerId}-blink.png`;
-  const mouthSlightSpriteUrl = `/trainers/${trainerId}-mouth-slight.png`;
-  const mouthOpenSpriteUrl   = `/trainers/${trainerId}-mouth-open.png`;
-  const activeMouthSpriteUrl = mouthState === "slight" ? mouthSlightSpriteUrl : mouthOpenSpriteUrl;
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
@@ -423,7 +395,7 @@ export function AvatarNarrator({
           <video
             ref={avatarVideoRef} src={avatarVideoUrl} poster={avatarPosterUrl}
             className="aspect-[9/12] w-full max-h-[420px] object-cover object-top"
-            autoPlay playsInline muted={videoMuted} controls={false} preload="metadata"
+            playsInline muted={videoMuted} controls={false} preload="metadata"
             onPlay={() => setVideoPlaying(true)}
             onPause={() => setVideoPlaying(false)}
             onEnded={() => setVideoPlaying(false)}
@@ -480,51 +452,11 @@ export function AvatarNarrator({
                   Subtle 9 s head-tilt animation gives life without being distracting.
                 */}
                 <img
-                  src={avatarImageUrl || "/trainers/priya.png"}
+                  src={avatarImageUrl}
                   alt={trainerName}
                   className="absolute inset-0 h-full w-full object-cover object-top"
                   onError={() => setHasAvatarImage(false)}
                 />
-
-                {/*
-                  LAYER 1 — eyes-closed blink sprite  (optional)
-                  Drop  /public/trainers/{id}-blink.png  to enable.
-                  Full-size PNG — transparent everywhere except closed-eyes area.
-                  Fades in for 140 ms at random 2–6 s intervals.
-                */}
-                {hasBlinkSprite !== false && (
-                  <img
-                    src={blinkSpriteUrl}
-                    alt=""
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
-                    style={{
-                      opacity: isBlinking ? 1 : 0,
-                      transition: "opacity 60ms ease-in-out",
-                    }}
-                    onError={() => setHasBlinkSprite(false)}
-                  />
-                )}
-
-                {/*
-                  LAYER 2a — mouth sprites  (optional, preferred)
-                  Drop  /public/trainers/{id}-mouth-slight.png
-                  and   /public/trainers/{id}-mouth-open.png  to enable.
-                  Full-size PNGs — transparent everywhere except the mouth area.
-                  Three states driven by viseme groups:
-                    rest   → no sprite shown (drawn closed mouth visible in layer 0)
-                    slight → fricatives / liquids  → {id}-mouth-slight.png
-                    open   → vowels                → {id}-mouth-open.png
-                */}
-                {hasMouthSprite === true && mouthState !== "rest" && (
-                  <img
-                    src={activeMouthSpriteUrl}
-                    alt=""
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
-                    style={{ transition: "opacity 55ms ease-out" }}
-                  />
-                )}
 
                 {/* LAYER 1b — CSS blink overlay fallback (when no sprite PNG) */}
                 {hasBlinkSprite === false && (() => {
@@ -560,25 +492,52 @@ export function AvatarNarrator({
                     </>
                   );
                 })()}
-
-                {/* LAYER 2b — CSS mouth overlay fallback (when no sprite PNG) */}
+                {/*
+                  LAYER 2b — CSS mouth overlay fallback (when no sprite PNG).
+                  Lips and opening are sized from MOUTH_LIP_* and follow the viseme, so the mouth opens and closes with speech.
+                  It sits in the same head-tilt wrapper as the face, so it moves with the head.
+                */}
                 {hasMouthSprite === false && (() => {
                   const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
+                  const shape = lipSyncProfile.visemes[effectiveViseme];
+                  // 0 = closed, 1 = fully open. Vowels open the jaw; rest/mbp stay closed.
+                  const openness = isTalking ? Math.min(1, Math.max(0, shape.height / 1.1)) : 0;
+                  const openRy = 1.5 + 15 * openness;   // half the mouth opening, in SVG units (0–100)
+                  const lipRy = openRy + 9;             // lips sit just outside the opening
+                  const teethVisible = openness > 0.15;
+                  const clipId = `narrator-mouth-${trainerId}`;
                   return (
-                    <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                      left: `${face.mouth.x}%`, top: `${face.mouth.y}%`,
-                      width: `${MTH_W}%`, height: `${MTH_H}%`,
-                      borderRadius: "50% 50% 60% 60%", overflow: "hidden",
-                      transform: "translate(-50%, -50%)",
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{
+                      animation: isTalking ? "headTilt 9s ease-in-out infinite" : "none",
+                      transformOrigin: "50% 80%",
                     }}>
-                      <div style={{
-                        width: "100%", height: "100%",
-                        background: "rgba(20,3,3,0.75)",
-                        borderRadius: "50% 50% 60% 60%",
-                        transform: `scaleY(${cssLipValue})`,
-                        transformOrigin: "top center",
-                        transition: "transform 60ms ease-out",
-                      }} />
+                      <div className="absolute" style={{
+                        left: `${face.mouth.x}%`, top: `${face.mouth.y}%`,
+                        width: `${MOUTH_LIP_W_PCT * shape.width}%`,
+                        height: `${MOUTH_LIP_H_PCT * 3.4}%`,
+                        opacity: isTalking ? 1 : 0,
+                        transform: "translate(-50%, -50%)",
+                        transition: "width 50ms ease-out, opacity 120ms ease-out",
+                      }}>
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}>
+                          <defs>
+                            <clipPath id={clipId}>
+                              <ellipse cx="50" cy="50" rx="42" ry={openRy} />
+                            </clipPath>
+                          </defs>
+                          {/* Lips */}
+                          <ellipse cx="50" cy="50" rx="47" ry={lipRy} fill="#A8524A" stroke="#5E2622" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                          {/* Mouth interior */}
+                          <ellipse cx="50" cy="50" rx="42" ry={openRy} fill="#2B0F0C" />
+                          <g clipPath={`url(#${clipId})`}>
+                            {/* Tongue */}
+                            <ellipse cx="50" cy={50 + openRy * 0.7} rx="24" ry={openRy * 0.6} fill="#C9646D" />
+                            {/* Upper teeth */}
+                            <rect x="8" y={50 - openRy} width="84" height="10" fill="#FFFFFF" opacity={teethVisible ? 1 : 0} />
+                            <line x1="8" x2="92" y1={50 - openRy + 10} y2={50 - openRy + 10} stroke="#B9B2A6" strokeWidth="1" vectorEffect="non-scaling-stroke" opacity={teethVisible ? 1 : 0} />
+                          </g>
+                        </svg>
+                      </div>
                     </div>
                   );
                 })()}
