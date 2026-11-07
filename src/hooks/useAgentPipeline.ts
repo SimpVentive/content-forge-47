@@ -466,6 +466,19 @@ const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
+// Writer model calls: each call has this timeout and one automatic retry (inside callClaudeWithRetry).
+const WRITER_TIMEOUT_MS = 120000;
+
+// Turns a failed Writer call into a clear message that names the module, and logs it.
+function writerFailure(err: unknown, moduleNumber: number, addLog: (msg: string) => void): Error {
+  const raw = (err as Error)?.message || "unknown error";
+  const message = /timed out/i.test(raw)
+    ? `Writer: model call timed out after ${WRITER_TIMEOUT_MS / 1000} s on module ${moduleNumber} (retried once). Run stopped.`
+    : `Writer: model call failed on module ${moduleNumber} — ${raw}. Run stopped.`;
+  addLog(message);
+  return new Error(message);
+}
+
 // Cards still marked "running" after a run has ended (stopped or failed) are reset, so they never show work that isn't happening.
 function settleRunningStatuses(prev: Record<string, AgentStatus>): Record<string, AgentStatus> {
   if (!Object.values(prev).includes("running")) return prev;
@@ -1085,11 +1098,17 @@ OUTPUT FORMAT — ABSOLUTE:
         if (parsedModules.length === 0) {
           // Fallback: single call if we can't parse modules
           addLog("Writer Agent: Drafting all content...");
+          addLog("Writer: model call sent (all content in one call)");
+          try {
           writerResult = await runAgentWithLanguage(
             writerSystemPromptWithMode,
             `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nPlanned Topic Count: ${totalTopics}\n\nDuration Plan:\n${summarizeDurationPlan(durationPlan)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"} and reach approximately ${targetNarrationWords} words in total.`,
-            addLog, "Writer Agent"
+            addLog, "Writer Agent", WRITER_TIMEOUT_MS
           );
+          } catch (err) {
+            throw writerFailure(err, 1, addLog);
+          }
+          addLog(`Writer: response received (${writerResult.length} characters)`);
         } else {
           // Per-module calls to avoid truncation
           const moduleResults: string[] = [];
@@ -1110,12 +1129,18 @@ OUTPUT FORMAT — ABSOLUTE:
             }).join("\n");
 
             addLog(`Writer Agent: Drafting Module ${mi + 1}/${parsedModules.length} — ${modTitle}...`);
-
-            const moduleContentRaw = await runAgentWithLanguage(
+            addLog(`Writer: module ${mi + 1} — model call sent`);
+            let moduleContentRaw = "";
+            try {
+              moduleContentRaw = await runAgentWithLanguage(
               writerSystemPromptWithMode,
               `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nModule Runtime Target: ${moduleDurationPlan?.targetMinutes ?? "auto"} minutes\nModule Word Budget: ${moduleDurationPlan?.targetWords ?? "auto"} words\nModule Topic Word Range: ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange}\nTopics:\n${topics}\n\nStructured Topic Blueprint JSON (FOR YOUR REFERENCE ONLY — DO NOT ECHO):\n${topicBlueprint}\n\nDuration Plan JSON (FOR YOUR REFERENCE ONLY — DO NOT ECHO):\n${JSON.stringify(moduleDurationPlan || null, null, 2)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging MARKDOWN PROSE for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange} words minimum. NEVER output JSON or code blocks — output flowing prose only. Your first character must be "#".`,
-              addLog, "Writer Agent"
-            );
+              addLog, "Writer Agent", WRITER_TIMEOUT_MS
+              );
+            } catch (err) {
+              throw writerFailure(err, mi + 1, addLog);
+            }
+            addLog(`Writer: module ${mi + 1} — response received (${moduleContentRaw.length} characters)`);
             const moduleContent = sanitizeWriterOutput(moduleContentRaw);
             moduleResults.push(`# ${modTitle}\n\n${moduleContent}`);
             
@@ -1123,6 +1148,7 @@ OUTPUT FORMAT — ABSOLUTE:
             writerResult = moduleResults.join("\n\n---\n\n");
             setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
             setOutputData((prev) => ({ ...prev, script: writerResult }));
+            addLog(`Writer: module ${mi + 1} — saved`);
           }
           writerResult = moduleResults.join("\n\n---\n\n");
         }
