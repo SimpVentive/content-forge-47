@@ -743,7 +743,7 @@ const IMSMD_XSD = `<?xml version="1.0" encoding="UTF-8"?>
 </xs:schema>`;
 
 /* ── SCORM imsmanifest.xml ── */
-function buildManifest(courseTitle: string, modules: Module[]): string {
+function buildManifest(courseTitle: string, modules: Module[], moduleFiles: (index: number) => string[] = () => []): string {
   const orgItems = modules.map((m, i) =>
     `      <item identifier="ITEM_M${i + 1}" identifierref="RES_M${i + 1}">
         <title>${escapeXml(m.title)}</title>
@@ -752,7 +752,8 @@ function buildManifest(courseTitle: string, modules: Module[]): string {
 
   const resources = modules.map((m, i) =>
     `    <resource identifier="RES_M${i + 1}" type="webcontent" adlcp:scormType="sco" href="module_${i + 1}.html">
-      <file href="module_${i + 1}.html"/>
+      <file href="module_${i + 1}.html"/>${moduleFiles(i).map((href) => `
+      <file href="${escapeXml(href)}"/>`).join("")}
     </resource>`
   ).join("\n");
 
@@ -843,6 +844,86 @@ function scormSetScore(score) {
 // Pass mark for SCORM assessment (percent). Could be made configurable later.
 const PASS_MARK_PERCENT = 70;
 
+// Trainer face points, in % of the 1024×1536 picture. Copied from AvatarNarrator FACE_COORDS:
+// keep the two in sync when a trainer is re-measured.
+const TRAINER_FACE_POINTS: Record<string, { eyeLeft: { x: number; y: number }; eyeRight: { x: number; y: number }; mouth: { x: number; y: number } }> = {
+  priya: { eyeLeft: { x: 56.64, y: 27.99 }, eyeRight: { x: 43.65, y: 27.99 }, mouth: { x: 49.32, y: 35.81 } },
+  arjun: { eyeLeft: { x: 54.98, y: 26.43 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 47.66, y: 34.64 } },
+  soumya: { eyeLeft: { x: 55.66, y: 26.69 }, eyeRight: { x: 42.97, y: 26.89 }, mouth: { x: 48.63, y: 34.44 } },
+  vedprakash: { eyeLeft: { x: 54.30, y: 25.59 }, eyeRight: { x: 42.68, y: 25.59 }, mouth: { x: 48.34, y: 33.33 } },
+  atul: { eyeLeft: { x: 53.71, y: 25.98 }, eyeRight: { x: 41.99, y: 25.98 }, mouth: { x: 47.36, y: 34.24 } },
+  irina: { eyeLeft: { x: 55.37, y: 26.69 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 48.63, y: 34.64 } },
+  john: { eyeLeft: { x: 53.32, y: 25.98 }, eyeRight: { x: 42.29, y: 25.98 }, mouth: { x: 47.9, y: 33.9 } },
+};
+
+// Mouth track: one digit (0–9) per frame, 25 frames per second, from the narration audio.
+const MOUTH_TRACK_FPS = 25;
+
+/** Measures how loud the narration is in each frame. Pauses come out as 0 (closed mouth). */
+async function computeMouthTrack(base64: string): Promise<string | null> {
+  try {
+    const AudioCtor = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtor) return null;
+    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+    const ctx = new AudioCtor();
+    const buffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
+    void ctx.close();
+    const data = buffer.getChannelData(0);
+    const hop = Math.max(1, Math.round(buffer.sampleRate / MOUTH_TRACK_FPS));
+    const frames = Math.floor(data.length / hop);
+    const levelDb = new Float32Array(frames);
+    for (let f = 0; f < frames; f++) {
+      let sum = 0;
+      const start = f * hop;
+      for (let i = 0; i < hop; i++) sum += data[start + i] * data[start + i];
+      levelDb[f] = 10 * Math.log10(sum / hop + 1e-10);
+    }
+    const sorted = Array.from(levelDb).sort((a, b) => a - b);
+    const peak = sorted[Math.floor(sorted.length * 0.95)] ?? -60;
+    const floor = peak - 32;
+    let track = "";
+    for (let f = 0; f < frames; f++) {
+      if (levelDb[f] < floor) { track += "0"; continue; }
+      const level = Math.max(0, Math.min(1, (levelDb[f] - floor) / (peak - floor)));
+      track += String(Math.round(level * 9));
+    }
+    return track;
+  } catch (err) {
+    console.warn("Mouth track could not be measured:", err);
+    return null;
+  }
+}
+
+/* ── Speaker card: the trainer picture with the drawn mouth and blink, driven by the narration ── */
+function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack: string | null, points: { eyeLeft: { x: number; y: number }; eyeRight: { x: number; y: number }; mouth: { x: number; y: number } } | undefined): string {
+  if (!mouthTrack || !points) {
+    return `<div class="speaker-card"><img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/></div>`;
+  }
+  // Lip box and eye boxes match the app's sizes (% of the picture), centred on the measured points.
+  const lipW = 11.5, lipH = 9.52, eyeW = 8.79, eyeH = 2.08;
+  const mx = points.mouth.x - lipW / 2, my = points.mouth.y - lipH / 2;
+  const eye = (e: { x: number; y: number }) => `<svg x="${(e.x - eyeW / 2).toFixed(2)}" y="${(e.y - eyeH / 2).toFixed(2)}" width="${eyeW}" height="${eyeH}" viewBox="0 0 100 100" preserveAspectRatio="none" overflow="visible"><ellipse class="eyelid" cx="50" cy="50" rx="50" ry="0" fill="rgba(20,10,5,0.82)"/></svg>`;
+  return `<div class="speaker-card" id="speakerCard">
+    <img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/>
+    <svg class="speaker-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+      <defs><clipPath id="mouthClip"><ellipse id="mouthClipEllipse" cx="50" cy="50" rx="42" ry="1.5"/></clipPath></defs>
+      ${eye(points.eyeLeft)}
+      ${eye(points.eyeRight)}
+      <svg x="${mx.toFixed(2)}" y="${my.toFixed(2)}" width="${lipW}" height="${lipH}" viewBox="0 0 100 100" preserveAspectRatio="none" overflow="visible">
+        <g id="mouth" opacity="0">
+          <ellipse id="mouthLips" cx="50" cy="50" rx="47" ry="10.5" fill="#A8524A" stroke="#5E2622" stroke-width="2" vector-effect="non-scaling-stroke"/>
+          <ellipse id="mouthOpening" cx="50" cy="50" rx="42" ry="1.5" fill="#2B0F0C"/>
+          <g clip-path="url(#mouthClip)">
+            <ellipse id="mouthTongue" cx="50" cy="51" rx="24" ry="1" fill="#C9646D"/>
+            <rect id="mouthTeeth" x="8" y="48.5" width="84" height="10" fill="#FFFFFF" opacity="0"/>
+          </g>
+        </g>
+      </svg>
+    </svg>
+  </div>
+  <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_FPS = ${MOUTH_TRACK_FPS};</script>`;
+}
+
 /* ── Module HTML page builder ── */
 function buildModuleHtml(
   courseTitle: string,
@@ -855,7 +936,9 @@ function buildModuleHtml(
   narrationText: string,
   moduleVideos: ScormInsertedVideo[] = [],
   avatarImageSrc: string | null = null,
-  avatarName = "Sarah"
+  avatarName = "Sarah",
+  mouthTrack: string | null = null,
+  trainerId = ""
 ): string {
   // Split narration into sentences for highlighting
   const sentences = narrationText
@@ -1133,6 +1216,7 @@ function buildModuleHtml(
     `<div class="scorm-screen" data-screen-index="${sectionIndex}">${renderSection(section, sectionIndex)}</div>`
   ).join("\n");
 
+  const speakerCardHtml = audioSrc ? buildSpeakerCard(avatarImageSrc || "", avatarName, mouthTrack, TRAINER_FACE_POINTS[trainerId]) : "";
   const audioHtml = audioSrc ? `
       <div class="audio-section">
         <div class="audio-header">
@@ -1151,6 +1235,7 @@ function buildModuleHtml(
             <button class="hl-toggle active" id="hlToggle" onclick="toggleHighlight()">On</button>
           </div>
         </div>
+        ${speakerCardHtml}
         <audio controls class="audio-player" id="moduleAudio" preload="auto">
           <source src="${escapeAttribute(audioSrc)}" type="audio/mpeg"/>
           Your browser does not support the audio element.
@@ -1413,6 +1498,9 @@ function buildModuleHtml(
     .audio-player::-webkit-media-controls-panel { background: var(--card); color: var(--text); }
     .audio-player::-webkit-media-controls-current-time-display,
     .audio-player::-webkit-media-controls-time-remaining-display { color: var(--text); }
+    .speaker-card { position: relative; width: 240px; max-width: 100%; aspect-ratio: 2 / 3; margin: 0 auto 16px; border-radius: 20px; overflow: hidden; background: #eef2ff; box-shadow: 0 12px 28px rgba(15,23,42,0.18); }
+    .speaker-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .speaker-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
     .audio-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
     .audio-screen { z-index: 200; }
     .palette-bar { display: flex; align-items: center; gap: 6px; }
@@ -1633,6 +1721,51 @@ function buildModuleHtml(
       btn.className = hlEnabled ? 'hl-toggle active' : 'hl-toggle';
       if (!hlEnabled) clearHighlights();
     }
+
+    // Drawn mouth: follows the narration's precomputed track using audio.currentTime only.
+    // It needs no AudioContext, so it still moves when the LMS blocks audio analysis.
+    (function () {
+      var audioEl = document.getElementById('moduleAudio');
+      var mouth = document.getElementById('mouth');
+      var lips = document.getElementById('mouthLips');
+      var opening = document.getElementById('mouthOpening');
+      var clip = document.getElementById('mouthClipEllipse');
+      var tongue = document.getElementById('mouthTongue');
+      var teeth = document.getElementById('mouthTeeth');
+      var lids = document.querySelectorAll('#speakerCard .eyelid');
+      if (!audioEl || !mouth || typeof MOUTH_TRACK === 'undefined' || !MOUTH_TRACK) return;
+      var rafId = 0;
+      function setOpen(v) {
+        var openness = Math.max(0, Math.min(1, v / 9));
+        var openRy = openness > 0.01 ? 1.5 + 15 * openness : 1.5;
+        mouth.setAttribute('opacity', openness > 0.02 ? '1' : '0');
+        lips.setAttribute('ry', (openRy + 9).toFixed(2));
+        opening.setAttribute('ry', openRy.toFixed(2));
+        clip.setAttribute('ry', openRy.toFixed(2));
+        tongue.setAttribute('cy', (50 + openRy * 0.7).toFixed(2));
+        tongue.setAttribute('ry', (openRy * 0.6).toFixed(2));
+        teeth.setAttribute('y', (50 - openRy).toFixed(2));
+        teeth.setAttribute('opacity', openness > 0.15 ? '1' : '0');
+      }
+      function frame() {
+        if (audioEl.paused || audioEl.ended) { setOpen(0); rafId = 0; return; }
+        var idx = Math.floor(audioEl.currentTime * MOUTH_FPS);
+        setOpen(idx < MOUTH_TRACK.length ? MOUTH_TRACK.charCodeAt(idx) - 48 : 0);
+        rafId = requestAnimationFrame(frame);
+      }
+      audioEl.addEventListener('play', function () { if (!rafId) rafId = requestAnimationFrame(frame); });
+      audioEl.addEventListener('pause', function () { setOpen(0); });
+      audioEl.addEventListener('ended', function () { setOpen(0); });
+      setOpen(0);
+      function setLids(ry) { for (var i = 0; i < lids.length; i++) lids[i].setAttribute('ry', String(ry)); }
+      function blinkLater() {
+        setTimeout(function () {
+          setLids(50);
+          setTimeout(function () { setLids(0); blinkLater(); }, 140);
+        }, 2000 + Math.random() * 4000);
+      }
+      blinkLater();
+    })();
 
     // Sync highlight with audio playback
     var audio = document.getElementById('moduleAudio');
@@ -1911,7 +2044,6 @@ export async function exportScormPackage(
   }
 
   // Add SCORM manifest and required XSD schema files
-  zip.file("imsmanifest.xml", buildManifest(courseTitle, modules));
   zip.file("imscp_rootv1p1p2.xsd", IMSCP_XSD);
   zip.file("adlcp_rootv1p2.xsd", ADLCP_XSD);
   zip.file("imsmd_rootv1p2p1.xsd", IMSMD_XSD);
@@ -1934,17 +2066,31 @@ export async function exportScormPackage(
     }
   });
 
+  // Mouth tracks come from each module's narration, measured in the browser at export time,
+  // so the package carries the timing and needs no audio analysis when it runs in an LMS.
+  const mouthTrackMap = new Map<number, string>();
+  for (const [idx, base64] of audioBase64Map) {
+    const track = await computeMouthTrack(base64);
+    if (track) mouthTrackMap.set(idx, track);
+  }
+
   let avatarImageSrc: string | null = null;
   try {
     const avatarResponse = await fetch(`/trainers/${avatarTrainerId}.png`);
     if (avatarResponse.ok) {
       const avatarBuffer = await avatarResponse.arrayBuffer();
-      avatarImageSrc = `trainers/${avatarTrainerId}.png`;
+      avatarImageSrc = `assets/avatar-${avatarTrainerId}.png`;
       zip.file(avatarImageSrc, avatarBuffer);
     }
   } catch (err) {
     console.warn("Avatar image packaging failed:", err);
   }
+
+  // The manifest lists every file each module page loads (its audio and the trainer picture).
+  zip.file("imsmanifest.xml", buildManifest(courseTitle, modules, (i) => [
+    ...(audioSrcMap.has(i) ? [audioSrcMap.get(i) as string] : []),
+    ...(avatarImageSrc ? [avatarImageSrc] : []),
+  ]));
 
   // Extract images from data URLs and add them as separate files
   // This is necessary because large data URLs can exceed SCORM player limits
@@ -1996,7 +2142,7 @@ export async function exportScormPackage(
     const audioSrc = audioSrcMap.get(i) || null;
     const narrationText = voiceSections[i]?.narration_text || "";
     const moduleVideos = insertedVideos.filter((video) => normalizeTextKey(video.moduleTitle || "") === normalizeTextKey(mod.title));
-    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioSrc, narrationText, moduleVideos, avatarImageSrc, avatarName);
+    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioSrc, narrationText, moduleVideos, avatarImageSrc, avatarName, mouthTrackMap.get(i) || null, avatarTrainerId);
     zip.file(`module_${i + 1}.html`, html);
   });
 
