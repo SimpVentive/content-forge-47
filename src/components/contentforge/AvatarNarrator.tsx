@@ -4,7 +4,7 @@ import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 import { DEFAULT_FACE, TRAINER_FACE_POINTS } from "@/lib/trainerFacePoints";
-import { applyMouthOpenness, setTrainerBlink, trainerOverlayMarkup, trainerStageBox } from "@/lib/trainerMouth";
+import { applyMouthOpenness, setTrainerBlink, trainerOverlayMarkup, trainerSpriteUrls, trainerStageBox, type TrainerSprites } from "@/lib/trainerMouth";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -97,8 +97,6 @@ export function AvatarNarrator({
   // Sprite readiness: null = probing, true = PNG found, false = not found → CSS fallback
   // No sprite PNGs ship with the app. The mouth is drawn (SVG) and eyes blink with a CSS lid,
   // and sprite files are never requested, so nothing is fetched from /trainers/ inside an LMS.
-  const hasMouthSprite = false;
-  const hasBlinkSprite = false;
   const [isBlinking,     setIsBlinking]     = useState(false);
 
   const avatarVideoRef          = useRef<HTMLVideoElement | null>(null);
@@ -123,7 +121,24 @@ export function AvatarNarrator({
   const faceOverlayRef = useRef<HTMLDivElement | null>(null);
   const mouthOpenness = isTalking ? Math.min(1, Math.max(0, lipSyncProfile.visemes[effectiveViseme].height / 1.1)) : 0;
   const faceFacePoints = TRAINER_FACE_POINTS[trainerId] || DEFAULT_FACE;
-  const faceOverlayMarkup = trainerOverlayMarkup(faceFacePoints, `narrator-${trainerId}`);
+  // Painted images are used only when all three exist for this trainer (probed below); otherwise the drawn mouth.
+  const [paintedSprites, setPaintedSprites] = useState<TrainerSprites | null>(null);
+  useEffect(() => {
+    let alive = true;
+    setPaintedSprites(null);
+    const urls = trainerSpriteUrls(trainerId);
+    const keys = Object.keys(urls) as (keyof TrainerSprites)[];
+    Promise.all(keys.map((key) => new Promise<boolean>((resolve) => {
+      const probe = new Image();
+      probe.onload = () => resolve(true);
+      probe.onerror = () => resolve(false);
+      probe.src = urls[key];
+    }))).then((found) => {
+      if (alive && found.every(Boolean)) setPaintedSprites(urls);
+    });
+    return () => { alive = false; };
+  }, [trainerId]);
+  const faceOverlayMarkup = trainerOverlayMarkup(faceFacePoints, `narrator-${trainerId}`, paintedSprites || undefined);
   useEffect(() => { applyMouthOpenness(faceOverlayRef.current, mouthOpenness); }, [mouthOpenness]);
   useEffect(() => { setTrainerBlink(faceOverlayRef.current, isBlinking); }, [isBlinking]);
 

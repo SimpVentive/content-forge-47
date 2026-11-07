@@ -2,7 +2,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
 import { TRAINER_FACE_POINTS, type TrainerFacePoints } from "@/lib/trainerFacePoints";
-import { MOUTH_SPEC, applyMouthOpenness, setTrainerBlink, trainerOverlayMarkup, trainerStageStyle } from "@/lib/trainerMouth";
+import { MOUTH_SPEC, applyMouthOpenness, setTrainerBlink, trainerOverlayMarkup, trainerSpriteUrls, trainerStageStyle, type TrainerSprites } from "@/lib/trainerMouth";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 
 /* ── helpers ── */
@@ -886,20 +886,36 @@ async function computeMouthTrack(base64: string): Promise<string | null> {
 }
 
 /* ── Speaker card: the shared trainer mouth and blink (see lib/trainerMouth.ts) ── */
-function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack: string | null, points: TrainerFacePoints | undefined): string {
+function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack: string | null, points: TrainerFacePoints | undefined, sprites: TrainerSprites | null = null): string {
   if (!mouthTrack || !points) {
     return `<div class="speaker-card"><img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/></div>`;
   }
   return `<div class="speaker-card" id="speakerCard">
     <div class="speaker-stage" style="${trainerStageStyle(points)}">
       <img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/>
-      <div id="speakerOverlay">${trainerOverlayMarkup(points, "scorm")}</div>
+      <div id="speakerOverlay">${trainerOverlayMarkup(points, "scorm", sprites || undefined)}</div>
     </div>
   </div>
   <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_FPS = ${MOUTH_TRACK_FPS}; var MOUTH_SPEC = ${JSON.stringify(MOUTH_SPEC)};
   ${applyMouthOpenness.toString()}
   ${setTrainerBlink.toString()}
   </script>`;
+}
+
+/* Painted mouth/blink images for one trainer: used only when all three exist (no partial sets). */
+async function fetchTrainerSpriteFiles(trainerId: string): Promise<{ urls: TrainerSprites; blobs: Record<keyof TrainerSprites, Blob> } | null> {
+  try {
+    const urls = trainerSpriteUrls(trainerId);
+    const entries = await Promise.all((Object.keys(urls) as (keyof TrainerSprites)[]).map(async (key) => {
+      const response = await fetch(new URL(urls[key], window.location.origin));
+      if (!response.ok || !(response.headers.get("content-type") || "").startsWith("image/")) return null;
+      return [key, await response.blob()] as const;
+    }));
+    if (entries.some((e) => e === null)) return null;
+    return { urls, blobs: Object.fromEntries(entries as (readonly [keyof TrainerSprites, Blob])[]) as Record<keyof TrainerSprites, Blob> };
+  } catch {
+    return null;
+  }
 }
 
 /* ── Module HTML page builder ── */
@@ -916,7 +932,8 @@ function buildModuleHtml(
   avatarImageSrc: string | null = null,
   avatarName = "Sarah",
   mouthTrack: string | null = null,
-  trainerId = ""
+  trainerId = "",
+  sprites: TrainerSprites | null = null
 ): string {
   // Split narration into sentences for highlighting
   const sentences = narrationText
@@ -1194,7 +1211,7 @@ function buildModuleHtml(
     `<div class="scorm-screen" data-screen-index="${sectionIndex}">${renderSection(section, sectionIndex)}</div>`
   ).join("\n");
 
-  const speakerCardHtml = audioSrc ? buildSpeakerCard(avatarImageSrc || "", avatarName, mouthTrack, TRAINER_FACE_POINTS[trainerId]) : "";
+  const speakerCardHtml = audioSrc ? buildSpeakerCard(avatarImageSrc || "", avatarName, mouthTrack, TRAINER_FACE_POINTS[trainerId], sprites) : "";
   const audioHtml = audioSrc ? `
       <div class="audio-section">
         <div class="audio-header">
@@ -2034,6 +2051,19 @@ export async function exportScormPackage(
     if (track) mouthTrackMap.set(idx, track);
   }
 
+  // Painted mouth images (when a trainer has all three). Inside the package they are relative paths only.
+  const spriteFiles = await fetchTrainerSpriteFiles(avatarTrainerId);
+  const packagedSprites: TrainerSprites | null = spriteFiles ? {
+    slight: "assets/trainer-mouth-slight.png",
+    open: "assets/trainer-mouth-open.png",
+    blink: "assets/trainer-blink.png",
+  } : null;
+  if (spriteFiles && packagedSprites) {
+    zip.file(packagedSprites.slight, spriteFiles.blobs.slight);
+    zip.file(packagedSprites.open, spriteFiles.blobs.open);
+    zip.file(packagedSprites.blink, spriteFiles.blobs.blink);
+  }
+
   let avatarImageSrc: string | null = null;
   try {
     const avatarResponse = await fetch(`/trainers/${avatarTrainerId}.png`);
@@ -2050,6 +2080,7 @@ export async function exportScormPackage(
   zip.file("imsmanifest.xml", buildManifest(courseTitle, modules, (i) => [
     ...(audioSrcMap.has(i) ? [audioSrcMap.get(i) as string] : []),
     ...(avatarImageSrc ? [avatarImageSrc] : []),
+    ...(packagedSprites ? [packagedSprites.slight, packagedSprites.open, packagedSprites.blink] : []),
   ]));
 
   // Extract images from data URLs and add them as separate files
@@ -2102,7 +2133,7 @@ export async function exportScormPackage(
     const audioSrc = audioSrcMap.get(i) || null;
     const narrationText = voiceSections[i]?.narration_text || "";
     const moduleVideos = insertedVideos.filter((video) => normalizeTextKey(video.moduleTitle || "") === normalizeTextKey(mod.title));
-    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioSrc, narrationText, moduleVideos, avatarImageSrc, avatarName, mouthTrackMap.get(i) || null, avatarTrainerId);
+    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioSrc, narrationText, moduleVideos, avatarImageSrc, avatarName, mouthTrackMap.get(i) || null, avatarTrainerId, packagedSprites);
     zip.file(`module_${i + 1}.html`, html);
   });
 

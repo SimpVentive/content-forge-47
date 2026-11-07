@@ -16,7 +16,23 @@ export const MOUTH_SPEC = {
   eyeRx: 4.4,           // eyelid half-width (% of picture width)
   eyeRy: 1.1,           // eyelid half-height when the eye is open-size (% of picture height)
   blinkRy: 1.1,         // eyelid half-height while blinking
+  spriteSlightFrom: 0.02, // painted-image mode: "slight" image from this openness
+  spriteOpenFrom: 0.5,    // painted-image mode: "open" image from this openness
 };
+
+/**
+ * Painted mouth and blink images for a trainer: {id}-mouth-slight.png, {id}-mouth-open.png, {id}-blink.png,
+ * each the same 1024×1536 size as the base picture. When all three exist they replace the drawn mouth.
+ */
+export type TrainerSprites = { slight: string; open: string; blink: string };
+
+export function trainerSpriteUrls(trainerId: string, dir = "/trainers"): TrainerSprites {
+  return {
+    slight: `${dir}/${trainerId}-mouth-slight.png`,
+    open: `${dir}/${trainerId}-mouth-open.png`,
+    blink: `${dir}/${trainerId}-blink.png`,
+  };
+}
 
 /** Position of the zoomed stage that holds the picture and the mouth overlay together (React style object). */
 export function trainerStageBox(points: TrainerFacePoints): { left: string; top: string; width: string; height: string } {
@@ -35,8 +51,16 @@ export function trainerStageStyle(points: TrainerFacePoints): string {
   return `left:${b.left};top:${b.top};width:${b.width};height:${b.height}`;
 }
 
-/** SVG overlay: eyelids (skin colour) and the mouth opening with its teeth strip. Numbers only, no user text. */
-export function trainerOverlayMarkup(points: TrainerFacePoints, idPrefix: string): string {
+/**
+ * Overlay for the stage. With sprites it holds the three painted images (all hidden until used);
+ * without them it holds the drawn mouth and skin-coloured eyelids. Numbers and trusted URLs only.
+ */
+export function trainerOverlayMarkup(points: TrainerFacePoints, idPrefix: string, sprites?: TrainerSprites): string {
+  if (sprites) {
+    const img = (role: string, src: string) =>
+      `<img data-role="${role}" src="${src}" alt="" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none"/>`;
+    return img("sprite-slight", sprites.slight) + img("sprite-open", sprites.open) + img("sprite-blink", sprites.blink);
+  }
   const m = points.mouth;
   const lid = (e: FacePoint) => `<ellipse data-role="lid" cx="${e.x}" cy="${e.y}" rx="${MOUTH_SPEC.eyeRx}" ry="0" fill="${points.skin}"/>`;
   return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible">`
@@ -49,18 +73,27 @@ export function trainerOverlayMarkup(points: TrainerFacePoints, idPrefix: string
 }
 
 /**
- * Sets the mouth from openness (0 closed, 1 fully open).
+ * Sets the mouth from openness (0 closed, 1 fully open), in either mode.
+ * Closed always shows the painted lips (nothing drawn on top).
  * Self-contained on purpose: the SCORM template embeds this function's source, so it may only use
  * MOUTH_SPEC and its arguments.
  */
 export function applyMouthOpenness(root: ParentNode | null, openness: number): void {
   if (!root) return;
+  const o = Math.max(0, Math.min(1, openness));
+  const slight = root.querySelector('[data-role="sprite-slight"]');
+  if (slight) {
+    const open = root.querySelector('[data-role="sprite-open"]');
+    if (!open) return;
+    slight.setAttribute("style", slight.getAttribute("style").replace(/opacity:[^;]*/, "opacity:" + (o >= MOUTH_SPEC.spriteSlightFrom && o < MOUTH_SPEC.spriteOpenFrom ? "1" : "0")));
+    open.setAttribute("style", open.getAttribute("style").replace(/opacity:[^;]*/, "opacity:" + (o >= MOUTH_SPEC.spriteOpenFrom ? "1" : "0")));
+    return;
+  }
   const group = root.querySelector('[data-role="mouth"]');
   const opening = root.querySelector('[data-role="opening"]');
   const clip = root.querySelector('[data-role="clip"]');
   const teeth = root.querySelector('[data-role="teeth"]');
   if (!group || !opening || !clip || !teeth) return;
-  const o = Math.max(0, Math.min(1, openness));
   const cy = parseFloat(group.getAttribute("data-cy") || "0");
   const ry = o > 0.02 ? MOUTH_SPEC.ryMin + MOUTH_SPEC.ryRange * o : 0;
   group.setAttribute("opacity", ry > 0 ? "1" : "0");
@@ -71,9 +104,14 @@ export function applyMouthOpenness(root: ParentNode | null, openness: number): v
   teeth.setAttribute("opacity", o >= MOUTH_SPEC.teethShowFrom ? "1" : "0");
 }
 
-/** Closes the eyelids (skin colour) for a blink, or opens them. Same self-contained rule as above. */
+/** Blink: closes the eyelids (drawn: skin colour; painted: the blink image) or opens them. Same self-contained rule. */
 export function setTrainerBlink(root: ParentNode | null, closed: boolean): void {
   if (!root) return;
+  const blink = root.querySelector('[data-role="sprite-blink"]');
+  if (blink) {
+    blink.setAttribute("style", blink.getAttribute("style").replace(/opacity:[^;]*/, "opacity:" + (closed ? "1" : "0")));
+    return;
+  }
   const lids = root.querySelectorAll('[data-role="lid"]');
   for (let i = 0; i < lids.length; i++) {
     lids[i].setAttribute("ry", closed ? String(MOUTH_SPEC.blinkRy) : "0");
