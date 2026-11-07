@@ -1,6 +1,7 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
+import { TRAINER_FACE_POINTS } from "@/lib/trainerFacePoints";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 
 /* ── helpers ── */
@@ -844,17 +845,6 @@ function scormSetScore(score) {
 // Pass mark for SCORM assessment (percent). Could be made configurable later.
 const PASS_MARK_PERCENT = 70;
 
-// Trainer face points, in % of the 1024×1536 picture. Copied from AvatarNarrator FACE_COORDS:
-// keep the two in sync when a trainer is re-measured.
-const TRAINER_FACE_POINTS: Record<string, { eyeLeft: { x: number; y: number }; eyeRight: { x: number; y: number }; mouth: { x: number; y: number } }> = {
-  priya: { eyeLeft: { x: 56.64, y: 27.99 }, eyeRight: { x: 43.65, y: 27.99 }, mouth: { x: 49.32, y: 35.81 } },
-  arjun: { eyeLeft: { x: 54.98, y: 26.43 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 47.66, y: 34.64 } },
-  soumya: { eyeLeft: { x: 55.66, y: 26.69 }, eyeRight: { x: 42.97, y: 26.89 }, mouth: { x: 48.63, y: 34.44 } },
-  vedprakash: { eyeLeft: { x: 54.30, y: 25.59 }, eyeRight: { x: 42.68, y: 25.59 }, mouth: { x: 48.34, y: 33.33 } },
-  atul: { eyeLeft: { x: 53.71, y: 25.98 }, eyeRight: { x: 41.99, y: 25.98 }, mouth: { x: 47.36, y: 34.24 } },
-  irina: { eyeLeft: { x: 55.37, y: 26.69 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 48.63, y: 34.64 } },
-  john: { eyeLeft: { x: 53.32, y: 25.98 }, eyeRight: { x: 42.29, y: 25.98 }, mouth: { x: 47.9, y: 33.9 } },
-};
 
 // Mouth track: one digit (0–9) per frame, 25 frames per second, from the narration audio.
 const MOUTH_TRACK_FPS = 25;
@@ -1498,7 +1488,7 @@ function buildModuleHtml(
     .audio-player::-webkit-media-controls-panel { background: var(--card); color: var(--text); }
     .audio-player::-webkit-media-controls-current-time-display,
     .audio-player::-webkit-media-controls-time-remaining-display { color: var(--text); }
-    .speaker-card { position: relative; width: 240px; max-width: 100%; aspect-ratio: 2 / 3; margin: 0 auto 16px; border-radius: 20px; overflow: hidden; background: #eef2ff; box-shadow: 0 12px 28px rgba(15,23,42,0.18); }
+    .speaker-card { position: relative; width: 360px; max-width: 100%; aspect-ratio: 2 / 3; margin: 0 auto 16px; border-radius: 20px; overflow: hidden; background: #eef2ff; box-shadow: 0 12px 28px rgba(15,23,42,0.18); }
     .speaker-image { display: block; width: 100%; height: 100%; object-fit: cover; }
     .speaker-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
     .audio-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }

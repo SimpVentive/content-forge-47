@@ -3,6 +3,7 @@ import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
+import { DEFAULT_FACE, TRAINER_FACE_POINTS } from "@/lib/trainerFacePoints";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,16 +40,6 @@ const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "a
 
 // CSS-overlay facial coordinates — exact pctX/pctY from narrator_config.json
 // These are percentages of the original 1024×1536 image.
-const FACE_COORDS: Record<string, { eyeLeft: { x: number; y: number }; eyeRight: { x: number; y: number }; mouth: { x: number; y: number } }> = {
-  priya:      { eyeLeft: { x: 56.64, y: 27.99 }, eyeRight: { x: 43.65, y: 27.99 }, mouth: { x: 49.32, y: 35.81 } },
-  arjun:      { eyeLeft: { x: 54.98, y: 26.43 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 47.66, y: 34.64 } },
-  soumya:     { eyeLeft: { x: 55.66, y: 26.69 }, eyeRight: { x: 42.97, y: 26.89 }, mouth: { x: 48.63, y: 34.44 } },
-  vedprakash: { eyeLeft: { x: 54.30, y: 25.59 }, eyeRight: { x: 42.68, y: 25.59 }, mouth: { x: 48.34, y: 33.33 } },
-  atul:       { eyeLeft: { x: 53.71, y: 25.98 }, eyeRight: { x: 41.99, y: 25.98 }, mouth: { x: 47.36, y: 34.24 } },
-  irina:      { eyeLeft: { x: 55.37, y: 26.69 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 48.63, y: 34.64 } },
-  john:       { eyeLeft: { x: 53.32, y: 25.98 }, eyeRight: { x: 42.29, y: 25.98 }, mouth: { x: 47.9, y: 33.9 } },
-};
-const DEFAULT_FACE = { eyeLeft: { x: 55, y: 27 }, eyeRight: { x: 43, y: 27 }, mouth: { x: 48.5, y: 34.5 } };
 
 // Source image is 1024×1536 (2:3). The face layer keeps that ratio and every overlay
 // is positioned in % of it, so the eyes and mouth stay on the face at any width.
@@ -460,7 +451,7 @@ export function AvatarNarrator({
 
                 {/* LAYER 1b — CSS blink overlay fallback (when no sprite PNG) */}
                 {hasBlinkSprite === false && (() => {
-                  const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
+                  const face = TRAINER_FACE_POINTS[trainerId] || DEFAULT_FACE;
                   return (
                     <>
                       <div aria-hidden="true" className="pointer-events-none absolute" style={{
@@ -498,7 +489,7 @@ export function AvatarNarrator({
                   It sits in the same head-tilt wrapper as the face, so it moves with the head.
                 */}
                 {hasMouthSprite === false && (() => {
-                  const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
+                  const face = TRAINER_FACE_POINTS[trainerId] || DEFAULT_FACE;
                   const shape = lipSyncProfile.visemes[effectiveViseme];
                   // 0 = closed, 1 = fully open. Vowels open the jaw; rest/mbp stay closed.
                   const openness = isTalking ? Math.min(1, Math.max(0, shape.height / 1.1)) : 0;
