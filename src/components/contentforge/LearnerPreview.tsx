@@ -13,7 +13,7 @@ import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOption
 import { fitSvgToContent } from "@/lib/svgFit";
 import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
-import { computeMouthTrackFromAudio } from "@/lib/mouthTrack";
+import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
 import { mouthFrameAt, type MouthFrame } from "@/lib/trainerMouth";
 
 /* helpers */
@@ -1792,7 +1792,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
       const slideForTrack = currentSlide;
       void fetch(url)
         .then((r) => r.arrayBuffer())
-        .then((bytes) => computeMouthTrackFromAudio(bytes))
+        .then((bytes) => mouthTrackForAudio(bytes))
         .then((track) => { if (track) mouthTracksRef.current[slideForTrack] = track; })
         .catch(() => {});
       const audio = new Audio(url);

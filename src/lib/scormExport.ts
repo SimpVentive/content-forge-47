@@ -3,7 +3,7 @@ import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
 import { TRAINER_FACE_POINTS, type TrainerFacePoints } from "@/lib/trainerFacePoints";
 import { mouthFrameAt, renderMouthFrame, trainerSpriteUrls, trainerStageStyle, type TrainerSprites } from "@/lib/trainerMouth";
-import { computeMouthTrackFromAudio } from "@/lib/mouthTrack";
+import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 
 /* ── helpers ── */
@@ -2012,7 +2012,7 @@ export async function exportScormPackage(
   // so the package carries the timing and needs no audio analysis when it runs in an LMS.
   const mouthTrackMap = new Map<number, string>();
   for (const [idx, base64] of audioBase64Map) {
-    const track = await computeMouthTrackFromAudio(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer);
+    const track = await mouthTrackForAudio(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer);
     if (track) mouthTrackMap.set(idx, track);
   }
 
