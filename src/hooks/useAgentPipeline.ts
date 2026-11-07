@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
@@ -466,6 +466,12 @@ const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
+// Cards still marked "running" after a run has ended (stopped or failed) are reset, so they never show work that isn't happening.
+function settleRunningStatuses(prev: Record<string, AgentStatus>): Record<string, AgentStatus> {
+  if (!Object.values(prev).includes("running")) return prev;
+  return Object.fromEntries(Object.entries(prev).map(([id, status]) => [id, status === "running" ? "idle" : status])) as Record<string, AgentStatus>;
+}
+
 const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", animation: "", youtube: "", compliance: "", assessment: "", quality: "", voice: "", assembly: "", "final-qa": "" });
 
 /**
@@ -2079,8 +2085,15 @@ ${modeInstructions}`;
 
   const stopPipeline = useCallback(() => {
     cancelledRef.current = true;
-    addLog("Orchestrator: Stop requested — finishing current agent...");
+    setAgentStatuses((prev) => settleRunningStatuses(prev));
+    setIsRunning(false);
+    addLog("Orchestrator: Stop requested — the run ends now.");
   }, [addLog]);
+
+  // Whenever the run is not running, no card may still show "running".
+  useEffect(() => {
+    if (!isRunning) setAgentStatuses((prev) => settleRunningStatuses(prev));
+  }, [isRunning]);
 
   const applyQAFixes = useCallback(async () => {
     if (!qaResult?.wasAutoFixed || !qaResult.revisedOutputs) {
