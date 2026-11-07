@@ -4,6 +4,7 @@ import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 import { DEFAULT_FACE, TRAINER_FACE_POINTS } from "@/lib/trainerFacePoints";
+import { applyMouthOpenness, setTrainerBlink, trainerOverlayMarkup, trainerStageBox } from "@/lib/trainerMouth";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,13 +46,9 @@ const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "a
 // is positioned in % of it, so the eyes and mouth stay on the face at any width.
 const ORIG_W  = 1024, ORIG_H  = 1536;
 
-const EYE_W = (90 / ORIG_W) * 100;   // % of face width
-const EYE_H = (32 / ORIG_H) * 100;   // % of face height
 // Lip size, measured on the trainer art: the dark lip line is 51–59 px wide on a 512 px image,
 // and the lips are about 2.8% of the image height. Percent of the image, so the overlay
 // scales with the face at any render width.
-const MOUTH_LIP_W_PCT = 11.5; // % of image width
-const MOUTH_LIP_H_PCT = 2.8;  // % of image height
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -122,6 +119,13 @@ export function AvatarNarrator({
   const isTalking  = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
   const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
   const mouthState = getVisemeMouthState(effectiveViseme, isTalking);
+  // Shared mouth and blink (lib/trainerMouth.ts): the same functions drive the SCORM card.
+  const faceOverlayRef = useRef<HTMLDivElement | null>(null);
+  const mouthOpenness = isTalking ? Math.min(1, Math.max(0, lipSyncProfile.visemes[effectiveViseme].height / 1.1)) : 0;
+  const faceFacePoints = TRAINER_FACE_POINTS[trainerId] || DEFAULT_FACE;
+  const faceOverlayMarkup = trainerOverlayMarkup(faceFacePoints, `narrator-${trainerId}`);
+  useEffect(() => { applyMouthOpenness(faceOverlayRef.current, mouthOpenness); }, [mouthOpenness]);
+  useEffect(() => { setTrainerBlink(faceOverlayRef.current, isBlinking); }, [isBlinking]);
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
@@ -438,100 +442,16 @@ export function AvatarNarrator({
                     transformOrigin: "50% 71%",
                   }}
                 >
-                {/*
-                  LAYER 0 — base head image
-                  Subtle 9 s head-tilt animation gives life without being distracting.
-                */}
-                <img
-                  src={avatarImageUrl}
-                  alt={trainerName}
-                  className="absolute inset-0 h-full w-full object-cover object-top"
-                  onError={() => setHasAvatarImage(false)}
-                />
-
-                {/* LAYER 1b — CSS blink overlay fallback (when no sprite PNG) */}
-                {hasBlinkSprite === false && (() => {
-                  const face = TRAINER_FACE_POINTS[trainerId] || DEFAULT_FACE;
-                  return (
-                    <>
-                      <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: `${face.eyeLeft.x}%`, top: `${face.eyeLeft.y}%`,
-                        width: `${EYE_W}%`, height: `${EYE_H}%`, borderRadius: "50%", overflow: "hidden",
-                        transform: "translate(-50%, -50%)",
-                      }}>
-                        <div style={{
-                          width: "100%", height: "100%", borderRadius: "50%",
-                          background: "rgba(20,10,5,0.82)",
-                          transform: isBlinking ? "scaleY(1)" : "scaleY(0)",
-                          transformOrigin: "top center",
-                          transition: "transform 70ms ease-in",
-                        }} />
-                      </div>
-                      <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: `${face.eyeRight.x}%`, top: `${face.eyeRight.y}%`,
-                        width: `${EYE_W}%`, height: `${EYE_H}%`, borderRadius: "50%", overflow: "hidden",
-                        transform: "translate(-50%, -50%)",
-                      }}>
-                        <div style={{
-                          width: "100%", height: "100%", borderRadius: "50%",
-                          background: "rgba(20,10,5,0.82)",
-                          transform: isBlinking ? "scaleY(1)" : "scaleY(0)",
-                          transformOrigin: "top center",
-                          transition: "transform 70ms ease-in",
-                        }} />
-                      </div>
-                    </>
-                  );
-                })()}
-                {/*
-                  LAYER 2b — CSS mouth overlay fallback (when no sprite PNG).
-                  Lips and opening are sized from MOUTH_LIP_* and follow the viseme, so the mouth opens and closes with speech.
-                  It sits in the same head-tilt wrapper as the face, so it moves with the head.
-                */}
-                {hasMouthSprite === false && (() => {
-                  const face = TRAINER_FACE_POINTS[trainerId] || DEFAULT_FACE;
-                  const shape = lipSyncProfile.visemes[effectiveViseme];
-                  // 0 = closed, 1 = fully open. Vowels open the jaw; rest/mbp stay closed.
-                  const openness = isTalking ? Math.min(1, Math.max(0, shape.height / 1.1)) : 0;
-                  const openRy = 1.5 + 15 * openness;   // half the mouth opening, in SVG units (0–100)
-                  const lipRy = openRy + 9;             // lips sit just outside the opening
-                  const teethVisible = openness > 0.15;
-                  const clipId = `narrator-mouth-${trainerId}`;
-                  return (
-                    <div aria-hidden="true" className="pointer-events-none absolute inset-0" style={{
-                      animation: isTalking ? "headTilt 9s ease-in-out infinite" : "none",
-                      transformOrigin: "50% 80%",
-                    }}>
-                      <div className="absolute" style={{
-                        left: `${face.mouth.x}%`, top: `${face.mouth.y}%`,
-                        width: `${MOUTH_LIP_W_PCT * shape.width}%`,
-                        height: `${MOUTH_LIP_H_PCT * 3.4}%`,
-                        opacity: isTalking ? 1 : 0,
-                        transform: "translate(-50%, -50%)",
-                        transition: "width 50ms ease-out, opacity 120ms ease-out",
-                      }}>
-                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: "100%", height: "100%", display: "block", overflow: "visible" }}>
-                          <defs>
-                            <clipPath id={clipId}>
-                              <ellipse cx="50" cy="50" rx="42" ry={openRy} />
-                            </clipPath>
-                          </defs>
-                          {/* Lips */}
-                          <ellipse cx="50" cy="50" rx="47" ry={lipRy} fill="#A8524A" stroke="#5E2622" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                          {/* Mouth interior */}
-                          <ellipse cx="50" cy="50" rx="42" ry={openRy} fill="#2B0F0C" />
-                          <g clipPath={`url(#${clipId})`}>
-                            {/* Tongue */}
-                            <ellipse cx="50" cy={50 + openRy * 0.7} rx="24" ry={openRy * 0.6} fill="#C9646D" />
-                            {/* Upper teeth */}
-                            <rect x="8" y={50 - openRy} width="84" height="10" fill="#FFFFFF" opacity={teethVisible ? 1 : 0} />
-                            <line x1="8" x2="92" y1={50 - openRy + 10} y2={50 - openRy + 10} stroke="#B9B2A6" strokeWidth="1" vectorEffect="non-scaling-stroke" opacity={teethVisible ? 1 : 0} />
-                          </g>
-                        </svg>
-                      </div>
-                    </div>
-                  );
-                })()}
+                {/* Zoomed stage: the picture and the drawn mouth/blink share one coordinate system (lib/trainerMouth.ts) */}
+                <div className="absolute" style={trainerStageBox(faceFacePoints)}>
+                  <img
+                    src={avatarImageUrl}
+                    alt={trainerName}
+                    className="absolute inset-0 h-full w-full object-cover object-top"
+                    onError={() => setHasAvatarImage(false)}
+                  />
+                  <div ref={faceOverlayRef} className="absolute inset-0" dangerouslySetInnerHTML={{ __html: faceOverlayMarkup }} />
+                </div>
                 </div>
               </>
             ) : (

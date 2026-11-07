@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
 import { TRAINER_FACE_POINTS, type TrainerFacePoints } from "@/lib/trainerFacePoints";
+import { MOUTH_SPEC, applyMouthOpenness, setTrainerBlink, trainerOverlayMarkup, trainerStageStyle } from "@/lib/trainerMouth";
 import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 
 /* ── helpers ── */
@@ -884,35 +885,21 @@ async function computeMouthTrack(base64: string): Promise<string | null> {
   }
 }
 
-/* ── Speaker card: the trainer picture with a narrow drawn mouth and a skin-coloured blink ── */
+/* ── Speaker card: the shared trainer mouth and blink (see lib/trainerMouth.ts) ── */
 function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack: string | null, points: TrainerFacePoints | undefined): string {
   if (!mouthTrack || !points) {
     return `<div class="speaker-card"><img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/></div>`;
   }
-  // Everything is in % of the picture. The painted lips stay as they are; the overlay adds only the
-  // opening, a thin strip of upper teeth, and an eyelid in the trainer's skin tone for blinks.
-  const m = points.mouth;
-  const eyeRx = 4.4, eyeRy = 1.1, openRx = 3.7;
-  const eye = (e: { x: number; y: number }) => `<ellipse class="eyelid" cx="${e.x}" cy="${e.y}" rx="${eyeRx}" ry="0" fill="${points.skin}"/>`;
-  // Zoom on the face like the app's narrator: the stage holds the picture and the overlay together,
-  // so the mouth stays on the painted mouth at any zoom.
-  const zoom = 1.6;
-  const stageLeft = (50 - m.x * zoom).toFixed(2), stageTop = (40 - m.y * zoom).toFixed(2);
   return `<div class="speaker-card" id="speakerCard">
-    <div class="speaker-stage" style="left:${stageLeft}%;top:${stageTop}%;width:${zoom * 100}%;height:${zoom * 100}%">
-    <img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/>
-    <svg class="speaker-overlay" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-      <defs><clipPath id="mouthClip"><ellipse id="mouthClipEllipse" cx="${m.x}" cy="${m.y}" rx="${openRx}" ry="0.3"/></clipPath></defs>
-      ${eye(points.eyeLeft)}
-      ${eye(points.eyeRight)}
-      <g id="mouth" opacity="0">
-        <ellipse id="mouthOpening" cx="${m.x}" cy="${m.y}" rx="${openRx}" ry="0.3" fill="#2e1210" fill-opacity="0.85" stroke="#8a4a42" stroke-width="0.6" vector-effect="non-scaling-stroke"/>
-        <rect id="mouthTeeth" clip-path="url(#mouthClip)" x="${(m.x - openRx).toFixed(2)}" y="${m.y}" width="${(openRx * 2).toFixed(2)}" height="0.2" fill="#ffffff" opacity="0"/>
-      </g>
-    </svg>
+    <div class="speaker-stage" style="${trainerStageStyle(points)}">
+      <img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/>
+      <div id="speakerOverlay">${trainerOverlayMarkup(points, "scorm")}</div>
     </div>
   </div>
-  <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_FPS = ${MOUTH_TRACK_FPS}; var EYE_RY = ${eyeRy};</script>`;
+  <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_FPS = ${MOUTH_TRACK_FPS}; var MOUTH_SPEC = ${JSON.stringify(MOUTH_SPEC)};
+  ${applyMouthOpenness.toString()}
+  ${setTrainerBlink.toString()}
+  </script>`;
 }
 
 /* ── Module HTML page builder ── */
@@ -1718,40 +1705,23 @@ function buildModuleHtml(
     // It needs no AudioContext, so it still moves when the LMS blocks audio analysis.
     (function () {
       var audioEl = document.getElementById('moduleAudio');
-      var mouth = document.getElementById('mouth');
-      var opening = document.getElementById('mouthOpening');
-      var clip = document.getElementById('mouthClipEllipse');
-      var teeth = document.getElementById('mouthTeeth');
-      var lids = document.querySelectorAll('#speakerCard .eyelid');
-      if (!audioEl || !mouth || typeof MOUTH_TRACK === 'undefined' || !MOUTH_TRACK) return;
-      var cy = parseFloat(opening.getAttribute('cy'));
+      var overlay = document.getElementById('speakerOverlay');
+      if (!audioEl || !overlay || typeof MOUTH_TRACK === 'undefined' || !MOUTH_TRACK) return;
       var rafId = 0;
-      function setOpen(v) {
-        var openness = Math.max(0, Math.min(1, v / 9));
-        var ry = openness > 0.02 ? 0.2 + 0.8 * openness : 0;   // narrow: at most about 2% of the picture height
-        mouth.setAttribute('opacity', ry > 0 ? '1' : '0');
-        opening.setAttribute('ry', ry.toFixed(2));
-        clip.setAttribute('ry', Math.max(ry, 0.01).toFixed(2));
-        teeth.setAttribute('y', (cy - ry).toFixed(2));
-        teeth.setAttribute('height', (ry * 0.4).toFixed(2));
-        teeth.setAttribute('opacity', openness > 0.5 ? '0.95' : '0');
-      }
       function frame() {
-        if (audioEl.paused || audioEl.ended) { setOpen(0); rafId = 0; return; }
+        if (audioEl.paused || audioEl.ended) { applyMouthOpenness(overlay, 0); rafId = 0; return; }
         var idx = Math.floor(audioEl.currentTime * MOUTH_FPS);
-        setOpen(idx < MOUTH_TRACK.length ? MOUTH_TRACK.charCodeAt(idx) - 48 : 0);
+        applyMouthOpenness(overlay, (idx < MOUTH_TRACK.length ? MOUTH_TRACK.charCodeAt(idx) - 48 : 0) / 9);
         rafId = requestAnimationFrame(frame);
       }
       audioEl.addEventListener('play', function () { if (!rafId) rafId = requestAnimationFrame(frame); });
-      audioEl.addEventListener('pause', function () { setOpen(0); });
-      audioEl.addEventListener('ended', function () { setOpen(0); });
-      setOpen(0);
-      // Blink: the eyelid (skin colour) covers the eye only for about 140 ms.
-      function setLids(ry) { for (var i = 0; i < lids.length; i++) lids[i].setAttribute('ry', String(ry)); }
+      audioEl.addEventListener('pause', function () { applyMouthOpenness(overlay, 0); });
+      audioEl.addEventListener('ended', function () { applyMouthOpenness(overlay, 0); });
+      applyMouthOpenness(overlay, 0);
       function blinkLater() {
         setTimeout(function () {
-          setLids(EYE_RY);
-          setTimeout(function () { setLids(0); blinkLater(); }, 140);
+          setTrainerBlink(overlay, true);
+          setTimeout(function () { setTrainerBlink(overlay, false); blinkLater(); }, 140);
         }, 2000 + Math.random() * 4000);
       }
       blinkLater();
