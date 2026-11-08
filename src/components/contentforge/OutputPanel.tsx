@@ -1,7 +1,8 @@
 ﻿import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
 import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2, AlertCircle, Info, Images } from "lucide-react";
-import { exportToScorm, downloadBlob } from "@/lib/scormExportOrchestrator";
+import { downloadBlob } from "@/lib/scormExportOrchestrator";
+import { createLearnerScormPackage } from "@/lib/learnerScormPackage";
 import { validateCourse, type QAReport } from "@/lib/qaValidator";
 import { toast } from "sonner";
 import { VoicePreview } from "./VoicePreview";
@@ -608,28 +609,15 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
                     }
                   }
                 } else {
+                  // The full learner player (slides, trainer narrator, narration audio, quiz, exit) in one package.
                   const hasVoice = !!rawOutputs.voice;
-                  const result = await exportToScorm(
-                    rawOutputs,
-                    {
-                      courseTitle,
-                      courseDescription: courseDuration,
-                      trainerId: avatarTrainerId,
-                      enableVoiceNarration: hasVoice,
-                      embedStrategy: "data-uri",
-                      passingScore: 70,
-                      courseVersion: "1.0",
-                    },
-                    (progress) => {
-                      if (progress.message) toast.info(progress.message, { duration: 2000 });
-                    }
+                  const { zip } = await createLearnerScormPackage(
+                    { courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, companyLogo: null },
+                    70,
+                    (message) => toast.info(message, { duration: 2000 }),
                   );
-
-                  if (!result.success || !result.fileBlob) {
-                    throw new Error(result.message || "Export failed");
-                  }
-
-                  downloadBlob(result.fileBlob, result.fileName);
+                  const blob = await zip.generateAsync({ type: "blob" });
+                  downloadBlob(blob, `${courseTitle.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "course"}_SCORM.zip`);
                   toast.success(hasVoice
                     ? "SCORM package with voice narration exported!"
                     : "SCORM package exported successfully!");

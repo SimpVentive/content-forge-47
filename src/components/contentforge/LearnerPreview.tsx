@@ -15,6 +15,7 @@ import { toast } from "sonner";
 import { logApiUsage } from "@/lib/edgeFunctions";
 import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
 import { mouthFrameAt, stepMouth, type MouthFrame } from "@/lib/trainerMouth";
+import { learnerExportMedia, type LearnerExportMedia } from "@/lib/learnerExportData";
 
 /* helpers */
 function tryParseJSON(raw: unknown): any | null {
@@ -617,7 +618,7 @@ function findModuleMatchedQuestionIndexes(mcqs: any[], module: Module): number[]
 }
 
 /* build slides from agent outputs */
-function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
+export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
   const writerText = typeof rawOutputs.writer === "string" ? rawOutputs.writer : rawOutputs.writer ? JSON.stringify(rawOutputs.writer) : "";
   const assessData = tryParseJSON(rawOutputs.assessment);
@@ -1222,7 +1223,38 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string 
 };
 
 
-interface LearnerPreviewProps {
+/** The text a slide speaks. The voice-agent narration is used when it exists; otherwise the slide's own content. */
+export function narrationTextForSlide(slides: { type: string; content?: string; question?: any; moduleIndex?: number; topicIndex?: number }[], slideIdx: number, voiceRaw: unknown): string {
+  const s = slides[slideIdx];
+  if (!s) return "";
+  if (s.type !== "content" && s.type !== "assessment") return "";
+  const narrationSections: { narration_text?: string }[] = tryParseJSON(voiceRaw)?.sections || [];
+  if (s.type === "content" && narrationSections.length) {
+    const contentSlides = slides.filter((sl) => sl.type === "content");
+    const contentIdx = contentSlides.indexOf(s);
+    if (contentIdx >= 0 && narrationSections[contentIdx]) {
+      const txt = narrationSections[contentIdx].narration_text || "";
+      if (txt) return txt;
+    }
+  }
+  if (s.type === "content") {
+    const parts = parseContentParts(s.content || "");
+    const lines: string[] = [];
+    if (parts.hook) lines.push(parts.hook);
+    parts.body.forEach((p) => lines.push(p));
+    if (parts.takeaway) lines.push(`Key takeaway: ${parts.takeaway}`);
+    return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
+  }
+  if (s.type === "assessment" && s.question) return s.question.question || "";
+  return "";
+}
+
+export interface LearnerPreviewProps {
+  /** Set for the exported SCORM player: no editor-only actions. */
+  standalone?: boolean;
+  /** Media packaged with the export (trainer picture, narration audio, intro images). */
+  exportMedia?: LearnerExportMedia;
+  companyLogo?: string | null;
   courseTitle: string;
   rawOutputs: RawAgentOutputs;
   onClose: () => void;
@@ -1269,12 +1301,12 @@ function getCourseNotesStorageKey(courseTitle: string): string {
   return `${PREVIEW_NOTES_STORAGE_KEY_PREFIX}.${normalizedTitle || "default"}`;
 }
 
-export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true }) => {
+export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ standalone = false, exportMedia, courseTitle, rawOutputs, onClose, insertedVideos = [], courseDuration, learnerNotesEnabled = true, resourcesPanelEnabled = true, glossaryEnabled = true, discussionEnabled = true, assessmentIntensity = "standard", avatarTrainerId, flipStylePreference, slideLayout, textLanguage, narratorLanguage, onUpdateVisualTopic, captionsEnabled = true }) => {
   // Prefer the explicit narrator language; fall back to text language; final fallback English.
   const effectiveNarratorLanguage = narratorLanguage || textLanguage || "English";
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
   const avatarEnv = import.meta.env as Record<string, string | undefined>;
-  const trainerMedia = getTrainerMedia(selectedTrainer.id, avatarEnv);
+  const trainerMedia = exportMedia?.trainerMedia || getTrainerMedia(selectedTrainer.id, avatarEnv);
   const trainerVoiceId = getTrainerVoiceId(selectedTrainer.id);
   const avatarVideoUrl = trainerMedia.videoUrl;
   const avatarPosterUrl = trainerMedia.posterUrl;
@@ -1393,8 +1425,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   const mouthTracksRef = useRef<Record<number, string>>({});
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlsRef = useRef<Record<number, string>>({});
-  const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>({});
+  const audioUrlsRef = useRef<Record<number, string>>({ ...(exportMedia?.audioBySlide || {}) });
+  const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>(exportMedia?.introImages || learnerExportMedia.get(courseTitle)?.introImages || {});
   const moduleIntroPending = useRef<Set<number>>(new Set());
   const visemeTimelinesRef = useRef<Record<number, VisemeCue[]>>({});
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -1594,41 +1626,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   }, [stopLipSync, runTimelineLipSync]);
 
   // Narration text for current slide - with fallback to slide content
-  const getNarrationForSlide = useCallback((slideIdx: number) => {
-    const s = slides[slideIdx];
-    if (!s) return "";
-
-    // Only get narration for content and assessment slides
-    if (s.type !== "content" && s.type !== "assessment") return "";
-
-    // Try voice agent output first (for content slides)
-    if (s.type === "content" && narrationSections.length) {
-      const contentSlides = slides.filter(sl => sl.type === "content");
-      const contentIdx = contentSlides.indexOf(s);
-      if (contentIdx >= 0 && narrationSections[contentIdx]) {
-        const txt = narrationSections[contentIdx].narration_text || "";
-        if (txt) return txt;
-      }
-    }
-
-    // For content slides, fallback: build narration from slide content
-    if (s.type === "content") {
-      const parts = parseContentParts(s.content || "");
-      const lines: string[] = [];
-      if (parts.hook) lines.push(parts.hook);
-      parts.body.forEach(p => lines.push(p));
-      if (parts.takeaway) lines.push(`Key takeaway: ${parts.takeaway}`);
-      return lines.join(". ").replace(/\.\./g, ".").slice(0, 2500) || "";
-    }
-
-    // For assessment slides, use the question as narration
-    if (s.type === "assessment" && s.question) {
-      const q = s.question;
-      return q.question || "";
-    }
-
-    return "";
-  }, [slides, narrationSections]);
+  const getNarrationForSlide = useCallback((slideIdx: number) => narrationTextForSlide(slides, slideIdx, rawOutputs.voice), [slides, rawOutputs.voice]);
 
   // Split narration into sentences for highlighting
   const narrationSentences = useMemo(() => {
@@ -1714,6 +1712,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
   }, [narrationSentences, narrationWords]);
 
   // Helper to wire up audio events
+  // The packaged player reports progress to the LMS: the screen reached, and completion on the last screen.
+  useEffect(() => {
+    if (!standalone) return;
+    const total = slides.length;
+    window.dispatchEvent(new CustomEvent("contentforge:progress", {
+      detail: { slide: currentSlide, total, score: 0, answered: 0, completed: total > 0 && currentSlide >= total - 1 },
+    }));
+  }, [standalone, currentSlide, slides.length]);
+
   // While narration plays, read the track at the audio's current time. No AudioContext is needed.
   useEffect(() => {
     if (!isPlaying) { setActiveMouth(null); return; }
@@ -1765,12 +1772,23 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, raw
 
     // If we already have audio for this slide, just play it
     if (audioUrlsRef.current[currentSlide]) {
+      // Packaged or earlier-loaded audio: make sure its mouth track exists too.
+      const trackSlide = currentSlide;
+      if (!mouthTracksRef.current[trackSlide]) {
+        void fetch(audioUrlsRef.current[trackSlide])
+          .then((r) => r.arrayBuffer())
+          .then((bytes) => mouthTrackForAudio(bytes))
+          .then((track) => { if (track) mouthTracksRef.current[trackSlide] = track; })
+          .catch(() => {});
+      }
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
       wireAudio(audio);
       await audio.play().catch(() => {});
       return;
     }
 
+    // The packaged player carries its narration audio and has no voice service.
+    if (standalone) return;
     // Fetch from ElevenLabs
     setAudioLoading(true);
     try {

@@ -7,7 +7,8 @@ import { HelpModal } from "@/components/HelpModal";
 import { AssetLibraryPanel } from "@/components/AssetLibraryPanel";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import { toast } from "sonner";
-import { exportToScorm, downloadBlob } from "@/lib/scormExportOrchestrator";
+import { downloadBlob } from "@/lib/scormExportOrchestrator";
+import { createLearnerScormPackage } from "@/lib/learnerScormPackage";
 import type { RawAgentOutputs } from "@/types/agents";
 
 type SidebarItemId = "courses" | "templates" | "assets" | "analytics" | "help";
@@ -121,26 +122,16 @@ export const Dashboard = () => {
         flipbookHTML: course.rawOutputs?.flipbookHTML || "",
       };
 
-      const result = await exportToScorm(rawOutputs, {
+      // The full learner player (same as the course preview), packaged as one SCORM zip.
+      const { zip } = await createLearnerScormPackage({
         courseTitle: course.title || "Untitled Course",
-        courseDescription: course.inputText,
-        trainerId: course.courseParams?.avatarTrainerId,
-        enableVoiceNarration: Boolean(course.rawOutputs?.voice),
-        embedStrategy: "data-uri",
-        passingScore: 70,
-        courseVersion: "1.0",
-      }, (progress) => {
-        if (progress.percentage === 100) {
-          toast.dismiss(toastId);
-        }
-      });
-
-      if (result.success && result.fileBlob) {
-        downloadBlob(result.fileBlob, result.fileName);
-        toast.success("SCORM package exported successfully!");
-      } else {
-        toast.error(result.message || "Export failed");
-      }
+        rawOutputs,
+        avatarTrainerId: course.courseParams?.avatarTrainerId,
+        insertedVideos: [],
+      }, 70, (message) => toast.info(message, { duration: 2000 }));
+      const blob = await zip.generateAsync({ type: "blob" });
+      downloadBlob(blob, `${(course.title || "course").replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "course"}_SCORM.zip`);
+      toast.success("SCORM package exported successfully!");
     } catch (error) {
       console.error("Export failed:", error);
       toast.error("Failed to export course: " + (error instanceof Error ? error.message : "Unknown error"));
