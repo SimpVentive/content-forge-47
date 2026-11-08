@@ -15,6 +15,8 @@ interface AvatarNarratorProps {
   systemHint: string;
   trainerName?: string;
   avatarImageUrl?: string;
+  /** A custom trainer's own photo: shown unzoomed and still (no drawn mouth), until the talking video is ready. */
+  stillPhoto?: boolean;
   avatarVideoUrl?: string;
   avatarPosterUrl?: string;
   trainerId?: string;
@@ -84,6 +86,7 @@ export function AvatarNarrator({
   topic, moduleContent, systemHint,
   trainerName = "Sarah",
   avatarImageUrl, avatarVideoUrl, avatarPosterUrl,
+  stillPhoto = false,
   trainerId = "priya",
   isVoiceActive, isVoiceLoading,
   currentViseme = "rest",
@@ -138,6 +141,7 @@ export function AvatarNarrator({
   const frameSpread = mouthFrame ? mouthFrame.spread : 0.5;
   const frameFlag = mouthFrame ? mouthFrame.flag : 0;
   useEffect(() => {
+    if (stillPhoto) return;
     renderMouthFrame(faceOverlayRef.current, { open: frameOpen, spread: frameSpread, flag: frameFlag }, faceFacePoints, `narrator-${trainerId}`, isBlinking, paintedSprites);
   }, [frameOpen, frameSpread, frameFlag, isBlinking, paintedSprites, faceFacePoints, trainerId]);
 
@@ -458,14 +462,14 @@ export function AvatarNarrator({
                   }}
                 >
                 {/* Zoomed stage: the picture and the drawn mouth/blink share one coordinate system (lib/trainerMouth.ts) */}
-                <div className="absolute" style={{ ...trainerStageBox(faceFacePoints), animation: "trainerBob 8.8s ease-in-out infinite" }}>
+                <div className="absolute" style={stillPhoto ? { inset: 0 } : { ...trainerStageBox(faceFacePoints), animation: "trainerBob 8.8s ease-in-out infinite" }}>
                   <img
                     src={avatarImageUrl}
                     alt={trainerName}
                     className="absolute inset-0 h-full w-full object-cover object-top"
                     onError={() => setHasAvatarImage(false)}
                   />
-                  <div ref={faceOverlayRef} className="absolute inset-0" />
+                  {stillPhoto ? null : <div ref={faceOverlayRef} className="absolute inset-0" />}
                 </div>
                 </div>
               </>

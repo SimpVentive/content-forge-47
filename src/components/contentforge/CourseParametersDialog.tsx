@@ -1,6 +1,9 @@
 ﻿import React, { useState, useMemo, useEffect } from "react";
 import { X, Settings2, AlertTriangle, Info, Check } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { TrainerGrid } from "./TrainerGrid";
+import { CustomTrainerDialog } from "./CustomTrainerDialog";
+import { listCustomTrainers, signedPhotoUrl, type CustomTrainer } from "@/lib/customTrainers";
 import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage, getAvatarEnv } from "@/lib/avatarTrainers";
 
 export interface CourseParameters {
@@ -247,6 +250,22 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [voiceAccent, setVoiceAccent] = useState("Rachel");
   const [avatarTrainerId, setAvatarTrainerId] = useState(() => getDefaultTrainerIdForLanguage("English"));
   const [trainerAutoMode, setTrainerAutoMode] = useState(true);
+  const [customTrainers, setCustomTrainers] = useState<CustomTrainer[]>([]);
+  const [customPhotoUrls, setCustomPhotoUrls] = useState<Record<string, string | null>>({});
+  const [showCustomTrainer, setShowCustomTrainer] = useState(false);
+
+  // Load the signed-in user's custom trainers (RLS limits the list to their own).
+  const refreshCustomTrainers = async () => {
+    try {
+      const list = await listCustomTrainers();
+      setCustomTrainers(list);
+      const urls = await Promise.all(list.map(async (trainer) => [trainer.id, await signedPhotoUrl(trainer.photo_path)] as const));
+      setCustomPhotoUrls(Object.fromEntries(urls));
+    } catch {
+      setCustomTrainers([]);
+    }
+  };
+  useEffect(() => { if (open) void refreshCustomTrainers(); }, [open]);
   const [duration, setDuration] = useState("15min");
   const [videoDurationHandling, setVideoDurationHandling] = useState<CourseParameters["videoDurationHandling"]>("within-course");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
@@ -742,48 +761,14 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                       {trainerAutoMode ? "Auto" : "Manual"}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                    {AVATAR_TRAINERS.map((trainer) => {
-                      const selected = avatarTrainerId === trainer.id;
-                      const trainerMedia = getTrainerMedia(trainer.id, avatarEnv);
-
-                      return (
-                        <button
-                          key={trainer.id}
-                          onClick={() => {
-                            setAvatarTrainerId(trainer.id);
-                            setTrainerAutoMode(false);
-                          }}
-                          className={`overflow-hidden rounded-[12px] border bg-white text-left transition-all duration-200 ease-in-out ${
-                            selected ? "border-transparent shadow-[0_8px_20px_rgba(181,126,220,0.2)]" : "border-[#E5E7EB] hover:border-[#6EC1E4]"
-                          }`}
-                          style={selected ? { boxShadow: "0 0 0 2px rgba(37,99,235,0.25), 0 8px 20px rgba(37,99,235,0.2)" } : undefined}
-                          type="button"
-                        >
-                          <div className="relative flex h-[112px] items-center justify-center bg-[#F3F4F6]">
-                            <img
-                              src={trainerMedia.imageUrl}
-                              alt={trainer.name}
-                              className={`h-24 w-24 rounded-full border-2 border-[#E5E7EB] object-cover transition-transform duration-300 ${selected ? "scale-[1.05]" : "scale-100"}`}
-                              onError={(event) => {
-                                event.currentTarget.src = "/placeholder.svg";
-                              }}
-                            />
-                            {selected ? (
-                              <span className="absolute bottom-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-black text-white shadow"
-                                style={{ background: "#2563EB" }}>
-                                <Check className="h-3.5 w-3.5" />
-                              </span>
-                            ) : null}
-                          </div>
-                          <div className="px-2 py-1.5">
-                            <p className={`truncate text-[12px] font-bold ${selected ? "text-primary" : "text-foreground"}`}>{trainer.name}</p>
-                            <p className="text-[10px] text-muted-foreground">{trainer.region === "india" ? "India trainer" : "Global trainer"}</p>
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <TrainerGrid
+                    selectedId={avatarTrainerId}
+                    onSelect={(id) => { setAvatarTrainerId(id); setTrainerAutoMode(false); }}
+                    customTrainers={customTrainers}
+                    customPhotoUrls={customPhotoUrls}
+                    onCreateCustom={() => setShowCustomTrainer(true)}
+                    avatarEnv={avatarEnv}
+                  />
                   <p className="text-[10px] font-semibold text-[#3f8f73]">
                     {isIndianLanguage(narratorLanguage)
                       ? `Recommended for ${narratorLanguage}: India trainers`
@@ -829,48 +814,14 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     {trainerAutoMode ? "Auto" : "Manual"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-                  {AVATAR_TRAINERS.map((trainer) => {
-                    const selected = avatarTrainerId === trainer.id;
-                    const trainerMedia = getTrainerMedia(trainer.id, avatarEnv);
-
-                    return (
-                      <button
-                        key={trainer.id}
-                        onClick={() => {
-                          setAvatarTrainerId(trainer.id);
-                          setTrainerAutoMode(false);
-                        }}
-                        className={`overflow-hidden rounded-[12px] border bg-white text-left transition-all duration-200 ease-in-out ${
-                          selected ? "border-transparent shadow-[0_8px_20px_rgba(181,126,220,0.2)]" : "border-[#E5E7EB] hover:border-[#6EC1E4]"
-                        }`}
-                        style={selected ? { boxShadow: "0 0 0 2px rgba(37,99,235,0.25), 0 8px 20px rgba(37,99,235,0.2)" } : undefined}
-                        type="button"
-                      >
-                        <div className="relative flex h-[112px] items-center justify-center bg-[#F3F4F6]">
-                          <img
-                            src={trainerMedia.imageUrl}
-                            alt={trainer.name}
-                            className={`h-24 w-24 rounded-full border-2 border-[#E5E7EB] object-cover transition-transform duration-300 ${selected ? "scale-[1.05]" : "scale-100"}`}
-                            onError={(event) => {
-                              event.currentTarget.src = "/placeholder.svg";
-                            }}
-                          />
-                          {selected ? (
-                            <span className="absolute bottom-2 right-2 inline-flex h-6 w-6 items-center justify-center rounded-full text-[12px] font-black text-white shadow"
-                              style={{ background: "#2563EB" }}>
-                              <Check className="h-3.5 w-3.5" />
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="px-2 py-1.5">
-                          <p className={`truncate text-[12px] font-bold ${selected ? "text-primary" : "text-foreground"}`}>{trainer.name}</p>
-                          <p className="text-[10px] text-muted-foreground">{trainer.region === "india" ? "India trainer" : "Global trainer"}</p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+                <TrainerGrid
+                  selectedId={avatarTrainerId}
+                  onSelect={(id) => { setAvatarTrainerId(id); setTrainerAutoMode(false); }}
+                  customTrainers={customTrainers}
+                  customPhotoUrls={customPhotoUrls}
+                  onCreateCustom={() => setShowCustomTrainer(true)}
+                  avatarEnv={avatarEnv}
+                />
               </div>
             </div>
             )}
@@ -1735,6 +1686,16 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           </div>
         </TooltipProvider>
       </div>
+      {showCustomTrainer ? <CustomTrainerDialog
+        open={showCustomTrainer}
+        onOpenChange={setShowCustomTrainer}
+        onCreated={(trainer) => {
+          setShowCustomTrainer(false);
+          void refreshCustomTrainers();
+          setAvatarTrainerId(trainer.id);
+          setTrainerAutoMode(false);
+        }}
+      /> : null}
     </div>
   );
 };

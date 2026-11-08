@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffe
 import { stepMouth, mouthFrameAt, type MouthFrame } from "@/lib/trainerMouth";
 import { fitSvgToContent } from "@/lib/svgFit";
 import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
+import { getCustomTrainer, isCustomTrainerId, signedPhotoUrl } from "@/lib/customTrainers";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle, Maximize2, Minimize2 } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
@@ -1273,11 +1274,28 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
   const avatarEnv = getAvatarEnv();
   const trainerMedia = exportMedia?.trainerMedia || getTrainerMedia(selectedTrainer.id, avatarEnv);
-  const trainerVoiceId = getTrainerVoiceId(selectedTrainer.id);
+  // A custom trainer (the signed-in user's own photo and voice). Loaded from the account in the app preview.
+  const [customTrainerInfo, setCustomTrainerInfo] = useState<{ name: string; voiceId: string | null; photoUrl: string | null } | null>(null);
+  useEffect(() => {
+    if (standalone || !isCustomTrainerId(avatarTrainerId)) { setCustomTrainerInfo(null); return; }
+    let alive = true;
+    getCustomTrainer(avatarTrainerId as string)
+      .then(async (row) => {
+        if (!alive) return;
+        if (!row) { setCustomTrainerInfo(null); return; }
+        const photoUrl = await signedPhotoUrl(row.photo_path);
+        if (alive) setCustomTrainerInfo({ name: row.name, voiceId: row.voice_status === "ready" ? row.voice_id : null, photoUrl });
+      })
+      .catch(() => { if (alive) setCustomTrainerInfo(null); });
+    return () => { alive = false; };
+  }, [avatarTrainerId, standalone]);
+  const isCustomTrainer = Boolean(customTrainerInfo);
+  // The custom trainer's own voice; the built-in trainers keep their voices.
+  const trainerVoiceId = customTrainerInfo ? (customTrainerInfo.voiceId || "") : getTrainerVoiceId(selectedTrainer.id);
   const avatarVideoUrl = trainerMedia.videoUrl;
   const avatarPosterUrl = trainerMedia.posterUrl;
-  const avatarImageUrl = trainerMedia.imageUrl;
-  const trainerName = selectedTrainer.name;
+  const avatarImageUrl = customTrainerInfo?.photoUrl || trainerMedia.imageUrl;
+  const trainerName = customTrainerInfo?.name || selectedTrainer.name;
   const trainerBadgeInitial = trainerName.charAt(0).toUpperCase();
   const hasAvatarVideoNarration = Boolean(avatarVideoUrl);
   const [localVideos, setLocalVideos] = useState<InsertedVideo[]>(insertedVideos);
@@ -1879,6 +1897,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const playNarration = useCallback(async () => {
     const narrationText = getNarrationForSlide(currentSlide);
     if (!narrationText) return;
+    if (isCustomTrainer && !trainerVoiceId) { toast.error("This trainer's voice is not ready yet. Check the trainer in Course Setup."); return; }
     // A voice request for this screen is already on its way (auto-play, unmute, Explain, or a
     // double-mounted effect); a second request would read the same screen twice.
     if (narrationRequestSlideRef.current === currentSlide) return;
@@ -2700,6 +2719,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     systemHint="Coach the learner through the scenario and emphasize the stronger practical response."
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
+                    stillPhoto={isCustomTrainer}
                     avatarVideoUrl={avatarVideoUrl}
                     avatarPosterUrl={avatarPosterUrl}
                     trainerId={selectedTrainer.id}
@@ -2902,6 +2922,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     systemHint="Explain this lesson's practical application."
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
+                    stillPhoto={isCustomTrainer}
                     avatarVideoUrl={avatarVideoUrl}
                     avatarPosterUrl={avatarPosterUrl}
                     trainerId={selectedTrainer.id}
@@ -3070,6 +3091,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     systemHint="Focus on the practical benefit to an office worker."
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
+                    stillPhoto={isCustomTrainer}
                     avatarVideoUrl={avatarVideoUrl}
                     avatarPosterUrl={avatarPosterUrl}
                     trainerId={selectedTrainer.id}
@@ -3422,6 +3444,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     systemHint="Coach the learner through this scenario response and emphasize the best approach."
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
+                    stillPhoto={isCustomTrainer}
                     avatarVideoUrl={avatarVideoUrl}
                     avatarPosterUrl={avatarPosterUrl}
                     trainerId={selectedTrainer.id}
