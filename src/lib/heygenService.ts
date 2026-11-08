@@ -3,8 +3,42 @@
  * Handles avatar video creation with customization options
  */
 
-const HEYGEN_API_URL = "https://api.heygen.com/v1";
-const HEYGEN_API_KEY = import.meta.env.VITE_HEYGEN_API_KEY;
+import { supabase } from "@/lib/supabase";
+
+// HeyGen is called only through the heygen-proxy edge function. The API key lives in
+// the Supabase secret HEYGEN_API_KEY and is never part of the website build.
+const FUNCTION_URL = import.meta.env.VITE_SUPABASE_URL + "/functions/v1";
+
+type HeyGenRequest =
+  | { action: "generate"; payload: unknown }
+  | { action: "status"; videoId: string }
+  | { action: "usage" };
+
+/** Calls HeyGen through the proxy. Returns a fetch-like object carrying HeyGen's own status and JSON. */
+export async function heygenFetch(request: HeyGenRequest) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Not authenticated");
+
+  const res = await fetch(`${FUNCTION_URL}/heygen-proxy`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session.access_token}`,
+    },
+    body: JSON.stringify(request),
+  });
+  const envelope = await res.json().catch(() => null);
+  if (!res.ok || !envelope?.ok) {
+    throw new Error(envelope?.error?.message || `HeyGen proxy error (${res.status})`);
+  }
+  const { status, body } = envelope.data as { status: number; body: any };
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    statusText: String(status),
+    json: async () => body,
+  };
+}
 
 export interface HeyGenVideoParams {
   avatarId: "rachel" | "josh" | "anna" | string;
@@ -62,10 +96,6 @@ function estimateScriptDuration(script: string): number {
  * Generate video via HeyGen API
  */
 export async function generateHeyGenVideo(params: HeyGenVideoParams): Promise<GeneratedVideo> {
-  if (!HEYGEN_API_KEY) {
-    throw new Error("HEYGEN_API_KEY not configured");
-  }
-
   const avatarId = avatarMap[params.avatarId] || params.avatarId;
 
   const heygenPayload = {
@@ -104,14 +134,7 @@ export async function generateHeyGenVideo(params: HeyGenVideoParams): Promise<Ge
   }
 
   try {
-    const response = await fetch(`${HEYGEN_API_URL}/video_generate`, {
-      method: "POST",
-      headers: {
-        "X-HEYGEN-API-KEY": HEYGEN_API_KEY,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(heygenPayload),
-    });
+    const response = await heygenFetch({ action: "generate", payload: heygenPayload });
 
     if (!response.ok) {
       const error = await response.json();
@@ -146,17 +169,9 @@ export async function pollForVideoCompletion(
   maxAttempts = 120,
   pollIntervalMs = 5000
 ): Promise<string> {
-  if (!HEYGEN_API_KEY) {
-    throw new Error("HEYGEN_API_KEY not configured");
-  }
-
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const response = await fetch(`${HEYGEN_API_URL}/video/${videoId}`, {
-        headers: {
-          "X-HEYGEN-API-KEY": HEYGEN_API_KEY,
-        },
-      });
+      const response = await heygenFetch({ action: "status", videoId });
 
       if (!response.ok) {
         throw new Error(`HeyGen API error: ${response.statusText}`);
@@ -191,15 +206,7 @@ export async function pollForVideoCompletion(
  * Get video status without waiting
  */
 export async function getVideoStatus(videoId: string): Promise<{ status: string; url?: string }> {
-  if (!HEYGEN_API_KEY) {
-    throw new Error("HEYGEN_API_KEY not configured");
-  }
-
-  const response = await fetch(`${HEYGEN_API_URL}/video/${videoId}`, {
-    headers: {
-      "X-HEYGEN-API-KEY": HEYGEN_API_KEY,
-    },
-  });
+  const response = await heygenFetch({ action: "status", videoId });
 
   if (!response.ok) {
     throw new Error(`Failed to get video status: ${response.statusText}`);

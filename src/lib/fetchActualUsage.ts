@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { heygenFetch } from "./heygenService";
 
 interface ProviderUsageData {
   provider: string;
@@ -31,9 +32,8 @@ async function fetchElevenLabsUsage(apiKey: string): Promise<ProviderUsageData |
 // Fetch HeyGen account info
 async function fetchHeyGenUsage(apiKey: string): Promise<ProviderUsageData | null> {
   try {
-    const res = await fetch("https://api.heygen.com/v1/account", {
-      headers: { "x-api-key": apiKey },
-    });
+    // The key is held by the heygen-proxy edge function, not passed from the browser.
+    const res = await heygenFetch({ action: "usage" });
     const data = await res.json();
     // HeyGen typically shows remaining credits/minutes
     const used = data.credits_used || 0;
