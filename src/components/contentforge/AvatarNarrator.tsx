@@ -4,7 +4,7 @@ import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
 import { DEFAULT_FACE, TRAINER_FACE_POINTS } from "@/lib/trainerFacePoints";
-import { renderMouthFrame, trainerSpriteUrls, trainerStageBox, type MouthFrame, type TrainerSprites } from "@/lib/trainerMouth";
+import { renderMouthFrame, trainerStageBox, type MouthFrame, type TrainerSprites } from "@/lib/trainerMouth";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -127,19 +127,9 @@ export function AvatarNarrator({
   // Painted images are used only when all three exist for this trainer (probed below); otherwise the drawn mouth.
   const [paintedSprites, setPaintedSprites] = useState<TrainerSprites | null>(null);
   useEffect(() => {
-    let alive = true;
+    // No painted sprite files ship in public/trainers/, so the drawn mouth is always used and
+    // /trainers/ is never requested (a 404 inside an LMS package). Re-enable the probe only when sprites ship.
     setPaintedSprites(null);
-    const urls = trainerSpriteUrls(trainerId);
-    const keys = Object.keys(urls) as (keyof TrainerSprites)[];
-    Promise.all(keys.map((key) => new Promise<boolean>((resolve) => {
-      const probe = new Image();
-      probe.onload = () => resolve(true);
-      probe.onerror = () => resolve(false);
-      probe.src = urls[key];
-    }))).then((found) => {
-      if (alive && found.every(Boolean)) setPaintedSprites(urls);
-    });
-    return () => { alive = false; };
   }, [trainerId]);
   // The mouth frame: from the narration track when there is one, otherwise from the viseme (ElevenLabs timing).
   const frameOpen = mouthFrame ? mouthFrame.open : mouthOpenness;
