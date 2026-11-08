@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 import type { LearnerPreviewProps } from "@/components/contentforge/LearnerPreview";
-import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId } from "@/lib/avatarTrainers";
+import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, getAvatarEnv } from "@/lib/avatarTrainers";
 import { learnerExportMedia } from "@/lib/learnerExportData";
 import { generateNarrationAudio } from "@/lib/narrationAudioService";
 import { generateManifest } from "@/lib/scormManifestGenerator";
@@ -50,7 +50,7 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   const { buildSlides, buildSlideNarration } = await import("@/components/contentforge/LearnerPreview");
   const cached = learnerExportMedia.get(props.courseTitle);
   const trainerId = props.avatarTrainerId || AVATAR_TRAINERS[0].id;
-  const trainerMedia = cached?.trainerMedia || getTrainerMedia(trainerId, import.meta.env as Record<string, string | undefined>);
+  const trainerMedia = cached?.trainerMedia || getTrainerMedia(trainerId, getAvatarEnv());
   const media = { ...cached, ...props.exportMedia, trainerMedia: { ...trainerMedia, ...props.exportMedia?.trainerMedia }, audioBySlide: { ...cached?.audioBySlide, ...props.exportMedia?.audioBySlide }, introImages: { ...cached?.introImages, ...props.exportMedia?.introImages }, audioTextBySlide: { ...cached?.audioTextBySlide, ...props.exportMedia?.audioTextBySlide } };
   const { slides } = buildSlides(props.rawOutputs, props.insertedVideos, props.courseDuration, props.slideLayout?.maxLines, props.assessmentIntensity);
   const zip = new JSZip();

@@ -47,9 +47,15 @@ jobs:
             export BUN_INSTALL="$HOME/.bun"
             export PATH="$BUN_INSTALL/bin:$PATH"
 
+            set -e
             cd /var/www/testing.l-kurve.com/content-forge-47
 
-            git pull origin main
+            # Exactly origin/main. A plain pull failed earlier when the server's old .env conflicted with main.
+            git fetch origin main
+            git reset --hard origin/main
+
+            # The build reads only the values written below from the GitHub secrets. Old local env files are removed.
+            rm -f .env.local .env.production .env.development
 
             echo "VITE_RAZORPAY_KEY_ID=${{ secrets.VITE_RAZORPAY_KEY_ID }}" > .env
             echo "VITE_SUPABASE_PROJECT_ID=${{ secrets.VITE_SUPABASE_PROJECT_ID }}" >> .env
@@ -60,6 +66,11 @@ jobs:
             echo "VITE_HEYGEN_DEFAULT_QUALITY=${{ secrets.VITE_HEYGEN_DEFAULT_QUALITY }}" >> .env
             echo "VITE_HEYGEN_DEFAULT_BACKGROUND=${{ secrets.VITE_HEYGEN_DEFAULT_BACKGROUND }}" >> .env
             echo "BFL_API_KEY=${{ secrets.BFL_API_KEY }}" >> .env
+
+            # Stop before the build if a required value is empty, so the live site is never built without it.
+            for v in VITE_SUPABASE_URL VITE_SUPABASE_PUBLISHABLE_KEY VITE_SUPABASE_PROJECT_ID VITE_RAZORPAY_KEY_ID; do
+              grep -Eq "^$v=.+" .env || { echo "Missing $v in the GitHub secrets"; exit 1; }
+            done
 
             bun install
 

@@ -1,7 +1,7 @@
 ﻿import React, { useState, useMemo, useEffect } from "react";
 import { X, Settings2, AlertTriangle, Info, Check } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage } from "@/lib/avatarTrainers";
+import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage, getAvatarEnv } from "@/lib/avatarTrainers";
 
 export interface CourseParameters {
   companyLogo?: string | null;
@@ -281,7 +281,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [mismatchType, setMismatchType] = useState<"more" | "less">("more");
   const [showModeConfirm, setShowModeConfirm] = useState(false);
   const [pendingLearningType, setPendingLearningType] = useState<CourseParameters["learningType"] | null>(null);
-  const avatarEnv = import.meta.env as Record<string, string | undefined>;
+  const avatarEnv = getAvatarEnv();
 
   const selectedMinutes = getDurationMinutes(duration);
   const selectedLevelLabel = LEVELS.find((item) => item.value === level)?.label || "Intermediate";

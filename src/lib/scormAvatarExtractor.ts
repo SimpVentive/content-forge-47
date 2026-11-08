@@ -3,7 +3,7 @@
  * Extracts images and voice configuration from trainer selections
  */
 
-import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId } from "@/lib/avatarTrainers";
+import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, getAvatarEnv } from "@/lib/avatarTrainers";
 
 export interface AvatarMedia {
   trainerName: string;
@@ -35,7 +35,7 @@ export function extractAvatarMedia(trainerId?: string): AvatarMedia {
   }
 
   // Get trainer media (images, videos) - pass environment variables for proper URL resolution
-  const env = import.meta.env as Record<string, string | undefined>;
+  const env = getAvatarEnv();
   const media = getTrainerMedia(trainerId, env);
   if (!media) {
     console.warn(`[Avatar Extractor] No media found for trainer: ${trainerId}`);
@@ -85,7 +85,7 @@ export function validateAvatarMedia(trainerId?: string): {
     return { isValid: false, warnings };
   }
 
-  const env = import.meta.env as Record<string, string | undefined>;
+  const env = getAvatarEnv();
   const media = getTrainerMedia(trainerId, env);
   if (!media) {
     warnings.push(`No media found for trainer: ${trainer.name}`);
@@ -115,7 +115,7 @@ export function getAvailableTrainers(): Array<{
   hasVideo: boolean;
   voiceName: string;
 }> {
-  const env = import.meta.env as Record<string, string | undefined>;
+  const env = getAvatarEnv();
   return AVATAR_TRAINERS.map((trainer) => {
     const media = getTrainerMedia(trainer.id, env);
     const voiceId = getTrainerVoiceId(trainer.id);
@@ -174,7 +174,7 @@ export function estimateAvatarStorageSize(trainerId?: string): {
   // JPEG image: 50-200KB
   // MP3 audio: 1MB per minute (128kbps)
 
-  const env = import.meta.env as Record<string, string | undefined>;
+  const env = getAvatarEnv();
   const media = trainerId ? getTrainerMedia(trainerId, env) : null;
 
   return {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, Volume2, X, Youtube } from "lucide-react";
 import { isPlaceholderToken, safeLearnerText, stripNarratorMarkdown } from "@/lib/textCleaningUtility";
-import { AVATAR_TRAINERS, getTrainerMedia } from "@/lib/avatarTrainers";
+import { AVATAR_TRAINERS, getTrainerMedia, getAvatarEnv } from "@/lib/avatarTrainers";
 import type { InsertedVideo } from "./VideosTab";
 
 interface SlidePreviewProps {
@@ -251,7 +251,7 @@ const TitleSlide: React.FC<{ slide: SlideData }> = ({ slide }) => (
 const ContentSlide: React.FC<{ slide: SlideData; avatarTrainerId?: string; hasVoice?: boolean }> = ({ slide, avatarTrainerId = "irina", hasVoice = false }) => {
   const parts = parseContentParts(slide.body || "");
   const trainer = AVATAR_TRAINERS.find((item) => item.id === avatarTrainerId) || AVATAR_TRAINERS[0];
-  const trainerMedia = getTrainerMedia(trainer.id, import.meta.env as Record<string, string | undefined>);
+  const trainerMedia = getTrainerMedia(trainer.id, getAvatarEnv());
   const hasRichContent = !!(parts.hook || parts.body.length || parts.takeaway || parts.challenge);
   const situation = parts.hook || parts.body[0] || slide.topicTitle || slide.moduleTitle;
   const notice = sentenceBullets([parts.hook, ...parts.body, parts.takeaway].filter(Boolean));

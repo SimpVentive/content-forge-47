@@ -14,7 +14,7 @@ import { AvatarNarrator } from "./AvatarNarrator";
 import { NarrativeFlipbook } from "./NarrativeFlipbook";
 import { VideoWithVisuals, type VisualOverlay } from "./VideoWithVisuals";
 import type { TopicNarrative } from "@/lib/visualNarrativeService";
-import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey } from "@/lib/avatarTrainers";
+import { AVATAR_TRAINERS, getTrainerMedia, getTrainerVoiceId, type VisemeKey, getAvatarEnv } from "@/lib/avatarTrainers";
 import { stripAiPlaceholders, stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix, buildAssessmentNarration } from "@/lib/textCleaningUtility";
 import { generateNarrationAudio } from "@/lib/narrationAudioService";
 import { toast } from "sonner";
@@ -1271,7 +1271,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   // Prefer the explicit narrator language; fall back to text language; final fallback English.
   const effectiveNarratorLanguage = narratorLanguage || textLanguage || "English";
   const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
-  const avatarEnv = import.meta.env as Record<string, string | undefined>;
+  const avatarEnv = getAvatarEnv();
   const trainerMedia = exportMedia?.trainerMedia || getTrainerMedia(selectedTrainer.id, avatarEnv);
   const trainerVoiceId = getTrainerVoiceId(selectedTrainer.id);
   const avatarVideoUrl = trainerMedia.videoUrl;
