@@ -1503,8 +1503,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ standalone = fal
   }, []);
 
   useEffect(() => {
-    Object.values(audioUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
-    audioUrlsRef.current = {};
+    // Keep the audio packaged with the course; only temporary browser links are released.
+    const packaged = exportMedia?.audioBySlide || {};
+    Object.entries(audioUrlsRef.current).forEach(([slide, url]) => {
+      if (packaged[Number(slide)] !== url && url.startsWith("blob:")) URL.revokeObjectURL(url);
+    });
+    audioUrlsRef.current = { ...packaged };
     visemeTimelinesRef.current = {};
 
     if (audioRef.current) {
