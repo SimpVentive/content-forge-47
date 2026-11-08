@@ -9,9 +9,10 @@ interface AgentPipelineProps {
   agentToggles: Record<string, boolean>;
   setAgentToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   onStop?: () => void;
+  isStopping?: boolean;
 }
 
-export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning, agentToggles, setAgentToggles, onStop }) => {
+export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning, agentToggles, setAgentToggles, onStop, isStopping = false }) => {
   const enabledAgents = agents.filter((agent) => agentToggles[agent.id] ?? true).length;
 
   return (
@@ -27,9 +28,10 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
           <button
             type="button"
             onClick={onStop}
-            className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all text-[13px]"
+            disabled={isStopping}
+            className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all text-[13px] disabled:opacity-60 disabled:cursor-wait"
           >
-            Stop Generating
+            {isStopping ? "Stopping…" : "Stop Generating"}
           </button>
         )}
         <div className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card">

@@ -641,6 +641,8 @@ export function useAgentPipeline() {
   const [rawOutputs, setRawOutputs] = useState<RawAgentOutputs>(initialRaw());
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const runActiveRef = useRef(false);
   const [showQAConfirmation, setShowQAConfirmation] = useState(false);
   const [showQADialog, setShowQADialog] = useState(false);
   const [qaResult, setQAResult] = useState<QAResult | null>(null);
@@ -724,7 +726,7 @@ export function useAgentPipeline() {
 
   const loadPersistedState = useCallback((nextRaw: RawAgentOutputs, nextOutput: OutputData, nextLogs: string[] = []) => {
     cancelledRef.current = false;
-    setIsRunning(false);
+    if (!runActiveRef.current) setIsRunning(false);
     setAgentStatuses(initialStatuses());
     setRawOutputs(nextRaw);
     setOutputData(nextOutput);
@@ -733,7 +735,7 @@ export function useAgentPipeline() {
 
   const clearPipelineState = useCallback(() => {
     cancelledRef.current = false;
-    setIsRunning(false);
+    if (!runActiveRef.current) setIsRunning(false);
     setAgentStatuses(initialStatuses());
     setRawOutputs(initialRaw());
     setOutputData(initialOutput());
@@ -789,7 +791,7 @@ export function useAgentPipeline() {
     }
   };
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentTypes?: ("mcq" | "match-the-following" | "true-false" | "scenario" | "fill-blanks")[]; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3 | 4 | 5; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; avatarTrainerId?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
+  const runPipelineBody = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentTypes?: ("mcq" | "match-the-following" | "true-false" | "scenario" | "fill-blanks")[]; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3 | 4 | 5; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; avatarTrainerId?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
     cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
@@ -2109,11 +2111,24 @@ ${modeInstructions}`;
     setIsRunning(false);
   }, [addLog, setStatus]);
 
+  // The run is finished only when its body has returned or thrown. Nothing else clears the running flag.
+  const runPipeline = useCallback(
+    (...args: Parameters<typeof runPipelineBody>) => {
+      runActiveRef.current = true;
+      setIsRunning(true);
+      return runPipelineBody(...args).finally(() => {
+        runActiveRef.current = false;
+        setIsStopping(false);
+        setIsRunning(false);
+      });
+    },
+    [runPipelineBody],
+  );
+
   const stopPipeline = useCallback(() => {
     cancelledRef.current = true;
-    setAgentStatuses((prev) => settleRunningStatuses(prev));
-    setIsRunning(false);
-    addLog("Orchestrator: Stop requested — the run ends now.");
+    setIsStopping(true);
+    addLog("Orchestrator: Stop requested — the run stops after the current step.");
   }, [addLog]);
 
   // Whenever the run is not running, no card may still show "running".
@@ -2276,6 +2291,7 @@ ${modeInstructions}`;
     rawOutputs,
     logs,
     isRunning,
+    isStopping,
     runPipeline,
     stopPipeline,
     updateVisualTopicAsset,

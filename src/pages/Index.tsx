@@ -124,6 +124,7 @@ const Index = () => {
     rawOutputs,
     logs,
     isRunning,
+    isStopping,
     runPipeline,
     stopPipeline,
     updateVisualTopicAsset,
@@ -888,9 +889,10 @@ const Index = () => {
                     </div>
                     <button
                       onClick={stopPipeline}
-                      className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all text-[13px]"
+                      disabled={isStopping}
+                      className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all text-[13px] disabled:opacity-60 disabled:cursor-wait"
                     >
-                      Stop Generation
+                      {isStopping ? "Stopping after current step…" : "Stop Generation"}
                     </button>
                   </div>
                 </div>
@@ -915,10 +917,10 @@ const Index = () => {
               </div>
             )}
             {!hasRun ? (
-              <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} onStop={stopPipeline} />
+              <AgentPipeline agents={agents} isRunning={isRunning} isStopping={isStopping} agentToggles={agentToggles} setAgentToggles={setAgentToggles} onStop={stopPipeline} />
             ) : (
               <div className="space-y-6 max-w-[720px] mx-auto">
-                <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} onStop={stopPipeline} />
+                <AgentPipeline agents={agents} isRunning={isRunning} isStopping={isStopping} agentToggles={agentToggles} setAgentToggles={setAgentToggles} onStop={stopPipeline} />
                 <OrchestratorLog logs={logs} />
               </div>
             )}
