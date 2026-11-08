@@ -160,7 +160,8 @@ Block time for deep work and meetings separately. Key Takeaway: Intentional sche
       if (manifestContent) {
         expect(manifestContent).toContain("<?xml");
         expect(manifestContent).toContain("manifest");
-        expect(manifestContent).toContain("imsmanifest");
+        expect(manifestContent).toContain("<organizations");
+        expect(manifestContent).toContain("href='module_0.html'");
       }
     }
   });
