@@ -1590,6 +1590,8 @@ function buildModuleHtml(
         screens[i].classList.toggle('active', i === idx);
       }
       currentScreenIndex = idx;
+      // Completion at the last screen, when the course has no quiz (a quiz records its own result).
+      if (idx === screens.length - 1 && !document.querySelector('.quiz-screen')) scormSetComplete();
       var counter = document.getElementById('scormScreenCounter');
       if (counter) counter.textContent = 'Screen ' + (idx + 1) + ' of ' + screens.length;
       var prev = document.getElementById('scormPrevBtn');
