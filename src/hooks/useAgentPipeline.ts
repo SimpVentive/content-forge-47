@@ -2115,8 +2115,11 @@ ${modeInstructions}`;
   const runPipeline = useCallback(
     (...args: Parameters<typeof runPipelineBody>) => {
       runActiveRef.current = true;
+      pipelineContextRef.current = null; // a new run never inherits a pending decision from an earlier one
       setIsRunning(true);
       return runPipelineBody(...args).finally(() => {
+        // Waiting for the user's Quality Check decision: the run is not over yet. The decision handlers end it.
+        if (pipelineContextRef.current) return;
         runActiveRef.current = false;
         setIsStopping(false);
         setIsRunning(false);
@@ -2190,6 +2193,7 @@ ${modeInstructions}`;
     } finally {
       setIsApplyingQAFixes(false);
       setIsRunning(false);
+      runActiveRef.current = false;
       pipelineContextRef.current = null;
     }
   }, [qaResult, rawOutputs, addLog]);
@@ -2199,6 +2203,7 @@ ${modeInstructions}`;
     setShowQADialog(false);
     addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
     setIsRunning(false);
+    runActiveRef.current = false;
     pipelineContextRef.current = null;
   }, [addLog]);
 
@@ -2208,6 +2213,7 @@ ${modeInstructions}`;
     setStatus("final-qa", "idle");
     addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
     setIsRunning(false);
+    runActiveRef.current = false;
     pipelineContextRef.current = null;
   }, [addLog, setStatus]);
 

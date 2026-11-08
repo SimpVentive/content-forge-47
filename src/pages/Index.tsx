@@ -626,7 +626,7 @@ const Index = () => {
             </h2>
 
             <p className="text-center text-slate-600 mb-8">
-              <span className="font-semibold text-slate-900">"{courseTitle}"</span> is ready. Click on <span className="font-semibold">Course Output</span> to view your material.
+              <span className="font-semibold text-slate-900">"{courseTitle}"</span> is ready. Fixes are applied. Open <span className="font-semibold">Course Output</span> to review it, or open the <span className="font-semibold">Learner Preview</span> from there.
             </p>
 
             <div className="space-y-3">
