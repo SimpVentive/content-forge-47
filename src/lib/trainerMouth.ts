@@ -111,6 +111,7 @@ export function renderMouthFrame(
   const yLine = points.mouth.y * 7.68;
   const lipW = points.lipWidth * 5.12;
   const skin = points.skin;
+  const mouthSkin = points.mouthSkin;
   const lip = points.lip;
   // the team's reds: lower lip a little darker than the upper, outline much darker (same mix, from the painted lip colour)
   const mix = (hex: string, k: number) => {
@@ -121,7 +122,8 @@ export function renderMouthFrame(
   const loLipCol = mix(lip, 0.86), outline = mix(lip, 0.45);
   const cavity = "#4f0d0c", tongue = "#c4463b", teethUp = "#f7eee6", teethLo = "#ece0d6", highlight = "#e0584a";
 
-  let inner = "";
+  // soft edge for the skin cover, so no outline shows over the painted lips
+  let inner = '<defs><filter id="' + idPrefix + '-soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="1.4"/></filter></defs>';
   if (shape !== "closed") {
     const opD = shape === "slight" ? MOUTH_SPEC.slightOpen : MOUTH_SPEC.openOpen;
     const y0 = yLine - opD * 1.3;
@@ -137,7 +139,7 @@ export function renderMouthFrame(
     const loTeeth = flag === 1 ? 1.8 : (hh > 7.5 ? Math.min((hh - 7) * 0.6, 2.2) : 0);
     const tw = w * (flag === 1 ? 0.8 : 0.62);
     inner +=
-      '<ellipse cx="' + cx + '" cy="' + (y0 + 4.2 + hh * 0.5) + '" rx="' + (w * 0.58) + '" ry="' + (14 + hh * 1.1) + '" fill="' + skin + '"/>' +
+      '<ellipse cx="' + cx + '" cy="' + (yLine + 1) + '" rx="' + (lipW * 0.5 + 2) + '" ry="' + (11 + hh * 0.5) + '" fill="' + mouthSkin + '" filter="url(#' + idPrefix + '-soft)"/>' +
       '<path d="' + loLipP + '" fill="' + loLipCol + '"/>' +
       '<path d="' + cav + '" fill="' + cavity + '"/>' +
       '<clipPath id="' + idPrefix + '-mc"><path d="' + cav + '"/></clipPath><g clip-path="url(#' + idPrefix + '-mc)">' +
