@@ -55,7 +55,8 @@ describe("scorm HTML export", () => {
     expect(html).toContain('>Inbox triage<');
     expect(html).toContain('>Meeting hygiene<');
     expect(html).not.toContain('{&quot;label&quot;');
-    expect(html).toContain('<strong>Batch</strong>');
+    // The module shows the first section as plain text in the objective and content list.
+    expect(html).toContain('Batch the rest into scheduled review windows.');
     expect(html).toContain('<ul><li>Clarify the decision needed</li><li>Invite only the people required</li></ul>');
     expect(html).toContain('class="key-takeaway-card"');
     expect(html).toContain('Protecting attention helps you finish more meaningful work.');

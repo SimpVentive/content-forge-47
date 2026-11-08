@@ -3,6 +3,8 @@ import { Pause, Play, Volume2, VolumeX } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { getTrainerLipSyncProfile, type VisemeKey } from "@/lib/avatarTrainers";
+import { DEFAULT_FACE, TRAINER_FACE_POINTS } from "@/lib/trainerFacePoints";
+import { renderMouthFrame, trainerStageBox, type MouthFrame, type TrainerSprites } from "@/lib/trainerMouth";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -21,6 +23,8 @@ interface AvatarNarratorProps {
   currentViseme?: VisemeKey;
   /** Language for the narrator's spoken reply (also used for the on-screen bubble). */
   narratorLanguage?: string;
+  /** Mouth from the narration track (lib/mouthTrack.ts). When absent, the mouth follows the viseme. */
+  mouthFrame?: MouthFrame | null;
 }
 
 type RequestMode = "initial" | "example";
@@ -39,32 +43,14 @@ const STREAMING_VISEME_SEQUENCE: VisemeKey[] = ["aa", "oh", "ee", "l", "mbp", "a
 
 // CSS-overlay facial coordinates — exact pctX/pctY from narrator_config.json
 // These are percentages of the original 1024×1536 image.
-const FACE_COORDS: Record<string, { eyeLeft: { x: number; y: number }; eyeRight: { x: number; y: number }; mouth: { x: number; y: number } }> = {
-  priya:      { eyeLeft: { x: 56.64, y: 27.99 }, eyeRight: { x: 43.65, y: 27.99 }, mouth: { x: 49.30, y: 35.55 } },
-  arjun:      { eyeLeft: { x: 54.98, y: 26.43 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 48.13, y: 34.08 } },
-  soumya:     { eyeLeft: { x: 55.66, y: 26.69 }, eyeRight: { x: 42.97, y: 26.89 }, mouth: { x: 48.52, y: 33.98 } },
-  vedprakash: { eyeLeft: { x: 54.30, y: 25.59 }, eyeRight: { x: 42.68, y: 25.59 }, mouth: { x: 48.22, y: 32.85 } },
-  atul:       { eyeLeft: { x: 53.71, y: 25.98 }, eyeRight: { x: 41.99, y: 25.98 }, mouth: { x: 47.36, y: 33.48 } },
-  irina:      { eyeLeft: { x: 55.37, y: 26.69 }, eyeRight: { x: 42.68, y: 26.69 }, mouth: { x: 48.46, y: 34.09 } },
-  john:       { eyeLeft: { x: 53.32, y: 25.98 }, eyeRight: { x: 42.29, y: 25.98 }, mouth: { x: 47.03, y: 33.32 } },
-};
-const DEFAULT_FACE = { eyeLeft: { x: 55, y: 27 }, eyeRight: { x: 43, y: 27 }, mouth: { x: 48.5, y: 34.5 } };
 
-// Stage & scaling — matches narrator_animator.html logic
-const STAGE_W = 360, STAGE_H = 480;
+// Source image is 1024×1536 (2:3). The face layer keeps that ratio and every overlay
+// is positioned in % of it, so the eyes and mouth stay on the face at any width.
 const ORIG_W  = 1024, ORIG_H  = 1536;
-const SCALE_X = STAGE_W / ORIG_W;                 // 0.3516
-const DISPLAYED_H = ORIG_H * SCALE_X;             // 540px
-const Y_CORRECT = DISPLAYED_H / STAGE_H;          // 1.125
 
-// Overlays are placed in percent of the stage, not fixed pixels, so they stay on the face at any rendered width.
-const pctOfStageW = (px: number) => `${(px / STAGE_W) * 100}%`;
-const pctOfStageH = (px: number) => `${(px / STAGE_H) * 100}%`;
-
-const EYE_W = 90 * SCALE_X;   // ~31.6px
-const EYE_H = 32 * SCALE_X;   // ~11.3px
-const MTH_W = 82 * SCALE_X;   // ~28.8px
-const MTH_H = 26 * SCALE_X;   // ~9.1px
+// Lip size, measured on the trainer art: the dark lip line is 51–59 px wide on a 512 px image,
+// and the lips are about 2.8% of the image height. Percent of the image, so the overlay
+// scales with the face at any render width.
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -102,6 +88,7 @@ export function AvatarNarrator({
   isVoiceActive, isVoiceLoading,
   currentViseme = "rest",
   narratorLanguage = "English",
+  mouthFrame = null,
 }: AvatarNarratorProps) {
   const [speechText,    setSpeechText]    = useState(() => buildDefaultSpeech(topic, moduleContent, trainerName));
   const [isStreaming,   setIsStreaming]   = useState(false);
@@ -113,8 +100,8 @@ export function AvatarNarrator({
   const [streamingViseme, setStreamingViseme] = useState<VisemeKey>("rest");
 
   // Sprite readiness: null = probing, true = PNG found, false = not found → CSS fallback
-  const [hasMouthSprite, setHasMouthSprite] = useState<boolean | null>(null);
-  const [hasBlinkSprite, setHasBlinkSprite] = useState<boolean | null>(null);
+  // No sprite PNGs ship with the app. The mouth is drawn (SVG) and eyes blink with a CSS lid,
+  // and sprite files are never requested, so nothing is fetched from /trainers/ inside an LMS.
   const [isBlinking,     setIsBlinking]     = useState(false);
 
   const avatarVideoRef          = useRef<HTMLVideoElement | null>(null);
@@ -133,33 +120,32 @@ export function AvatarNarrator({
     (isStreaming || isMouthHold) && currentViseme === "rest" ? streamingViseme : currentViseme;
 
   const isTalking  = Boolean(isVoiceActive || isVoiceLoading || isStreaming || isMouthHold);
-  const mouthState = getVisemeMouthState(effectiveViseme, isTalking);
   const lipSyncProfile = getTrainerLipSyncProfile(trainerId);
+  const mouthState = getVisemeMouthState(effectiveViseme, isTalking);
+  // Shared mouth and blink (lib/trainerMouth.ts): the same functions drive the SCORM card.
+  const faceOverlayRef = useRef<HTMLDivElement | null>(null);
+  const mouthOpenness = isTalking ? Math.min(1, Math.max(0, lipSyncProfile.visemes[effectiveViseme].height / 1.1)) : 0;
+  const faceFacePoints = TRAINER_FACE_POINTS[trainerId] || DEFAULT_FACE;
+  // Painted images are used only when all three exist for this trainer (probed below); otherwise the drawn mouth.
+  const [paintedSprites, setPaintedSprites] = useState<TrainerSprites | null>(null);
+  useEffect(() => {
+    // No painted sprite files ship in public/trainers/, so the drawn mouth is always used and
+    // /trainers/ is never requested (a 404 inside an LMS package). Re-enable the probe only when sprites ship.
+    setPaintedSprites(null);
+  }, [trainerId]);
+  // The mouth frame: from the narration track when there is one, otherwise from the viseme (ElevenLabs timing).
+  const frameOpen = mouthFrame ? mouthFrame.open : mouthOpenness;
+  const frameSpread = mouthFrame ? mouthFrame.spread : 0.5;
+  const frameFlag = mouthFrame ? mouthFrame.flag : 0;
+  useEffect(() => {
+    renderMouthFrame(faceOverlayRef.current, { open: frameOpen, spread: frameSpread, flag: frameFlag }, faceFacePoints, `narrator-${trainerId}`, isBlinking, paintedSprites);
+  }, [frameOpen, frameSpread, frameFlag, isBlinking, paintedSprites, faceFacePoints, trainerId]);
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
     .map((p) => p[0]?.toUpperCase() || "").join("") || "AV";
 
-  // ── sprite probing ────────────────────────────────────────────────────────
-  // Probe once per trainer so we know whether PNG files exist.
-  // Uses Image() instead of fetch — silent failure with onError, no console 404.
-  useEffect(() => {
-    setHasMouthSprite(null);
-    const probe = new Image();
-    probe.onload  = () => setHasMouthSprite(true);
-    probe.onerror = () => setHasMouthSprite(false);
-    probe.src = `/trainers/${trainerId}-mouth-slight.png`;
-  }, [trainerId]);
-
-  useEffect(() => {
-    setHasBlinkSprite(null);
-    const probe = new Image();
-    probe.onload  = () => setHasBlinkSprite(true);
-    probe.onerror = () => setHasBlinkSprite(false);
-    probe.src = `/trainers/${trainerId}-blink.png`;
-  }, [trainerId]);
-
-  // ── random eye blink ──────────────────────────────────────────────────────
+  // ──────────────────────────────────────────────────────
   // Schedules itself recursively with a random 2–6 s interval.
   // Blink lasts 140 ms. Works with a sprite PNG or is silently skipped
   // if hasBlinkSprite === false.
@@ -253,7 +239,7 @@ export function AvatarNarrator({
     clearMouthHold();
     stopFlushLoop();
     stopStreamViseme();
-    setSpeechText(`I'm having trouble connecting right now — please tap again in a moment and I'll walk you through ${topic}.`);
+    setSpeechText(`Here is the key point: ${moduleContent}`);
     setIsStreaming(false);
     setIsMouthHold(false);
     if (mode === "initial") setHasSpoken(true);
@@ -274,7 +260,6 @@ export function AvatarNarrator({
   // ── narration fetch ───────────────────────────────────────────────────────
   const runNarration = async (mode: RequestMode) => {
     if (isStreaming) return;
-    if (window.__CONTENTFORGE_COURSE__?.standalone) return;
     abortControllerRef.current?.abort();
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -351,12 +336,35 @@ export function AvatarNarrator({
 
   useEffect(() => { setHasAvatarImage(true); }, [avatarImageUrl, trainerName]);
 
+  // The talking-head video follows the narration: it plays while the narration plays, and
+  // when the narration pauses or ends it stops on the first frame (the closed-mouth pose).
+  const narrationActiveRef = useRef(false);
   useEffect(() => {
-    if (!avatarVideoUrl || !avatarVideoRef.current) return;
+    narrationActiveRef.current = Boolean(isVoiceActive);
     const v = avatarVideoRef.current;
-    v.currentTime = 0;
-    v.play().then(() => setVideoPlaying(true)).catch(() => setVideoPlaying(false));
-  }, [avatarVideoUrl, topic, moduleContent]);
+    if (!avatarVideoUrl || !v) return;
+    if (isVoiceActive) {
+      v.play().then(() => setVideoPlaying(true)).catch(() => setVideoPlaying(false));
+    } else {
+      v.pause();
+      v.currentTime = 0;
+      setVideoPlaying(false);
+    }
+  }, [avatarVideoUrl, isVoiceActive]);
+
+  // Browsers block video playback until the learner clicks. If the narration started before
+  // that, the video is retried on the first click so it doesn't stay frozen mid-speech.
+  useEffect(() => {
+    if (!avatarVideoUrl) return;
+    const resumeOnClick = () => {
+      const v = avatarVideoRef.current;
+      if (narrationActiveRef.current && v && v.paused) {
+        v.play().then(() => setVideoPlaying(true)).catch(() => setVideoPlaying(false));
+      }
+    };
+    document.addEventListener("pointerdown", resumeOnClick);
+    return () => document.removeEventListener("pointerdown", resumeOnClick);
+  }, [avatarVideoUrl]);
 
   const toggleVideoPlayback = () => {
     const v = avatarVideoRef.current;
@@ -365,14 +373,7 @@ export function AvatarNarrator({
     else { v.pause(); setVideoPlaying(false); }
   };
 
-  // Caption names the topic; it only quotes speech once the tutor has said something new.
-  const captionText = hasSpoken ? speechText.trim().replace(/\s+/g, " ").slice(0, 80) : topic;
-
-  // Sprite URLs
-  const blinkSpriteUrl       = `/trainers/${trainerId}-blink.png`;
-  const mouthSlightSpriteUrl = `/trainers/${trainerId}-mouth-slight.png`;
-  const mouthOpenSpriteUrl   = `/trainers/${trainerId}-mouth-open.png`;
-  const activeMouthSpriteUrl = mouthState === "slight" ? mouthSlightSpriteUrl : mouthOpenSpriteUrl;
+  const captionText = speechText.trim().replace(/\s+/g, " ").slice(0, 80);
 
   // ── render ────────────────────────────────────────────────────────────────
   return (
@@ -386,11 +387,12 @@ export function AvatarNarrator({
           0%, 100% { box-shadow: 0 10px 24px rgba(60,52,137,0.08); }
           50%       { box-shadow: 0 14px 32px rgba(60,52,137,0.16); }
         }
+        @keyframes trainerBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.1px); } }
         @keyframes headTilt {
-          0%,  100% { transform: rotate(0deg)     translateX(0px);   }
-          20%        { transform: rotate(0.8deg)   translateX(1px);   }
-          55%        { transform: rotate(-0.5deg)  translateX(-0.5px);}
-          80%        { transform: rotate(0.6deg)   translateX(0.8px); }
+          0%,  100% { transform: scale(1.02) rotate(0deg)     translateX(0px);   }
+          20%        { transform: scale(1.02) rotate(0.8deg)   translateX(1px);   }
+          55%        { transform: scale(1.02) rotate(-0.5deg)  translateX(-0.5px);}
+          80%        { transform: scale(1.02) rotate(0.6deg)   translateX(0.8px); }
         }
       `}</style>
 
@@ -403,7 +405,7 @@ export function AvatarNarrator({
           <video
             ref={avatarVideoRef} src={avatarVideoUrl} poster={avatarPosterUrl}
             className="aspect-[9/12] w-full max-h-[420px] object-cover object-top"
-            autoPlay playsInline muted={videoMuted} controls={false} preload="metadata"
+            playsInline muted={videoMuted} controls={false} preload="metadata"
             onPlay={() => setVideoPlaying(true)}
             onPause={() => setVideoPlaying(false)}
             onEnded={() => setVideoPlaying(false)}
@@ -443,129 +445,29 @@ export function AvatarNarrator({
             {hasAvatarImage ? (
               <>
                 {/*
-                  LAYER 0 — base head image
-                  Subtle 9 s head-tilt animation gives life without being distracting.
-                  transform-origin "50% 80%" pivots around the shoulders so the tilt
-                  feels like a natural head movement, not a full-body rock.
+                  Face layer — holds the base image and every overlay below. It has the
+                  source image's 2:3 ratio and the head tilt is applied here, so the
+                  overlays move with the face. Its bottom edge is cropped by the parent.
                 */}
-                <img
-                  src={avatarImageUrl || "/trainers/priya.png"}
-                  alt={trainerName}
-                  className="absolute inset-0 h-full w-full object-cover object-top"
+                <div
+                  className="absolute inset-x-0 top-0 aspect-[2/3]"
                   style={{
+                    transform: "scale(1.02)",
                     animation: isTalking ? "headTilt 9s ease-in-out infinite" : "none",
-                    transformOrigin: "50% 80%",
+                    transformOrigin: "50% 71%",
                   }}
-                  onError={() => setHasAvatarImage(false)}
-                />
-
-                {/*
-                  LAYER 1 — eyes-closed blink sprite  (optional)
-                  Drop  /public/trainers/{id}-blink.png  to enable.
-                  Full-size PNG — transparent everywhere except closed-eyes area.
-                  Fades in for 140 ms at random 2–6 s intervals.
-                */}
-                {hasBlinkSprite !== false && (
+                >
+                {/* Zoomed stage: the picture and the drawn mouth/blink share one coordinate system (lib/trainerMouth.ts) */}
+                <div className="absolute" style={{ ...trainerStageBox(faceFacePoints), animation: "trainerBob 8.8s ease-in-out infinite" }}>
                   <img
-                    src={blinkSpriteUrl}
-                    alt=""
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
-                    style={{
-                      opacity: isBlinking ? 1 : 0,
-                      transition: "opacity 60ms ease-in-out",
-                    }}
-                    onError={() => setHasBlinkSprite(false)}
+                    src={avatarImageUrl}
+                    alt={trainerName}
+                    className="absolute inset-0 h-full w-full object-cover object-top"
+                    onError={() => setHasAvatarImage(false)}
                   />
-                )}
-
-                {/*
-                  LAYER 2a — mouth sprites  (optional, preferred)
-                  Drop  /public/trainers/{id}-mouth-slight.png
-                  and   /public/trainers/{id}-mouth-open.png  to enable.
-                  Full-size PNGs — transparent everywhere except the mouth area.
-                  Three states driven by viseme groups:
-                    rest   → no sprite shown (drawn closed mouth visible in layer 0)
-                    slight → fricatives / liquids  → {id}-mouth-slight.png
-                    open   → vowels                → {id}-mouth-open.png
-                */}
-                {hasMouthSprite === true && mouthState !== "rest" && (
-                  <img
-                    src={activeMouthSpriteUrl}
-                    alt=""
-                    aria-hidden="true"
-                    className="pointer-events-none absolute inset-0 h-full w-full object-cover object-top"
-                    style={{ transition: "opacity 55ms ease-out" }}
-                  />
-                )}
-
-                {/* LAYER 1b — CSS blink overlay fallback (when no sprite PNG) */}
-                {/*
-                  Y-correction: container is aspect-[3/4] (0.75) but images are
-                  1024×1536 (0.667). With object-cover object-top the image is
-                  scaled to match container width; its rendered height exceeds
-                  the container, and the bottom is cropped.
-                  Scale factor = (1536/1024) / (4/3) = 1.125
-                */}
-                {hasBlinkSprite === false && (() => {
-                  const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
-                  const elx = `${face.eyeLeft.x}%`;
-                  const ely = `${face.eyeLeft.y * Y_CORRECT}%`;
-                  const erx = `${face.eyeRight.x}%`;
-                  const ery = `${face.eyeRight.y * Y_CORRECT}%`;
-                  return (
-                    <>
-                      <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: elx, top: ely,
-                        width: pctOfStageW(EYE_W), height: pctOfStageH(EYE_H), borderRadius: "50%", overflow: "hidden",
-                        transform: "translate(-50%, -50%)",
-                      }}>
-                        <div style={{
-                          width: "100%", height: "100%", borderRadius: "50%",
-                          background: "rgba(20,10,5,0.82)",
-                          transform: isBlinking ? "scaleY(1)" : "scaleY(0)",
-                          transformOrigin: "top center",
-                          transition: "transform 70ms ease-in",
-                        }} />
-                      </div>
-                      <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                        left: erx, top: ery,
-                        width: pctOfStageW(EYE_W), height: pctOfStageH(EYE_H), borderRadius: "50%", overflow: "hidden",
-                        transform: "translate(-50%, -50%)",
-                      }}>
-                        <div style={{
-                          width: "100%", height: "100%", borderRadius: "50%",
-                          background: "rgba(20,10,5,0.82)",
-                          transform: isBlinking ? "scaleY(1)" : "scaleY(0)",
-                          transformOrigin: "top center",
-                          transition: "transform 70ms ease-in",
-                        }} />
-                      </div>
-                    </>
-                  );
-                })()}
-
-                {/* LAYER 2b — CSS mouth overlay fallback (when no sprite PNG) */}
-                {hasMouthSprite === false && (() => {
-                  const face = FACE_COORDS[trainerId] || DEFAULT_FACE;
-                  const shape = lipSyncProfile.visemes[effectiveViseme];
-                  return (
-                    <div aria-hidden="true" className="pointer-events-none absolute" style={{
-                      left: `${face.mouth.x}%`, top: `${face.mouth.y * Y_CORRECT}%`,
-                      width: pctOfStageW(MTH_W * shape.width), height: pctOfStageH(MTH_H * shape.height),
-                      borderRadius: "50% 50% 60% 60%", overflow: "hidden",
-                      opacity: isTalking ? 1 : 0,
-                      transform: "translate(-50%, -50%)",
-                      transition: "width 50ms ease-out, height 50ms ease-out, opacity 120ms ease-out",
-                    }}>
-                      <div style={{
-                        width: "100%", height: "100%",
-                        background: "rgba(20,3,3,0.75)",
-                        borderRadius: "50% 50% 60% 60%",
-                      }} />
-                    </div>
-                  );
-                })()}
+                  <div ref={faceOverlayRef} className="absolute inset-0" />
+                </div>
+                </div>
               </>
             ) : (
               <div className="flex h-full w-full items-center justify-center text-4xl font-bold text-[#3C3489]">
@@ -614,8 +516,8 @@ export function AvatarNarrator({
           </p>
         </div>
 
-        {/* Trigger row — needs the live tutor, so not shown in downloaded courses */}
-        {!window.__CONTENTFORGE_COURSE__?.standalone && <div className="flex items-center justify-between border-t px-4 py-2" style={{ borderColor: BUBBLE_BORDER }}>
+        {/* Trigger row */}
+        <div className="flex items-center justify-between border-t px-4 py-2" style={{ borderColor: BUBBLE_BORDER }}>
           {isStreaming ? (
             <button type="button" onClick={stopStreaming}
               className="text-[12px] font-semibold text-red-400 hover:text-red-600 transition-colors">
@@ -635,7 +537,7 @@ export function AvatarNarrator({
               Give example ›
             </button>
           )}
-        </div>}
+        </div>
       </div>
     </section>
   );

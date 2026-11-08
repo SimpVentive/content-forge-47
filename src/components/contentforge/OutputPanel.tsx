@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { OutputData, RawAgentOutputs } from "@/types/agents";
 import { FileText, BookOpen, ClipboardCheck, Package, Sparkles, Check, Clock, Layers, BarChart3, AlertTriangle, Download, Play, Youtube, Loader2, AlertCircle, Info, Images } from "lucide-react";
-import { exportToScorm, downloadBlob } from "@/lib/scormExportOrchestrator";
+import { downloadBlob } from "@/lib/scormExportOrchestrator";
+import { createLearnerScormPackage } from "@/lib/learnerScormPackage";
 import { validateCourse, type QAReport } from "@/lib/qaValidator";
 import { toast } from "sonner";
 import { VoicePreview } from "./VoicePreview";
@@ -614,41 +615,15 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
                     }
                   }
                 } else {
+                  // The full learner player (slides, trainer narrator, narration audio, quiz, exit) in one package.
                   const hasVoice = !!rawOutputs.voice;
-                  const result = await exportToScorm(
-                    rawOutputs,
-                    {
-                      courseTitle,
-                      companyLogo,
-                      courseDescription: courseDuration,
-                      courseDuration,
-                      insertedVideos,
-                      slideLayout,
-                      learnerNotesEnabled,
-                      resourcesPanelEnabled,
-                      glossaryEnabled,
-                      infographicsEnabled,
-                      discussionEnabled,
-                      assessmentIntensity,
-                      flipStylePreference,
-                      textLanguage,
-                      narratorLanguage,
-                      trainerId: avatarTrainerId,
-                      enableVoiceNarration: hasVoice,
-                      embedStrategy: "data-uri",
-                      passingScore: 70,
-                      courseVersion: "1.0",
-                    },
-                    (progress) => {
-                      if (progress.message) toast.info(progress.message, { duration: 2000 });
-                    }
+                  const { zip } = await createLearnerScormPackage(
+                    { courseTitle, rawOutputs, insertedVideos, courseDuration, avatarTrainerId, companyLogo: null },
+                    70,
+                    (message) => toast.info(message, { duration: 2000 }),
                   );
-
-                  if (!result.success || !result.fileBlob) {
-                    throw new Error(result.message || "Export failed");
-                  }
-
-                  downloadBlob(result.fileBlob, result.fileName);
+                  const blob = await zip.generateAsync({ type: "blob" });
+                  downloadBlob(blob, `${courseTitle.replace(/[^a-z0-9]+/gi, "_").replace(/^_+|_+$/g, "") || "course"}_SCORM.zip`);
                   toast.success(hasVoice
                     ? "SCORM package with voice narration exported!"
                     : "SCORM package exported successfully!");
@@ -704,22 +679,157 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
 };
 
 /* Script Renderer (highlights narration cues + voice preview) */
+// Display-only formatting: the stored script text is unchanged (exports and narration still use it).
+type ScriptBlock =
+  | { kind: "heading"; level: number; text: string; notes: boolean }
+  | { kind: "hr"; notes: boolean }
+  | { kind: "matrix"; title: string; cols: string[]; rows: string[]; cells: string[]; notes: boolean }
+  | { kind: "list"; items: { depth: number; text: string }[]; notes: boolean }
+  | { kind: "para"; text: string; notes: boolean };
+
+const MATRIX_LINE_RE = /^\[MATRIX(\d)X(\d)\s*\|(.*)\]$/i;
+const CUE_SPLIT_RE = /(\[(?:PAUSE[^\]]*|EMPHASIZE|SLOW DOWN|SPEED UP|WHISPER|EXCITED)\])/i;
+const CUE_TEST_RE = /^\[(?:PAUSE|EMPHASIZE|SLOW DOWN|SPEED UP|WHISPER|EXCITED)/i;
+
+function parseMatrixLine(line: string): Omit<Extract<ScriptBlock, { kind: "matrix" }>, "kind" | "notes"> | null {
+  const match = line.match(MATRIX_LINE_RE);
+  if (!match) return null;
+  const fields: Record<string, string> = {};
+  match[3].split("|").forEach((part) => {
+    const idx = part.indexOf(":");
+    if (idx > 0) fields[part.slice(0, idx).trim().toLowerCase()] = part.slice(idx + 1).trim();
+  });
+  const cols = (fields.columns || "").split(";").map((s) => s.trim()).filter(Boolean);
+  const rows = (fields.rows || "").split(";").map((s) => s.trim()).filter(Boolean);
+  const cells = (fields.cells || "").split(";").map((s) => s.trim());
+  if (!cols.length || !rows.length || cells.length < cols.length * rows.length) return null;
+  return { title: fields.title || "", cols, rows, cells };
+}
+
+function parseScriptBlocks(raw: string): ScriptBlock[] {
+  const blocks: ScriptBlock[] = [];
+  let notes = false;
+  let list: { depth: number; text: string }[] | null = null;
+  let para: string[] = [];
+  const flushPara = () => {
+    if (para.length) { blocks.push({ kind: "para", text: para.join(" "), notes }); para = []; }
+  };
+  const flushList = () => {
+    if (list) { blocks.push({ kind: "list", items: list, notes }); list = null; }
+  };
+
+  for (const rawLine of raw.split(/\r?\n/)) {
+    const trimmed = rawLine.trim();
+    if (!trimmed) { flushPara(); flushList(); continue; }
+
+    if (/^-{3,}$/.test(trimmed)) { flushPara(); flushList(); blocks.push({ kind: "hr", notes }); continue; }
+
+    const heading = trimmed.match(/^(#{1,6})\s+(.*)$/);
+    if (heading) {
+      flushPara(); flushList();
+      const level = heading[1].length;
+      // Everything after an "Animation & Interaction Notes" heading is designer notes, until the next top-level heading.
+      if (level <= 2) notes = /animation|interaction notes/i.test(heading[2]);
+      blocks.push({ kind: "heading", level, text: heading[2].replace(/\*\*/g, "").trim(), notes });
+      continue;
+    }
+
+    const matrix = parseMatrixLine(trimmed);
+    if (matrix) { flushPara(); flushList(); blocks.push({ kind: "matrix", ...matrix, notes }); continue; }
+
+    const bullet = rawLine.match(/^(\s*)[*-]\s+(.*)$/);
+    if (bullet) {
+      flushPara();
+      (list ??= []).push({ depth: Math.floor(bullet[1].length / 2), text: bullet[2] });
+      continue;
+    }
+
+    flushList();
+    para.push(trimmed);
+  }
+  flushPara(); flushList();
+  return blocks;
+}
+
+function renderInline(text: string, keyBase: string): React.ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/).flatMap((segment, i) => {
+    const bold = segment.match(/^\*\*([^*]+)\*\*$/);
+    if (bold) return [<strong key={`${keyBase}-b${i}`} className="font-semibold text-foreground">{bold[1]}</strong>];
+    return segment.split(CUE_SPLIT_RE).map((part, j) =>
+      CUE_TEST_RE.test(part)
+        ? <span key={`${keyBase}-${i}-${j}`} className="text-primary font-bold bg-primary/10 px-1 rounded">{part}</span>
+        : <React.Fragment key={`${keyBase}-${i}-${j}`}>{part}</React.Fragment>
+    );
+  });
+}
+
+function renderScriptBlock(block: ScriptBlock, key: number): React.ReactNode {
+  switch (block.kind) {
+    case "heading": {
+      const cls = block.level <= 1 ? "text-[20px] font-bold mt-2" : block.level === 2 ? "text-[17px] font-bold mt-4" : "text-[15px] font-semibold mt-3";
+      return <div key={key} className={`${cls} text-foreground`}>{block.text}</div>;
+    }
+    case "hr":
+      return <hr key={key} className="my-4 border-border" />;
+    case "matrix":
+      return (
+        <div key={key} className="my-3 overflow-x-auto rounded-lg border border-border">
+          <table className="w-full border-collapse text-[13px]">
+            <thead>
+              <tr>
+                <th className="p-2 text-left font-semibold bg-muted/50">{block.title}</th>
+                {block.cols.map((col) => <th key={col} className="p-2 text-left font-semibold bg-muted/50">{col}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {block.rows.map((row, ri) => (
+                <tr key={row} className="border-t border-border">
+                  <th className="p-2 text-left font-semibold bg-muted/30">{row}</th>
+                  {block.cols.map((col, ci) => (
+                    <td key={col} className="p-2">{block.cells[ri * block.cols.length + ci]}</td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    case "list":
+      return (
+        <ul key={key} className="space-y-1 list-disc pl-5">
+          {block.items.map((item, i) => (
+            <li key={i} style={{ marginLeft: `${Math.min(item.depth, 3) * 16}px` }}>{renderInline(item.text, `l${key}-${i}`)}</li>
+          ))}
+        </ul>
+      );
+    case "para":
+      return <p key={key}>{renderInline(block.text, `p${key}`)}</p>;
+  }
+}
+
 const ScriptView: React.FC<{ raw: string; voiceRaw: string }> = ({ raw, voiceRaw }) => {
-  const parts = raw.split(/(\[(?:PAUSE[^]]*?|EMPHASIZE|SLOW DOWN|SPEED UP|WHISPER|EXCITED)\])/gi);
+  const blocks = parseScriptBlocks(raw);
   return (
     <div className="animate-fade-in space-y-0">
       {/* Voice Preview (at top if voice data available) */}
       {voiceRaw && <VoicePreview voiceRaw={voiceRaw} />}
 
-      {/* Script text with SSML cue highlights */}
-      <div className="text-[14px] text-foreground/90 whitespace-pre-wrap leading-[1.7] mt-4">
-        {parts.map((part, i) =>
-          /^\[(?:PAUSE|EMPHASIZE|SLOW DOWN|SPEED UP|WHISPER|EXCITED)/i.test(part) ? (
-            <span key={i} className="text-primary font-bold bg-primary/10 px-1 rounded">{part}</span>
-          ) : (
-            <span key={i}>{part}</span>
-          )
-        )}
+      <div className="mt-4 space-y-3 text-[14px] text-foreground/90 leading-[1.7]">
+        {blocks.map((block, i) => {
+          const startsNotes = block.notes && !blocks[i - 1]?.notes;
+          return (
+            <React.Fragment key={i}>
+              {startsNotes && (
+                <div className="mt-6 text-[11px] font-bold uppercase tracking-[0.12em] text-muted-foreground">
+                  Designer notes (not narrated)
+                </div>
+              )}
+              <div className={block.notes ? "border-l-2 border-primary/30 pl-3 text-muted-foreground" : undefined}>
+                {renderScriptBlock(block, i)}
+              </div>
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );

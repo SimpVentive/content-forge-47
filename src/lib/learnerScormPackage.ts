@@ -98,10 +98,9 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   }
   const rawOutputs = await portableValue(props.rawOutputs) as PortableLearnerProps["rawOutputs"];
   const companyLogo = props.companyLogo ? await embed(props.companyLogo) : props.companyLogo;
-  for (const key of ["imageUrl", "videoUrl", "posterUrl"] as const) {
-    const url = media.trainerMedia[key];
-    if (url) media.trainerMedia[key] = await embed(url);
-  }
+  if (media.trainerMedia.imageUrl) media.trainerMedia.imageUrl = await embed(media.trainerMedia.imageUrl);
+  // No trainer video in the package (the narrator is the drawn mouth on the trainer picture).
+  const packageTrainerMedia = { ...media.trainerMedia, videoUrl: undefined, posterUrl: undefined };
   if (media.introImages) for (const [index, url] of Object.entries(media.introImages)) media.introImages[Number(index)] = await embed(url);
   for (const [index, url] of Object.entries(media.audioBySlide)) media.audioBySlide[Number(index)] = await embed(url);
 
@@ -128,7 +127,7 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
   learnerExportMedia.set(props.courseTitle, media);
   report("Packaging the same interactive learner preview...");
   const runtime = await readRuntime();
-  const html = learnerDocument(props.courseTitle, { ...props, companyLogo, rawOutputs, exportMedia: media, standalone: true }, runtime, passingScore);
+  const html = learnerDocument(props.courseTitle, { ...props, companyLogo, rawOutputs, exportMedia: { ...media, trainerMedia: packageTrainerMedia }, standalone: true }, runtime, passingScore);
   // One page only: the manifest launches module_0.html, so a second copy would just duplicate the course.
   zip.file("module_0.html", html);
   zip.file("imsmanifest.xml", generateManifest({ courseId: `course_${Date.now()}`, courseTitle: props.courseTitle, passingScore, createdDate: new Date(), modifiedDate: new Date() }, { title: props.courseTitle, items: [{ identifier: "course", title: props.courseTitle, resourceId: "res_course" }] }, [{ id: "res_course", type: "webcontent", href: "module_0.html", scormType: "sco", files: [{ href: "module_0.html" }, ...Object.keys(zip.files).filter(name => name.startsWith("assets/") && !zip.files[name].dir).map(href => ({ href }))] }]));

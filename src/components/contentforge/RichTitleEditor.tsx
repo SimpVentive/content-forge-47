@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef } from "react";
 import { RotateCcw, Type } from "lucide-react";
 import { keepTitleFocus } from "./TitleFormatter";
 
@@ -27,6 +27,14 @@ interface RichTitleEditorProps {
   isOpen: boolean;
 }
 
+type TitleStyle = TitleSpan["style"];
+
+interface StyleRun {
+  start: number;
+  end: number;
+  style: TitleStyle;
+}
+
 const FONT_SIZES = [
   { value: "small", label: "Small (14px)", px: 14 },
   { value: "medium", label: "Medium (18px)", px: 18 },
@@ -49,40 +57,85 @@ const COLORS = [
   { value: "#ea580c", label: "Orange" },
 ];
 
+/** Drop unset values so that equal styles compare equal. */
+const cleanStyle = (style: TitleStyle): TitleStyle => {
+  const cleaned: Record<string, unknown> = {};
+  (Object.keys(style) as (keyof TitleStyle)[]).forEach((key) => {
+    const value = style[key];
+    if (value !== undefined && value !== false && value !== "") cleaned[key] = value;
+  });
+  return cleaned as TitleStyle;
+};
+
+const styleKey = (style: TitleStyle): string =>
+  JSON.stringify(Object.entries(style).sort(([a], [b]) => a.localeCompare(b)));
+
+/** Resolve the style of every character. Overlapping spans are merged in order. */
+const buildCharStyles = (length: number, spans: TitleSpan[]): TitleStyle[] => {
+  const chars: TitleStyle[] = Array.from({ length }, () => ({}));
+  spans.forEach((span) => {
+    for (let i = Math.max(0, span.start); i < Math.min(length, span.end); i++) {
+      chars[i] = { ...chars[i], ...span.style };
+    }
+  });
+  return chars.map(cleanStyle);
+};
+
+/** Group consecutive characters that share a style into runs. */
+const groupRuns = (chars: TitleStyle[]): StyleRun[] => {
+  const runs: StyleRun[] = [];
+  chars.forEach((style, i) => {
+    const last = runs[runs.length - 1];
+    if (last && last.end === i && styleKey(last.style) === styleKey(style)) {
+      last.end = i + 1;
+    } else {
+      runs.push({ start: i, end: i + 1, style });
+    }
+  });
+  return runs;
+};
+
+const charsToSpans = (chars: TitleStyle[]): TitleSpan[] =>
+  groupRuns(chars)
+    .filter((run) => Object.keys(run.style).length > 0)
+    .map(({ start, end, style }) => ({ start, end, style }));
+
+/** Character offset of a DOM point, measured from the start of the editor text. */
+const getTextOffset = (root: HTMLElement, node: Node, offset: number): number => {
+  const range = document.createRange();
+  range.selectNodeContents(root);
+  range.setEnd(node, offset);
+  return range.toString().length;
+};
+
 export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, onTitleChange, isOpen }) => {
   const [selectionStart, setSelectionStart] = useState(0);
   const [selectionEnd, setSelectionEnd] = useState(0);
   const [showToolbar, setShowToolbar] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
 
-  const getSpanAtRange = (): TitleSpan | null => {
-    return spans.find((s) => s.start === selectionStart && s.end === selectionEnd) || null;
+  const charStyles = buildCharStyles(title.length, spans);
+  const rangeStart = Math.min(selectionStart, selectionEnd);
+  const rangeEnd = Math.max(selectionStart, selectionEnd);
+  const hasSelection = rangeEnd > rangeStart;
+  const currentStyle: TitleStyle = hasSelection ? charStyles[rangeStart] ?? {} : {};
+  const hasStyleAtSelection = Object.keys(currentStyle).length > 0;
+
+  const applyStyleToSelection = (update: (prev: TitleStyle) => TitleStyle) => {
+    if (!hasSelection) return;
+    const next = [...charStyles];
+    for (let i = rangeStart; i < rangeEnd; i++) {
+      next[i] = cleanStyle(update(next[i]));
+    }
+    onTitleChange(title, charsToSpans(next));
   };
 
-  const applyFormatting = (property: keyof TitleSpan["style"], value: any) => {
-    if (selectionStart === selectionEnd) return;
-
-    let newSpans = spans.filter((s) => !(s.start === selectionStart && s.end === selectionEnd));
-    const existingSpan = getSpanAtRange();
-
-    const newStyle = {
-      ...(existingSpan?.style || {}),
-      [property]: value,
-    };
-
-    newSpans.push({
-      start: selectionStart,
-      end: selectionEnd,
-      style: newStyle,
-    });
-
-    newSpans = newSpans.sort((a, b) => a.start - b.start);
-    onTitleChange(title, newSpans);
+  const applyFormatting = (property: keyof TitleStyle, value: string | boolean) => {
+    applyStyleToSelection((prev) => ({ ...prev, [property]: value } as TitleStyle));
   };
 
   const resetFormatting = () => {
-    const newSpans = spans.filter((s) => !(s.start === selectionStart && s.end === selectionEnd));
-    onTitleChange(title, newSpans);
+    applyStyleToSelection(() => ({}));
   };
 
   // DOM offsets are relative to the span's own text node, so measure from the start of the editor to get a position in the title.
@@ -107,26 +160,7 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
     }
   };
 
-  const getStyledSegments = () => {
-    const segments: { text: string; style: TitleSpan["style"] }[] = [];
-    let lastEnd = 0;
-
-    spans.sort((a, b) => a.start - b.start).forEach((span) => {
-      if (lastEnd < span.start) {
-        segments.push({ text: title.slice(lastEnd, span.start), style: {} });
-      }
-      segments.push({ text: title.slice(span.start, span.end), style: span.style });
-      lastEnd = span.end;
-    });
-
-    if (lastEnd < title.length) {
-      segments.push({ text: title.slice(lastEnd), style: {} });
-    }
-
-    return segments.length === 0 ? [{ text: title, style: {} }] : segments;
-  };
-
-  const getStyleProps = (style: TitleSpan["style"]) => {
+  const getStyleProps = (style: TitleStyle) => {
     const fontSizeObj = FONT_SIZES.find((f) => f.value === style.fontSize);
     const fontFamilyObj = FONT_FAMILIES.find((f) => f.value === style.fontFamily);
 
@@ -142,7 +176,7 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
 
   if (!isOpen) return null;
 
-  const currentSpan = getSpanAtRange();
+  const runs = groupRuns(charStyles);
 
   return (
     <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-2 animate-fade-in">
@@ -166,9 +200,9 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
         onMouseUp={handleMouseUp}
         className="border-[1.5px] border-border rounded-lg p-4 bg-white mb-4 text-center cursor-text select-text focus:outline-none focus:border-primary min-h-16 flex items-center justify-center"
       >
-        {getStyledSegments().map((seg, idx) => (
-          <span key={idx} style={getStyleProps(seg.style)}>
-            {seg.text}
+        {runs.map((run) => (
+          <span key={run.start} style={getStyleProps(run.style)}>
+            {title.slice(run.start, run.end)}
           </span>
         ))}
       </div>
@@ -177,10 +211,10 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
         <div className="border-t border-blue-200 pt-3" onMouseDown={keepTitleFocus}>
           {selectionStart !== selectionEnd && (
             <p className="text-[11px] font-semibold text-muted-foreground mb-2">
-              Selected: "{title.slice(Math.min(selectionStart, selectionEnd), Math.max(selectionStart, selectionEnd))}"
+              Selected: "{title.slice(rangeStart, rangeEnd)}"
             </p>
           )}
-          {selectionStart === selectionEnd && (
+          {!hasSelection && (
             <p className="text-[11px] text-muted-foreground mb-2 italic">👆 Select text to apply formatting</p>
           )}
 
@@ -192,10 +226,10 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
                 {FONT_SIZES.map((size) => (
                   <button
                     key={size.value}
-                    onClick={() => applyFormatting("fontSize", size.value as any)}
+                    onClick={() => applyFormatting("fontSize", size.value)}
                     type="button"
                     className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
-                      currentSpan?.style.fontSize === size.value
+                      currentStyle.fontSize === size.value
                         ? "bg-blue-600 text-white"
                         : "bg-white border border-border hover:border-primary text-foreground"
                     }`}
@@ -213,10 +247,10 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
                 {FONT_FAMILIES.map((font) => (
                   <button
                     key={font.value}
-                    onClick={() => applyFormatting("fontFamily", font.value as any)}
+                    onClick={() => applyFormatting("fontFamily", font.value)}
                     type="button"
                     className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
-                      currentSpan?.style.fontFamily === font.value
+                      currentStyle.fontFamily === font.value
                         ? "bg-blue-600 text-white"
                         : "bg-white border border-border hover:border-primary text-foreground"
                     }`}
@@ -239,14 +273,14 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
                     className="w-7 h-7 rounded-lg border-2 transition-all hover:scale-110"
                     style={{
                       backgroundColor: color.value,
-                      borderColor: currentSpan?.style.color === color.value ? "#000" : "#ddd",
+                      borderColor: currentStyle.color === color.value ? "#000" : "#ddd",
                     }}
                     title={color.label}
                   />
                 ))}
                 <input
                   type="color"
-                  value={currentSpan?.style.color || "#000000"}
+                  value={currentStyle.color || "#000000"}
                   onChange={(e) => applyFormatting("color", e.target.value)}
                   className="w-7 h-7 rounded-lg cursor-pointer border border-border"
                   title="Custom color"
@@ -259,33 +293,33 @@ export const RichTitleEditor: React.FC<RichTitleEditorProps> = ({ title, spans, 
               <label className="text-[11px] font-semibold text-foreground block mb-1">Style</label>
               <div className="flex gap-1 flex-wrap">
                 <button
-                  onClick={() => applyFormatting("bold", !currentSpan?.style.bold)}
+                  onClick={() => applyFormatting("bold", !currentStyle.bold)}
                   type="button"
                   className={`text-[12px] font-bold px-3 py-1.5 rounded-lg transition-all ${
-                    currentSpan?.style.bold ? "bg-blue-600 text-white" : "bg-white border border-border hover:border-primary text-foreground"
+                    currentStyle.bold ? "bg-blue-600 text-white" : "bg-white border border-border hover:border-primary text-foreground"
                   }`}
                 >
                   B
                 </button>
                 <button
-                  onClick={() => applyFormatting("italic", !currentSpan?.style.italic)}
+                  onClick={() => applyFormatting("italic", !currentStyle.italic)}
                   type="button"
                   className={`text-[12px] italic px-3 py-1.5 rounded-lg transition-all ${
-                    currentSpan?.style.italic ? "bg-blue-600 text-white" : "bg-white border border-border hover:border-primary text-foreground"
+                    currentStyle.italic ? "bg-blue-600 text-white" : "bg-white border border-border hover:border-primary text-foreground"
                   }`}
                 >
                   I
                 </button>
                 <button
-                  onClick={() => applyFormatting("underline", !currentSpan?.style.underline)}
+                  onClick={() => applyFormatting("underline", !currentStyle.underline)}
                   type="button"
                   className={`text-[12px] underline px-3 py-1.5 rounded-lg transition-all ${
-                    currentSpan?.style.underline ? "bg-blue-600 text-white" : "bg-white border border-border hover:border-primary text-foreground"
+                    currentStyle.underline ? "bg-blue-600 text-white" : "bg-white border border-border hover:border-primary text-foreground"
                   }`}
                 >
                   U
                 </button>
-                {currentSpan && (
+                {hasStyleAtSelection && (
                   <button
                     onClick={resetFormatting}
                     type="button"

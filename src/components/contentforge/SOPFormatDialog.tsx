@@ -3,10 +3,12 @@ import { X } from "lucide-react";
 
 interface SOPFormatDialogProps {
   open: boolean;
+  /** True when the content looks like an SOP; otherwise the generic wording is shown. */
+  detected?: boolean;
   onFormatSelect: (format: "learning-course" | "work-instruction") => void;
 }
 
-export const SOPFormatDialog: React.FC<SOPFormatDialogProps> = ({ open, onFormatSelect }) => {
+export const SOPFormatDialog: React.FC<SOPFormatDialogProps> = ({ open, detected = true, onFormatSelect }) => {
   if (!open) return null;
 
   return (
@@ -14,9 +16,13 @@ export const SOPFormatDialog: React.FC<SOPFormatDialogProps> = ({ open, onFormat
       <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl animate-fade-in">
         {/* Header */}
         <div className="mb-6">
-          <h2 className="text-[24px] font-bold text-foreground">We Detected an SOP</h2>
+          <h2 className="text-[24px] font-bold text-foreground">
+            {detected ? "We Detected an SOP" : "Choose Content Format"}
+          </h2>
           <p className="text-[14px] text-muted-foreground mt-2">
-            How would you like to create content from this Standard Operating Procedure?
+            {detected
+              ? "How would you like to create content from this Standard Operating Procedure?"
+              : "How would you like to create content from this material?"}
           </p>
         </div>
 

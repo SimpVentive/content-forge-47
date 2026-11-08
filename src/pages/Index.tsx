@@ -126,6 +126,7 @@ const Index = () => {
     rawOutputs,
     logs,
     isRunning,
+    isStopping,
     runPipeline,
     stopPipeline,
     updateVisualTopicAsset,
@@ -636,7 +637,7 @@ const Index = () => {
             </h2>
 
             <p className="text-center text-slate-600 mb-8">
-              <span className="font-semibold text-slate-900">"{courseTitle}"</span> is ready. You are now on <span className="font-semibold">Course Output</span> — preview it as a learner or export it.
+              <span className="font-semibold text-slate-900">"{courseTitle}"</span> is ready. Fixes are applied. Open <span className="font-semibold">Course Output</span> to review it, or open the <span className="font-semibold">Learner Preview</span> from there.
             </p>
 
             <div className="space-y-3">
@@ -906,9 +907,10 @@ const Index = () => {
                     </div>
                     <button
                       onClick={stopPipeline}
-                      className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all text-[13px]"
+                      disabled={isStopping}
+                      className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all text-[13px] disabled:opacity-60 disabled:cursor-wait"
                     >
-                      Stop Generation
+                      {isStopping ? "Stopping after current step…" : "Stop Generation"}
                     </button>
                   </div>
                 </div>
@@ -933,10 +935,10 @@ const Index = () => {
               </div>
             )}
             {!hasRun ? (
-              <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} />
+              <AgentPipeline agents={agents} isRunning={isRunning} isStopping={isStopping} agentToggles={agentToggles} setAgentToggles={setAgentToggles} onStop={stopPipeline} />
             ) : (
               <div className="space-y-6 max-w-[720px] mx-auto">
-                <AgentPipeline agents={agents} isRunning={isRunning} agentToggles={agentToggles} setAgentToggles={setAgentToggles} />
+                <AgentPipeline agents={agents} isRunning={isRunning} isStopping={isStopping} agentToggles={agentToggles} setAgentToggles={setAgentToggles} onStop={stopPipeline} />
                 <OrchestratorLog logs={logs} />
               </div>
             )}

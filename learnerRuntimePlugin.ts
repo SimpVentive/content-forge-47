@@ -31,7 +31,7 @@ export function learnerRuntimePlugin(): Plugin {
   return {
     name: "contentforge-learner-runtime",
     configureServer(server) {
-      server.watcher.on("change", file => { if (file.includes("/src/") || file.endsWith("tailwind.config.ts")) runtime = undefined; });
+      server.watcher.on("change", file => { const f = file.replace(/\\/g, "/"); if (f.includes("/src/") || f.endsWith("tailwind.config.ts")) runtime = undefined; });
       server.middlewares.use(async (req, res, next) => {
         if (!req.url?.startsWith("/learner-runtime.")) return next();
         try {

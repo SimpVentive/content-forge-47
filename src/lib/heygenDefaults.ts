@@ -11,7 +11,8 @@ export interface HeyGenConfig {
 }
 
 export const HEYGEN_DEFAULTS: HeyGenConfig = {
-  apiKey: "sk_V2_hgu_kJEvc3auSBO_T2GzJi71HK8ljbedWjiZiv9PswcOlNAq",
+  // The API key is not stored in the app. Keys belong on the server, not in source code.
+  apiKey: "",
   accountId: "default",
   defaultAvatar: "rachel",
   defaultVideoQuality: "1080p",

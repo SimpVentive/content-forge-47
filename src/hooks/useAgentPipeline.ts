@@ -2,7 +2,7 @@ import { requireLessonContent } from "@/lib/lessonContent";
 import { EXPLAINER_INFOGRAPHIC_SYSTEM_PROMPT, assessInfographicSvg, buildInfographicUserPrompt } from "@/lib/infographicQuality";
 import { addMissingDiagramMarkers } from "@/lib/diagramSpec";
 import { ANSWER_AUDIT_SYSTEM_PROMPT, applyAnswerCorrections, buildAnswerAuditUserMessage, collectVerifiableQuestions } from "@/lib/assessmentVerification";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { AgentInfo, AgentStatus, AGENTS, OutputData, RawAgentOutputs } from "@/types/agents";
 import { supabase } from "@/integrations/supabase/client";
 import { generateHeyGenVideo, pollForVideoCompletion, type GeneratedVideo } from "@/lib/heygenService";
@@ -481,6 +481,25 @@ const initialStatuses = (): Record<string, AgentStatus> =>
   Object.fromEntries(AGENTS.map((a) => [a.id, "idle" as AgentStatus]));
 
 const initialOutput = (): OutputData => ({ outline: "", script: "", assessment: "", package: "" });
+// Writer model calls: each call has this timeout and one automatic retry (inside callClaudeWithRetry).
+const WRITER_TIMEOUT_MS = 120000;
+
+// Turns a failed Writer call into a clear message that names the module, and logs it.
+function writerFailure(err: unknown, moduleNumber: number, addLog: (msg: string) => void): Error {
+  const raw = (err as Error)?.message || "unknown error";
+  const message = /timed out/i.test(raw)
+    ? `Writer: model call timed out after ${WRITER_TIMEOUT_MS / 1000} s on module ${moduleNumber} (retried once). Run stopped.`
+    : `Writer: model call failed on module ${moduleNumber} — ${raw}. Run stopped.`;
+  addLog(message);
+  return new Error(message);
+}
+
+// Cards still marked "running" after a run has ended (stopped or failed) are reset, so they never show work that isn't happening.
+function settleRunningStatuses(prev: Record<string, AgentStatus>): Record<string, AgentStatus> {
+  if (!Object.values(prev).includes("running")) return prev;
+  return Object.fromEntries(Object.entries(prev).map(([id, status]) => [id, status === "running" ? "idle" : status])) as Record<string, AgentStatus>;
+}
+
 const initialRaw = (): RawAgentOutputs => ({ research: "", architect: "", writer: "", visual: "", diagrams: "{}", animation: "", youtube: "", compliance: "", assessment: "", quality: "", voice: "", assembly: "", "final-qa": "" });
 
 /**
@@ -637,6 +656,8 @@ export function useAgentPipeline() {
   const [rawOutputs, setRawOutputs] = useState<RawAgentOutputs>(initialRaw());
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
+  const runActiveRef = useRef(false);
   const [showQAConfirmation, setShowQAConfirmation] = useState(false);
   const [showQADialog, setShowQADialog] = useState(false);
   const [qaResult, setQAResult] = useState<QAResult | null>(null);
@@ -720,7 +741,7 @@ export function useAgentPipeline() {
 
   const loadPersistedState = useCallback((nextRaw: RawAgentOutputs, nextOutput: OutputData, nextLogs: string[] = []) => {
     cancelledRef.current = false;
-    setIsRunning(false);
+    if (!runActiveRef.current) setIsRunning(false);
     setAgentStatuses(initialStatuses());
     setRawOutputs(nextRaw);
     setOutputData(nextOutput);
@@ -729,7 +750,7 @@ export function useAgentPipeline() {
 
   const clearPipelineState = useCallback(() => {
     cancelledRef.current = false;
-    setIsRunning(false);
+    if (!runActiveRef.current) setIsRunning(false);
     setAgentStatuses(initialStatuses());
     setRawOutputs(initialRaw());
     setOutputData(initialOutput());
@@ -844,7 +865,7 @@ export function useAgentPipeline() {
     return diagrams;
   };
 
-  const runPipeline = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentTypes?: ("mcq" | "match-the-following" | "true-false" | "scenario" | "fill-blanks")[]; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3 | 4 | 5; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; avatarTrainerId?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; infographicsEnabled?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
+  const runPipelineBody = useCallback(async (courseTitle: string, inputText: string, toggles: Record<string, boolean>, params?: { level?: string; language?: string; textLanguage?: string; narratorLanguage?: string; voiceAccent?: string; duration?: string; assessmentRequired?: boolean; assessmentTypes?: ("mcq" | "match-the-following" | "true-false" | "scenario" | "fill-blanks")[]; assessmentIntensity?: AssessmentIntensity; slideLayout?: SlideLayoutParams; maxYoutubeVideos?: number; learningMode?: VideoMode; videoSettings?: { selectedAvatar: string; videoQuality: string; backgroundStyle: string }; imageCount?: 1 | 2 | 3 | 4 | 5; imageNarrativeSceneCount?: number; imageStyleVariant?: string; imageAspectRatio?: string; characterEthnicity?: string; avatarTrainerId?: string; flipbookDisplayStyle?: "page-flip" | "smooth-slide" | "step-reveal"; imageOutputFormat?: "interactive-html" | "video" | "pdf"; flipbookVoiceoverEnabled?: boolean; flipbookNarrationLanguage?: string; showAvatarNarrator?: boolean; infographicsEnabled?: boolean; voiceoverPace?: "slow" | "normal" | "fast"; contentType?: "learning-course" | "work-instruction"; titleSpans?: any[]; companyLogo?: string | null }, selectedAssets?: SelectedAsset[], courseId?: string, userId?: string) => {
     cancelledRef.current = false;
     setIsRunning(true);
     setAgentStatuses(initialStatuses());
@@ -1170,11 +1191,17 @@ ZERO-REPETITION RULE — ABSOLUTE:
         if (parsedModules.length === 0) {
           // Fallback: single call if we can't parse modules
           addLog("Writer Agent: Drafting all content...");
-          writerResult = sanitizeWriterOutput(await runAgentWithLanguage(
-            writerSystemPromptWithMode,
-            `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nPlanned Topic Count: ${totalTopics}\n\nDuration Plan:\n${summarizeDurationPlan(durationPlan)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"} and reach approximately ${targetNarrationWords} words in total.`,
-            addLog, "Writer Agent"
-          ));
+          addLog("Writer: model call sent (all content in one call)");
+          try {
+            writerResult = sanitizeWriterOutput(await runAgentWithLanguage(
+              writerSystemPromptWithMode,
+              `Course Title: ${courseTitle}\nTarget Duration: ${params?.duration || "15min"}\nTarget Narration Budget: ${targetNarrationWords} words\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes\nPlanned Topic Count: ${totalTopics}\n\nDuration Plan:\n${summarizeDurationPlan(durationPlan)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite engaging content for the entire course. Scale total content to fit ${params?.duration || "15min"} and reach approximately ${targetNarrationWords} words in total.`,
+              addLog, "Writer Agent", WRITER_TIMEOUT_MS
+            ));
+          } catch (err) {
+            throw writerFailure(err, 1, addLog);
+          }
+          addLog(`Writer: response received (${writerResult.length} characters)`);
         } else {
           // Per-module calls to avoid truncation
           const moduleResults: string[] = [];
@@ -1195,12 +1222,18 @@ ZERO-REPETITION RULE — ABSOLUTE:
             }).join("\n");
 
             addLog(`Writer Agent: Drafting Module ${mi + 1}/${parsedModules.length} — ${modTitle}...`);
-
-            const moduleContentRaw = await runAgentWithLanguage(
+            addLog(`Writer: module ${mi + 1} — model call sent`);
+            let moduleContentRaw = "";
+            try {
+              moduleContentRaw = await runAgentWithLanguage(
               writerSystemPromptWithMode,
               `Course Title: ${courseTitle}\nThis is Module ${mi + 1} of ${parsedModules.length} in a ${params?.duration || "15min"} course.\nTarget Narration Budget: ${targetNarrationWords} words across ${totalTopics} topics total.\nAllowed Runtime Drift: +/- ${durationToleranceMinutes} minutes.\nThis module should carry its fair share of that runtime.\n\nModule: ${modTitle}\nModule Runtime Target: ${moduleDurationPlan?.targetMinutes ?? "auto"} minutes\nModule Word Budget: ${moduleDurationPlan?.targetWords ?? "auto"} words\nModule Topic Word Range: ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange}\nTopics:\n${topics}\n\nStructured Topic Blueprint JSON (FOR YOUR REFERENCE ONLY — DO NOT ECHO):\n${topicBlueprint}\n\nDuration Plan JSON (FOR YOUR REFERENCE ONLY — DO NOT ECHO):\n${JSON.stringify(moduleDurationPlan || null, null, 2)}\n\nResearch Context:\n${researchResult}\n\n=== ORIGINAL SOURCE MATERIAL ===\n${inputText}\n=== END ===\n\nWrite FULL, detailed, engaging MARKDOWN PROSE for EVERY topic in this module. Use ## headers matching the topic names exactly. Each topic must be ${moduleDurationPlan?.topicWordRange ?? wordsPerTopicRange} words minimum. NEVER output JSON or code blocks — output flowing prose only. Your first character must be "#".`,
-              addLog, "Writer Agent"
-            );
+              addLog, "Writer Agent", WRITER_TIMEOUT_MS
+              );
+            } catch (err) {
+              throw writerFailure(err, mi + 1, addLog);
+            }
+            addLog(`Writer: module ${mi + 1} — response received (${moduleContentRaw.length} characters)`);
             const moduleContent = sanitizeWriterOutput(moduleContentRaw);
             requireLessonContent(moduleContent, [{ title: modTitle, topics: (mod.topics || mod.sections || mod.lessons || []).map((topic: any) => typeof topic === "string" ? topic : topic.topic_title || topic.topic_name || topic.title || topic.name).filter(Boolean).length ? (mod.topics || mod.sections || mod.lessons || []).map((topic: any) => typeof topic === "string" ? topic : topic.topic_title || topic.topic_name || topic.title || topic.name).filter(Boolean) : [modTitle] }]);
             moduleResults.push(`# ${modTitle}\n\n${moduleContent}`);
@@ -1209,6 +1242,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
             writerResult = moduleResults.join("\n\n---\n\n");
             setRawOutputs((prev) => ({ ...prev, writer: writerResult }));
             setOutputData((prev) => ({ ...prev, script: writerResult }));
+            addLog(`Writer: module ${mi + 1} — saved`);
           }
           writerResult = moduleResults.join("\n\n---\n\n");
         }
@@ -2253,13 +2287,12 @@ ${modeInstructions}`;
       }
 
     } catch (err) {
-      // Find which agent was running and mark it as error
-      const runningAgent = AGENTS.find((a) => {
-        // We can't read state here, so just log the error
-        return false;
-      });
       addLog(`Orchestrator: Pipeline error — ${(err as Error).message}`);
       setStatus("assembly", "error");
+      // Any agent still marked "running" has failed; without this its card stays "Running" forever.
+      setAgentStatuses((prev) => Object.fromEntries(
+        Object.entries(prev).map(([id, status]) => [id, status === "running" ? "error" : status]),
+      ) as Record<string, AgentStatus>);
       setIsRunning(false);
       return;
     }
@@ -2269,10 +2302,33 @@ ${modeInstructions}`;
     setIsRunning(false);
   }, [addLog, setStatus]);
 
+  // The run is finished only when its body has returned or thrown. Nothing else clears the running flag.
+  const runPipeline = useCallback(
+    (...args: Parameters<typeof runPipelineBody>) => {
+      runActiveRef.current = true;
+      pipelineContextRef.current = null; // a new run never inherits a pending decision from an earlier one
+      setIsRunning(true);
+      return runPipelineBody(...args).finally(() => {
+        // Waiting for the user's Quality Check decision: the run is not over yet. The decision handlers end it.
+        if (pipelineContextRef.current) return;
+        runActiveRef.current = false;
+        setIsStopping(false);
+        setIsRunning(false);
+      });
+    },
+    [runPipelineBody],
+  );
+
   const stopPipeline = useCallback(() => {
     cancelledRef.current = true;
-    addLog("Orchestrator: Stop requested — finishing current agent...");
+    setIsStopping(true);
+    addLog("Orchestrator: Stop requested — the run stops after the current step.");
   }, [addLog]);
+
+  // Whenever the run is not running, no card may still show "running".
+  useEffect(() => {
+    if (!isRunning) setAgentStatuses((prev) => settleRunningStatuses(prev));
+  }, [isRunning]);
 
   const applyQAFixes = useCallback(async () => {
     if (!qaResult?.wasAutoFixed || !qaResult.revisedOutputs) {
@@ -2334,6 +2390,7 @@ ${modeInstructions}`;
     } finally {
       setIsApplyingQAFixes(false);
       setIsRunning(false);
+      runActiveRef.current = false;
       pipelineContextRef.current = null;
     }
   }, [qaResult, rawOutputs, addLog]);
@@ -2343,6 +2400,7 @@ ${modeInstructions}`;
     setShowQADialog(false);
     addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
     setIsRunning(false);
+    runActiveRef.current = false;
     pipelineContextRef.current = null;
   }, [addLog]);
 
@@ -2352,6 +2410,7 @@ ${modeInstructions}`;
     setStatus("final-qa", "idle");
     addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
     setIsRunning(false);
+    runActiveRef.current = false;
     pipelineContextRef.current = null;
   }, [addLog, setStatus]);
 
@@ -2435,6 +2494,7 @@ ${modeInstructions}`;
     rawOutputs,
     logs,
     isRunning,
+    isStopping,
     runPipeline,
     stopPipeline,
     updateVisualTopicAsset,

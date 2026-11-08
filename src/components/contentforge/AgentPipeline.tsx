@@ -8,9 +8,11 @@ interface AgentPipelineProps {
   isRunning?: boolean;
   agentToggles: Record<string, boolean>;
   setAgentToggles: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onStop?: () => void;
+  isStopping?: boolean;
 }
 
-export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning, agentToggles, setAgentToggles }) => {
+export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning, agentToggles, setAgentToggles, onStop, isStopping = false }) => {
   const enabledAgents = agents.filter((agent) => agentToggles[agent.id] ?? true).length;
 
   return (
@@ -21,6 +23,17 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
           <h2 className="text-[22px] font-[700] text-foreground">Pipeline Agents</h2>
           <p className="text-[14px] text-muted-foreground mt-0.5">Toggle agents on/off · Watch them work in real-time</p>
         </div>
+        <div className="flex items-center gap-2">
+        {isRunning && onStop && (
+          <button
+            type="button"
+            onClick={onStop}
+            disabled={isStopping}
+            className="px-4 py-2 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 transition-all text-[13px] disabled:opacity-60 disabled:cursor-wait"
+          >
+            {isStopping ? "Stopping…" : "Stop Generating"}
+          </button>
+        )}
         <div className="flex items-center gap-2 rounded-full bg-card px-4 py-2 shadow-card">
           {isRunning ? (
             <Loader2 className="h-4 w-4 animate-spin text-primary" />
@@ -31,6 +44,7 @@ export const AgentPipeline: React.FC<AgentPipelineProps> = ({ agents, isRunning,
             {isRunning ? `Running · ${enabledAgents} active` : `${enabledAgents} active`}
           </span>
         </div>
+      </div>
       </div>
 
       {/* Orchestrator bar */}

@@ -1,8 +1,12 @@
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import type { RawAgentOutputs } from "@/types/agents";
-import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, safeLearnerInlineText, stripOptionPrefix } from "@/lib/textCleaningUtility";
+import { safeLearnerInlineText } from "@/lib/textCleaningUtility";
 import { collectAssessmentItems } from "@/lib/assessmentAnswer";
+import { TRAINER_FACE_POINTS, type TrainerFacePoints } from "@/lib/trainerFacePoints";
+import { mouthFrameAt, renderMouthFrame, stepMouth, trainerSpriteUrls, trainerStageStyle, type TrainerSprites } from "@/lib/trainerMouth";
+import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
+import { stripNarratorMarkdown, isPlaceholderToken, safeLearnerText, stripOptionPrefix } from "@/lib/textCleaningUtility";
 
 /* ── helpers ── */
 function tryParseJSON(raw: string): any | null {
@@ -747,7 +751,7 @@ const IMSMD_XSD = `<?xml version="1.0" encoding="UTF-8"?>
 </xs:schema>`;
 
 /* ── SCORM imsmanifest.xml ── */
-function buildManifest(courseTitle: string, modules: Module[]): string {
+function buildManifest(courseTitle: string, modules: Module[], moduleFiles: (index: number) => string[] = () => []): string {
   const orgItems = modules.map((m, i) =>
     `      <item identifier="ITEM_M${i + 1}" identifierref="RES_M${i + 1}">
         <title>${escapeXml(m.title)}</title>
@@ -756,7 +760,8 @@ function buildManifest(courseTitle: string, modules: Module[]): string {
 
   const resources = modules.map((m, i) =>
     `    <resource identifier="RES_M${i + 1}" type="webcontent" adlcp:scormType="sco" href="module_${i + 1}.html">
-      <file href="module_${i + 1}.html"/>
+      <file href="module_${i + 1}.html"/>${moduleFiles(i).map((href) => `
+      <file href="${escapeXml(href)}"/>`).join("")}
     </resource>`
   ).join("\n");
 
@@ -810,6 +815,15 @@ function scormFinish() {
   var api = getAPI();
   if (api) api.LMSFinish("");
 }
+function exitCourse() {
+  if (window.__scormExited) return;
+  window.__scormExited = true;
+  var api = getAPI();
+  if (api) api.LMSCommit("");
+  scormFinish();
+  window.close();
+  document.body.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;text-align:center;font-family:sans-serif;color:#1f2937"><p>You have left the course. Your progress has been saved. You can close this tab.</p></div>';
+}
 function scormSetComplete() {
   var api = getAPI();
   if (api) {
@@ -838,6 +852,41 @@ function scormSetScore(score) {
 // Pass mark for SCORM assessment (percent). Could be made configurable later.
 const PASS_MARK_PERCENT = 70;
 
+
+/* ── Speaker card: the shared trainer mouth and blink (lib/trainerMouth.ts), driven by the narration track (lib/mouthTrack.ts) ── */
+function buildSpeakerCard(avatarImageSrc: string, avatarName: string, mouthTrack: string | null, points: TrainerFacePoints | undefined, sprites: TrainerSprites | null = null): string {
+  if (!mouthTrack || !points) {
+    return `<div class="speaker-card"><img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/></div>`;
+  }
+  return `<div class="speaker-card" id="speakerCard">
+    <div class="speaker-stage" style="${trainerStageStyle(points)}">
+      <img src="${escapeAttribute(avatarImageSrc)}" alt="${escapeAttribute(avatarName)}" class="speaker-image"/>
+      <div id="speakerOverlay" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></div>
+    </div>
+  </div>
+  <script>var MOUTH_TRACK = ${JSON.stringify(mouthTrack)}; var MOUTH_POINTS = ${JSON.stringify(points)}; var MOUTH_SPRITES = ${JSON.stringify(sprites)};
+  ${mouthFrameAt.toString()}
+  ${stepMouth.toString()}
+  ${renderMouthFrame.toString()}
+  </script>`;
+}
+
+/* Painted mouth/blink images for one trainer: used only when all three exist (no partial sets). */
+async function fetchTrainerSpriteFiles(trainerId: string): Promise<{ urls: TrainerSprites; blobs: Record<keyof TrainerSprites, Blob> } | null> {
+  try {
+    const urls = trainerSpriteUrls(trainerId);
+    const entries = await Promise.all((Object.keys(urls) as (keyof TrainerSprites)[]).map(async (key) => {
+      const response = await fetch(new URL(urls[key], window.location.origin));
+      if (!response.ok || !(response.headers.get("content-type") || "").startsWith("image/")) return null;
+      return [key, await response.blob()] as const;
+    }));
+    if (entries.some((e) => e === null)) return null;
+    return { urls, blobs: Object.fromEntries(entries as (readonly [keyof TrainerSprites, Blob])[]) as Record<keyof TrainerSprites, Blob> };
+  } catch {
+    return null;
+  }
+}
+
 /* ── Module HTML page builder ── */
 function buildModuleHtml(
   courseTitle: string,
@@ -850,7 +899,10 @@ function buildModuleHtml(
   narrationText: string,
   moduleVideos: ScormInsertedVideo[] = [],
   avatarImageSrc: string | null = null,
-  avatarName = "Sarah"
+  avatarName = "Sarah",
+  mouthTrack: string | null = null,
+  trainerId = "",
+  sprites: TrainerSprites | null = null
 ): string {
   // Split narration into sentences for highlighting
   const sentences = narrationText
@@ -1128,6 +1180,7 @@ function buildModuleHtml(
     `<div class="scorm-screen" data-screen-index="${sectionIndex}">${renderSection(section, sectionIndex)}</div>`
   ).join("\n");
 
+  const speakerCardHtml = audioSrc ? buildSpeakerCard(avatarImageSrc || "", avatarName, mouthTrack, TRAINER_FACE_POINTS[trainerId], sprites) : "";
   const audioHtml = audioSrc ? `
       <div class="audio-section">
         <div class="audio-header">
@@ -1146,6 +1199,7 @@ function buildModuleHtml(
             <button class="hl-toggle active" id="hlToggle" onclick="toggleHighlight()">On</button>
           </div>
         </div>
+        ${speakerCardHtml}
         <audio controls class="audio-player" id="moduleAudio" preload="auto">
           <source src="${escapeAttribute(audioSrc)}" type="audio/mpeg"/>
           Your browser does not support the audio element.
@@ -1298,6 +1352,8 @@ function buildModuleHtml(
     .header { position: relative; background: linear-gradient(135deg, var(--header-start, #4f46e5), var(--header-end, #7c3aed)); color: var(--text-inverse, #fff); padding: 32px 40px 27px; }
     .header h1 { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
     .header .meta { font-size: 13px; opacity: 0.85; }
+    .header .exit-btn { position: absolute; top: 14px; right: 16px; border: 1px solid rgba(255,255,255,0.5); background: rgba(255,255,255,0.12); color: inherit; border-radius: 8px; padding: 6px 12px; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .header .exit-btn:hover { background: rgba(255,255,255,0.22); }
     .progress-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: var(--progress-track, rgba(255,255,255,0.25)); }
     .progress-fill { height: 100%; background: var(--progress-fill, #fbbf24); transition: width 0.3s; }
     .container { max-width: 780px; margin: 0 auto; padding: 32px 24px; }
@@ -1406,6 +1462,11 @@ function buildModuleHtml(
     .audio-player::-webkit-media-controls-panel { background: var(--card); color: var(--text); }
     .audio-player::-webkit-media-controls-current-time-display,
     .audio-player::-webkit-media-controls-time-remaining-display { color: var(--text); }
+    .speaker-card { position: relative; width: 360px; max-width: 100%; aspect-ratio: 2 / 3; margin: 0 auto 16px; border-radius: 20px; overflow: hidden; background: #eef2ff; box-shadow: 0 12px 28px rgba(15,23,42,0.18); }
+    .speaker-stage { position: absolute; animation: trainerBob 8.8s ease-in-out infinite; }
+    @keyframes trainerBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1.1px); } }
+    .speaker-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .speaker-overlay { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
     .audio-hint { font-size: 12px; color: var(--muted); margin-top: 8px; }
     .audio-screen { z-index: 200; }
     .palette-bar { display: flex; align-items: center; gap: 6px; }
@@ -1459,6 +1520,7 @@ function buildModuleHtml(
 <body onload="scormInit()">
   <div class="header">
     <div class="meta">${escapeHtml(courseTitle)}</div>
+    <button type="button" class="exit-btn" onclick="exitCourse()">Exit course</button>
     <h1>Module ${moduleIndex + 1}: ${escapeHtml(mod.title)}</h1>
     <div class="progress-bar"><div class="progress-fill" style="width:${Math.round(((moduleIndex + 1) / totalModules) * 100)}%"></div></div>
   </div>
@@ -1533,6 +1595,8 @@ function buildModuleHtml(
         screens[i].classList.toggle('active', i === idx);
       }
       currentScreenIndex = idx;
+      // Completion at the last screen, when the course has no quiz (a quiz records its own result).
+      if (idx === screens.length - 1 && !document.querySelector('.quiz-screen')) scormSetComplete();
       var counter = document.getElementById('scormScreenCounter');
       if (counter) counter.textContent = 'Screen ' + (idx + 1) + ' of ' + screens.length;
       var prev = document.getElementById('scormPrevBtn');
@@ -1625,6 +1689,36 @@ function buildModuleHtml(
       btn.className = hlEnabled ? 'hl-toggle active' : 'hl-toggle';
       if (!hlEnabled) clearHighlights();
     }
+
+    // Drawn mouth: follows the narration's track using audio.currentTime only (no AudioContext).
+    (function () {
+      var audioEl = document.getElementById('moduleAudio');
+      var overlay = document.getElementById('speakerOverlay');
+      if (!audioEl || !overlay || typeof MOUTH_TRACK === 'undefined' || !MOUTH_TRACK) return;
+      var rafId = 0, blinking = false;
+      var CLOSED = { open: 0, spread: 0.5, flag: 2 };
+      var smoothed = CLOSED;
+      function current() { return (audioEl.paused || audioEl.ended) ? CLOSED : smoothed; }
+      function draw(fr) { renderMouthFrame(overlay, fr, MOUTH_POINTS, 'scorm', blinking, MOUTH_SPRITES); }
+      function frame() {
+        if (audioEl.paused || audioEl.ended) { smoothed = CLOSED; draw(CLOSED); rafId = 0; return; }
+        // the team's timing: look 0.06 s ahead, then smooth once per frame
+        smoothed = stepMouth(smoothed, mouthFrameAt(MOUTH_TRACK, audioEl.currentTime + 0.06));
+        draw(smoothed);
+        rafId = requestAnimationFrame(frame);
+      }
+      audioEl.addEventListener('play', function () { if (!rafId) rafId = requestAnimationFrame(frame); });
+      audioEl.addEventListener('pause', function () { draw(CLOSED); });
+      audioEl.addEventListener('ended', function () { draw(CLOSED); });
+      draw(CLOSED);
+      function blinkLater() {
+        setTimeout(function () {
+          blinking = true; draw(current());
+          setTimeout(function () { blinking = false; draw(current()); blinkLater(); }, 140);
+        }, 2000 + Math.random() * 4000);
+      }
+      blinkLater();
+    })();
 
     // Sync highlight with audio playback
     var audio = document.getElementById('moduleAudio');
@@ -1903,7 +1997,6 @@ export async function exportScormPackage(
   }
 
   // Add SCORM manifest and required XSD schema files
-  zip.file("imsmanifest.xml", buildManifest(courseTitle, modules));
   zip.file("imscp_rootv1p1p2.xsd", IMSCP_XSD);
   zip.file("adlcp_rootv1p2.xsd", ADLCP_XSD);
   zip.file("imsmd_rootv1p2p1.xsd", IMSMD_XSD);
@@ -1926,17 +2019,45 @@ export async function exportScormPackage(
     }
   });
 
+  // Mouth tracks come from each module's narration, measured in the browser at export time,
+  // so the package carries the timing and needs no audio analysis when it runs in an LMS.
+  const mouthTrackMap = new Map<number, string>();
+  for (const [idx, base64] of audioBase64Map) {
+    const track = await mouthTrackForAudio(Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer);
+    if (track) mouthTrackMap.set(idx, track);
+  }
+
+  // Painted mouth images (when a trainer has all three). Inside the package they are relative paths only.
+  const spriteFiles = await fetchTrainerSpriteFiles(avatarTrainerId);
+  const packagedSprites: TrainerSprites | null = spriteFiles ? {
+    slight: "assets/trainer-mouth-slight.png",
+    open: "assets/trainer-mouth-open.png",
+    blink: "assets/trainer-blink.png",
+  } : null;
+  if (spriteFiles && packagedSprites) {
+    zip.file(packagedSprites.slight, spriteFiles.blobs.slight);
+    zip.file(packagedSprites.open, spriteFiles.blobs.open);
+    zip.file(packagedSprites.blink, spriteFiles.blobs.blink);
+  }
+
   let avatarImageSrc: string | null = null;
   try {
     const avatarResponse = await fetch(`/trainers/${avatarTrainerId}.png`);
     if (avatarResponse.ok) {
       const avatarBuffer = await avatarResponse.arrayBuffer();
-      avatarImageSrc = `trainers/${avatarTrainerId}.png`;
+      avatarImageSrc = `assets/avatar-${avatarTrainerId}.png`;
       zip.file(avatarImageSrc, avatarBuffer);
     }
   } catch (err) {
     console.warn("Avatar image packaging failed:", err);
   }
+
+  // The manifest lists every file each module page loads (its audio and the trainer picture).
+  zip.file("imsmanifest.xml", buildManifest(courseTitle, modules, (i) => [
+    ...(audioSrcMap.has(i) ? [audioSrcMap.get(i) as string] : []),
+    ...(avatarImageSrc ? [avatarImageSrc] : []),
+    ...(packagedSprites ? [packagedSprites.slight, packagedSprites.open, packagedSprites.blink] : []),
+  ]));
 
   // Extract images from data URLs and add them as separate files
   // This is necessary because large data URLs can exceed SCORM player limits
@@ -1988,7 +2109,7 @@ export async function exportScormPackage(
     const audioSrc = audioSrcMap.get(i) || null;
     const narrationText = voiceSections[i]?.narration_text || "";
     const moduleVideos = insertedVideos.filter((video) => normalizeTextKey(video.moduleTitle || "") === normalizeTextKey(mod.title));
-    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioSrc, narrationText, moduleVideos, avatarImageSrc, avatarName);
+    const html = buildModuleHtml(courseTitle, mod, i, modules.length, sections, modQuizzes, audioSrc, narrationText, moduleVideos, avatarImageSrc, avatarName, mouthTrackMap.get(i) || null, avatarTrainerId, packagedSprites);
     zip.file(`module_${i + 1}.html`, html);
   });
 

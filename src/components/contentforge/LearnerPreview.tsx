@@ -1,6 +1,9 @@
 import { resolveLessonContent, sequenceLessonSlides } from "@/lib/lessonContent";
 ﻿import { createPortal } from "react-dom";
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from "react";
+import { stepMouth, mouthFrameAt, type MouthFrame } from "@/lib/trainerMouth";
+import { fitSvgToContent } from "@/lib/svgFit";
+import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle, Maximize2, Minimize2 } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
@@ -27,8 +30,10 @@ import { assessInfographicSvg, buildInfographicUserPrompt, EXPLAINER_INFOGRAPHIC
 import { carryDiagramsForward, extractDiagramSpecs, findDiagramRevealIndex, isDiagramRevealed, renderDiagramSvg, type DiagramSpec } from "@/lib/diagramSpec";
 
 /* helpers */
-function tryParseJSON(raw: string | undefined | null): any | null {
-  if (!raw) return null;
+function tryParseJSON(raw: unknown): any | null {
+  // Some agent outputs arrive already parsed. Use them as they are; anything that isn't text or an object is ignored.
+  if (raw && typeof raw === "object") return raw;
+  if (typeof raw !== "string" || !raw) return null;
   try { return JSON.parse(raw); } catch {
     const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (m) { try { return JSON.parse(m[1].trim()); } catch { return null; } }
@@ -558,7 +563,7 @@ export function buildSlideNarration(slide: { type: string; content?: string; que
 
 export function buildSlides(rawOutputs: RawAgentOutputs, insertedVideos: InsertedVideo[] = [], courseDuration?: string, maxLines = 10, assessmentIntensity: AssessmentIntensity = "standard"): { modules: Module[]; slides: Slide[] } {
   const archData = tryParseJSON(rawOutputs.architect);
-  const writerText = rawOutputs.writer || "";
+  const writerText = typeof rawOutputs.writer === "string" ? rawOutputs.writer : rawOutputs.writer ? JSON.stringify(rawOutputs.writer) : "";
   const assessData = tryParseJSON(rawOutputs.assessment);
   const visualData = tryParseJSON(rawOutputs.visual);
   const narrativeScenesData = tryParseJSON(rawOutputs.narrativeScenes);
@@ -884,7 +889,7 @@ function normalizeSvg(svg: string): string {
   });
 }
 
-const INFOGRAPHIC_SYSTEM_PROMPT = "You are an elite SVG infographic designer for polished corporate eLearning. Generate a sophisticated, presentation-quality SVG infographic that uses the full canvas confidently, with strong visual hierarchy, large readable headings, 3-5 clearly separated content zones, connectors, icons built only from SVG primitives, and disciplined whitespace. Avoid giant empty margins, tiny text, clip-art aesthetics, or toy layouts. The SVG must be self-contained, 1200x800, with no external fonts or images. Use only these colors: #0f172a, #123d78, #355fa8, #4f46e5, #7c3aed, #10b981, #f59e0b, #e8eef9, #f8fafc, #ffffff. Make it feel like a premium consulting slide, not a simple classroom handout. Return only SVG markup.";
+const INFOGRAPHIC_SYSTEM_PROMPT = "You are an elite SVG infographic designer for polished corporate eLearning. Generate a sophisticated, presentation-quality SVG infographic that uses the full canvas confidently, with strong visual hierarchy, large readable headings, 3-5 clearly separated content zones, connectors, icons built only from SVG primitives, and disciplined whitespace. Avoid giant empty margins, tiny text, clip-art aesthetics, or toy layouts. The SVG must be self-contained, 1200x800, with no external fonts or images. Keep every element inside the canvas with at least 40px margin, keep titles under 60 characters, keep each label within its box so no text runs past the edges, and use body text of at least 22px so it stays legible when scaled. Use only these colors: #0f172a, #123d78, #355fa8, #4f46e5, #7c3aed, #10b981, #f59e0b, #e8eef9, #f8fafc, #ffffff. Make it feel like a premium consulting slide, not a simple classroom handout. Return only SVG markup.";
 
 /**
  * The infographic agent sometimes stores finished SVG markup in the
@@ -937,6 +942,12 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string;
   const [explanation, setExplanation] = useState("");
   const [explaining, setExplaining] = useState(false);
   const [zoomLevel, setZoomLevel] = useState(1.45);
+  const inlineSvgRef = useRef<HTMLDivElement>(null);
+  const focusSvgRef = useRef<HTMLDivElement>(null);
+
+  // Make sure generated text isn't clipped by the SVG's own viewBox
+  useLayoutEffect(() => { fitSvgToContent(inlineSvgRef.current); }, [svg, expanded]);
+  useLayoutEffect(() => { fitSvgToContent(focusSvgRef.current); }, [svg, showZoomed]);
 
   const generateSvg = useCallback(async () => {
     if (svg || loading) return;
@@ -1104,6 +1115,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string;
               </div>
               <div className="overflow-hidden rounded-[18px] border border-[#d8deea] bg-white p-3 shadow-[0_18px_44px_rgba(15,23,42,0.08)]">
                 <div
+                  ref={inlineSvgRef}
                   className="mx-auto aspect-[3/2] w-full max-w-[860px] [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:max-h-full [&_svg]:max-w-full"
                   dangerouslySetInnerHTML={{ __html: svg }}
                 />
@@ -1175,6 +1187,7 @@ const InfographicVisualAid: React.FC<{ description: string; moduleTitle: string;
                 <div className="mx-auto min-w-fit">
                   <div className="rounded-[26px] border border-[#d8deea] bg-white p-4 shadow-[0_30px_80px_rgba(15,23,42,0.12)]">
                     <div
+                      ref={focusSvgRef}
                       className="aspect-[3/2] [&_svg]:block [&_svg]:h-full [&_svg]:w-full [&_svg]:max-h-full [&_svg]:max-w-none"
                       style={{ width: `${Math.round(900 * zoomLevel)}px` }}
                       dangerouslySetInnerHTML={{ __html: svg }}
@@ -1375,6 +1388,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const audioRefMap = useRef<Record<number, HTMLAudioElement | null>>({});
   const [voiceActivityLevel, setVoiceActivityLevel] = useState(0);
   const [activeViseme, setActiveViseme] = useState<VisemeKey>("rest");
+  // Mouth from the narration track (computed once per clip); null means the viseme (ElevenLabs timing) is used.
+  const [activeMouth, setActiveMouth] = useState<MouthFrame | null>(null);
+  const mouthTracksRef = useRef<Record<number, string>>({});
   const [slideMotion, setSlideMotion] = useState<"forward" | "backward" | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const narrationOwnerRef = useRef(`narration-${Math.random().toString(36).slice(2)}`);
@@ -1398,6 +1414,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     const spoken = audioTextRef.current[idx];
     if (spoken !== text) { delete audioUrlsRef.current[idx]; return undefined; }
     return url;
+  };
+  // The mouth follows the clip's measured track; measure it once per clip, whichever path plays it.
+  const ensureMouthTrack = (idx: number, url: string) => {
+    if (mouthTracksRef.current[idx]) return;
+    void fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((bytes) => mouthTrackForAudio(bytes))
+      .then((track) => { if (track) mouthTracksRef.current[idx] = track; })
+      .catch(() => {});
   };
   const translatedNarrationRef = useRef<Record<string, string>>({});
   const [moduleIntroImages, setModuleIntroImages] = useState<Record<number, string>>(exportMedia?.introImages || learnerExportMedia.get(courseTitle)?.introImages || {});
@@ -1512,6 +1537,31 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     stopLipSync();
   }, [trainerVoiceId, rawOutputs.writer, rawOutputs.voice, stopLipSync]);
 
+  // Drives the mouth from audio.currentTime and the narration's viseme timing in its own
+  // frame loop. Used whenever audio analysis is unavailable (blocked AudioContext, LMS sandbox),
+  // so the mouth keeps moving and closes at pauses instead of freezing open.
+  const runTimelineLipSync = useCallback((audio: HTMLAudioElement, visemeTimeline: VisemeCue[]) => {
+    const fallbackCycle: VisemeKey[] = ["aa", "oh", "ee", "rest", "ih", "aa", "mbp", "oh"];
+    const tick = () => {
+      if (audio.paused || audio.ended) {
+        setVoiceActivityLevel(0);
+        setActiveViseme("rest");
+        lipSyncFrameRef.current = 0;
+        return;
+      }
+      const nowMs = audio.currentTime * 1000;
+      setVoiceActivityLevel(0.35);
+      if (visemeTimeline.length > 0) {
+        const cue = visemeTimeline.find((c) => nowMs >= c.startMs && nowMs < c.endMs);
+        setActiveViseme(cue ? cue.viseme : "rest");
+      } else {
+        setActiveViseme(fallbackCycle[Math.floor(nowMs / 160) % fallbackCycle.length]);
+      }
+      lipSyncFrameRef.current = requestAnimationFrame(tick);
+    };
+    lipSyncFrameRef.current = requestAnimationFrame(tick);
+  }, []);
+
   const startLipSync = useCallback(async (audio: HTMLAudioElement, visemeTimeline: VisemeCue[] = []) => {
     stopLipSync();
     visemeIndexRef.current = 0;
@@ -1521,8 +1571,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
 
       if (!AudioContextCtor) {
-        setVoiceActivityLevel(audio.paused ? 0 : 0.35);
-        setActiveViseme(audio.paused ? "rest" : "aa");
+        runTimelineLipSync(audio, visemeTimeline);
         return;
       }
 
@@ -1597,10 +1646,9 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
 
       lipSyncFrameRef.current = requestAnimationFrame(tick);
     } catch {
-      setVoiceActivityLevel(audio.paused ? 0 : 0.35);
-      setActiveViseme(audio.paused ? "rest" : "aa");
+      runTimelineLipSync(audio, visemeTimeline);
     }
-  }, [stopLipSync]);
+  }, [stopLipSync, runTimelineLipSync]);
 
   // Narration text for current slide - with fallback to slide content
   // Narration = exactly the on-screen lines (shared with the downloaded course).
@@ -1740,6 +1788,37 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   }, [narrationSentences, narrationWords]);
 
   // Helper to wire up audio events
+  // The packaged player reports progress to the LMS: the screen reached, and completion on the last screen.
+  useEffect(() => {
+    if (!standalone) return;
+    const total = slides.length;
+    window.dispatchEvent(new CustomEvent("contentforge:progress", {
+      detail: { slide: currentSlide, total, score: 0, answered: 0, completed: total > 0 && currentSlide >= total - 1 },
+    }));
+  }, [standalone, currentSlide, slides.length]);
+
+  // While narration plays, read the track at the audio's current time. No AudioContext is needed.
+  useEffect(() => {
+    if (!isPlaying) { setActiveMouth(null); return; }
+    let frameId = 0;
+    let smoothed: MouthFrame = { open: 0, spread: 0.5, flag: 2 };
+    const tick = () => {
+      const a = audioRef.current;
+      const track = mouthTracksRef.current[currentSlide];
+      if (a && track && !a.paused) {
+        // the team's timing: look 0.06 s ahead, then smooth once per frame
+        smoothed = stepMouth(smoothed, mouthFrameAt(track, a.currentTime + 0.06));
+        setActiveMouth(smoothed);
+      } else {
+        smoothed = { open: 0, spread: 0.5, flag: 2 };
+        setActiveMouth(null);
+      }
+      frameId = requestAnimationFrame(tick);
+    };
+    frameId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frameId);
+  }, [isPlaying, currentSlide]);
+
   const wireAudio = useCallback((audio: HTMLAudioElement) => {
     audio.muted = muted;
     // Only one voice at a time: tell every open preview to stop, then silence anything still playing here.
@@ -1806,6 +1885,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
 
     // If we already have audio for this slide, just play it
     if (getCachedAudio(currentSlide, narrationText)) {
+      ensureMouthTrack(currentSlide, audioUrlsRef.current[currentSlide]);
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
       wireAudio(audio);
       await audio.play().catch(() => {});
@@ -1872,6 +1952,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
       const url = result.audioDataUrl;
       audioUrlsRef.current[requestSlide] = url;
       audioTextRef.current[requestSlide] = narrationText;
+      ensureMouthTrack(requestSlide, url);
       visemeTimelinesRef.current[requestSlide] = buildVisemeTimeline(result.alignment);
       learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), audioBySlide: { ...audioUrlsRef.current }, audioTextBySlide: { ...audioTextRef.current } });
       // Learner already moved on: keep the clip for when they come back, but don't play it here.
@@ -1918,6 +1999,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
     if (!narration) return;
     // If audio already cached for this slide, play it
     if (getCachedAudio(currentSlide, narration)) {
+      ensureMouthTrack(currentSlide, audioUrlsRef.current[currentSlide]);
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
       wireAudio(audio);
       audio.play().catch((err) => {
@@ -2623,7 +2705,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
-                    currentViseme={activeViseme}
+                    currentViseme={activeViseme} mouthFrame={activeMouth}
                     narratorLanguage={effectiveNarratorLanguage}
                   />
                 </div>
@@ -2994,7 +3076,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
                     
-                    currentViseme={activeViseme}
+                    currentViseme={activeViseme} mouthFrame={activeMouth}
                     narratorLanguage={effectiveNarratorLanguage}
                   />
                 </div>
@@ -3309,6 +3391,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                   </div>
 
                   {ans?.submitted && <AnswerFeedbackBanner correct={ans.selected === correctAnswerIndex} revealed={!!ans.revealed} letter={String.fromCharCode(65 + (correctAnswerIndex ?? 0))} />}
+                  {/* Submit: choosing an option only selects it; the answer is checked when submitted */}
+                  {ans && !ans.submitted && (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => handleSubmitAnswer(currentSlide)}
+                        className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
+                      >
+                        Submit Answer
+                      </button>
+                    </div>
+                  )}
+
                   {/* Rationale/Explanation */}
                   {ans?.submitted && ans.revealed && (q.rationale || q.explanation) && (
                     <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-200">
@@ -3333,7 +3427,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
-                    currentViseme={activeViseme}
+                    currentViseme={activeViseme} mouthFrame={activeMouth}
                     narratorLanguage={effectiveNarratorLanguage}
                   />
                 </div>
@@ -4178,6 +4272,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                       }
                       // If we already have a cached URL for this slide, (re)create the element and play it.
                       if (cachedUrl) {
+                        ensureMouthTrack(currentSlide, cachedUrl);
                         const audio = new Audio(cachedUrl);
                         wireAudio(audio);
                         audio.play().catch(() => {
