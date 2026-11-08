@@ -1861,6 +1861,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ standalone = fal
     if (!narration) return;
     // If audio already cached for this slide, play it
     if (audioUrlsRef.current[currentSlide]) {
+      // Measure the mouth track for this clip too; without it the mouth falls back to the viseme guess and never closes in pauses.
+      const trackSlide = currentSlide;
+      if (!mouthTracksRef.current[trackSlide]) {
+        void fetch(audioUrlsRef.current[trackSlide])
+          .then((r) => r.arrayBuffer())
+          .then((bytes) => mouthTrackForAudio(bytes))
+          .then((track) => { if (track) mouthTracksRef.current[trackSlide] = track; })
+          .catch(() => {});
+      }
       const audio = new Audio(audioUrlsRef.current[currentSlide]);
       wireAudio(audio);
       audio.play().catch((err) => {
@@ -3165,6 +3174,18 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ standalone = fal
                       );
                     })}
                   </div>
+
+                  {/* Submit: choosing an option only selects it; the answer is checked when submitted */}
+                  {ans && !ans.submitted && (
+                    <div className="flex justify-end">
+                      <button
+                        onClick={() => handleSubmitAnswer(currentSlide)}
+                        className="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all"
+                      >
+                        Submit Answer
+                      </button>
+                    </div>
+                  )}
 
                   {/* Rationale/Explanation */}
                   {ans?.submitted && (q.rationale || q.explanation) && (
