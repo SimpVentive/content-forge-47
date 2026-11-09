@@ -15,6 +15,13 @@
       "when": 1794225368354,
       "tag": "0001_custom_trainer_clips",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794225387863,
+      "tag": "0002_custom_trainer_clips_grants",
+      "breakpoints": true
     }
   ]
 }
