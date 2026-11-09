@@ -13,6 +13,7 @@ import {
   audioDurationSeconds,
   createCustomTrainer,
   createCustomVoice,
+  assessPhotoQuality,
   cropToPortrait,
   recordConsent,
   setTrainerFields,
@@ -34,6 +35,7 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
   const { user } = useAuth();
   const [name, setName] = useState("");
   const [photoBlob, setPhotoBlob] = useState<Blob | null>(null);
+  const [photoWarnings, setPhotoWarnings] = useState<string[]>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [voiceSeconds, setVoiceSeconds] = useState<number | null>(null);
@@ -52,6 +54,7 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
     if (!open) {
       setName("");
       setPhotoBlob(null);
+      setPhotoWarnings([]);
       setPhotoPreview((url) => { if (url) URL.revokeObjectURL(url); return null; });
       setVoiceFile(null);
       setVoiceSeconds(null);
@@ -72,9 +75,17 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
     if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return toast.error("Use a JPG, PNG or WebP photo");
     if (file.size > MAX_PHOTO_BYTES) return toast.error("The photo must be under 10 MB");
     try {
+      const quality = await assessPhotoQuality(file);
+      if (quality.blocking.length) {
+        setPhotoBlob(null);
+        setPhotoPreview((url) => { if (url) URL.revokeObjectURL(url); return null; });
+        setPhotoWarnings([]);
+        return toast.error(quality.blocking[0]);
+      }
+      setPhotoWarnings(quality.warnings);
       const cropped = await cropToPortrait(file);
       setPhotoBlob(cropped);
-      setPhotoPreview(URL.createObjectURL(cropped));
+      setPhotoPreview((url) => { if (url) URL.revokeObjectURL(url); return URL.createObjectURL(cropped); });
     } catch (err) {
       toast.error((err as Error).message);
     }
@@ -206,6 +217,12 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
                 <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0])} />
               </label>
               <p className="text-[11px] text-muted-foreground">The photo is cropped to a 2:3 portrait. Your face should fill the frame from the shoulders up.</p>
+              {photoWarnings.length ? (
+                <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900">
+                  <p className="font-semibold">Check this photo before you continue</p>
+                  <ul className="mt-1 list-disc pl-4">{photoWarnings.map((w) => <li key={w}>{w}</li>)}</ul>
+                </div>
+              ) : null}
             </div>
           </div>
 

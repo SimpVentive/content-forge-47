@@ -1425,12 +1425,16 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   }, []);
   const audioUrlsRef = useRef<Record<number, string>>({});
   const audioTextRef = useRef<Record<number, string>>({});
+  // The voice each generated clip was made with. A clip made with another trainer's voice is not reused.
+  const audioVoiceRef = useRef<Record<number, string>>({});
   // Drop cached audio whose spoken text differs from the current narration (e.g. old question-only quiz audio).
   const getCachedAudio = (idx: number, text: string): string | undefined => {
     const url = audioUrlsRef.current[idx];
     if (!url) return undefined;
     const spoken = audioTextRef.current[idx];
     if (spoken !== text) { delete audioUrlsRef.current[idx]; return undefined; }
+    const voice = audioVoiceRef.current[idx];
+    if (voice !== undefined && voice !== trainerVoiceId) return undefined;
     return url;
   };
   // The mouth follows the clip's measured track; measure it once per clip, whichever path plays it.
@@ -1971,6 +1975,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
       const url = result.audioDataUrl;
       audioUrlsRef.current[requestSlide] = url;
       audioTextRef.current[requestSlide] = narrationText;
+      audioVoiceRef.current[requestSlide] = trainerVoiceId;
       ensureMouthTrack(requestSlide, url);
       visemeTimelinesRef.current[requestSlide] = buildVisemeTimeline(result.alignment);
       learnerExportMedia.set(courseTitle, { ...learnerExportMedia.get(courseTitle), audioBySlide: { ...audioUrlsRef.current }, audioTextBySlide: { ...audioTextRef.current } });

@@ -154,3 +154,77 @@ export const UPLOAD_GUIDELINES = [
   "Face the camera straight on, mouth closed, neutral expression.",
   "Quiet room for the voice recording. No music, fans or other voices.",
 ];
+
+export type PhotoQuality = {
+  /** Problems that stop the photo from being used. */
+  blocking: string[];
+  /** Problems the user should look at, but can accept. */
+  warnings: string[];
+};
+
+export const MIN_PHOTO_SHORT_SIDE = 640;
+
+/**
+ * Checks a photo before it is cropped: size, brightness, contrast and sharpness.
+ * Measured on a small copy, so it is quick on a phone or a laptop.
+ */
+export async function assessPhotoQuality(file: File): Promise<PhotoQuality> {
+  const blocking: string[] = [];
+  const warnings: string[] = [];
+  const bitmap = await createImageBitmap(file);
+  const shortSide = Math.min(bitmap.width, bitmap.height);
+  if (shortSide < MIN_PHOTO_SHORT_SIDE) {
+    blocking.push(`The photo is too small (${bitmap.width} × ${bitmap.height} px). Use a photo at least ${MIN_PHOTO_SHORT_SIDE} px on its shorter side. A close-up taken on a phone is ideal.`);
+  }
+
+  // Analyse a 256 px copy: average brightness, contrast, and sharpness (variance of the Laplacian).
+  const size = 256;
+  const scale = size / Math.max(bitmap.width, bitmap.height);
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d", { willReadFrequently: true });
+  if (!ctx) {
+    bitmap.close();
+    return { blocking, warnings };
+  }
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  const { data } = ctx.getImageData(0, 0, w, h);
+
+  const gray = new Float32Array(w * h);
+  let sum = 0;
+  for (let i = 0, p = 0; i < gray.length; i++, p += 4) {
+    const y = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+    gray[i] = y;
+    sum += y;
+  }
+  const mean = sum / gray.length;
+  let varSum = 0;
+  for (const y of gray) varSum += (y - mean) * (y - mean);
+  const std = Math.sqrt(varSum / gray.length);
+
+  let lapSum = 0;
+  let lapSq = 0;
+  let count = 0;
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const i = y * w + x;
+      const lap = 4 * gray[i] - gray[i - 1] - gray[i + 1] - gray[i - w] - gray[i + w];
+      lapSum += lap;
+      lapSq += lap * lap;
+      count++;
+    }
+  }
+  const lapMean = lapSum / count;
+  const sharpness = lapSq / count - lapMean * lapMean;
+
+  if (mean < 70) warnings.push("The photo is dark. Face a window or a light, and take it again if the face is hard to see.");
+  if (mean > 215) warnings.push("The photo is very bright or washed out. Avoid strong light behind you.");
+  if (std < 30) warnings.push("The photo has low contrast. Use even light and a plain background.");
+  if (sharpness < 40) warnings.push("The photo looks blurry. Hold the camera still and check the focus.");
+
+  return { blocking, warnings };
+}
