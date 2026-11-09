@@ -1275,7 +1275,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const avatarEnv = getAvatarEnv();
   const trainerMedia = exportMedia?.trainerMedia || getTrainerMedia(selectedTrainer.id, avatarEnv);
   // A custom trainer (the signed-in user's own photo and voice). Loaded from the account in the app preview.
-  const [customTrainerInfo, setCustomTrainerInfo] = useState<{ name: string; voiceId: string | null; photoUrl: string | null } | null>(null);
+  const [customTrainerInfo, setCustomTrainerInfo] = useState<{ name: string; voiceId: string | null; photoUrl: string | null; voiceStatus: string; voiceError: string | null } | null>(null);
   useEffect(() => {
     if (standalone || !isCustomTrainerId(avatarTrainerId)) { setCustomTrainerInfo(null); return; }
     let alive = true;
@@ -1284,7 +1284,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         if (!alive) return;
         if (!row) { setCustomTrainerInfo(null); return; }
         const photoUrl = await signedPhotoUrl(row.photo_path);
-        if (alive) setCustomTrainerInfo({ name: row.name, voiceId: row.voice_status === "ready" ? row.voice_id : null, photoUrl });
+        if (alive) setCustomTrainerInfo({ name: row.name, voiceId: row.voice_status === "ready" ? row.voice_id : null, photoUrl, voiceStatus: row.voice_status, voiceError: row.voice_error });
       })
       .catch(() => { if (alive) setCustomTrainerInfo(null); });
     return () => { alive = false; };
@@ -1901,7 +1901,11 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const playNarration = useCallback(async () => {
     const narrationText = getNarrationForSlide(currentSlide);
     if (!narrationText) return;
-    if (isCustomTrainer && !trainerVoiceId) { toast.error("This trainer's voice is not ready yet. Check the trainer in Course Setup."); return; }
+    if (isCustomTrainer && !trainerVoiceId) {
+      const reason = customTrainerInfo?.voiceError ? ` Reason: ${customTrainerInfo.voiceError}` : "";
+      toast.error(`${customTrainerInfo?.name || "This trainer"}'s voice was not created (${customTrainerInfo?.voiceStatus || "not ready"}).${reason} Open Course Setup and choose Retry voice.`);
+      return;
+    }
     // A voice request for this screen is already on its way (auto-play, unmute, Explain, or a
     // double-mounted effect); a second request would read the same screen twice.
     if (narrationRequestSlideRef.current === currentSlide) return;
