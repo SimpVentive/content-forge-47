@@ -11,6 +11,7 @@ export async function describeImageFailure(error: unknown, data?: unknown): Prom
   if (/verification|verified/i.test(detail)) reasons.push("the image account requires verification");
   if (/401|invalid_api_key|not set/.test(detail)) reasons.push("an image provider credential is missing or invalid");
   if (/429|insufficient_quota/.test(detail)) reasons.push("the image provider reached its billing or rate limit");
+  if (/402|payment required/i.test(detail)) reasons.push("the Black Forest Labs image account has no credit left (HTTP 402). Top up the balance, then retry");
   return reasons.length ? reasons.join("; ") : "The image service could not return an image. Please retry.";
 }
 
