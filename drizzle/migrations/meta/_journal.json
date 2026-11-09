@@ -22,6 +22,13 @@
       "when": 1794225387863,
       "tag": "0002_custom_trainer_clips_grants",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794234398845,
+      "tag": "0003_custom_trainer_photos",
+      "breakpoints": true
     }
   ]
 }
