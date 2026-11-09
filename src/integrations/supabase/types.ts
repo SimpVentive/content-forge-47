@@ -253,6 +253,89 @@ export type Database = {
           },
         ]
       }
+      custom_trainer_consents: {
+        Row: {
+          consent_audio_path: string | null
+          consent_sentence: string
+          consented_at: string
+          id: string
+          owner_user_id: string
+          trainer_id: string
+          user_agent: string | null
+        }
+        Insert: {
+          consent_audio_path?: string | null
+          consent_sentence: string
+          consented_at?: string
+          id?: string
+          owner_user_id: string
+          trainer_id: string
+          user_agent?: string | null
+        }
+        Update: {
+          consent_audio_path?: string | null
+          consent_sentence?: string
+          consented_at?: string
+          id?: string
+          owner_user_id?: string
+          trainer_id?: string
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_trainer_consents_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "custom_trainers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      custom_trainers: {
+        Row: {
+          created_at: string
+          deleted_at: string | null
+          id: string
+          name: string
+          owner_org_id: string | null
+          owner_user_id: string
+          photo_path: string | null
+          updated_at: string
+          voice_error: string | null
+          voice_id: string | null
+          voice_sample_path: string | null
+          voice_status: string
+        }
+        Insert: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name: string
+          owner_org_id?: string | null
+          owner_user_id: string
+          photo_path?: string | null
+          updated_at?: string
+          voice_error?: string | null
+          voice_id?: string | null
+          voice_sample_path?: string | null
+          voice_status?: string
+        }
+        Update: {
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          owner_org_id?: string | null
+          owner_user_id?: string
+          photo_path?: string | null
+          updated_at?: string
+          voice_error?: string | null
+          voice_id?: string | null
+          voice_sample_path?: string | null
+          voice_status?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_type: string
