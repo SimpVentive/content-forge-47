@@ -1279,7 +1279,13 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   // A custom trainer (the signed-in user's own photo and voice). Loaded from the account in the app preview.
   const [customTrainerInfo, setCustomTrainerInfo] = useState<{ name: string; voiceId: string | null; photoUrl: string | null; voiceStatus: string; voiceError: string | null } | null>(null);
   useEffect(() => {
-    if (standalone || !isCustomTrainerId(avatarTrainerId)) { setCustomTrainerInfo(null); return; }
+    // In the package the custom trainer comes with the course data: no account, no network.
+    if (standalone) {
+      const packaged = exportMedia?.customTrainer;
+      setCustomTrainerInfo(packaged ? { name: packaged.name, voiceId: packaged.voiceId, photoUrl: packaged.photoUrl, voiceStatus: packaged.voiceStatus, voiceError: packaged.voiceError } : null);
+      return;
+    }
+    if (!isCustomTrainerId(avatarTrainerId)) { setCustomTrainerInfo(null); return; }
     let alive = true;
     getCustomTrainer(avatarTrainerId as string)
       .then(async (row) => {
@@ -1290,7 +1296,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
       })
       .catch(() => { if (alive) setCustomTrainerInfo(null); });
     return () => { alive = false; };
-  }, [avatarTrainerId, standalone]);
+  }, [avatarTrainerId, standalone, exportMedia?.customTrainer]);
   const isCustomTrainer = Boolean(customTrainerInfo);
   // The custom trainer's own voice; the built-in trainers keep their voices.
   const trainerVoiceId = customTrainerInfo ? (customTrainerInfo.voiceId || "") : getTrainerVoiceId(selectedTrainer.id);
@@ -1678,7 +1684,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   // Narration = exactly the on-screen lines (shared with the downloaded course).
   const getNarrationForSlide = useCallback((slideIdx: number) => buildSlideNarration(slides[slideIdx], slideRules.maxLines), [slides, slideRules.maxLines]);
   // Talking-photo clips for a custom trainer. The saved clips are looked up once per course; nothing is generated here.
-  const [talkingClips, setTalkingClips] = useState<Record<string, TalkingClip>>({});
+  const [talkingClips, setTalkingClips] = useState<Record<string, TalkingClip>>(() => (exportMedia?.talkingClips ?? {}) as unknown as Record<string, TalkingClip>);
   const narrationsForCourse = useMemo(() => slides.map((_, i) => getNarrationForSlide(i)), [slides, getNarrationForSlide]);
   const narrationKey = narrationsForCourse.join("\u0001");
   useEffect(() => {
@@ -4264,7 +4270,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
             </div>
           </div>
 
-          {isCustomTrainer && avatarTrainerId ? (
+          {isCustomTrainer && avatarTrainerId && !standalone ? (
             <TalkingVideoPanel
               trainerId={avatarTrainerId}
               trainerName={trainerName}

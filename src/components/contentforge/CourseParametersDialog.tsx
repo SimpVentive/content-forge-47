@@ -3,7 +3,7 @@ import { X, Settings2, AlertTriangle, Info, Check } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrainerGrid } from "./TrainerGrid";
 import { CustomTrainerDialog } from "./CustomTrainerDialog";
-import { createCustomVoice, listCustomTrainers, signedPhotoUrl, type CustomTrainer } from "@/lib/customTrainers";
+import { createCustomVoice, deleteCustomTrainer as deleteCustomTrainerRecord, listCustomTrainers, signedPhotoUrl, type CustomTrainer } from "@/lib/customTrainers";
 import { toast } from "sonner";
 import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage, getAvatarEnv } from "@/lib/avatarTrainers";
 
@@ -268,6 +268,18 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   };
   useEffect(() => { if (open) void refreshCustomTrainers(); }, [open]);
   const [retryingVoiceId, setRetryingVoiceId] = useState<string | null>(null);
+  const deleteCustomTrainerNow = async (trainer: CustomTrainer) => {
+    if (!window.confirm(`Delete ${trainer.name}? This removes the voice, photo and talking videos. The consent record is kept. This cannot be undone.`)) return;
+    try {
+      await deleteCustomTrainerRecord(trainer.id);
+      toast.success(`${trainer.name} was deleted`);
+      if (avatarTrainerId === trainer.id) setTrainerAutoMode(true);
+    } catch (err) {
+      toast.error(`Not deleted: ${(err as Error).message}`);
+    } finally {
+      await refreshCustomTrainers();
+    }
+  };
   const retryCustomVoice = async (trainer: CustomTrainer) => {
     setRetryingVoiceId(trainer.id);
     try {
@@ -791,6 +803,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     customPhotoUrls={customPhotoUrls}
                     onCreateCustom={() => setShowCustomTrainer(true)}
                     onRetryVoice={retryCustomVoice}
+                    onDeleteTrainer={deleteCustomTrainerNow}
                     retryingVoiceId={retryingVoiceId}
                     avatarEnv={avatarEnv}
                   />
@@ -846,6 +859,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   customPhotoUrls={customPhotoUrls}
                   onCreateCustom={() => setShowCustomTrainer(true)}
                   onRetryVoice={retryCustomVoice}
+                  onDeleteTrainer={deleteCustomTrainerNow}
                   retryingVoiceId={retryingVoiceId}
                   avatarEnv={avatarEnv}
                 />

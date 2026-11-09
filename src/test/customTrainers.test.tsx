@@ -90,4 +90,24 @@ describe("TrainerGrid", () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
     cleanup();
   });
+
+  it("offers Delete on a custom trainer card and passes the trainer to the handler", () => {
+    const base = { owner_user_id: "u", owner_org_id: null, photo_path: "p", voice_sample_path: "v", voice_error: null, created_at: "", deleted_at: null };
+    const onDelete = vi.fn();
+    render(
+      <TrainerGrid
+        selectedId=""
+        onSelect={() => {}}
+        customTrainers={[{ ...base, id: "6f2b8c1e-9a4d-4e7b-8c1f-0a1b2c3d4e5f", name: "Asha", voice_id: "vx", voice_status: "ready" }]}
+        customPhotoUrls={{}}
+        onCreateCustom={() => {}}
+        onDeleteTrainer={onDelete}
+        avatarEnv={{}}
+      />,
+    );
+    fireEvent.click(screen.getByText("Delete"));
+    expect(onDelete).toHaveBeenCalledTimes(1);
+    expect(onDelete.mock.calls[0][0].name).toBe("Asha");
+    cleanup();
+  });
 });

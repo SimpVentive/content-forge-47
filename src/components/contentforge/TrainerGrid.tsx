@@ -14,12 +14,14 @@ type Props = {
   /** Retries the voice for a custom trainer whose voice was not created. */
   onRetryVoice?: (trainer: CustomTrainer) => void;
   retryingVoiceId?: string | null;
+  /** Deletes a custom trainer (voice, photo, videos). The caller asks for confirmation. */
+  onDeleteTrainer?: (trainer: CustomTrainer) => void;
   avatarEnv: Record<string, string | undefined>;
 };
 
 const CARD_SHADOW = "0 0 0 2px rgba(37,99,235,0.25), 0 8px 20px rgba(37,99,235,0.2)";
 
-export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoUrls, onCreateCustom, onRetryVoice, retryingVoiceId, avatarEnv }: Props) {
+export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoUrls, onCreateCustom, onRetryVoice, retryingVoiceId, onDeleteTrainer, avatarEnv }: Props) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
       {AVATAR_TRAINERS.map((trainer) => {
@@ -50,16 +52,30 @@ export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoU
             imageUrl={customPhotoUrls[trainer.id] || "/placeholder.svg"}
             name={trainer.name}
             subtitle={ready ? "Your trainer · AI-generated" : processing ? "Creating voice…" : "Voice not created"}
-            footer={!ready && !processing && onRetryVoice ? (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onRetryVoice(trainer); }}
-                className="mt-1 rounded-full border border-[#6EC1E4] px-2 py-0.5 text-[10px] font-semibold text-[#0369A1] hover:bg-[#F3F9FC]"
-                title={trainer.voice_error || "Create the voice from the recording"}
-              >
-                Retry voice
-              </button>
-            ) : null}
+            footer={(
+              <span className="mt-1 flex flex-wrap gap-1">
+                {!ready && !processing && onRetryVoice ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onRetryVoice(trainer); }}
+                    className="rounded-full border border-[#6EC1E4] px-2 py-0.5 text-[10px] font-semibold text-[#0369A1] hover:bg-[#F3F9FC]"
+                    title={trainer.voice_error || "Create the voice from the recording"}
+                  >
+                    Retry voice
+                  </button>
+                ) : null}
+                {onDeleteTrainer ? (
+                  <button
+                    type="button"
+                    disabled={processing}
+                    onClick={(e) => { e.stopPropagation(); onDeleteTrainer(trainer); }}
+                    className="rounded-full border border-red-300 px-2 py-0.5 text-[10px] font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    Delete
+                  </button>
+                ) : null}
+              </span>
+            )}
           />
         );
       })}

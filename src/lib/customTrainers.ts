@@ -228,3 +228,8 @@ export async function assessPhotoQuality(file: File): Promise<PhotoQuality> {
 
   return { blocking, warnings };
 }
+
+/** Removes the trainer's voice, photo, audio and talking videos. The consent record is kept. */
+export async function deleteCustomTrainer(trainerId: string): Promise<void> {
+  await callEdgeFunction("custom-trainer-delete", { trainer_id: trainerId });
+}

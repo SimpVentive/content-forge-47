@@ -5,6 +5,8 @@ import { learnerExportMedia } from "@/lib/learnerExportData";
 import { generateNarrationAudio } from "@/lib/narrationAudioService";
 import { generateManifest } from "@/lib/scormManifestGenerator";
 import { generateIntroImage, resolveIntroImage } from "@/lib/learnerIntroImage";
+import { isCustomTrainerId } from "@/lib/customTrainers";
+import { loadCustomTrainerForPackage, narrateWithCustomVoice, type PackagedCustomTrainer } from "@/lib/customTrainerPackage";
 
 export type PortableLearnerProps = Omit<LearnerPreviewProps, "onClose" | "onUpdateVisualTopic" | "onLearnerProgress">;
 
@@ -48,11 +50,16 @@ async function readRuntime(): Promise<{ js: string; css: string }> {
 
 export async function createLearnerScormPackage(props: PortableLearnerProps, passingScore: number, report: (message: string) => void): Promise<{ zip: JSZip; slides: number }> {
   const { buildSlides, buildSlideNarration } = await import("@/components/contentforge/LearnerPreview");
-  const cached = learnerExportMedia.get(props.courseTitle);
   const trainerId = props.avatarTrainerId || AVATAR_TRAINERS[0].id;
-  const trainerMedia = cached?.trainerMedia || getTrainerMedia(trainerId, getAvatarEnv());
-  const media = { ...cached, ...props.exportMedia, trainerMedia: { ...trainerMedia, ...props.exportMedia?.trainerMedia }, audioBySlide: { ...cached?.audioBySlide, ...props.exportMedia?.audioBySlide }, introImages: { ...cached?.introImages, ...props.exportMedia?.introImages }, audioTextBySlide: { ...cached?.audioTextBySlide, ...props.exportMedia?.audioTextBySlide } };
+  const customId = isCustomTrainerId(trainerId) ? trainerId : null;
+  // A custom trainer never reuses narration recorded earlier: it may have been made with another voice.
+  const cached = customId ? undefined : learnerExportMedia.get(props.courseTitle);
   const { slides } = buildSlides(props.rawOutputs, props.insertedVideos, props.courseDuration, props.slideLayout?.maxLines, props.assessmentIntensity);
+  const custom: PackagedCustomTrainer | null = customId
+    ? await loadCustomTrainerForPackage(customId, slides.map(slide => buildSlideNarration(slide, props.slideLayout?.maxLines ?? 10)), report)
+    : null;
+  const trainerMedia = custom ? { imageUrl: custom.photoDataUrl, videoUrl: undefined, posterUrl: undefined } : (cached?.trainerMedia || getTrainerMedia(trainerId, getAvatarEnv()));
+  const media = { ...cached, ...props.exportMedia, trainerMedia: { ...trainerMedia, ...props.exportMedia?.trainerMedia }, audioBySlide: { ...cached?.audioBySlide, ...props.exportMedia?.audioBySlide }, introImages: { ...cached?.introImages, ...props.exportMedia?.introImages }, audioTextBySlide: { ...cached?.audioTextBySlide, ...props.exportMedia?.audioTextBySlide } };
   const zip = new JSZip();
   const mediaCache = new Map<string, Promise<string>>();
   let mediaIndex = 0;
@@ -114,7 +121,12 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
       if (media.audioBySlide[index]) continue;
       if (typeof narration !== "string" || !narration.trim()) continue;
       report(`Including recorded narration ${index + 1} of ${slides.length}...`);
-      const result = await withTimeout(generateNarrationAudio(narration.slice(0, 2500), getTrainerVoiceId(trainerId), props.narratorLanguage || props.textLanguage || "English"), 30_000).catch(() => null);
+      // A custom trainer always speaks with its own voice, in every language.
+      const result = await withTimeout(
+        custom ? narrateWithCustomVoice(narration, custom.voiceId).then(audioDataUrl => ({ success: Boolean(audioDataUrl), audioDataUrl }))
+          : generateNarrationAudio(narration.slice(0, 2500), getTrainerVoiceId(trainerId), props.narratorLanguage || props.textLanguage || "English"),
+        30_000,
+      ).catch(() => null);
       if (!result?.success || !result.audioDataUrl) {
         // Voice service down: stop calling it; the package uses the browser voice instead.
         report("Voice service unavailable — the course will use the browser's built-in voice.");
@@ -123,6 +135,15 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
       media.audioBySlide[index] = result.audioDataUrl;
       media.audioTextBySlide[index] = narration;
     }
+  }
+  if (custom) {
+    media.customTrainer = { name: custom.name, photoUrl: custom.photoDataUrl, voiceId: custom.voiceId, voiceStatus: "ready", voiceError: null };
+    media.talkingClips = Object.fromEntries(Object.entries(custom.videos).map(([text, video]) => [text, { status: "ready", video_url: video.path }]));
+    for (const video of Object.values(custom.videos)) zip.file(video.path, video.file);
+  } else {
+    // Another trainer's package must never carry a custom trainer's photo, voice or videos.
+    delete media.customTrainer;
+    delete media.talkingClips;
   }
   learnerExportMedia.set(props.courseTitle, media);
   report("Packaging the same interactive learner preview...");
