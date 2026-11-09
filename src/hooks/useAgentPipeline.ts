@@ -1248,7 +1248,12 @@ ZERO-REPETITION RULE — ABSOLUTE:
         }
         
         writerResult = stripAiPlaceholders(writerResult);
-        requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
+        // Missing lesson text is logged by topic, and the course continues. The Writer no longer stops the whole run.
+        try {
+          requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
+        } catch (lessonErr) {
+          addLog(`Writer: warning — ${(lessonErr as Error).message}`);
+        }
         // Diagrams, images and charts the script refers to get a visual: grids as markers, others as drawn SVGs.
         // Failures only skip visuals; the course continues without them.
         let drawnDiagrams: Record<string, unknown> = {};
