@@ -5,6 +5,8 @@ import { stepMouth, mouthFrameAt, type MouthFrame } from "@/lib/trainerMouth";
 import { fitSvgToContent } from "@/lib/svgFit";
 import { mouthTrackForAudio } from "@/lib/mouthTrackStore";
 import { getCustomTrainer, isCustomTrainerId, signedPhotoUrl } from "@/lib/customTrainers";
+import { lookupTalkingClips, type TalkingClip } from "@/lib/customTrainerVideo";
+import { TalkingVideoPanel } from "@/components/contentforge/TalkingVideoPanel";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX, Check, Clock, Film, Loader2, RefreshCw, ZoomIn, ZoomOut, Home, BarChart3, NotebookPen, FolderOpen, MessageSquareText, BookOpenText, Settings2, HelpCircle, AlertTriangle, Maximize2, Minimize2 } from "lucide-react";
 import { HelpModal } from "@/components/HelpModal";
 import { RawAgentOutputs } from "@/types/agents";
@@ -1675,6 +1677,24 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   // Narration text for current slide - with fallback to slide content
   // Narration = exactly the on-screen lines (shared with the downloaded course).
   const getNarrationForSlide = useCallback((slideIdx: number) => buildSlideNarration(slides[slideIdx], slideRules.maxLines), [slides, slideRules.maxLines]);
+  // Talking-photo clips for a custom trainer. The saved clips are looked up once per course; nothing is generated here.
+  const [talkingClips, setTalkingClips] = useState<Record<string, TalkingClip>>({});
+  const narrationsForCourse = useMemo(() => slides.map((_, i) => getNarrationForSlide(i)), [slides, getNarrationForSlide]);
+  const narrationKey = narrationsForCourse.join("\u0001");
+  useEffect(() => {
+    if (!isCustomTrainer || !avatarTrainerId || standalone) return;
+    const texts = narrationsForCourse.filter((text) => text.trim());
+    if (texts.length === 0) return;
+    let alive = true;
+    lookupTalkingClips(avatarTrainerId, texts)
+      .then((clips) => { if (alive) setTalkingClips((prev) => ({ ...prev, ...clips })); })
+      .catch(() => {});
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isCustomTrainer, avatarTrainerId, standalone, narrationKey]);
+  const currentClip = isCustomTrainer ? talkingClips[getNarrationForSlide(currentSlide)] : undefined;
+  // The saved video for this screen when one is ready; otherwise the still photo (see AvatarNarrator stillPhoto).
+  const currentTalkingUrl = currentClip?.status === "ready" && currentClip.video_url ? currentClip.video_url : undefined;
 
   // Split narration into sentences for highlighting
   const narrationSentences = useMemo(() => {
@@ -2729,8 +2749,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
                     stillPhoto={isCustomTrainer}
-                    avatarVideoUrl={avatarVideoUrl}
-                    avatarPosterUrl={avatarPosterUrl}
+                    avatarVideoUrl={isCustomTrainer ? currentTalkingUrl : avatarVideoUrl}
+                    avatarPosterUrl={isCustomTrainer ? avatarImageUrl : avatarPosterUrl}
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
@@ -2932,8 +2952,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
                     stillPhoto={isCustomTrainer}
-                    avatarVideoUrl={avatarVideoUrl}
-                    avatarPosterUrl={avatarPosterUrl}
+                    avatarVideoUrl={isCustomTrainer ? currentTalkingUrl : avatarVideoUrl}
+                    avatarPosterUrl={isCustomTrainer ? avatarImageUrl : avatarPosterUrl}
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
@@ -3101,8 +3121,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
                     stillPhoto={isCustomTrainer}
-                    avatarVideoUrl={avatarVideoUrl}
-                    avatarPosterUrl={avatarPosterUrl}
+                    avatarVideoUrl={isCustomTrainer ? currentTalkingUrl : avatarVideoUrl}
+                    avatarPosterUrl={isCustomTrainer ? avatarImageUrl : avatarPosterUrl}
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
@@ -3454,8 +3474,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
                     stillPhoto={isCustomTrainer}
-                    avatarVideoUrl={avatarVideoUrl}
-                    avatarPosterUrl={avatarPosterUrl}
+                    avatarVideoUrl={isCustomTrainer ? currentTalkingUrl : avatarVideoUrl}
+                    avatarPosterUrl={isCustomTrainer ? avatarImageUrl : avatarPosterUrl}
                     trainerId={selectedTrainer.id}
                     isVoiceActive={isPlaying}
                     isVoiceLoading={audioLoading}
@@ -4244,6 +4264,15 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
             </div>
           </div>
 
+          {isCustomTrainer && avatarTrainerId ? (
+            <TalkingVideoPanel
+              trainerId={avatarTrainerId}
+              trainerName={trainerName}
+              narrations={narrationsForCourse}
+              clips={talkingClips}
+              onClip={(text, clip) => setTalkingClips((prev) => ({ ...prev, [text]: clip }))}
+            />
+          ) : null}
           <div className="bottom-toolbar shrink-0 border-t border-[#d7e1ee] bg-white/90 px-5 py-4 backdrop-blur md:px-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <button
