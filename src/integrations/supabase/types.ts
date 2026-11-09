@@ -352,6 +352,8 @@ export type Database = {
       }
       custom_trainers: {
         Row: {
+          animation_mode: string
+          approved_at: string | null
           created_at: string
           deleted_at: string | null
           id: string
@@ -359,6 +361,7 @@ export type Database = {
           owner_org_id: string | null
           owner_user_id: string
           photo_path: string | null
+          photo_set: Json | null
           updated_at: string
           voice_error: string | null
           voice_id: string | null
@@ -366,6 +369,8 @@ export type Database = {
           voice_status: string
         }
         Insert: {
+          animation_mode?: string
+          approved_at?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -373,6 +378,7 @@ export type Database = {
           owner_org_id?: string | null
           owner_user_id: string
           photo_path?: string | null
+          photo_set?: Json | null
           updated_at?: string
           voice_error?: string | null
           voice_id?: string | null
@@ -380,6 +386,8 @@ export type Database = {
           voice_status?: string
         }
         Update: {
+          animation_mode?: string
+          approved_at?: string | null
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -387,6 +395,7 @@ export type Database = {
           owner_org_id?: string | null
           owner_user_id?: string
           photo_path?: string | null
+          photo_set?: Json | null
           updated_at?: string
           voice_error?: string | null
           voice_id?: string | null
