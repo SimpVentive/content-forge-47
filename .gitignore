@@ -27,3 +27,7 @@ dist-ssr
 
 # Local secrets: never commit
 .env
+
+# Personal photos used for tests: never commit them
+docs/*.jpg
+docs/*.png
