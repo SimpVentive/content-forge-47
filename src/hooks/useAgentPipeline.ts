@@ -551,7 +551,58 @@ const timestamp = () => {
   return `[${d.toLocaleTimeString("en-US", { hour12: false })}]`;
 };
 
+
+// Faults found by the last quality review. The next writer run is told about them, so the same faults are not repeated.
+const QA_LESSON_KEY = "contentforge.qaLessons.v1";
+const MAX_QA_LESSONS = 12;
+
+export function saveQaLessons(issues: { category: string; severity: string; description: string }[]): void {
+  try {
+    const lessons = issues.slice(0, MAX_QA_LESSONS).map((i) => ({ category: i.category, severity: i.severity, description: i.description }));
+    window.localStorage.setItem(QA_LESSON_KEY, JSON.stringify(lessons));
+  } catch {
+    // Storage can be unavailable (private browsing); the course still generates without the lessons.
+  }
+}
+
+export function qaLessonsBlock(): string {
+  try {
+    const lessons = JSON.parse(window.localStorage.getItem(QA_LESSON_KEY) || "[]") as { category: string; description: string }[];
+    if (!lessons.length) return "";
+    const lines = lessons.map((l) => "- [" + l.category + "] " + l.description).join("\n");
+    return "\n\nKNOWN DEFECTS FROM THE LAST QUALITY REVIEW. Do not repeat these:\n" + lines + "\nWrite every lesson, question and visual in full. Never stop mid-sentence, and never leave JSON or SVG unclosed.";
+  } catch {
+    return "";
+  }
+}
+
+const CONTINUE_TAIL_CHARS = 1500;
+const MAX_CONTINUATIONS = 4;
+
+/**
+ * One agent call. A reply that stops at the output limit is continued, not accepted as finished:
+ * the model is asked to pick up exactly where it stopped, and the parts are joined.
+ */
 async function callClaude(systemPrompt: string, userMessage: string): Promise<string> {
+  let combined = "";
+  let message = userMessage;
+  for (let round = 0; round <= MAX_CONTINUATIONS; round++) {
+    const { text, finishReason } = await callClaudeRound(systemPrompt, message);
+    combined += text;
+    if (finishReason !== "length" && finishReason !== "max_tokens") return combined;
+    const tail = combined.slice(-CONTINUE_TAIL_CHARS);
+    message = `${userMessage}
+
+=== CONTINUATION ===
+Your previous reply was cut off at the output limit. This is the end of what you have written so far:
+"""${tail}"""
+Continue from exactly where it stopped. Do not repeat anything already written. Output only the continuation.`;
+  }
+  // Still cut off after the allowed continuations: fail visibly rather than return an unfinished reply.
+  throw new Error("The reply was cut off at the output limit and could not be completed. Retry this step.");
+}
+
+async function callClaudeRound(systemPrompt: string, userMessage: string): Promise<{ text: string; finishReason: string | null }> {
   const { data, error } = await supabase.functions.invoke("claude", {
     body: { systemPrompt, userMessage },
   });
@@ -589,7 +640,7 @@ async function callClaude(systemPrompt: string, userMessage: string): Promise<st
     // Silently fail logging, don't interrupt the pipeline
   }
 
-  return data.text;
+  return { text: data.text || "", finishReason: data.finishReason ?? null };
 }
 
 async function callClaudeWithTimeout(systemPrompt: string, userMessage: string, timeoutMs = 90000): Promise<string> {
@@ -1180,7 +1231,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
 
       Write content that feels expensive, practical, and memorable — something a learner would actually respect, not skim out of obligation.`;
 
-        const enhancedWriterPrompt = enhanceScriptGenerationPrompt(baseWriterSystemPrompt, courseTitle, auditLogs).enhancedPrompt;
+        const enhancedWriterPrompt = enhanceScriptGenerationPrompt(baseWriterSystemPrompt, courseTitle, auditLogs).enhancedPrompt + qaLessonsBlock();
         const writerSystemPrompt = `${languageDirective}${enhancedWriterPrompt}`;
 
         // Append video mode instructions if needed
@@ -2491,6 +2542,7 @@ ${modeInstructions}`;
 
       // Update state with QA results
       setQAResult(result);
+      saveQaLessons(result.issuesFound ?? []);
       setShowQADialog(true);
 
       addLog(`Final QA Agent: Quality validation complete. ${result.issuesFound.length} issue(s) found.`);

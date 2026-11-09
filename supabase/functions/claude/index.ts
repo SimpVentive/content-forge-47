@@ -27,6 +27,8 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
+        // Explicit output limit, so long lessons are not cut short by a low default.
+        max_tokens: 16000,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userMessage },
@@ -56,8 +58,10 @@ serve(async (req) => {
     }
 
     const text = data.choices?.[0]?.message?.content || "";
+    // "length" means the reply was cut off at the output limit; the caller asks for the rest.
+    const finishReason = data.choices?.[0]?.finish_reason ?? null;
 
-    return new Response(JSON.stringify({ text }), {
+    return new Response(JSON.stringify({ text, finishReason }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error: unknown) {
