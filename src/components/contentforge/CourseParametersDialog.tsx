@@ -782,6 +782,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
 
                 <select
                   value={voiceAccent}
+                  disabled={Boolean(selectedCustomTrainer)}
+                  title={selectedCustomTrainer ? `${selectedCustomTrainer.name} speaks with their own voice` : undefined}
                   onChange={(e) => setVoiceAccent(e.target.value)}
                   className="w-full h-10 border border-[#E5E7EB] rounded-[20px] px-4 text-[13px] bg-[#F3F4F6] text-[#2E2E2E] focus:outline-none focus:border-[#6EC1E4] transition-colors duration-200 ease-in-out appearance-none cursor-pointer"
                 >
@@ -1667,7 +1669,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   <div className="space-y-2.5 text-[14px]">
                     <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Text Language:</span> {textLanguage}</p>
                     <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Narration Language:</span> {narratorLanguage}</p>
-                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Narrator Voice:</span> {selectedVoiceLabel}</p>
+                    <p className="flex items-center gap-2"><Check className="h-4 w-4 text-[#6EC1E4]" /> <span style={{ fontWeight: 600 }}>Narrator Voice:</span> {selectedCustomTrainer ? `${selectedCustomTrainer.name}'s own voice` : selectedVoiceLabel}</p>
 
                     {localLearningType === "image" ? (
                       <>
@@ -1733,7 +1735,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       </div>
       {/* Clicks in the upload screen must not reach this dialog's outside-click handler (it would close the course setup). */}
       <div onClick={(e) => e.stopPropagation()}>
-      {switchTrainer ? <SwitchOptionDialog trainer={switchTrainer} onOpenChange={(open) => { if (!open) setSwitchTrainer(null); }} onSwitched={() => void refreshCustomTrainers()} /> : null}
+      {/* The switch window sits on top; its clicks must not reach this dialog's outside-click handler. */}
+      {switchTrainer ? <div onClick={(e) => e.stopPropagation()}><SwitchOptionDialog trainer={switchTrainer} onOpenChange={(open) => { if (!open) setSwitchTrainer(null); }} onSwitched={() => void refreshCustomTrainers()} /></div> : null}
       {showCustomTrainer ? <CustomTrainerDialog
         open={showCustomTrainer}
         onOpenChange={setShowCustomTrainer}

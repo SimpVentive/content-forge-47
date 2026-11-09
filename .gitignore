@@ -31,3 +31,4 @@ dist-ssr
 # Personal photos used for tests: never commit them
 docs/*.jpg
 docs/*.png
+docs/**/*.gif

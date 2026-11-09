@@ -137,7 +137,7 @@ export async function createLearnerScormPackage(props: PortableLearnerProps, pas
     }
   }
   if (custom) {
-    media.customTrainer = { name: custom.name, photoUrl: custom.photoDataUrl, voiceId: custom.voiceId, voiceStatus: "ready", voiceError: null };
+    media.customTrainer = { name: custom.name, photoUrl: custom.photoDataUrl, voiceId: custom.voiceId, voiceStatus: "ready", voiceError: null, photoSprites: custom.photoSprites };
     media.talkingClips = Object.fromEntries(Object.entries(custom.videos).map(([text, video]) => [text, { status: "ready", video_url: video.path }]));
     for (const video of Object.values(custom.videos)) zip.file(video.path, video.file);
   } else {

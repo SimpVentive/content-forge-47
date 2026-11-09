@@ -59,7 +59,7 @@ export function SwitchOptionDialog({ trainer, onOpenChange, onSwitched }: Props)
 
   return (
     <Dialog open={!!trainer} onOpenChange={(next) => !busy && onOpenChange(next)}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" overlayClassName="z-[10000]">
+      <DialogContent className="z-[10000] max-w-2xl max-h-[90vh] overflow-y-auto" overlayClassName="z-[10000]">
         <DialogHeader>
           <DialogTitle>Change how {trainer?.name} comes alive</DialogTitle>
           <DialogDescription>Currently: {current === "photos" ? "Option 2, five photos" : "Option 1, one photo and video"}.</DialogDescription>

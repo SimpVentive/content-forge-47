@@ -1277,12 +1277,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const avatarEnv = getAvatarEnv();
   const trainerMedia = exportMedia?.trainerMedia || getTrainerMedia(selectedTrainer.id, avatarEnv);
   // A custom trainer (the signed-in user's own photo and voice). Loaded from the account in the app preview.
-  const [customTrainerInfo, setCustomTrainerInfo] = useState<{ name: string; voiceId: string | null; photoUrl: string | null; voiceStatus: string; voiceError: string | null; animationMode: string } | null>(null);
+  const [customTrainerInfo, setCustomTrainerInfo] = useState<{ name: string; voiceId: string | null; photoUrl: string | null; voiceStatus: string; voiceError: string | null; animationMode: string; photoSprites: { slight: string; open: string; blink: string } | null } | null>(null);
   useEffect(() => {
     // In the package the custom trainer comes with the course data: no account, no network.
     if (standalone) {
       const packaged = exportMedia?.customTrainer;
-      setCustomTrainerInfo(packaged ? { name: packaged.name, voiceId: packaged.voiceId, photoUrl: packaged.photoUrl, voiceStatus: packaged.voiceStatus, voiceError: packaged.voiceError, animationMode: "video" } : null);
+      setCustomTrainerInfo(packaged ? { name: packaged.name, voiceId: packaged.voiceId, photoUrl: packaged.photoUrl, voiceStatus: packaged.voiceStatus, voiceError: packaged.voiceError, animationMode: packaged.photoSprites ? "photos" : "video", photoSprites: packaged.photoSprites ?? null } : null);
       return;
     }
     if (!isCustomTrainerId(avatarTrainerId)) { setCustomTrainerInfo(null); return; }
@@ -1292,7 +1292,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         if (!alive) return;
         if (!row) { setCustomTrainerInfo(null); return; }
         const photoUrl = await signedPhotoUrl(row.photo_path);
-        if (alive) setCustomTrainerInfo({ name: row.name, voiceId: row.voice_status === "ready" ? row.voice_id : null, photoUrl, voiceStatus: row.voice_status, voiceError: row.voice_error, animationMode: row.animation_mode ?? "video" });
+        let photoSprites: { slight: string; open: string; blink: string } | null = null;
+        if (row.animation_mode === "photos" && row.photo_set) {
+          const [slight, open, blink] = await Promise.all([row.photo_set.eh, row.photo_set.ah, row.photo_set.blink].map((path) => signedPhotoUrl(path ?? null)));
+          if (slight && open && blink) photoSprites = { slight, open, blink };
+        }
+        if (alive) setCustomTrainerInfo({ name: row.name, voiceId: row.voice_status === "ready" ? row.voice_id : null, photoUrl, voiceStatus: row.voice_status, voiceError: row.voice_error, animationMode: row.animation_mode ?? "video", photoSprites });
       })
       .catch(() => { if (alive) setCustomTrainerInfo(null); });
     return () => { alive = false; };
@@ -2754,7 +2759,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     systemHint="Coach the learner through the scenario and emphasize the stronger practical response."
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
-                    stillPhoto={isCustomTrainer}
+                    stillPhoto={isCustomTrainer && !customTrainerInfo?.photoSprites}
+photoSprites={customTrainerInfo?.photoSprites ?? undefined}
                     avatarVideoUrl={isCustomTrainer ? currentTalkingUrl : avatarVideoUrl}
                     avatarPosterUrl={isCustomTrainer ? avatarImageUrl : avatarPosterUrl}
                     trainerId={selectedTrainer.id}
@@ -2957,7 +2963,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     systemHint="Explain this lesson's practical application."
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
-                    stillPhoto={isCustomTrainer}
+                    stillPhoto={isCustomTrainer && !customTrainerInfo?.photoSprites}
+photoSprites={customTrainerInfo?.photoSprites ?? undefined}
                     avatarVideoUrl={isCustomTrainer ? currentTalkingUrl : avatarVideoUrl}
                     avatarPosterUrl={isCustomTrainer ? avatarImageUrl : avatarPosterUrl}
                     trainerId={selectedTrainer.id}
@@ -3126,7 +3133,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     systemHint="Focus on the practical benefit to an office worker."
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
-                    stillPhoto={isCustomTrainer}
+                    stillPhoto={isCustomTrainer && !customTrainerInfo?.photoSprites}
+photoSprites={customTrainerInfo?.photoSprites ?? undefined}
                     avatarVideoUrl={isCustomTrainer ? currentTalkingUrl : avatarVideoUrl}
                     avatarPosterUrl={isCustomTrainer ? avatarImageUrl : avatarPosterUrl}
                     trainerId={selectedTrainer.id}
@@ -3479,7 +3487,8 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
                     systemHint="Coach the learner through this scenario response and emphasize the best approach."
                     trainerName={trainerName}
                     avatarImageUrl={avatarImageUrl}
-                    stillPhoto={isCustomTrainer}
+                    stillPhoto={isCustomTrainer && !customTrainerInfo?.photoSprites}
+photoSprites={customTrainerInfo?.photoSprites ?? undefined}
                     avatarVideoUrl={isCustomTrainer ? currentTalkingUrl : avatarVideoUrl}
                     avatarPosterUrl={isCustomTrainer ? avatarImageUrl : avatarPosterUrl}
                     trainerId={selectedTrainer.id}

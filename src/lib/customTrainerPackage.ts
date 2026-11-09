@@ -10,6 +10,8 @@ export type PackagedCustomTrainer = {
   photoDataUrl: string;
   /** Saved talking videos keyed by the screen's narration text; each file is written into the zip. */
   videos: Record<string, { file: Blob; path: string }>;
+  /** Option 2: the mouth and blink photos as data URLs, so the package makes no network requests. */
+  photoSprites: { slight: string; open: string; blink: string } | null;
 };
 
 function blobToDataUrl(blob: Blob): Promise<string> {
@@ -51,7 +53,17 @@ export async function loadCustomTrainerForPackage(trainerId: string, narrations:
       index++;
     }
   }
-  return { name: trainer.name, voiceId: trainer.voice_id, photoDataUrl, videos };
+  let photoSprites: PackagedCustomTrainer["photoSprites"] = null;
+  if (trainer.animation_mode === "photos" && trainer.photo_set) {
+    const set = trainer.photo_set as Record<string, string>;
+    const [eh, ah, blink] = await Promise.all([set.eh, set.ah, set.blink].map(async (path) => {
+      const url = await signedPhotoUrl(path ?? null);
+      if (!url) throw new Error(`A photo for ${trainer.name} could not be opened. Re-save the five photos.`);
+      return blobToDataUrl(await fetchBlob(url));
+    }));
+    photoSprites = { slight: eh, open: ah, blink };
+  }
+  return { name: trainer.name, voiceId: trainer.voice_id, photoDataUrl, videos, photoSprites };
 }
 
 /** One screen spoken with the trainer's own voice, as a data URL. Null if the voice service fails. */

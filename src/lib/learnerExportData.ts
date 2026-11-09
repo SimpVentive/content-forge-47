@@ -7,7 +7,7 @@ export interface LearnerExportMedia {
   audioTextBySlide?: Record<number, string>;
   introImages?: Record<number, string>;
   /** A custom trainer packaged with the course: its own name, photo and voice. */
-  customTrainer?: { name: string; photoUrl: string; voiceId: string; voiceStatus: string; voiceError: string | null };
+  customTrainer?: { name: string; photoUrl: string; voiceId: string; voiceStatus: string; voiceError: string | null; photoSprites?: { slight: string; open: string; blink: string } | null };
   /** Saved talking videos keyed by the screen's narration text, with the file path inside the package. */
   talkingClips?: Record<string, { status: string; video_url: string | null }>;
 }

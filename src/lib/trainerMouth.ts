@@ -85,7 +85,7 @@ export function renderMouthFrame(
     const band = op >= 0.5 ? 2 : op >= 0.02 ? 1 : 0;
     if (container.getAttribute("data-mode") !== "sprites") {
       const img = (role: string, src: string) =>
-        `<img data-role="${role}" src="${src}" alt="" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;opacity:0;pointer-events:none"/>`;
+        `<img data-role="${role}" src="${src}" alt="" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 0;opacity:0;pointer-events:none"/>`;
       container.innerHTML = img("sprite-slight", sprites.slight) + img("sprite-open", sprites.open) + img("sprite-blink", sprites.blink);
       container.setAttribute("data-mode", "sprites");
     }

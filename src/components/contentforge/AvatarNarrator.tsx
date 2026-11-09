@@ -17,6 +17,8 @@ interface AvatarNarratorProps {
   avatarImageUrl?: string;
   /** A custom trainer's own photo: shown unzoomed and still (no drawn mouth), until the talking video is ready. */
   stillPhoto?: boolean;
+  /** Option 2: the mouth and blink photos, swapped by the mouth track like the drawn trainers. */
+  photoSprites?: TrainerSprites | null;
   avatarVideoUrl?: string;
   avatarPosterUrl?: string;
   trainerId?: string;
@@ -87,6 +89,7 @@ export function AvatarNarrator({
   trainerName = "Sarah",
   avatarImageUrl, avatarVideoUrl, avatarPosterUrl,
   stillPhoto = false,
+  photoSprites = null,
   trainerId = "priya",
   isVoiceActive, isVoiceLoading,
   currentViseme = "rest",
@@ -142,8 +145,8 @@ export function AvatarNarrator({
   const frameFlag = mouthFrame ? mouthFrame.flag : 0;
   useEffect(() => {
     if (stillPhoto) return;
-    renderMouthFrame(faceOverlayRef.current, { open: frameOpen, spread: frameSpread, flag: frameFlag }, faceFacePoints, `narrator-${trainerId}`, isBlinking, paintedSprites);
-  }, [frameOpen, frameSpread, frameFlag, isBlinking, paintedSprites, faceFacePoints, trainerId]);
+    renderMouthFrame(faceOverlayRef.current, { open: frameOpen, spread: frameSpread, flag: frameFlag }, faceFacePoints, `narrator-${trainerId}`, isBlinking, photoSprites ?? paintedSprites);
+  }, [frameOpen, frameSpread, frameFlag, isBlinking, paintedSprites, photoSprites, faceFacePoints, trainerId]);
 
   const trainerInitials = trainerName
     .split(/\s+/).filter(Boolean).slice(0, 2)
@@ -462,7 +465,7 @@ export function AvatarNarrator({
                   }}
                 >
                 {/* Zoomed stage: the picture and the drawn mouth/blink share one coordinate system (lib/trainerMouth.ts) */}
-                <div className="absolute" style={stillPhoto ? { inset: 0 } : { ...trainerStageBox(faceFacePoints), animation: "trainerBob 8.8s ease-in-out infinite" }}>
+                <div className="absolute" style={photoSprites ? { inset: 0, animation: "trainerBob 8.8s ease-in-out infinite" } : stillPhoto ? { inset: 0 } : { ...trainerStageBox(faceFacePoints), animation: "trainerBob 8.8s ease-in-out infinite" }}>
                   <img
                     src={avatarImageUrl}
                     alt={trainerName}
