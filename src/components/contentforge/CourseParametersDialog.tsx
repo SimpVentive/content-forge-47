@@ -306,8 +306,14 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const selectedLevelLabel = LEVELS.find((item) => item.value === level)?.label || "Intermediate";
   const selectedVoiceLabel = VOICE_ACCENTS.find((voice) => voice.value === voiceAccent)?.label || voiceAccent;
   const selectedDurationLabel = DURATIONS.find((item) => item.value === duration)?.label || "15 min";
-  const selectedTrainer = AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0];
-  const selectedTrainerImage = getTrainerMedia(selectedTrainer.id, avatarEnv).imageUrl;
+  // A custom trainer (the user's own photo and voice) shows its own name and photo in the summary.
+  const selectedCustomTrainer = customTrainers.find((trainer) => trainer.id === avatarTrainerId);
+  const selectedTrainer = selectedCustomTrainer
+    ? { id: selectedCustomTrainer.id, name: selectedCustomTrainer.name }
+    : (AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0]);
+  const selectedTrainerImage = selectedCustomTrainer
+    ? (customPhotoUrls[selectedCustomTrainer.id] || "/placeholder.svg")
+    : getTrainerMedia(selectedTrainer.id, avatarEnv).imageUrl;
 
   // Warm the browser cache for every instructor so switching is instant.
   useEffect(() => {
