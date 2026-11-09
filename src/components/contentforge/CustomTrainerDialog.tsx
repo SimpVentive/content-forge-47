@@ -26,6 +26,7 @@ type Props = {
   onCreated: (trainer: CustomTrainer) => void;
 };
 
+const AUDIO_FILE = /\.(mp3|m4a|wav|webm|ogg|oga|opus|aac|mp4)$/i;
 const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
 const MAX_VOICE_BYTES = 50 * 1024 * 1024;
 
@@ -81,11 +82,12 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
 
   async function handleVoice(file: File | undefined) {
     if (!file) return;
-    if (!file.type.startsWith("audio/")) return toast.error("Use an audio file (MP3, M4A, WAV or WebM)");
+    // Windows reports some audio files (for example .ogg) as video/*, so the extension counts too.
+    if (!file.type.startsWith("audio/") && !AUDIO_FILE.test(file.name)) return toast.error("Use an audio file (MP3, M4A, WAV, WebM or OGG)");
     if (file.size > MAX_VOICE_BYTES) return toast.error("The recording must be under 50 MB");
     try {
       const seconds = await audioDurationSeconds(file);
-      if (!Number.isFinite(seconds)) return toast.error("Could not read the length of this recording");
+      if (!Number.isFinite(seconds)) return toast.error("The length of this recording could not be read. Try an MP3 or WAV file.");
       if (seconds < VOICE_MIN_SECONDS || seconds > VOICE_MAX_SECONDS) {
         return toast.error(`The recording must be between ${VOICE_MIN_SECONDS / 60} and ${VOICE_MAX_SECONDS / 60} minutes (this one is ${Math.round(seconds)} s)`);
       }
@@ -211,7 +213,7 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
             <p className="text-[13px] font-semibold">Voice recording (1 to 3 minutes)</p>
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted">
               <Upload className="h-4 w-4" /> Choose recording
-              <input type="file" accept="audio/*" className="hidden" onChange={(e) => handleVoice(e.target.files?.[0])} />
+              <input type="file" accept=".mp3,.m4a,.wav,.webm,.ogg,.oga,.opus,.aac,.mp4,audio/*" className="hidden" onChange={(e) => handleVoice(e.target.files?.[0])} />
             </label>
             {voiceFile ? <p className="text-[12px] text-muted-foreground">{voiceFile.name} · {Math.round(voiceSeconds || 0)} s</p> : null}
           </div>

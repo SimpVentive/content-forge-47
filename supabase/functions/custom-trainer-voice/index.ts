@@ -67,7 +67,9 @@ Deno.serve(async (req) => {
   form.append("name", `ContentForge ${trainer.name} ${trainerId.slice(0, 8)}`);
   form.append("description", "Consented voice for ContentForge course narration");
   form.append("remove_background_noise", "true");
-  form.append("files", sample, "voice-sample");
+  // ElevenLabs reads the format from the file name, so keep the extension the user uploaded.
+  const ext = (trainer.voice_sample_path.match(/\.[A-Za-z0-9]{2,5}$/) || [".mp3"])[0].toLowerCase();
+  form.append("files", sample, "voice-sample" + ext);
 
   let res: Response;
   try {
