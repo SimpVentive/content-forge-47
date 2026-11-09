@@ -1252,6 +1252,8 @@ ZERO-REPETITION RULE — ABSOLUTE:
         try {
           requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
         } catch (lessonErr) {
+          // An empty Writer result is still a failure: the course stops before assessment and packaging.
+          if (!writerResult.trim()) throw lessonErr;
           addLog(`Writer: warning — ${(lessonErr as Error).message}`);
         }
         // Diagrams, images and charts the script refers to get a visual: grids as markers, others as drawn SVGs.
@@ -1835,7 +1837,14 @@ ZERO-REPETITION RULE — ABSOLUTE:
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 7: Assessment ────
-      requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
+      // Missing lesson text is logged, not fatal (see the Writer step).
+      try {
+        requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
+      } catch (lessonErr) {
+        // An empty Writer result is still a failure: the course stops before assessment and packaging.
+        if (!writerResult.trim()) throw lessonErr;
+        addLog(`Lesson check: warning — ${(lessonErr as Error).message}`);
+      }
       if (toggles["assessment"] !== false) {
         setStatus("assessment", "running");
         const parsedArch = tryParseJson(archResult) || {};
@@ -2103,7 +2112,14 @@ ZERO-REPETITION RULE — ABSOLUTE:
 
       if (isCancelled()) { addLog("Orchestrator: Pipeline stopped."); setIsRunning(false); return; }
       // ──── AGENT 9: Final Assembly ────
-      requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
+      // Missing lesson text is logged, not fatal (see the Writer step).
+      try {
+        requireLessonContent(writerResult, durationPlan.length ? durationPlan.map(module => ({ title: module.moduleTitle, topics: module.topics.map(topic => topic.topicTitle) })) : [{ title: courseTitle, topics: [courseTitle] }]);
+      } catch (lessonErr) {
+        // An empty Writer result is still a failure: the course stops before assessment and packaging.
+        if (!writerResult.trim()) throw lessonErr;
+        addLog(`Lesson check: warning — ${(lessonErr as Error).message}`);
+      }
       if (toggles["assembly"] !== false) {
         setStatus("assembly", "running");
         addLog(learningMode === "image_based_learning" ? "Final Assembly: Preparing image series..." : "Final Assembly: Packaging all outputs...");

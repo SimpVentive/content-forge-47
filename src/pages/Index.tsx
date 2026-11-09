@@ -876,7 +876,7 @@ const Index = () => {
         {activeTab === "creation" && (
           <div className="h-full overflow-y-auto p-6" style={{ background: '#f0f2f7' }}>
             {isRunning && (
-              <div className="sticky top-4 z-20 mb-5 rounded-2xl border px-5 py-4 shadow-2xl"
+              <div className="mb-5 rounded-2xl border px-5 py-4 shadow-2xl"
                 style={{
                   background: "rgba(255,255,255,0.98)",
                   borderColor: "rgba(59,130,246,0.28)",
