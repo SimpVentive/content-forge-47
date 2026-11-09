@@ -3,6 +3,8 @@ import { toast } from "sonner";
 import { Mic, Square, Upload, ShieldCheck } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { PhotoSlotsStep, type SlotAnalysis } from "@/components/contentforge/PhotoSlotsStep";
+import { composeSlot, releaseFaceLandmarker, type PhotoSlot } from "@/lib/facePhotos";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
@@ -44,7 +46,8 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
   const [recording, setRecording] = useState(false);
   const [agreed, setAgreed] = useState(false);
   // Step 1 asks how the trainer should come alive. Option 1 continues to the form; Option 2 is the next stage.
-  const [step, setStep] = useState<"choose" | "form">("choose");
+  const [step, setStep] = useState<"choose" | "photos" | "form">("choose");
+  const [photoAnalysis, setPhotoAnalysis] = useState<SlotAnalysis>({ ready: false, photos: {} });
   const [choice, setChoice] = useState<"single" | "photos" | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
@@ -143,7 +146,8 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
   async function handleCreate() {
     if (!user) return toast.error("Sign in to create a trainer");
     if (!name.trim()) return toast.error("Enter a name for the trainer");
-    if (!photoBlob) return toast.error("Add a front-facing photo");
+    if (choice === "single" && !photoBlob) return toast.error("Add a front-facing photo");
+    if (choice === "photos" && !photoAnalysis.ready) return toast.error("Finish the five photos first");
     if (!voiceFile) return toast.error("Add a voice recording of 1 to 3 minutes");
     if (!consentRecording) return toast.error("Record the consent sentence");
     if (!agreed) return toast.error("Tick the consent box to continue");
@@ -153,11 +157,35 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
     try {
       setProgress("Saving your trainer…");
       trainer = await createCustomTrainer(user.id, name);
-      const photoPath = await uploadTrainerFile(user.id, trainer.id, "photo.jpg", photoBlob);
+      let photoPath: string;
+      let photoSet: Record<string, string> | null = null;
+      if (choice === "photos") {
+        // The closed photo is the base; each other photo is aligned to it and only its mouth or eyes are kept.
+        const closed = photoAnalysis.photos.closed;
+        if (!closed) throw new Error("The closed-mouth photo is missing");
+        setProgress("Lining up your photos…");
+        const closedExt = closed.file.name.split(".").pop()?.toLowerCase() || "png";
+        photoPath = await uploadTrainerFile(user.id, trainer.id, `photos/closed.${closedExt}`, closed.file);
+        photoSet = { closed: photoPath };
+        for (const slot of ["eh", "ah", "blink", "oo"] as PhotoSlot[]) {
+          const shot = photoAnalysis.photos[slot];
+          if (!shot) continue;
+          const region = slot === "blink" ? "eyes" : "mouth";
+          const blob = await composeSlot(closed.bitmap, closed.pts, shot.bitmap, shot.pts, region);
+          photoSet[slot] = await uploadTrainerFile(user.id, trainer.id, `photos/${slot}.jpg`, blob);
+        }
+      } else {
+        photoPath = await uploadTrainerFile(user.id, trainer.id, "photo.jpg", photoBlob as Blob);
+      }
       const ext = voiceFile.name.split(".").pop()?.toLowerCase() || "audio";
       const voicePath = await uploadTrainerFile(user.id, trainer.id, `voice-sample.${ext}`, voiceFile);
       const consentPath = await uploadTrainerFile(user.id, trainer.id, "consent.webm", consentRecording);
-      await setTrainerFields(trainer.id, { photo_path: photoPath, voice_sample_path: voicePath });
+      await setTrainerFields(trainer.id, {
+        photo_path: photoPath,
+        voice_sample_path: voicePath,
+        animation_mode: choice === "photos" ? "photos" : "video",
+        photo_set: photoSet,
+      });
       await recordConsent(user.id, trainer.id, consentSentence, consentPath);
 
       setProgress("Creating your voice (this can take a minute)…");
@@ -209,14 +237,33 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
                 <p className="mt-2 text-[11px] font-semibold text-emerald-700">No video cost</p>
               </button>
             </div>
-            {choice === "photos" ? (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-900">
-                The photo slots for Option 2 are the next build step. For now, choose Option 1 to create a trainer.
-              </div>
-            ) : null}
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button disabled={choice !== "single"} onClick={() => setStep("form")}>Continue</Button>
+              <Button disabled={!choice} onClick={() => setStep(choice === "photos" ? "photos" : "form")}>Continue</Button>
+            </DialogFooter>
+          </>
+        ) : step === "photos" ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Your five photos</DialogTitle>
+              <DialogDescription>Each photo is checked against the closed-mouth photo. Nothing is saved until you finish.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                <label className="text-[13px] font-semibold">Name</label>
+                <input
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  maxLength={60}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  placeholder="How learners will see your name"
+                />
+              </div>
+              <PhotoSlotsStep onAnalysis={setPhotoAnalysis} />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setStep("choose")}>Back</Button>
+              <Button disabled={!photoAnalysis.ready || !name.trim()} onClick={() => setStep("form")}>Continue</Button>
             </DialogFooter>
           </>
         ) : (
@@ -247,7 +294,7 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-[160px_1fr]">
+          <div className="grid gap-4 sm:grid-cols-[160px_1fr]" hidden={choice !== "single"}>
             <div className="space-y-1.5">
               <p className="text-[13px] font-semibold">Front-facing photo</p>
               <div className="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border bg-muted">

@@ -22,6 +22,10 @@ export type CustomTrainer = {
   voice_id: string | null;
   voice_status: CustomTrainerStatus;
   voice_error: string | null;
+  /** Option 1: one photo and video. Option 2: five photos, animated by ContentForge. */
+  animation_mode?: "video" | "photos";
+  /** Option 2: the saved photo paths by slot (closed, eh, ah, blink, oo). */
+  photo_set?: Record<string, string> | null;
   created_at: string;
   deleted_at: string | null;
 };
