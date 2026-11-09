@@ -3,7 +3,8 @@ import { X, Settings2, AlertTriangle, Info, Check } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrainerGrid } from "./TrainerGrid";
 import { CustomTrainerDialog } from "./CustomTrainerDialog";
-import { listCustomTrainers, signedPhotoUrl, type CustomTrainer } from "@/lib/customTrainers";
+import { createCustomVoice, listCustomTrainers, signedPhotoUrl, type CustomTrainer } from "@/lib/customTrainers";
+import { toast } from "sonner";
 import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage, getAvatarEnv } from "@/lib/avatarTrainers";
 
 export interface CourseParameters {
@@ -266,6 +267,19 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     }
   };
   useEffect(() => { if (open) void refreshCustomTrainers(); }, [open]);
+  const [retryingVoiceId, setRetryingVoiceId] = useState<string | null>(null);
+  const retryCustomVoice = async (trainer: CustomTrainer) => {
+    setRetryingVoiceId(trainer.id);
+    try {
+      await createCustomVoice(trainer.id);
+      toast.success(`${trainer.name}'s voice is ready`);
+    } catch (err) {
+      toast.error(`The voice was not created: ${(err as Error).message}`);
+    } finally {
+      setRetryingVoiceId(null);
+      await refreshCustomTrainers();
+    }
+  };
   const [duration, setDuration] = useState("15min");
   const [videoDurationHandling, setVideoDurationHandling] = useState<CourseParameters["videoDurationHandling"]>("within-course");
   const [assessmentRequired, setAssessmentRequired] = useState(true);
@@ -773,6 +787,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     customTrainers={customTrainers}
                     customPhotoUrls={customPhotoUrls}
                     onCreateCustom={() => setShowCustomTrainer(true)}
+                    onRetryVoice={retryCustomVoice}
+                    retryingVoiceId={retryingVoiceId}
                     avatarEnv={avatarEnv}
                   />
                   <p className="text-[10px] font-semibold text-[#3f8f73]">
@@ -826,6 +842,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   customTrainers={customTrainers}
                   customPhotoUrls={customPhotoUrls}
                   onCreateCustom={() => setShowCustomTrainer(true)}
+                  onRetryVoice={retryCustomVoice}
+                  retryingVoiceId={retryingVoiceId}
                   avatarEnv={avatarEnv}
                 />
               </div>

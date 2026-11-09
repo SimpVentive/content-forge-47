@@ -1,3 +1,4 @@
+import React from "react";
 import { Check, Plus } from "lucide-react";
 
 import { AVATAR_TRAINERS, getTrainerMedia } from "@/lib/avatarTrainers";
@@ -10,12 +11,15 @@ type Props = {
   customTrainers: CustomTrainer[];
   customPhotoUrls: Record<string, string | null>;
   onCreateCustom: () => void;
+  /** Retries the voice for a custom trainer whose voice was not created. */
+  onRetryVoice?: (trainer: CustomTrainer) => void;
+  retryingVoiceId?: string | null;
   avatarEnv: Record<string, string | undefined>;
 };
 
 const CARD_SHADOW = "0 0 0 2px rgba(37,99,235,0.25), 0 8px 20px rgba(37,99,235,0.2)";
 
-export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoUrls, onCreateCustom, avatarEnv }: Props) {
+export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoUrls, onCreateCustom, onRetryVoice, retryingVoiceId, avatarEnv }: Props) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
       {AVATAR_TRAINERS.map((trainer) => {
@@ -36,6 +40,8 @@ export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoU
       {customTrainers.map((trainer) => {
         const selected = selectedId === trainer.id;
         const ready = trainer.voice_status === "ready";
+        const processing = trainer.voice_status === "processing" || retryingVoiceId === trainer.id;
+        // The photo is usable as soon as it is saved; narration needs the voice, which the course screens check.
         return (
           <TrainerCard
             key={trainer.id}
@@ -43,8 +49,17 @@ export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoU
             onClick={() => onSelect(trainer.id)}
             imageUrl={customPhotoUrls[trainer.id] || "/placeholder.svg"}
             name={trainer.name}
-            subtitle={ready ? "Your trainer · AI-generated" : trainer.voice_status === "failed" ? "Voice not created" : "Voice being created…"}
-            disabled={!ready}
+            subtitle={ready ? "Your trainer · AI-generated" : processing ? "Creating voice…" : "Voice not created"}
+            footer={!ready && !processing && onRetryVoice ? (
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onRetryVoice(trainer); }}
+                className="mt-1 rounded-full border border-[#6EC1E4] px-2 py-0.5 text-[10px] font-semibold text-[#0369A1] hover:bg-[#F3F9FC]"
+                title={trainer.voice_error || "Create the voice from the recording"}
+              >
+                Retry voice
+              </button>
+            ) : null}
           />
         );
       })}
@@ -62,13 +77,14 @@ export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoU
   );
 }
 
-function TrainerCard({ selected, onClick, imageUrl, name, subtitle, disabled = false }: {
+function TrainerCard({ selected, onClick, imageUrl, name, subtitle, disabled = false, footer = null }: {
   selected: boolean;
   onClick: () => void;
   imageUrl: string;
   name: string;
   subtitle: string;
   disabled?: boolean;
+  footer?: React.ReactNode;
 }) {
   return (
     <button
@@ -98,6 +114,7 @@ function TrainerCard({ selected, onClick, imageUrl, name, subtitle, disabled = f
       <div className="px-2 py-1.5">
         <p className={`truncate text-[12px] font-bold ${selected ? "text-primary" : "text-foreground"}`}>{name}</p>
         <p className="truncate text-[10px] text-muted-foreground">{subtitle}</p>
+        {footer}
       </div>
     </button>
   );

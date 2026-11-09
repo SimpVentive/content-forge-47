@@ -65,7 +65,29 @@ describe("TrainerGrid", () => {
     );
     expect(screen.getByText("Dr Rao")).toBeTruthy();
     expect(screen.getByText("Your trainer · AI-generated")).toBeTruthy();
-    expect(screen.getByText("Voice being created…")).toBeTruthy();
+    expect(screen.getByText("Creating voice…")).toBeTruthy();
+    cleanup();
+  });
+
+  it("keeps a trainer whose voice failed selectable, with a retry button", () => {
+    const base = { owner_user_id: "u", owner_org_id: null, photo_path: "p", voice_sample_path: "v", voice_error: "boom", created_at: "", deleted_at: null };
+    const onSelect = vi.fn();
+    const onRetry = vi.fn();
+    render(
+      <TrainerGrid
+        selectedId=""
+        onSelect={onSelect}
+        customTrainers={[{ ...base, id: "5f2b8c1e-9a4d-4e7b-8c1f-0a1b2c3d4e5f", name: "Mouli", voice_id: null, voice_status: "failed" }]}
+        customPhotoUrls={{}}
+        onCreateCustom={() => {}}
+        onRetryVoice={onRetry}
+        avatarEnv={{}}
+      />,
+    );
+    fireEvent.click(screen.getByText("Mouli"));
+    expect(onSelect).toHaveBeenCalledWith("5f2b8c1e-9a4d-4e7b-8c1f-0a1b2c3d4e5f");
+    fireEvent.click(screen.getByText("Retry voice"));
+    expect(onRetry).toHaveBeenCalledTimes(1);
     cleanup();
   });
 });
