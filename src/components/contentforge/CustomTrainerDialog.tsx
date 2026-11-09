@@ -43,6 +43,9 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
   const [consentUrl, setConsentUrl] = useState<string | null>(null);
   const [recording, setRecording] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  // Step 1 asks how the trainer should come alive. Option 1 continues to the form; Option 2 is the next stage.
+  const [step, setStep] = useState<"choose" | "form">("choose");
+  const [choice, setChoice] = useState<"single" | "photos" | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
@@ -62,6 +65,8 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
       setConsentUrl((url) => { if (url) URL.revokeObjectURL(url); return null; });
       setAgreed(false);
       setProgress("");
+      setStep("choose");
+      setChoice(null);
     }
   }, [open]);
 
@@ -178,6 +183,44 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
   return (
     <Dialog open={open} onOpenChange={(next) => !busy && onOpenChange(next)}>
       <DialogContent className="z-[10000] max-w-2xl max-h-[90vh] overflow-y-auto" overlayClassName="z-[10000]">
+        {step === "choose" ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>How should your trainer come alive?</DialogTitle>
+              <DialogDescription>Pick one. Your voice and consent steps are the same either way.</DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => { setChoice("single"); setStep("form"); }}
+                className="rounded-xl border p-4 text-left transition-all hover:border-indigo-400 hover:bg-indigo-50/40"
+              >
+                <p className="text-[13px] font-semibold text-slate-900">Option 1: Single photo, full video animation</p>
+                <p className="mt-2 text-[12px] text-slate-600">Upload one photo. A video engine animates your face and lips. Video credits are charged per minute of narration.</p>
+                <p className="mt-2 text-[11px] font-semibold text-indigo-700">Most realistic</p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setChoice("photos")}
+                className={`rounded-xl border p-4 text-left transition-all hover:border-indigo-400 hover:bg-indigo-50/40 ${choice === "photos" ? "border-indigo-500 bg-indigo-50/40" : ""}`}
+              >
+                <p className="text-[13px] font-semibold text-slate-900">Option 2: 4 to 5 photos, ContentForge animation</p>
+                <p className="mt-2 text-[12px] text-slate-600">Upload a few photos of yourself. Our engine switches between them as you speak. Slightly less lifelike, and no video credits.</p>
+                <p className="mt-2 text-[11px] font-semibold text-emerald-700">No video cost</p>
+              </button>
+            </div>
+            {choice === "photos" ? (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-[12px] text-amber-900">
+                The photo slots for Option 2 are the next build step. For now, choose Option 1 to create a trainer.
+              </div>
+            ) : null}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+              <Button disabled={choice !== "single"} onClick={() => setStep("form")}>Continue</Button>
+            </DialogFooter>
+          </>
+        ) : (
+        <>
         <DialogHeader>
           <DialogTitle>Use my own photo and voice</DialogTitle>
           <DialogDescription>
@@ -263,6 +306,8 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button onClick={handleCreate} disabled={busy}>{busy ? "Creating…" : "Create my trainer"}</Button>
         </DialogFooter>
+        </>
+        )}
       </DialogContent>
     </Dialog>
   );
