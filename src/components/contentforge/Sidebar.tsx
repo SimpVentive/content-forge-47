@@ -5,6 +5,8 @@ import { TitleFormatter } from "./TitleFormatter";
 import { RichTitleEditor, type TitleSpan } from "./RichTitleEditor";
 import { LogoUploader } from "./LogoUploader";
 import { SOPFormatDialog } from "./SOPFormatDialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export { estimateMinutesFromText, estimateMinutesFromDocumentMeta, estimateMinutesCombined } from "@/lib/contentDuration";
 
@@ -157,6 +159,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [pendingGenerate, setPendingGenerate] = useState(false);
   const [showCourseOutline, setShowCourseOutline] = useState(false);
   const [contentMode, setContentMode] = useState<"upload" | "paste" | null>(null);
+  const [showNoMaterialNotice, setShowNoMaterialNotice] = useState(false);
 
   const isStep1Complete = courseTitle.trim().length > 0;
   const isStep2Complete = contentMode !== null && inputText.trim().length > 0;
@@ -294,7 +297,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setShowFormatSelection(false);
   };
 
-  const handleGenerateClick = () => {
+  const proceedGenerate = () => {
     if (!formatConfirmed && inputText.trim().length > 0) {
       setDetectedSOP(detectSOP(inputText));
       setPendingGenerate(true);
@@ -302,6 +305,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
       return;
     }
     onGenerate();
+  };
+
+  const handleGenerateClick = () => {
+    // No material chosen yet: explain that the AI will write the course from the settings on the next screen.
+    if (!contentMode) {
+      setShowNoMaterialNotice(true);
+      return;
+    }
+    proceedGenerate();
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -462,6 +474,22 @@ export const Sidebar: React.FC<SidebarProps> = ({
             onChange={handleFileSelect}
           />
         </div>
+
+        {/* No material yet: say what Generate will do */}
+        <Dialog open={showNoMaterialNotice} onOpenChange={setShowNoMaterialNotice}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>No material added</DialogTitle>
+              <DialogDescription>
+                AI will generate the appropriate material, based on the various input parameters such as the level of the course, language, etc. that you choose in the next screen.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowNoMaterialNotice(false)}>Cancel</Button>
+              <Button onClick={() => { setShowNoMaterialNotice(false); proceedGenerate(); }}>Continue</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Format Dialog - Modal */}
         <SOPFormatDialog
