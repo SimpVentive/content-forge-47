@@ -8,6 +8,13 @@
       "when": 1794199421086,
       "tag": "0000_custom_trainers",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794225368354,
+      "tag": "0001_custom_trainer_clips",
+      "breakpoints": true
     }
   ]
 }
