@@ -38,7 +38,7 @@ export function clipHash(voiceId: string, photoPath: string, text: string): Prom
 async function loadOwnedTrainer(admin: Admin, userId: string, trainerId: string) {
   const { data, error } = await admin
     .from("custom_trainers")
-    .select("id, owner_user_id, voice_id, voice_status, photo_path, deleted_at")
+    .select("id, owner_user_id, voice_id, voice_status, photo_path, animation_mode, deleted_at")
     .eq("id", trainerId)
     .maybeSingle();
   if (error) return { error: "Could not load the trainer" as const };
@@ -102,6 +102,8 @@ async function startClip(admin: Admin, userId: string, body: Record<string, any>
   const trainer = found.trainer;
   if (trainer.voice_status !== "ready" || !trainer.voice_id) return badRequest("This trainer's voice is not ready yet");
   if (!trainer.photo_path) return badRequest("This trainer has no photo");
+  // Option 2 trainers are animated from their photos: no video is ever generated for them.
+  if (trainer.animation_mode === "photos") return badRequest("This trainer uses five photos (Option 2). No video is made for it.");
 
   const hash = await clipHash(trainer.voice_id, trainer.photo_path, text);
   const { data: existing } = await admin

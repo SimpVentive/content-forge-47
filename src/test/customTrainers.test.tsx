@@ -64,7 +64,7 @@ describe("TrainerGrid", () => {
       />,
     );
     expect(screen.getByText("Dr Rao")).toBeTruthy();
-    expect(screen.getByText("Your trainer · AI-generated")).toBeTruthy();
+    expect(screen.getByText("Option 1 · video · AI-generated")).toBeTruthy();
     expect(screen.getByText("Creating voice…")).toBeTruthy();
     cleanup();
   });

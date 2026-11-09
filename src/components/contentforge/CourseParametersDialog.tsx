@@ -3,6 +3,7 @@ import { X, Settings2, AlertTriangle, Info, Check } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrainerGrid } from "./TrainerGrid";
 import { CustomTrainerDialog } from "./CustomTrainerDialog";
+import { SwitchOptionDialog } from "./SwitchOptionDialog";
 import { createCustomVoice, deleteCustomTrainer as deleteCustomTrainerRecord, listCustomTrainers, signedPhotoUrl, type CustomTrainer } from "@/lib/customTrainers";
 import { toast } from "sonner";
 import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage, getAvatarEnv } from "@/lib/avatarTrainers";
@@ -254,6 +255,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const [customTrainers, setCustomTrainers] = useState<CustomTrainer[]>([]);
   const [customPhotoUrls, setCustomPhotoUrls] = useState<Record<string, string | null>>({});
   const [showCustomTrainer, setShowCustomTrainer] = useState(false);
+  const [switchTrainer, setSwitchTrainer] = useState<CustomTrainer | null>(null);
 
   // Load the signed-in user's custom trainers (RLS limits the list to their own).
   const refreshCustomTrainers = async () => {
@@ -804,6 +806,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                     onCreateCustom={() => setShowCustomTrainer(true)}
                     onRetryVoice={retryCustomVoice}
                     onDeleteTrainer={deleteCustomTrainerNow}
+                    onSwitchOption={setSwitchTrainer}
                     retryingVoiceId={retryingVoiceId}
                     avatarEnv={avatarEnv}
                   />
@@ -860,6 +863,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
                   onCreateCustom={() => setShowCustomTrainer(true)}
                   onRetryVoice={retryCustomVoice}
                   onDeleteTrainer={deleteCustomTrainerNow}
+                  onSwitchOption={setSwitchTrainer}
                   retryingVoiceId={retryingVoiceId}
                   avatarEnv={avatarEnv}
                 />
@@ -1729,6 +1733,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       </div>
       {/* Clicks in the upload screen must not reach this dialog's outside-click handler (it would close the course setup). */}
       <div onClick={(e) => e.stopPropagation()}>
+      {switchTrainer ? <SwitchOptionDialog trainer={switchTrainer} onOpenChange={(open) => { if (!open) setSwitchTrainer(null); }} onSwitched={() => void refreshCustomTrainers()} /> : null}
       {showCustomTrainer ? <CustomTrainerDialog
         open={showCustomTrainer}
         onOpenChange={setShowCustomTrainer}

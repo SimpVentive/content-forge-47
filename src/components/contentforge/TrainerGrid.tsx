@@ -16,12 +16,14 @@ type Props = {
   retryingVoiceId?: string | null;
   /** Deletes a custom trainer (voice, photo, videos). The caller asks for confirmation. */
   onDeleteTrainer?: (trainer: CustomTrainer) => void;
+  /** Opens the dialog that changes the trainer between Option 1 and Option 2. */
+  onSwitchOption?: (trainer: CustomTrainer) => void;
   avatarEnv: Record<string, string | undefined>;
 };
 
 const CARD_SHADOW = "0 0 0 2px rgba(37,99,235,0.25), 0 8px 20px rgba(37,99,235,0.2)";
 
-export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoUrls, onCreateCustom, onRetryVoice, retryingVoiceId, onDeleteTrainer, avatarEnv }: Props) {
+export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoUrls, onCreateCustom, onRetryVoice, retryingVoiceId, onDeleteTrainer, onSwitchOption, avatarEnv }: Props) {
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
       {AVATAR_TRAINERS.map((trainer) => {
@@ -51,7 +53,7 @@ export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoU
             onClick={() => onSelect(trainer.id)}
             imageUrl={customPhotoUrls[trainer.id] || "/placeholder.svg"}
             name={trainer.name}
-            subtitle={ready ? "Your trainer · AI-generated" : processing ? "Creating voice…" : "Voice not created"}
+            subtitle={ready ? `Option ${trainer.animation_mode === "photos" ? "2 · photos" : "1 · video"} · AI-generated` : processing ? "Creating voice…" : "Voice not created"}
             footer={(
               <span className="mt-1 flex flex-wrap gap-1">
                 {!ready && !processing && onRetryVoice ? (
@@ -62,6 +64,15 @@ export function TrainerGrid({ selectedId, onSelect, customTrainers, customPhotoU
                     title={trainer.voice_error || "Create the voice from the recording"}
                   >
                     Retry voice
+                  </button>
+                ) : null}
+                {ready && onSwitchOption ? (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onSwitchOption(trainer); }}
+                    className="rounded-full border border-indigo-300 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 hover:bg-indigo-50"
+                  >
+                    Switch option
                   </button>
                 ) : null}
                 {onDeleteTrainer ? (

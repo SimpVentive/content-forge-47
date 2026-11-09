@@ -1277,12 +1277,12 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
   const avatarEnv = getAvatarEnv();
   const trainerMedia = exportMedia?.trainerMedia || getTrainerMedia(selectedTrainer.id, avatarEnv);
   // A custom trainer (the signed-in user's own photo and voice). Loaded from the account in the app preview.
-  const [customTrainerInfo, setCustomTrainerInfo] = useState<{ name: string; voiceId: string | null; photoUrl: string | null; voiceStatus: string; voiceError: string | null } | null>(null);
+  const [customTrainerInfo, setCustomTrainerInfo] = useState<{ name: string; voiceId: string | null; photoUrl: string | null; voiceStatus: string; voiceError: string | null; animationMode: string } | null>(null);
   useEffect(() => {
     // In the package the custom trainer comes with the course data: no account, no network.
     if (standalone) {
       const packaged = exportMedia?.customTrainer;
-      setCustomTrainerInfo(packaged ? { name: packaged.name, voiceId: packaged.voiceId, photoUrl: packaged.photoUrl, voiceStatus: packaged.voiceStatus, voiceError: packaged.voiceError } : null);
+      setCustomTrainerInfo(packaged ? { name: packaged.name, voiceId: packaged.voiceId, photoUrl: packaged.photoUrl, voiceStatus: packaged.voiceStatus, voiceError: packaged.voiceError, animationMode: "video" } : null);
       return;
     }
     if (!isCustomTrainerId(avatarTrainerId)) { setCustomTrainerInfo(null); return; }
@@ -1292,7 +1292,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
         if (!alive) return;
         if (!row) { setCustomTrainerInfo(null); return; }
         const photoUrl = await signedPhotoUrl(row.photo_path);
-        if (alive) setCustomTrainerInfo({ name: row.name, voiceId: row.voice_status === "ready" ? row.voice_id : null, photoUrl, voiceStatus: row.voice_status, voiceError: row.voice_error });
+        if (alive) setCustomTrainerInfo({ name: row.name, voiceId: row.voice_status === "ready" ? row.voice_id : null, photoUrl, voiceStatus: row.voice_status, voiceError: row.voice_error, animationMode: row.animation_mode ?? "video" });
       })
       .catch(() => { if (alive) setCustomTrainerInfo(null); });
     return () => { alive = false; };
@@ -4270,7 +4270,7 @@ export const LearnerPreview: React.FC<LearnerPreviewProps> = ({ courseTitle, com
             </div>
           </div>
 
-          {isCustomTrainer && avatarTrainerId && !standalone ? (
+          {isCustomTrainer && avatarTrainerId && !standalone && customTrainerInfo?.animationMode !== "photos" ? (
             <TalkingVideoPanel
               trainerId={avatarTrainerId}
               trainerName={trainerName}
