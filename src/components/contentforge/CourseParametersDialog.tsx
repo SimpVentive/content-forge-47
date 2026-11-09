@@ -273,6 +273,9 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
     try {
       await createCustomVoice(trainer.id);
       toast.success(`${trainer.name}'s voice is ready`);
+      // Choose the trainer that was just made ready, so it is the one used for the course.
+      setAvatarTrainerId(trainer.id);
+      setTrainerAutoMode(false);
     } catch (err) {
       toast.error(`The voice was not created: ${(err as Error).message}`);
     } finally {
