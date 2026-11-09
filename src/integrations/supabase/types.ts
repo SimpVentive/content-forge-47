@@ -253,6 +253,65 @@ export type Database = {
           },
         ]
       }
+      custom_trainer_clips: {
+        Row: {
+          audio_path: string | null
+          clip_hash: string
+          created_at: string
+          error: string | null
+          est_seconds: number | null
+          heygen_video_id: string | null
+          id: string
+          kind: string
+          owner_user_id: string
+          status: string
+          text_preview: string | null
+          trainer_id: string
+          updated_at: string
+          video_path: string | null
+        }
+        Insert: {
+          audio_path?: string | null
+          clip_hash: string
+          created_at?: string
+          error?: string | null
+          est_seconds?: number | null
+          heygen_video_id?: string | null
+          id?: string
+          kind?: string
+          owner_user_id: string
+          status?: string
+          text_preview?: string | null
+          trainer_id: string
+          updated_at?: string
+          video_path?: string | null
+        }
+        Update: {
+          audio_path?: string | null
+          clip_hash?: string
+          created_at?: string
+          error?: string | null
+          est_seconds?: number | null
+          heygen_video_id?: string | null
+          id?: string
+          kind?: string
+          owner_user_id?: string
+          status?: string
+          text_preview?: string | null
+          trainer_id?: string
+          updated_at?: string
+          video_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "custom_trainer_clips_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "custom_trainers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       custom_trainer_consents: {
         Row: {
           consent_audio_path: string | null
