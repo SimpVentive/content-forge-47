@@ -1686,6 +1686,8 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           </div>
         </TooltipProvider>
       </div>
+      {/* Clicks in the upload screen must not reach this dialog's outside-click handler (it would close the course setup). */}
+      <div onClick={(e) => e.stopPropagation()}>
       {showCustomTrainer ? <CustomTrainerDialog
         open={showCustomTrainer}
         onOpenChange={setShowCustomTrainer}
@@ -1696,6 +1698,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
           setTrainerAutoMode(false);
         }}
       /> : null}
+      </div>
     </div>
   );
 };
