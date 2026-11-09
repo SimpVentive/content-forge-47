@@ -74,6 +74,15 @@ jobs:
 
             bun install
 
-            bun run build
+            # Build into a temporary folder. The live folder is replaced only after the build has succeeded,
+            # so a failed build leaves the current site in place.
+            rm -rf dist.new
+            bun run build -- --outDir dist.new --emptyOutDir
+            test -f dist.new/index.html || { echo "The build produced no index.html. The live site is unchanged."; exit 1; }
+
+            rm -rf dist.old
+            if [ -d dist ]; then mv dist dist.old; fi
+            mv dist.new dist
+            rm -rf dist.old
 
             sudo systemctl reload apache2

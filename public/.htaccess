@@ -1,3 +1,6 @@
+# Never show a folder listing (the 'Index of /' page).
+Options -Indexes
+
 # Single-page app: serve index.html for any path that is not a real file,
 # so a refresh on /new-course loads the app instead of Apache's 404.
 # Requires AllowOverride FileInfo (or All) for this directory in the Apache vhost.
