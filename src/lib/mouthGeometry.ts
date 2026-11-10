@@ -294,8 +294,15 @@ export function denseField(closed: Pt[], open: Pt[], w: number, h: number): Floa
   const y0 = Math.max(0, Math.floor(Math.min(...ys) - pad));
   const y1 = Math.min(h - 1, Math.ceil(Math.max(...ys) + pad));
   const twoSigma2 = 2 * sigma * sigma;
+  // The movement fades to zero across the padding at the region's edge. A hard edge would show as a seam on the skin.
+  const smooth = (t: number) => {
+    const c = Math.min(1, Math.max(0, t));
+    return c * c * (3 - 2 * c);
+  };
   for (let y = y0; y <= y1; y++) {
+    const edgeY = smooth((y - y0) / pad) * smooth((y1 - y) / pad);
     for (let x = x0; x <= x1; x++) {
+      const edge = smooth((x - x0) / pad) * smooth((x1 - x) / pad) * edgeY;
       let nx = 0;
       let ny = 0;
       let den = 0;
@@ -309,8 +316,8 @@ export function denseField(closed: Pt[], open: Pt[], w: number, h: number): Floa
       }
       if (den > 1e-3) {
         const o = (y * w + x) * 2;
-        field[o] = nx / den;
-        field[o + 1] = ny / den;
+        field[o] = (nx / den) * edge;
+        field[o + 1] = (ny / den) * edge;
       }
     }
   }

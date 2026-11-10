@@ -88,6 +88,23 @@ describe("morph and composite guarantees", () => {
     }
   });
 
+  it("the movement fades to zero at the edge of the region, so no seam shows on the chin", () => {
+    const closed = standardFace();
+    const open = standardFace(16);
+    open[152] = { x: 100, y: 166 }; // the chin drops
+    const field = denseField(closed, open, 200, 200);
+    const rowPeak = (y: number) => {
+      let m = 0;
+      for (let x = 0; x < 200; x++) m = Math.max(m, Math.hypot(field[(y * 200 + x) * 2], field[(y * 200 + x) * 2 + 1]));
+      return m;
+    };
+    let peak = 0;
+    for (let y = 0; y < 200; y++) peak = Math.max(peak, rowPeak(y));
+    expect(peak).toBeGreaterThan(0.5);
+    // Rows at and beyond the region's bottom edge carry (almost) no movement.
+    for (let y = 176; y < 200; y++) expect(rowPeak(y)).toBeLessThan(0.05 * peak);
+  });
+
   it("the dense field is zero when the open shape equals the closed shape", () => {
     const face = standardFace();
     const field = denseField(face, face, 200, 200);
