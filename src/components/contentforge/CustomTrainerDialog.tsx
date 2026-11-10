@@ -3,8 +3,7 @@ import { toast } from "sonner";
 import { Mic, Square, Upload, ShieldCheck } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PhotoSlotsStep, type SlotAnalysis } from "@/components/contentforge/PhotoSlotsStep";
-import { composeSlot, releaseFaceLandmarker, type PhotoSlot } from "@/lib/facePhotos";
+import { buildMouthSet } from "@/lib/mouthPipeline";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
@@ -46,8 +45,8 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
   const [recording, setRecording] = useState(false);
   const [agreed, setAgreed] = useState(false);
   // Step 1 asks how the trainer should come alive. Option 1 continues to the form; Option 2 is the next stage.
-  const [step, setStep] = useState<"choose" | "photos" | "form">("choose");
-  const [photoAnalysis, setPhotoAnalysis] = useState<SlotAnalysis>({ ready: false, photos: {} });
+  const [step, setStep] = useState<"choose" | "form">("choose");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [choice, setChoice] = useState<"single" | "photos" | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
@@ -60,6 +59,7 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
     if (!open) {
       setName("");
       setPhotoBlob(null);
+      setPhotoFile(null);
       setPhotoWarnings([]);
       setPhotoPreview((url) => { if (url) URL.revokeObjectURL(url); return null; });
       setVoiceFile(null);
@@ -86,11 +86,13 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
       const quality = await assessPhotoQuality(file);
       if (quality.blocking.length) {
         setPhotoBlob(null);
+        setPhotoFile(null);
         setPhotoPreview((url) => { if (url) URL.revokeObjectURL(url); return null; });
         setPhotoWarnings([]);
         return toast.error(quality.blocking[0]);
       }
       setPhotoWarnings(quality.warnings);
+      setPhotoFile(file);
       const cropped = await cropToPortrait(file);
       setPhotoBlob(cropped);
       setPhotoPreview((url) => { if (url) URL.revokeObjectURL(url); return URL.createObjectURL(cropped); });
@@ -146,8 +148,7 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
   async function handleCreate() {
     if (!user) return toast.error("Sign in to create a trainer");
     if (!name.trim()) return toast.error("Enter a name for the trainer");
-    if (choice === "single" && !photoBlob) return toast.error("Add a front-facing photo");
-    if (choice === "photos" && !photoAnalysis.ready) return toast.error("Finish the five photos first");
+    if (!photoBlob || !photoFile) return toast.error("Add a front-facing photo");
     if (!voiceFile) return toast.error("Add a voice recording of 1 to 3 minutes");
     if (!consentRecording) return toast.error("Record the consent sentence");
     if (!agreed) return toast.error("Tick the consent box to continue");
@@ -155,24 +156,18 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
     setBusy(true);
     let trainer: CustomTrainer | null = null;
     try {
+      // Option 2 makes its mouth and eye shapes before anything is saved, so a failure leaves nothing behind.
+      const mouths = choice === "photos" ? await buildMouthSet(photoFile, setProgress) : null;
       setProgress("Saving your trainer…");
       trainer = await createCustomTrainer(user.id, name);
       let photoPath: string;
       let photoSet: Record<string, string> | null = null;
-      if (choice === "photos") {
-        // The closed photo is the base; each other photo is aligned to it and only its mouth or eyes are kept.
-        const closed = photoAnalysis.photos.closed;
-        if (!closed) throw new Error("The closed-mouth photo is missing");
-        setProgress("Lining up your photos…");
-        const closedExt = closed.file.name.split(".").pop()?.toLowerCase() || "png";
-        photoPath = await uploadTrainerFile(user.id, trainer.id, `photos/closed.${closedExt}`, closed.file);
+      if (mouths) {
+        setProgress("Saving your photos…");
+        photoPath = await uploadTrainerFile(user.id, trainer.id, "photos/closed.jpg", mouths.closed);
         photoSet = { closed: photoPath };
-        for (const slot of ["eh", "ah", "blink", "oo"] as PhotoSlot[]) {
-          const shot = photoAnalysis.photos[slot];
-          if (!shot) continue;
-          const region = slot === "blink" ? "eyes" : "mouth";
-          const blob = await composeSlot(closed.bitmap, closed.pts, shot.bitmap, shot.pts, region);
-          photoSet[slot] = await uploadTrainerFile(user.id, trainer.id, `photos/${slot}.jpg`, blob);
+        for (const slot of ["eh", "ah", "blink"] as const) {
+          photoSet[slot] = await uploadTrainerFile(user.id, trainer.id, `photos/${slot}.jpg`, mouths[slot]);
         }
       } else {
         photoPath = await uploadTrainerFile(user.id, trainer.id, "photo.jpg", photoBlob as Blob);
@@ -232,38 +227,14 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
                 onClick={() => setChoice("photos")}
                 className={`rounded-xl border p-4 text-left transition-all hover:border-indigo-400 hover:bg-indigo-50/40 ${choice === "photos" ? "border-indigo-500 bg-indigo-50/40" : ""}`}
               >
-                <p className="text-[13px] font-semibold text-slate-900">Option 2: 4 to 5 photos, ContentForge animation</p>
-                <p className="mt-2 text-[12px] text-slate-600">Upload a few photos of yourself. Our engine switches between them as you speak. Slightly less lifelike, and no video credits.</p>
+                <p className="text-[13px] font-semibold text-slate-900">Option 2: one photo, ContentForge animation</p>
+                <p className="mt-2 text-[12px] text-slate-600">Upload one photo. We make the mouth and eye shapes for you, so there is nothing else to upload. Slightly less lifelike, and no video credits.</p>
                 <p className="mt-2 text-[11px] font-semibold text-emerald-700">No video cost</p>
               </button>
             </div>
             <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-              <Button disabled={!choice} onClick={() => setStep(choice === "photos" ? "photos" : "form")}>Continue</Button>
-            </DialogFooter>
-          </>
-        ) : step === "photos" ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>Your five photos</DialogTitle>
-              <DialogDescription>Each photo is checked against the closed-mouth photo. Nothing is saved until you finish.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-2">
-              <div className="space-y-1.5">
-                <label className="text-[13px] font-semibold">Name</label>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  maxLength={60}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  placeholder="How learners will see your name"
-                />
-              </div>
-              <PhotoSlotsStep onAnalysis={setPhotoAnalysis} />
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setStep("choose")}>Back</Button>
-              <Button disabled={!photoAnalysis.ready || !name.trim()} onClick={() => setStep("form")}>Continue</Button>
+              <Button disabled={!choice} onClick={() => setStep("form")}>Continue</Button>
             </DialogFooter>
           </>
         ) : (
@@ -294,7 +265,7 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-[160px_1fr]" hidden={choice !== "single"}>
+          <div className="grid gap-4 sm:grid-cols-[160px_1fr]" hidden={!choice}>
             <div className="space-y-1.5">
               <p className="text-[13px] font-semibold">Front-facing photo</p>
               <div className="flex aspect-[2/3] w-full items-center justify-center overflow-hidden rounded-lg border bg-muted">
@@ -307,6 +278,9 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
                 <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => handlePhoto(e.target.files?.[0])} />
               </label>
               <p className="text-[11px] text-muted-foreground">The photo is cropped to a 2:3 portrait. Your face should fill the frame from the shoulders up.</p>
+              {choice === "photos" ? (
+                <p className="text-[11px] text-muted-foreground">We make your mouth and eye shapes from this one photo. This takes a few minutes; keep the dialog open.</p>
+              ) : null}
               {photoWarnings.length ? (
                 <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-[11px] text-amber-900">
                   <p className="font-semibold">Check this photo before you continue</p>
