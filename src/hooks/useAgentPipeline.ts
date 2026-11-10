@@ -27,6 +27,7 @@ import { runFinalQACheck, storeQAAuditLog, type QAResult } from "@/lib/qaService
 import { enhanceScriptGenerationPrompt, enhanceAssessmentGenerationPrompt, type AuditLogEntry } from "@/lib/feedbackIntegrationService";
 import { checkAndPrepareAsset, recordAssetUsage, type SelectedAsset } from "@/lib/pipelineAssetIntegration";
 import { describeImageFailure, requireNarrativeImages } from "@/lib/imageGenerationFailure";
+import { isCutOff } from "@/lib/replyCompleteness";
 
 type SlideLayoutParams = {
   maxLines?: number;
@@ -584,12 +585,14 @@ const MAX_CONTINUATIONS = 4;
  * the model is asked to pick up exactly where it stopped, and the parts are joined.
  */
 async function callClaude(systemPrompt: string, userMessage: string): Promise<string> {
+  // Every agent gets the defects the last quality review found, not only the writer.
+  const system = `${systemPrompt}${qaLessonsBlock()}`;
   let combined = "";
   let message = userMessage;
   for (let round = 0; round <= MAX_CONTINUATIONS; round++) {
-    const { text, finishReason } = await callClaudeRound(systemPrompt, message);
+    const { text, finishReason } = await callClaudeRound(system, message);
     combined += text;
-    if (finishReason !== "length" && finishReason !== "max_tokens") return combined;
+    if (!isCutOff(finishReason, combined)) return combined;
     const tail = combined.slice(-CONTINUE_TAIL_CHARS);
     message = `${userMessage}
 
@@ -1231,7 +1234,7 @@ ZERO-REPETITION RULE — ABSOLUTE:
 
       Write content that feels expensive, practical, and memorable — something a learner would actually respect, not skim out of obligation.`;
 
-        const enhancedWriterPrompt = enhanceScriptGenerationPrompt(baseWriterSystemPrompt, courseTitle, auditLogs).enhancedPrompt + qaLessonsBlock();
+        const enhancedWriterPrompt = enhanceScriptGenerationPrompt(baseWriterSystemPrompt, courseTitle, auditLogs).enhancedPrompt;
         const writerSystemPrompt = `${languageDirective}${enhancedWriterPrompt}`;
 
         // Append video mode instructions if needed
