@@ -149,13 +149,29 @@ export async function cropToFaceFrame(bitmap: ImageBitmap, pts: Pt[]): Promise<R
 
 // ---------- Flux (through the server, which holds the key) ----------
 
+/** The function's own message (for example BFL's "Request Moderated"), not the generic HTTP text. */
+async function invokeErrorMessage(error: { message?: string; context?: unknown }): Promise<string> {
+  const context = error.context as { json?: () => Promise<unknown> } | undefined;
+  if (context && typeof context.json === "function") {
+    try {
+      const body = (await context.json()) as { error?: { message?: string } };
+      if (body?.error?.message) return body.error.message;
+    } catch {
+      // Not JSON: fall through.
+    }
+  }
+  return error.message || "The image service failed";
+}
+
 async function fluxFill(imageB64: string, maskB64: string, prompt: string, seed: number, w: number, h: number): Promise<Rgba> {
   const { data, error } = await supabase.functions.invoke("flux-fill", {
     body: { image: imageB64, mask: maskB64, prompt, seed },
   });
-  if (error) throw new Error(error.message || "Image service failed");
-  if (!data?.png) throw new Error("Image service returned no image");
-  const blob = base64ToBlob(data.png, "image/png");
+  if (error) throw new Error(await invokeErrorMessage(error));
+  // The function answers { ok: true, data: { png } }.
+  const png = (data as { data?: { png?: string } } | null)?.data?.png;
+  if (!png) throw new Error("The image service answered, but without a picture");
+  const blob = base64ToBlob(png, "image/png");
   const bmp = await createImageBitmap(blob, { resizeWidth: w, resizeHeight: h, resizeQuality: "high" });
   return bitmapToRgba(bmp, w, h);
 }
@@ -226,6 +242,10 @@ export async function buildMouthSet(file: File, onProgress: (message: string) =>
         } catch {
           // Not usable.
         }
+      }
+      if (!blink && results.every((r) => r.status === "rejected")) {
+        const first = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+        throw new Error(first.reason instanceof Error ? first.reason.message : FAIL_BLINK);
       }
       if (blink && blink.ratio > LIMITS.eyeRatio) blink = null;
     }
