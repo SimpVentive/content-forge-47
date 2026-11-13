@@ -6,6 +6,8 @@ import { CustomTrainerDialog } from "./CustomTrainerDialog";
 import { SwitchOptionDialog } from "./SwitchOptionDialog";
 import { createCustomVoice, deleteCustomTrainer as deleteCustomTrainerRecord, listCustomTrainers, signedPhotoUrl, type CustomTrainer } from "@/lib/customTrainers";
 import { toast } from "sonner";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { AVATAR_TRAINERS, getDefaultTrainerIdForLanguage, getTrainerMedia, isIndianLanguage, getAvatarEnv } from "@/lib/avatarTrainers";
 
 export interface CourseParameters {
@@ -339,6 +341,14 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   const selectedDurationLabel = DURATIONS.find((item) => item.value === duration)?.label || "15 min";
   // A custom trainer (the user's own photo and voice) shows its own name and photo in the summary.
   const selectedCustomTrainer = customTrainers.find((trainer) => trainer.id === avatarTrainerId);
+
+  // Video with an individual trainer is not built yet: say so when it is chosen.
+  const [videoSoonOpen, setVideoSoonOpen] = useState(false);
+  useEffect(() => {
+    if (localLearningType === "video" && selectedCustomTrainer) setVideoSoonOpen(true);
+    // Only when the mode or the trainer changes, so closing the message does not reopen it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localLearningType, avatarTrainerId]);
   const selectedTrainer = selectedCustomTrainer
     ? { id: selectedCustomTrainer.id, name: selectedCustomTrainer.name }
     : (AVATAR_TRAINERS.find((trainer) => trainer.id === avatarTrainerId) || AVATAR_TRAINERS[0]);
@@ -1737,6 +1747,23 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       <div onClick={(e) => e.stopPropagation()}>
       {/* The switch window sits on top; its clicks must not reach this dialog's outside-click handler. */}
       {switchTrainer ? <div onClick={(e) => e.stopPropagation()}><SwitchOptionDialog trainer={switchTrainer} onOpenChange={(open) => { if (!open) setSwitchTrainer(null); }} onSwitched={() => void refreshCustomTrainers()} /></div> : null}
+      {videoSoonOpen ? (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Dialog open onOpenChange={setVideoSoonOpen}>
+            <DialogContent className="z-[10000] max-w-md" overlayClassName="z-[10000]">
+              <DialogHeader>
+                <DialogTitle>Video with your own trainer is coming up</DialogTitle>
+                <DialogDescription>
+                  This feature for video is not ready yet. For now, Static E-Learning uses your trainer as the narrator, with your photo and voice in the course.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button onClick={() => setVideoSoonOpen(false)}>OK</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
+      ) : null}
       {showCustomTrainer ? <CustomTrainerDialog
         open={showCustomTrainer}
         onOpenChange={setShowCustomTrainer}
