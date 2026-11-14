@@ -19,8 +19,8 @@ VITE_RAZORPAY_KEY_ID="rzp_test_1Aa00000000000"
 VITE_SUPABASE_PROJECT_ID="licezkkahseilnmswxbc"
 VITE_SUPABASE_PUBLISHABLE_KEY="eyJhbGci..."
 VITE_SUPABASE_URL="https://licezkkahseilnmswxbc.supabase.co"
-VITE_HEYGEN_API_KEY=sk_V2_hgu_kWLX0sPX3Ej_Fp4uWcMLeNw7lkmb2Oi96EhiG60z2qzR
-BFL_API_KEY=bfl_mKC7JuwhTruOEp1Ag6N8FzAvBsVviTGd  ✅ (This is configured)
+VITE_HEYGEN_API_KEY=<your-key-here>
+BFL_API_KEY=<your-key-here>  ✅ (This is configured)
 OPENAI_API_KEY=❌ MISSING! (This is required)
 ```
 
@@ -116,7 +116,7 @@ git revert 182f402 3098506 87ca9a8 342f265 90a8b1a 4577631 b43c0a4 aab2997
 ```bash
 # 1. Get your OpenAI API key from https://platform.openai.com/api-keys
 # 2. Add to .env:
-OPENAI_API_KEY=sk-your-actual-api-key-here
+OPENAI_API_KEY=<your-key-here>
 
 # 3. Note: Also need to set this in Supabase Dashboard:
 # → Project Settings → Edge Functions → Environment Variables
