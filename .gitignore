@@ -34,3 +34,21 @@ docs/*.png
 docs/**/*.gif
 docs/**/*.jpg
 docs/**/*.png
+
+# Video, audio and test outputs: never commit
+*.mp4
+*.mov
+*.webm
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.aac
+docs/screenshots/
+
+# Trainer media, caches and run reports: personal to each trainer
+trainers/*/clips/
+trainers/*/cache/
+trainers/*/voice.json
+run_report*.json
+__pycache__/
