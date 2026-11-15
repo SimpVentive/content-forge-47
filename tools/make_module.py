@@ -400,8 +400,26 @@ def smooth_track(track, window=7):
     return out
 
 
-def normalise_piece(src, dst, track_smooth, ref):
-    """Warp every frame so the face sits at the reference position and size (no zoom drift)."""
+def background_colour(path, every=10):
+    """Median colour of the top 8% of the frame, sampled every few frames. Used to fill the edges a warp uncovers.
+    The edges are filled, not copied: copying (replicate) smears the edge pixels into long streaks."""
+    cap = cv2.VideoCapture(str(path))
+    samples, i = [], 0
+    while True:
+        ok, f = cap.read()
+        if not ok:
+            break
+        if i % every == 0:
+            band = f[:max(1, int(f.shape[0] * 0.08))].reshape(-1, 3)
+            samples.append(np.median(band, axis=0))
+        i += 1
+    cap.release()
+    return tuple(float(c) for c in np.median(np.array(samples), axis=0)) if samples else (0.0, 0.0, 0.0)
+
+
+def normalise_piece(src, dst, track_smooth, ref, fill=(0.0, 0.0, 0.0)):
+    """Warp every frame so the face sits at the reference position and size (no zoom drift).
+    Edges the warp uncovers are filled with the background colour."""
     rcx, rcy, rfh = ref
     cap = cv2.VideoCapture(str(src))
     tmp = dst.with_name(dst.stem + ".noaudio.avi")
@@ -418,7 +436,8 @@ def normalise_piece(src, dst, track_smooth, ref):
         cx, cy, fh = track_smooth[min(i, len(track_smooth) - 1)]
         sc = rfh / fh
         M = np.array([[sc, 0, rcx - sc * cx], [0, sc, rcy - sc * cy]], dtype=np.float32)
-        writer.write(cv2.warpAffine(f, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE))
+        writer.write(cv2.warpAffine(f, M, (W, H), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT,
+                                    borderValue=tuple(float(c) for c in fill)))
         i += 1
     cap.release()
     if writer is not None:
@@ -505,6 +524,33 @@ def search_join(a_path, b_path, y_frac, a_frames, b_frames):
 
 
 # ---------- main ----------
+def assemble_pieces(norm_files, join_plan, joined_tmp):
+    """Joins the trimmed pieces into one video at joined_tmp and returns the join centres in seconds.
+    A crossfade starts at the end of the earlier clip minus the fade; a cut is a one-frame fade.
+    One piece has no join. It is re-encoded with the same settings, because ffmpeg rejects an empty filter graph."""
+    out_args = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-c:a", "aac", "-b:a", "192k"]
+    if len(norm_files) == 1:
+        ffmpeg("-i", str(norm_files[0]), *out_args, str(joined_tmp))
+        return []
+    lengths_out = [media_duration(p) for p in norm_files]
+    inputs = []
+    for p in norm_files:
+        inputs += ["-i", str(p)]
+    filters, chain_v, chain_a = [], "[0:v]", "[0:a]"
+    S, join_centres = 0.0, []
+    for k in range(1, len(norm_files)):
+        fade = join_plan[k - 1]["fade_frames"] / 25.0
+        offset = S + lengths_out[k - 1] - fade
+        join_centres.append(offset + fade / 2)
+        ov, oa = f"[v{k}]", f"[a{k}]"
+        filters.append(f"{chain_v}[{k}:v]xfade=transition=fade:duration={fade:.4f}:offset={offset:.4f}{ov}")
+        filters.append(f"{chain_a}[{k}:a]acrossfade=d={fade:.4f}{oa}")
+        chain_v, chain_a = ov, oa
+        S = offset
+    ffmpeg(*inputs, "-filter_complex", ";".join(filters), "-map", chain_v, "-map", chain_a, *out_args, str(joined_tmp))
+    return join_centres
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--trainer", required=True, help="trainer name, or the trainer folder (--trainer-dir)")
@@ -649,9 +695,10 @@ def main():
     report["face_reference"] = {"cx": round(ref[0], 1), "cy": round(ref[1], 1), "face_height_px": round(ref[2], 1)}
     norm_files = []
     for i, pf in enumerate(piece_files):
-        nf = work / f"norm-{pf.stem}-{sha(list(ref))}.mp4"
+        # The key includes the fill version, so normalised pieces made with the old edge copying are not reused.
+        nf = work / f"norm-{pf.stem}-{sha(list(ref), 'bgfill-v2')}.mp4"
         if not nf.exists():
-            normalise_piece(pf, nf, tracks[i], ref)
+            normalise_piece(pf, nf, tracks[i], ref, fill=background_colour(pf))
         norm_files.append(nf)
     print(f"Normalised {len(norm_files)} pieces to face centre ({ref[0]:.0f}, {ref[1]:.0f}), face height {ref[2]:.0f} px", flush=True)
 
@@ -680,26 +727,8 @@ def main():
         trimmed.append(dst)
     norm_files = trimmed
     print("Joins: " + ", ".join(f"{j['mode']} (cost {j['pose_cost']}, drop {j['dropped_from_end_of_piece']}, skip {j['skipped_at_start_of_next']})" for j in join_plan), flush=True)
-    lengths_out = [media_duration(p) for p in norm_files]
-
-    # Timeline: a crossfade starts at the end of the earlier clip minus the fade; a cut is a one-frame fade.
-    inputs = []
-    for p in norm_files:
-        inputs += ["-i", str(p)]
-    filters, chain_v, chain_a = [], "[0:v]", "[0:a]"
-    S, join_centres = 0.0, []
-    for k in range(1, len(norm_files)):
-        fade = join_plan[k - 1]["fade_frames"] / 25.0
-        offset = S + lengths_out[k - 1] - fade
-        join_centres.append(offset + fade / 2)
-        ov, oa = f"[v{k}]", f"[a{k}]"
-        filters.append(f"{chain_v}[{k}:v]xfade=transition=fade:duration={fade:.4f}:offset={offset:.4f}{ov}")
-        filters.append(f"{chain_a}[{k}:a]acrossfade=d={fade:.4f}{oa}")
-        chain_v, chain_a = ov, oa
-        S = offset
     joined_tmp = work / f"joined-{sha([p.name for p in norm_files], [j['mode'] for j in join_plan])}.mp4"
-    ffmpeg(*inputs, "-filter_complex", ";".join(filters), "-map", chain_v, "-map", chain_a,
-           "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-c:a", "aac", "-b:a", "192k", str(joined_tmp))
+    join_centres = assemble_pieces(norm_files, join_plan, joined_tmp)
     # The "AI-generated" label is burned into the final video itself, not only the proof copy.
     ffmpeg("-i", str(joined_tmp), "-vf", LABEL_FILTER, "-c:a", "copy", "-c:v", "libx264", "-pix_fmt", "yuv420p",
            "-crf", "18", str(out_path))

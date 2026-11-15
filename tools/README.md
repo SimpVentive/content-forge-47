@@ -34,6 +34,30 @@ logo, and marks rest-pose clips (10 to 30 seconds, same pose at both ends, head 
 
 Rest pose is approximate. Check the clips by eye before using them.
 
+## lipsync_score.py
+
+Scores lip sync: mouth opening per frame (from the inner lip landmarks) against narration loudness, as a
+correlation in 2-second windows, with the best lag within 0.2 seconds.
+
+    python tools/lipsync_score.py <video.mp4> [window_seconds]
+
+A real recording of a presenter scores about 0.24 overall. A lip-synced piece scores near 0.
+
+## Local tests (no fal, no ElevenLabs, no spend)
+
+    python tools/test_make_module_join.py     one, two and three piece joins, and the audit and label on one piece
+    python tools/test_normalise_fill.py       edges uncovered by the face warp are filled, not streaked
+
+## Known limitations
+
+- **Lip sync is weak.** On one test the lip-synced piece scored about 0.02, against about 0.24 for a real recording
+  of the same presenter, using `lipsync_score.py`. Revisit when a better lip-sync model is available.
+- **The provider is hard-coded, not a setting.** `LIPSYNC_ENDPOINT` in `make_module.py` is `fal-ai/latentsync`,
+  and the request arguments and the LatentSync price (also in `supabase/functions/_shared/module-jobs.ts`) assume
+  that model. Changing the model means changing those places together.
+- **Edges uncovered by the face warp are filled with the background colour.** Where the presenter's body ends at
+  the camera frame, a straight edge is visible.
+
 ## Requirements
 
 Python 3.12 with: opencv-python, mediapipe, numpy, fal-client, imageio-ffmpeg. The face model file
