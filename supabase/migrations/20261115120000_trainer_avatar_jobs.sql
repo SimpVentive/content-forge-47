@@ -1,7 +1,9 @@
 -- Trainer avatar module jobs: teams, team members, job queue, consent flags, guards and storage buckets.
 --
 -- ADDITIVE ONLY. This migration creates new tables, columns, functions, triggers, indexes, policies and buckets.
--- It does not alter, rename, or delete any existing table, column, policy, function or object.
+-- It does not alter, rename, or delete any existing table, column, or function.
+-- Each policy below has a DROP POLICY IF EXISTS first. The names are new, so the drop only ever removes
+-- a policy this migration created on an earlier run.
 -- Not applied to any shared project yet: for review only.
 
 -- 1. Teams and membership -------------------------------------------------------------
@@ -25,6 +27,7 @@ ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
 
 -- Membership helpers. They run as the owner of the function, so they read team_members without
 -- going through its policies. That is what stops the policies from recursing into each other.
+-- SET search_path pins name resolution, so a caller cannot redirect the lookup to another schema.
 CREATE OR REPLACE FUNCTION public.is_team_member(p_team_id uuid)
 RETURNS boolean
 LANGUAGE sql
@@ -50,18 +53,24 @@ AS $$
   LIMIT 1;
 $$;
 
+-- Only signed-in users may run the helpers. Anonymous and public roles may not.
+-- REVOKE FROM PUBLIC alone does not remove a direct grant to anon, so anon is revoked by name.
 REVOKE EXECUTE ON FUNCTION public.is_team_member(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.is_team_member(uuid) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.team_role(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.team_role(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.is_team_member(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.team_role(uuid) TO authenticated;
 
 -- Members can read their teams. Nothing else in the app writes to these tables from the browser.
+DROP POLICY IF EXISTS teams_select_member ON public.teams;
 CREATE POLICY teams_select_member ON public.teams
   FOR SELECT TO authenticated
   USING (public.is_team_member(teams.id));
 
 -- A user sees their own membership rows, and the rows of teams they belong to. No direct read of team_members
 -- inside its own policy: the helper function does that work.
+DROP POLICY IF EXISTS team_members_select_member ON public.team_members;
 CREATE POLICY team_members_select_member ON public.team_members
   FOR SELECT TO authenticated
   USING (user_id = auth.uid() OR public.is_team_member(team_members.team_id));
@@ -77,8 +86,9 @@ ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS base_clip_count inte
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS voice_settings jsonb NULL;
 
 -- Guard: browser users cannot change consent, the team, or the clip count, on insert or update.
--- Only the server (service role) and the database owner can. The check uses auth.role(), which is set from the
--- caller's token: 'authenticated' and 'anon' are refused.
+-- auth.role() reads the role from the request's JWT. The service role's key has role 'service_role', so
+-- the first check lets the server through. A direct connection with no JWT gets NULL, which is also let through,
+-- so only 'authenticated' and 'anon' callers are refused.
 CREATE OR REPLACE FUNCTION public.guard_trainer_privileged_columns()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -114,6 +124,7 @@ CREATE TRIGGER custom_trainers_guard_privileged
   FOR EACH ROW EXECUTE FUNCTION public.guard_trainer_privileged_columns();
 
 -- Team members can read the trainers of their team.
+DROP POLICY IF EXISTS custom_trainers_select_team ON public.custom_trainers;
 CREATE POLICY custom_trainers_select_team ON public.custom_trainers
   FOR SELECT TO authenticated
   USING (team_id IS NOT NULL AND public.is_team_member(custom_trainers.team_id));
@@ -176,11 +187,13 @@ CREATE TRIGGER module_jobs_touch_updated_at
 
 -- Team members read the team's jobs. There is no insert policy: jobs are created only by the
 -- module-job-create edge function, with the service role. Updates (status, review) also come from the server.
+DROP POLICY IF EXISTS module_jobs_select_team ON public.module_jobs;
 CREATE POLICY module_jobs_select_team ON public.module_jobs
   FOR SELECT TO authenticated
   USING (public.is_team_member(module_jobs.team_id));
 
 -- Events are visible to the team. Written by the server only.
+DROP POLICY IF EXISTS module_job_events_select_team ON public.module_job_events;
 CREATE POLICY module_job_events_select_team ON public.module_job_events
   FOR SELECT TO authenticated
   USING (EXISTS (
@@ -203,18 +216,22 @@ ON CONFLICT (id) DO NOTHING;
 
 -- Storage access for the owner's own trainer folder only: <owner_user_id>/<trainer_id>/...
 -- These policies do not read team_members.
+DROP POLICY IF EXISTS trainer_clips_owner_select ON storage.objects;
 CREATE POLICY trainer_clips_owner_select ON storage.objects
   FOR SELECT TO authenticated
   USING (bucket_id = 'trainer-clips' AND (storage.foldername(name))[1] = auth.uid()::text);
 
+DROP POLICY IF EXISTS trainer_clips_owner_insert ON storage.objects;
 CREATE POLICY trainer_clips_owner_insert ON storage.objects
   FOR INSERT TO authenticated
   WITH CHECK (bucket_id = 'trainer-clips' AND (storage.foldername(name))[1] = auth.uid()::text);
 
+DROP POLICY IF EXISTS trainer_clips_owner_update ON storage.objects;
 CREATE POLICY trainer_clips_owner_update ON storage.objects
   FOR UPDATE TO authenticated
   USING (bucket_id = 'trainer-clips' AND (storage.foldername(name))[1] = auth.uid()::text);
 
+DROP POLICY IF EXISTS trainer_clips_owner_delete ON storage.objects;
 CREATE POLICY trainer_clips_owner_delete ON storage.objects
   FOR DELETE TO authenticated
   USING (bucket_id = 'trainer-clips' AND (storage.foldername(name))[1] = auth.uid()::text);
