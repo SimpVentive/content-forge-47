@@ -11,7 +11,7 @@
 --   policies:   teams_select_member, team_members_select_member, custom_trainers_select_team,
 --               module_jobs_select_team, module_job_events_select_team,
 --               trainer_clips_owner_select, trainer_clips_owner_insert, trainer_clips_owner_update, trainer_clips_owner_delete
---   buckets:    trainer-clips, generated-videos, module-cache (only when empty)
+--   buckets:    trainer-clips, generated-videos, module-cache (checked to be empty; deleted by hand in the Storage screen)
 --
 -- It does NOT touch anything that existed before the migration: custom_trainers' other columns, the existing
 -- custom_trainer_consents table (migration 20261108120000), the custom-trainers bucket, or any other policy,
@@ -20,7 +20,8 @@
 --
 -- It refuses to run if the feature holds data (teams, memberships, jobs, or trainers with a team, clip count or
 -- voice settings). Those rows would be lost. Export them first. To run it anyway, delete the preflight block on purpose.
--- Buckets are removed only when they are empty; the rollback stops if one still holds files.
+-- Buckets are not deleted by this script. It checks they are empty, then prints a notice to delete each one by hand.
+-- The rollback stops if a bucket still holds files.
 
 BEGIN;
 
@@ -93,7 +94,8 @@ DROP FUNCTION IF EXISTS public.module_jobs_touch_updated_at();
 DROP FUNCTION IF EXISTS public.team_role(uuid);
 DROP FUNCTION IF EXISTS public.is_team_member(uuid);
 
--- 8. Buckets, only when empty. Stops the whole rollback if a bucket still holds files.
+-- 8. Buckets. This script does not delete them. It checks that each one is empty, then tells you to delete it
+-- from the Storage screen. It stops the whole rollback if a bucket still holds files.
 DO $$
 DECLARE
   b text;
@@ -104,7 +106,7 @@ BEGIN
     IF n > 0 THEN
       RAISE EXCEPTION 'Rollback stopped: bucket % still holds % file(s). Export or delete them first.', b, n;
     END IF;
-    DELETE FROM storage.buckets WHERE id = b;
+    RAISE NOTICE 'Bucket % is empty. Delete it from the Storage screen of the Supabase dashboard (this script does not delete buckets).', b;
   END LOOP;
 END $$;
 
