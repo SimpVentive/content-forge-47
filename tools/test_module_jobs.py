@@ -98,11 +98,19 @@ def run():
         call("POST", "/rest/v1/team_members", {"team_id": team_id, "user_id": user["id"], "role": role}, service=True)
 
     def trainer(name, consent, clips):
+        """A trainer. With consent=True it also gets a consent record (the row custom-trainer-voice and the job check use)."""
         status, rows = call("POST", "/rest/v1/custom_trainers", {
             "owner_user_id": creator["id"], "name": name, "team_id": team_id, "voice_id": f"voice-{RUN}",
-            "voice_status": "ready", "consent_recorded": consent, "base_clip_count": clips,
+            "voice_status": "ready", "base_clip_count": clips,
         }, service=True, prefer="return=representation")
-        return rows[0]["id"]
+        trainer_id = rows[0]["id"]
+        if consent:
+            sentence = (f"I, {name}, agree that ContentForge may create a synthetic copy of my face and voice "
+                        f"to narrate courses I choose. I can delete it at any time.")
+            call("POST", "/rest/v1/custom_trainer_consents", {
+                "trainer_id": trainer_id, "owner_user_id": creator["id"], "consent_sentence": sentence,
+                "consent_audio_path": f"{creator['id']}/{trainer_id}/consent.webm"}, service=True)
+        return trainer_id
 
     t_ok = trainer(f"Trainer OK {RUN}", True, 1)
     status, team_b_rows = call("POST", "/rest/v1/teams", {"name": f"test-team-b-{RUN}"}, service=True, prefer="return=representation")
@@ -110,6 +118,7 @@ def run():
     call("POST", "/rest/v1/team_members", {"team_id": team_b, "user_id": creator["id"], "role": "creator"}, service=True)
     t_no_consent = trainer(f"Trainer no consent {RUN}", False, 1)
     t_no_clips = trainer(f"Trainer no clips {RUN}", True, 0)
+    t_deleted = trainer(f"Trainer deleted {RUN}", True, 1)
     created_jobs = []
 
     print("\n[step 3] Create-job rules", flush=True)
@@ -119,6 +128,9 @@ def run():
     check("trainer without consent is blocked (expect 403)", s == 403, f"HTTP {s}")
     s, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_no_clips, "script_text": "Short test."}, token=creator["token"])
     check("trainer with no base clips is blocked (expect 400)", s == 400, f"HTTP {s}")
+    call("PATCH", f"/rest/v1/custom_trainers?id=eq.{t_deleted}", {"deleted_at": "2026-11-15T00:00:00Z"}, service=True)
+    s, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_deleted, "script_text": "Short test."}, token=creator["token"])
+    check("a deleted trainer is not found (expect 404)", s == 404, f"HTTP {s}")
     # About 830 words is 9 pieces at $0.20 = $1.80. Over the cap -> 400; under it -> 200 (and we remove that test job).
     s, cap_body = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_ok, "script_text": script_of(5000)}, token=creator["token"])
     over_cap_expected = 400 if CAP < 1.8 else 200
@@ -175,17 +187,30 @@ def run():
     s, _ = call("POST", f"/storage/v1/object/module-cache/{creator['id']}/{t_ok}/cache/intruder.mp4", b"\x00" * 1024, token=creator["token"])
     check("a creator cannot write to module-cache (expect 400 or 403)", s in (400, 403), f"HTTP {s}")
 
-    print("\n[step 5b] Server-only columns: an owner cannot change consent, team or clip count", flush=True)
-    for label, body in (("consent_recorded", {"consent_recorded": True}),
-                        ("base_clip_count", {"base_clip_count": 7}),
+    print("\n[step 5b] Server-only columns (team, clip count) and the consent record", flush=True)
+    for label, body in (("base_clip_count", {"base_clip_count": 7}),
                         ("team_id", {"team_id": team_b})):
         s, rows = call("PATCH", f"/rest/v1/custom_trainers?id=eq.{t_no_consent}", body, token=creator["token"], prefer="return=representation")
         changed = isinstance(rows, list) and len(rows) > 0
         check(f"owner cannot set {label} (expect 400 or 403, no rows changed)", s in (400, 403) and not changed, f"HTTP {s}")
-    s, _ = call("POST", "/rest/v1/custom_trainers", {"owner_user_id": creator["id"], "name": f"Sneaky {RUN}", "voice_status": "ready", "consent_recorded": True}, token=creator["token"])
-    check("owner cannot insert a trainer with consent already recorded (expect 400 or 403)", s in (400, 403), f"HTTP {s}")
-    status, rows = call("GET", f"/rest/v1/custom_trainers?id=eq.{t_no_consent}&select=consent_recorded,team_id", service=True)
-    check("the consent flag stayed false after the attempts", status == 200 and rows and rows[0]["consent_recorded"] is False, f"HTTP {status}")
+    s, _ = call("POST", "/rest/v1/custom_trainers", {"owner_user_id": creator["id"], "name": f"Sneaky {RUN}", "voice_status": "ready", "base_clip_count": 5}, token=creator["token"])
+    check("owner cannot insert a trainer with clips already counted (expect 400 or 403)", s in (400, 403), f"HTTP {s}")
+    s, rows = call("PATCH", f"/rest/v1/custom_trainer_consents?trainer_id=eq.{t_ok}", {"consent_sentence": "changed by owner"},
+                   token=creator["token"], prefer="return=representation")
+    check("owner cannot change a consent record (no rows changed)", s in (200, 400, 403) and not rows, f"HTTP {s}, rows {rows}")
+    s, rows = call("DELETE", f"/rest/v1/custom_trainer_consents?trainer_id=eq.{t_ok}", token=creator["token"], prefer="return=representation")
+    check("owner cannot delete a consent record (no rows removed)", s in (200, 400, 403) and not rows, f"HTTP {s}, rows {rows}")
+    status, rows = call("GET", f"/rest/v1/custom_trainer_consents?trainer_id=eq.{t_ok}&select=consent_sentence", service=True)
+    check("the consent record is still there and unchanged", status == 200 and bool(rows) and rows[0]["consent_sentence"] != "changed by owner", f"HTTP {status}")
+
+    print("\n[step 5e] Consent comes from the consent record (trainer_has_consent)", flush=True)
+    for label, who, expect in (("owner", creator, True), ("team member", member, True), ("outsider", outsider, False)):
+        s, body = call("POST", "/rest/v1/rpc/trainer_has_consent", {"p_trainer_id": t_ok}, token=who["token"])
+        check(f"{label}: trainer_has_consent is {str(expect).lower()} for a consented trainer", s == 200 and body is expect, f"HTTP {s}, value {body}")
+    s, body = call("POST", "/rest/v1/rpc/trainer_has_consent", {"p_trainer_id": t_no_consent}, token=creator["token"])
+    check("a trainer with no consent record gives false", s == 200 and body is False, f"HTTP {s}, value {body}")
+    s, _ = call("POST", "/rest/v1/rpc/trainer_has_consent", {"p_trainer_id": t_ok})
+    check("anon key cannot call rpc/trainer_has_consent (expect 401, 403 or 404)", s in (401, 403, 404), f"HTTP {s}")
 
     print("\n[step 5c] Cross-team job and the team helpers", flush=True)
     s, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_b, "trainer_id": t_ok, "script_text": "Cross team test."}, token=creator["token"])

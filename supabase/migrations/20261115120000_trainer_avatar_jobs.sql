@@ -75,17 +75,17 @@ CREATE POLICY team_members_select_member ON public.team_members
   FOR SELECT TO authenticated
   USING (user_id = auth.uid() OR public.is_team_member(team_members.team_id));
 
--- 2. Team on trainers and consent flags (new columns only) -------------------------------
+-- 2. Team on trainers (new columns only) -------------------------------------------------
+-- Consent is not a column here. It lives in custom_trainer_consents (migration 20261108120000), and
+-- trainer_has_consent() below reads it.
 
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS team_id uuid NULL REFERENCES public.teams(id) ON DELETE SET NULL;
-ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS consent_recorded boolean NOT NULL DEFAULT false;
-ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS consent_ref text NULL;
 -- Number of base clips in storage. Written by the server only (trainer-clips-sync).
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS base_clip_count integer NOT NULL DEFAULT 0;
 -- Voice settings for generation (set in the Trainer setup screen). NULL means the approved defaults are used.
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS voice_settings jsonb NULL;
 
--- Guard: browser users cannot change consent, the team, or the clip count, on insert or update.
+-- Guard: browser users cannot change the team or the clip count, on insert or update.
 -- auth.role() reads the role from the request's JWT. The service role's key has role 'service_role', so
 -- the first check lets the server through. A direct connection with no JWT gets NULL, which is also let through,
 -- so only 'authenticated' and 'anon' callers are refused.
@@ -102,16 +102,13 @@ BEGIN
     RETURN NEW;
   END IF;
   IF TG_OP = 'INSERT' THEN
-    privileged_changed := NEW.consent_recorded OR NEW.consent_ref IS NOT NULL
-      OR NEW.team_id IS NOT NULL OR NEW.base_clip_count <> 0;
+    privileged_changed := NEW.team_id IS NOT NULL OR NEW.base_clip_count <> 0;
   ELSE
-    privileged_changed := NEW.consent_recorded IS DISTINCT FROM OLD.consent_recorded
-      OR NEW.consent_ref IS DISTINCT FROM OLD.consent_ref
-      OR NEW.team_id IS DISTINCT FROM OLD.team_id
+    privileged_changed := NEW.team_id IS DISTINCT FROM OLD.team_id
       OR NEW.base_clip_count IS DISTINCT FROM OLD.base_clip_count;
   END IF;
   IF privileged_changed THEN
-    RAISE EXCEPTION 'Consent, team and clip count can only be changed by the server'
+    RAISE EXCEPTION 'Team and clip count can only be changed by the server'
       USING ERRCODE = '42501';
   END IF;
   RETURN NEW;
@@ -122,6 +119,34 @@ DROP TRIGGER IF EXISTS custom_trainers_guard_privileged ON public.custom_trainer
 CREATE TRIGGER custom_trainers_guard_privileged
   BEFORE INSERT OR UPDATE ON public.custom_trainers
   FOR EACH ROW EXECUTE FUNCTION public.guard_trainer_privileged_columns();
+
+-- Consent for a trainer, read from custom_trainer_consents (the existing consent record).
+-- It counts only when there is a recording (consent_audio_path), the owner's row matches the trainer's owner,
+-- and the trainer is not deleted. Used by the app (through RPC) for the owner and team members.
+-- The worker and module-job-create run with the service role, where auth.uid() is empty, so they read the table
+-- directly with the same conditions.
+CREATE OR REPLACE FUNCTION public.trainer_has_consent(p_trainer_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.custom_trainers t
+    JOIN public.custom_trainer_consents c
+      ON c.trainer_id = t.id AND c.owner_user_id = t.owner_user_id
+    WHERE t.id = p_trainer_id
+      AND t.deleted_at IS NULL
+      AND c.consent_audio_path IS NOT NULL
+      AND (t.owner_user_id = auth.uid() OR public.is_team_member(t.team_id))
+  );
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.trainer_has_consent(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.trainer_has_consent(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.trainer_has_consent(uuid) TO authenticated;
 
 -- Team members can read the trainers of their team.
 DROP POLICY IF EXISTS custom_trainers_select_team ON public.custom_trainers;

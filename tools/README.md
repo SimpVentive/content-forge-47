@@ -57,6 +57,10 @@ A real recording of a presenter scores about 0.24 overall. A lip-synced piece sc
   that model. Changing the model means changing those places together.
 - **Edges uncovered by the face warp are filled with the background colour.** Where the presenter's body ends at
   the camera frame, a straight edge is visible.
+- **The owner's browser can insert consent records.** `custom_trainer_consents` allows an owner to insert their own
+  rows from the browser, so a record shows that the owner filed it, not that the person verified it. Generation relies
+  on that record. Fix later: a server function that stores the recording, and its own migration that removes the
+  browser insert policy. This changes a live table, so it is not part of the trainer migration.
 
 ## Requirements
 

@@ -52,11 +52,19 @@ Deno.serve(async (req) => {
   // 2. Trainer in the same team, with consent and a ready voice
   const { data: trainer } = await admin
     .from("custom_trainers")
-    .select("id, team_id, consent_recorded, voice_status, base_clip_count, deleted_at")
+    .select("id, owner_user_id, team_id, voice_status, base_clip_count, deleted_at")
     .eq("id", trainerId).maybeSingle();
   if (!trainer || trainer.deleted_at) return notFound("Trainer not found.");
   if (trainer.team_id !== teamId) return forbidden("This trainer is not in your team.");
-  if (!trainer.consent_recorded) return forbidden("Consent is not recorded for this trainer. Generation is blocked.");
+  // Consent is the record in custom_trainer_consents: a row by the trainer's owner, with the recording kept.
+  // Same rule as trainer_has_consent() in the migration.
+  const { count: consentCount } = await admin
+    .from("custom_trainer_consents")
+    .select("id", { count: "exact", head: true })
+    .eq("trainer_id", trainerId)
+    .eq("owner_user_id", trainer.owner_user_id)
+    .not("consent_audio_path", "is", null);
+  if (!consentCount) return forbidden("Consent is not recorded for this trainer. Generation is blocked.");
   if (trainer.voice_status !== "ready") return badRequest("The trainer's voice is not ready yet.");
   if (!(trainer.base_clip_count > 0)) return badRequest("No base clips are uploaded for this trainer yet.");
 

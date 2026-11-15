@@ -5,14 +5,19 @@ import { VOICE_RANGES, checkClipFile, checkVoiceSettings, clipPath } from "@/lib
 
 // The generated database types do not include the team columns until the migration is applied and the types are
 // regenerated. Until then, these queries use an untyped handle.
-const db = supabase as unknown as { from: (table: string) => any };
+// Untyped until the generated types include the new function. Consent comes from trainer_has_consent().
+const db = supabase as unknown as {
+  from: (table: string) => any;
+  rpc: (fn: string, args: Record<string, unknown>) => any;
+};
 
 type Row = {
   id: string;
   name: string;
   team_id: string | null;
   voice_status: string;
-  consent_recorded: boolean;
+  /** From trainer_has_consent() (not a column on the trainer). */
+  consent: boolean;
   base_clip_count: number;
   voice_settings: { stability?: number; style?: number } | null;
 };
@@ -27,9 +32,14 @@ export function TrainerSetup({ userId, teamId }: { userId: string; teamId: strin
 
   const load = useCallback(async () => {
     const { data } = await db.from("custom_trainers")
-      .select("id, name, team_id, voice_status, consent_recorded, base_clip_count, voice_settings")
+      .select("id, name, team_id, voice_status, base_clip_count, voice_settings")
       .eq("owner_user_id", userId).is("deleted_at", null).order("name");
-    setRows((data as Row[]) ?? []);
+    const trainers = (data as Omit<Row, "consent">[]) ?? [];
+    const withConsent: Row[] = await Promise.all(trainers.map(async (row) => {
+      const { data: has } = await db.rpc("trainer_has_consent", { p_trainer_id: row.id });
+      return { ...row, consent: has === true };
+    }));
+    setRows(withConsent);
   }, [userId]);
 
   useEffect(() => { void load(); }, [load]);
@@ -124,7 +134,7 @@ export function TrainerSetup({ userId, teamId }: { userId: string; teamId: strin
         <div className="space-y-3">
           <ul className="space-y-1 text-[12px]">
             <li>Voice: {selected.voice_status === "ready" ? "ready" : `not ready (${selected.voice_status})`}</li>
-            <li>Consent recorded: {selected.consent_recorded ? "yes" : "no (generation is blocked until it is recorded)"}</li>
+            <li>Consent recorded: {selected.consent ? "yes" : "no (generation is blocked until it is recorded)"}</li>
             <li>Base clips uploaded: {selected.base_clip_count}</li>
             <li>In a team: {selected.team_id ? "yes" : "no"}</li>
           </ul>

@@ -5,7 +5,11 @@ import { supabase } from "@/lib/supabase";
 
 // The generated database types do not include the team and job tables until the migration is applied and the
 // types are regenerated. Until then, these queries use an untyped handle. Row shapes are checked by the types below.
-const db = supabase as unknown as { from: (table: string) => any };
+// Untyped until the generated types include the new function and columns. Consent comes from trainer_has_consent().
+const db = supabase as unknown as {
+  from: (table: string) => any;
+  rpc: (fn: string, args: Record<string, unknown>) => any;
+};
 import { useAuth } from "@/hooks/useAuth";
 import {
   AI_LABEL,
@@ -21,7 +25,8 @@ type Role = "creator" | "admin" | "member";
 type Trainer = {
   id: string;
   name: string;
-  consent_recorded: boolean;
+  /** Whether consent is recorded, from trainer_has_consent() (not a column on the trainer). */
+  consent: boolean;
   voice_status: string;
   base_clip_count: number;
 };
@@ -72,7 +77,7 @@ export function TrainerVideoPanel({ moduleTitle, initialScript = "" }: { moduleT
   const estimate = useMemo(() => estimateUsd(script), [script]);
   const activeJobs = jobs.filter((j) => j.status === "queued" || j.status === "generating").length;
   const selected = trainers.find((t) => t.id === trainerId) ?? null;
-  const generatable = trainers.filter((t) => t.consent_recorded && t.voice_status === "ready" && t.base_clip_count > 0);
+  const generatable = trainers.filter((t) => t.consent && t.voice_status === "ready" && t.base_clip_count > 0);
   const noClips = selected !== null && selected.base_clip_count <= 0;
 
   const loadTeam = useCallback(async () => {
@@ -86,13 +91,18 @@ export function TrainerVideoPanel({ moduleTitle, initialScript = "" }: { moduleT
   const loadTrainersAndJobs = useCallback(async () => {
     if (!teamId) return;
     const [{ data: t }, { data: j }] = await Promise.all([
-      db.from("custom_trainers").select("id, name, consent_recorded, voice_status, base_clip_count")
+      db.from("custom_trainers").select("id, name, voice_status, base_clip_count")
         .eq("team_id", teamId).is("deleted_at", null).order("name"),
       db.from("module_jobs")
         .select("id, status, progress, error, estimate_usd, cost_usd, created_at, trainer_id, proof_path")
         .eq("team_id", teamId).order("created_at", { ascending: false }).limit(5),
     ]);
-    setTrainers((t as Trainer[]) ?? []);
+    const rows = (t as Omit<Trainer, "consent">[]) ?? [];
+    const withConsent: Trainer[] = await Promise.all(rows.map(async (row) => {
+      const { data: has } = await db.rpc("trainer_has_consent", { p_trainer_id: row.id });
+      return { ...row, consent: has === true };
+    }));
+    setTrainers(withConsent);
     setJobs((j as Job[]) ?? []);
   }, [teamId]);
 
@@ -112,7 +122,7 @@ export function TrainerVideoPanel({ moduleTitle, initialScript = "" }: { moduleT
       estimateUsd: estimate,
       capUsd: DISPLAYED_CAP_USD,
       activeJobsForUser: activeJobs,
-      consentRecorded: selected.consent_recorded,
+      consentRecorded: selected.consent,
       hasBaseClips: selected.base_clip_count > 0,
       trainerInTeam: true,
       userRole: role,
@@ -171,7 +181,7 @@ export function TrainerVideoPanel({ moduleTitle, initialScript = "" }: { moduleT
 
       {teamId && (
         <>
-          {trainers.filter((t) => !(t.consent_recorded && t.voice_status === "ready")).map((t) => (
+          {trainers.filter((t) => !(t.consent && t.voice_status === "ready")).map((t) => (
             <p key={t.id} className="rounded-md bg-muted px-3 py-2 text-[12px]">
               Video with {t.name} is coming up. Consent and a ready voice are needed first.
             </p>

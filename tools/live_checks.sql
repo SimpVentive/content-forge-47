@@ -51,7 +51,7 @@ SELECT json_build_object(
      SELECT column_name
      FROM information_schema.columns
      WHERE table_schema = 'public' AND table_name = 'custom_trainers'
-       AND column_name IN ('team_id', 'consent_recorded', 'consent_ref', 'base_clip_count', 'voice_settings')
+       AND column_name IN ('team_id', 'base_clip_count', 'voice_settings')
      ORDER BY column_name) t),
 
   -- 9. Migration 9: the private schema exists.
