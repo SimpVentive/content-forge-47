@@ -55,3 +55,9 @@ __pycache__/
 
 # Test state written by tools/test_module_jobs.py
 tools/.test_module_jobs_state.json
+
+# Worker job folders: downloaded trainer files and generated videos, never committed
+worker/work/
+
+# Supabase CLI local state (links and caches). Never committed.
+supabase/.temp/
