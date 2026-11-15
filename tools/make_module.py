@@ -51,6 +51,8 @@ LIPSYNC_ENDPOINT = "fal-ai/latentsync"
 PRICE_PER_SECOND = 0.005
 BILLING_MINIMUM_S = 40
 PIECE_MAX = 40.0          # never over the billing minimum, so no piece is billed for more than it uses
+LABEL_FILTER = (r"drawtext=fontfile='C\:/Windows/Fonts/arial.ttf':text='AI-generated':fontcolor=white:fontsize=28:"
+                "box=1:boxcolor=black@0.6:x=12:y=h-th-16")
 FADE_FRAMES = 9               # 8-10 frame crossfade at every join
 FADE = FADE_FRAMES / 25.0
 ELEVEN_MODEL = "eleven_multilingual_v2"
@@ -59,6 +61,12 @@ SMALL = (78, 116)         # size used for pose matching
 
 # ---------- configuration ----------
 def read_env(name):
+    """A key from the environment (the worker's secret store), else from .env. Never printed."""
+    env_value = os.environ.get(name) or os.environ.get(name.upper())
+    if env_value:
+        return env_value
+    if not ENV.exists():
+        sys.exit(f"{name} is not set in the environment or .env")
     for line in ENV.read_text("utf8").splitlines():
         n, _, v = line.partition("=")
         if n.strip().lower() == name.lower():
@@ -69,7 +77,8 @@ def read_env(name):
 
 
 def load_trainer(name):
-    folder = TRAINERS / name
+    """A trainer by name (trainers/<name>/), or by folder path when --trainer-dir is given."""
+    folder = pathlib.Path(name) if pathlib.Path(name).is_dir() else TRAINERS / name
     voice_path = folder / "voice.json"
     clips_dir = folder / "clips"
     if not voice_path.exists():
@@ -498,7 +507,7 @@ def search_join(a_path, b_path, y_frac, a_frames, b_frames):
 # ---------- main ----------
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--trainer", required=True)
+    ap.add_argument("--trainer", required=True, help="trainer name, or the trainer folder (--trainer-dir)")
     ap.add_argument("--script", required=True)
     ap.add_argument("--out", required=True)
     ap.add_argument("--workers", type=int, default=4, help="pieces processed at once (default 4)")
@@ -506,7 +515,7 @@ def main():
     ap.add_argument("--upscale", action="store_true", help="off by default; no upscaler is configured yet")
     args = ap.parse_args()
 
-    voice, clips, cache_dir = load_trainer(args.trainer)
+    voice, clips, cache_dir = load_trainer(args.trainer)  # a folder path works too
     script = pathlib.Path(args.script).read_text("utf8").strip()
     if not script:
         sys.exit("The script is empty")
@@ -691,7 +700,9 @@ def main():
     joined_tmp = work / f"joined-{sha([p.name for p in norm_files], [j['mode'] for j in join_plan])}.mp4"
     ffmpeg(*inputs, "-filter_complex", ";".join(filters), "-map", chain_v, "-map", chain_a,
            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-c:a", "aac", "-b:a", "192k", str(joined_tmp))
-    shutil.copy(joined_tmp, out_path)
+    # The "AI-generated" label is burned into the final video itself, not only the proof copy.
+    ffmpeg("-i", str(joined_tmp), "-vf", LABEL_FILTER, "-c:a", "copy", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+           "-crf", "18", str(out_path))
 
     # 7. Checks: raw change at every frame, flags above 3x the median, ghosting, and a contact sheet per join.
     sys.path.insert(0, str(ROOT / "tools"))
@@ -718,11 +729,9 @@ def main():
     report["times_s"]["sum_of_piece_times"] = round(sum(p.get("seconds_taken", 0) for p in report["pieces"]), 1)
     report["costs"]["total_usd"] = report["costs"]["latentsync_usd"]
 
-    # 7. Proof copy with a burned-in label
+    # 7. Proof copy: the same labelled video, kept beside the final for review.
     proof = out_path.with_name(out_path.stem + "-proof.mp4")
-    ffmpeg("-i", str(out_path), "-vf",
-           "drawtext=fontfile='C\\:/Windows/Fonts/arial.ttf':text='AI-generated':fontcolor=white:fontsize=28:box=1:boxcolor=black@0.6:x=12:y=h-th-16",
-           "-c:a", "copy", "-c:v", "libx264", "-crf", "18", str(proof))
+    shutil.copy(out_path, proof)
     report["outputs"] = {"video": str(out_path), "proof": str(proof)}
     (out_dir / "run_report.json").write_text(json.dumps(report, indent=1), "utf8")
     print(json.dumps({"status": report["status"], "video": str(out_path), "proof": str(proof),
