@@ -105,6 +105,9 @@ def run():
         return rows[0]["id"]
 
     t_ok = trainer(f"Trainer OK {RUN}", True, 1)
+    status, team_b_rows = call("POST", "/rest/v1/teams", {"name": f"test-team-b-{RUN}"}, service=True, prefer="return=representation")
+    team_b = team_b_rows[0]["id"]
+    call("POST", "/rest/v1/team_members", {"team_id": team_b, "user_id": creator["id"], "role": "creator"}, service=True)
     t_no_consent = trainer(f"Trainer no consent {RUN}", False, 1)
     t_no_clips = trainer(f"Trainer no clips {RUN}", True, 0)
     created_jobs = []
@@ -159,10 +162,36 @@ def run():
     check("outsider cannot see the team's jobs (expect empty)", status == 200 and rows == [], f"HTTP {status}, rows {len(rows) if isinstance(rows, list) else '?'}")
     status, rows = call("GET", f"/rest/v1/module_jobs?team_id=eq.{team_id}&select=id", token=member["token"])
     check("member can see the team's jobs", status == 200 and isinstance(rows, list) and len(rows) >= 1, f"HTTP {status}")
+    s, _ = call("POST", "/rest/v1/module_jobs", {"team_id": team_id, "owner_user_id": creator["id"], "trainer_id": t_ok, "script_text": "x", "status": "queued"}, token=creator["token"])
+    check("a creator cannot insert a job directly (expect 401 or 403)", s in (401, 403), f"HTTP {s}")
     s, _ = call("POST", "/rest/v1/module_jobs", {"team_id": team_id, "owner_user_id": member["id"], "trainer_id": t_ok, "script_text": "x", "status": "queued"}, token=member["token"])
-    check("member cannot insert a job directly (expect 401 or 403)", s in (401, 403), f"HTTP {s}")
-    s, _ = call("POST", "/rest/v1/module_jobs", {"team_id": team_id, "owner_user_id": creator["id"], "trainer_id": t_ok, "script_text": "x", "status": "queued"}, token=outsider["token"])
-    check("outsider cannot insert a job for the team (expect 401 or 403)", s in (401, 403), f"HTTP {s}")
+    check("a member cannot insert a job directly (expect 401 or 403)", s in (401, 403), f"HTTP {s}")
+
+    print("\n[step 5b] Server-only columns: an owner cannot change consent, team or clip count", flush=True)
+    for label, body in (("consent_recorded", {"consent_recorded": True}),
+                        ("base_clip_count", {"base_clip_count": 7}),
+                        ("team_id", {"team_id": team_b})):
+        s, rows = call("PATCH", f"/rest/v1/custom_trainers?id=eq.{t_no_consent}", body, token=creator["token"], prefer="return=representation")
+        changed = isinstance(rows, list) and len(rows) > 0
+        check(f"owner cannot set {label} (expect 400 or 403, no rows changed)", s in (400, 403) and not changed, f"HTTP {s}")
+    s, _ = call("POST", "/rest/v1/custom_trainers", {"owner_user_id": creator["id"], "name": f"Sneaky {RUN}", "voice_status": "ready", "consent_recorded": True}, token=creator["token"])
+    check("owner cannot insert a trainer with consent already recorded (expect 400 or 403)", s in (400, 403), f"HTTP {s}")
+    status, rows = call("GET", f"/rest/v1/custom_trainers?id=eq.{t_no_consent}&select=consent_recorded,team_id", service=True)
+    check("the consent flag stayed false after the attempts", status == 200 and rows and rows[0]["consent_recorded"] is False, f"HTTP {status}")
+
+    print("\n[step 5c] Cross-team job and the team helpers", flush=True)
+    s, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_b, "trainer_id": t_ok, "script_text": "Cross team test."}, token=creator["token"])
+    check("a job for a trainer of another team is refused (expect 403)", s == 403, f"HTTP {s}")
+
+    print("\n[step 5d] Policies do not recurse", flush=True)
+    for path, who in (("/rest/v1/team_members?select=team_id,user_id,role", member),
+                      ("/rest/v1/teams?select=id,name", member),
+                      ("/rest/v1/module_jobs?select=id,status", member),
+                      ("/rest/v1/module_job_events?select=id,status", member),
+                      (f"/rest/v1/custom_trainers?select=id,name&team_id=eq.{team_id}", member)):
+        s, body = call("GET", path, token=who["token"])
+        recursion = "recursion" in json.dumps(body).lower() if body is not None else False
+        check(f"read succeeds without recursion: {path.split('?')[0]}", s == 200 and not recursion, f"HTTP {s}")
 
     print("\n[step 6] Trainer setup: storage and clip count", flush=True)
     clip = b"\x00" * 1024
@@ -170,6 +199,15 @@ def run():
     check("owner can upload a clip to their own folder (expect 200)", s == 200, f"HTTP {s}")
     s, _ = call("POST", f"/storage/v1/object/trainer-clips/{creator['id']}/{t_ok}/clips/intruder.mp4", clip, token=outsider["token"])
     check("outsider cannot upload into the owner's folder (expect 400 or 403)", s in (400, 403), f"HTTP {s}")
+    s, body = call("POST", "/functions/v1/trainer-clips-sync", {"trainer_id": t_ok}, token=creator["token"])
+    count = (body or {}).get("data", {}).get("base_clip_count") if isinstance(body, dict) else None
+    check("the server counts the uploaded clips (expect 200 and 1)", s == 200 and count == 1, f"HTTP {s}, count {count}")
+    s, _ = call("POST", "/functions/v1/trainer-clips-sync", {"trainer_id": t_ok}, token=outsider["token"])
+    check("only the owner can sync clips (expect 403)", s == 403, f"HTTP {s}")
+    s, _ = call("POST", "/functions/v1/trainer-attach-team", {"trainer_id": t_no_clips, "team_id": team_b}, token=member["token"])
+    check("a member cannot attach a trainer to a team (expect 403)", s == 403, f"HTTP {s}")
+    s, _ = call("POST", "/functions/v1/trainer-attach-team", {"trainer_id": t_no_clips, "team_id": team_b}, token=creator["token"])
+    check("the owner can attach a trainer to a team where they are a creator (expect 200)", s == 200, f"HTTP {s}")
 
     print("\n[step 7] Worker (optional)", flush=True)
     if CHECK_WORKER and job1:
@@ -187,16 +225,16 @@ def run():
 
     failed = [r for r in results if not r[1]]
     print(f"\nResult: {len(results) - len(failed)} passed, {len(failed)} failed.", flush=True)
-    write_state(team_id, [creator, admin, member, outsider], created_jobs)
+    write_state(team_id, [creator, admin, member, outsider], created_jobs, extra_team=team_b)
     sys.exit(1 if failed else 0)
 
 
 STATE = os.path.join(os.path.dirname(__file__), ".test_module_jobs_state.json")
 
 
-def write_state(team_id, users, jobs):
+def write_state(team_id, users, jobs, extra_team=None):
     with open(STATE, "w", encoding="utf8") as f:
-        json.dump({"team_id": team_id, "user_ids": [u["id"] for u in users], "job_ids": jobs}, f)
+        json.dump({"team_id": team_id, "extra_team_id": extra_team, "user_ids": [u["id"] for u in users], "job_ids": jobs}, f)
 
 
 def cleanup():
@@ -205,6 +243,8 @@ def cleanup():
         sys.exit("Nothing to clean up (no state file).")
     state = json.load(open(STATE, encoding="utf8"))
     call("DELETE", f"/rest/v1/teams?id=eq.{state['team_id']}", service=True)
+    if state.get("extra_team_id"):
+        call("DELETE", f"/rest/v1/teams?id=eq.{state['extra_team_id']}", service=True)
     for uid in state["user_ids"]:
         call("DELETE", f"/auth/v1/admin/users/{uid}", service=True)
     os.remove(STATE)

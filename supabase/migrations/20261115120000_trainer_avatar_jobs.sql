@@ -1,7 +1,7 @@
--- Trainer avatar module jobs: teams, team members, job queue, consent flags and storage buckets.
+-- Trainer avatar module jobs: teams, team members, job queue, consent flags, guards and storage buckets.
 --
--- ADDITIVE ONLY. This migration creates new tables, adds new columns, adds new policies and creates new buckets.
--- It does not alter, rename, or delete any existing table, column, policy or object.
+-- ADDITIVE ONLY. This migration creates new tables, columns, functions, triggers, indexes, policies and buckets.
+-- It does not alter, rename, or delete any existing table, column, policy, function or object.
 -- Not applied to any shared project yet: for review only.
 
 -- 1. Teams and membership -------------------------------------------------------------
@@ -23,32 +23,100 @@ CREATE TABLE IF NOT EXISTS public.team_members (
 ALTER TABLE public.teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.team_members ENABLE ROW LEVEL SECURITY;
 
--- A member can see their own teams and the members of those teams.
+-- Membership helpers. They run as the owner of the function, so they read team_members without
+-- going through its policies. That is what stops the policies from recursing into each other.
+CREATE OR REPLACE FUNCTION public.is_team_member(p_team_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.team_members m
+    WHERE m.team_id = p_team_id AND m.user_id = auth.uid()
+  );
+$$;
+
+CREATE OR REPLACE FUNCTION public.team_role(p_team_id uuid)
+RETURNS text
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT m.role FROM public.team_members m
+  WHERE m.team_id = p_team_id AND m.user_id = auth.uid()
+  LIMIT 1;
+$$;
+
+REVOKE EXECUTE ON FUNCTION public.is_team_member(uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.team_role(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_team_member(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.team_role(uuid) TO authenticated;
+
+-- Members can read their teams. Nothing else in the app writes to these tables from the browser.
 CREATE POLICY teams_select_member ON public.teams
   FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.team_members m WHERE m.team_id = teams.id AND m.user_id = auth.uid()));
+  USING (public.is_team_member(teams.id));
 
+-- A user sees their own membership rows, and the rows of teams they belong to. No direct read of team_members
+-- inside its own policy: the helper function does that work.
 CREATE POLICY team_members_select_member ON public.team_members
   FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.team_members m WHERE m.team_id = team_members.team_id AND m.user_id = auth.uid()));
+  USING (user_id = auth.uid() OR public.is_team_member(team_members.team_id));
 
 -- 2. Team on trainers and consent flags (new columns only) -------------------------------
 
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS team_id uuid NULL REFERENCES public.teams(id) ON DELETE SET NULL;
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS consent_recorded boolean NOT NULL DEFAULT false;
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS consent_ref text NULL;
--- Number of base clips uploaded for the trainer (set by the upload step). Generation needs at least one.
+-- Number of base clips in storage. Written by the server only (trainer-clips-sync).
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS base_clip_count integer NOT NULL DEFAULT 0;
 -- Voice settings for generation (set in the Trainer setup screen). NULL means the approved defaults are used.
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS voice_settings jsonb NULL;
 
--- Teammates can read the trainers of their team (the existing owner policies are not changed).
+-- Guard: browser users cannot change consent, the team, or the clip count, on insert or update.
+-- Only the server (service role) and the database owner can. The check uses auth.role(), which is set from the
+-- caller's token: 'authenticated' and 'anon' are refused.
+CREATE OR REPLACE FUNCTION public.guard_trainer_privileged_columns()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+DECLARE
+  caller text := COALESCE(auth.role(), '');
+  privileged_changed boolean;
+BEGIN
+  IF caller NOT IN ('authenticated', 'anon') THEN
+    RETURN NEW;
+  END IF;
+  IF TG_OP = 'INSERT' THEN
+    privileged_changed := NEW.consent_recorded OR NEW.consent_ref IS NOT NULL
+      OR NEW.team_id IS NOT NULL OR NEW.base_clip_count <> 0;
+  ELSE
+    privileged_changed := NEW.consent_recorded IS DISTINCT FROM OLD.consent_recorded
+      OR NEW.consent_ref IS DISTINCT FROM OLD.consent_ref
+      OR NEW.team_id IS DISTINCT FROM OLD.team_id
+      OR NEW.base_clip_count IS DISTINCT FROM OLD.base_clip_count;
+  END IF;
+  IF privileged_changed THEN
+    RAISE EXCEPTION 'Consent, team and clip count can only be changed by the server'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS custom_trainers_guard_privileged ON public.custom_trainers;
+CREATE TRIGGER custom_trainers_guard_privileged
+  BEFORE INSERT OR UPDATE ON public.custom_trainers
+  FOR EACH ROW EXECUTE FUNCTION public.guard_trainer_privileged_columns();
+
+-- Team members can read the trainers of their team.
 CREATE POLICY custom_trainers_select_team ON public.custom_trainers
   FOR SELECT TO authenticated
-  USING (
-    team_id IS NOT NULL
-    AND EXISTS (SELECT 1 FROM public.team_members m WHERE m.team_id = custom_trainers.team_id AND m.user_id = auth.uid())
-  );
+  USING (team_id IS NOT NULL AND public.is_team_member(custom_trainers.team_id));
 
 -- 3. Module jobs ----------------------------------------------------------------------
 
@@ -84,29 +152,40 @@ CREATE TABLE IF NOT EXISTS public.module_job_events (
 ALTER TABLE public.module_jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.module_job_events ENABLE ROW LEVEL SECURITY;
 
--- Teammates see the team's jobs.
+-- Indexes for the queue and for team listings.
+CREATE INDEX IF NOT EXISTS module_jobs_status_created_idx ON public.module_jobs (status, created_at);
+CREATE INDEX IF NOT EXISTS module_jobs_team_idx ON public.module_jobs (team_id);
+CREATE INDEX IF NOT EXISTS module_job_events_job_idx ON public.module_job_events (job_id);
+
+-- updated_at is set by the database on every change to a job.
+CREATE OR REPLACE FUNCTION public.module_jobs_touch_updated_at()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = public
+AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS module_jobs_touch_updated_at ON public.module_jobs;
+CREATE TRIGGER module_jobs_touch_updated_at
+  BEFORE UPDATE ON public.module_jobs
+  FOR EACH ROW EXECUTE FUNCTION public.module_jobs_touch_updated_at();
+
+-- Team members read the team's jobs. There is no insert policy: jobs are created only by the
+-- module-job-create edge function, with the service role. Updates (status, review) also come from the server.
 CREATE POLICY module_jobs_select_team ON public.module_jobs
   FOR SELECT TO authenticated
-  USING (EXISTS (SELECT 1 FROM public.team_members m WHERE m.team_id = module_jobs.team_id AND m.user_id = auth.uid()));
+  USING (public.is_team_member(module_jobs.team_id));
 
--- Only creators and admins of the team can create a job, and only as themselves.
-CREATE POLICY module_jobs_insert_creator ON public.module_jobs
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    owner_user_id = auth.uid()
-    AND EXISTS (
-      SELECT 1 FROM public.team_members m
-      WHERE m.team_id = module_jobs.team_id AND m.user_id = auth.uid() AND m.role IN ('creator', 'admin')
-    )
-  );
-
--- Events are visible to the team, written by the server only (service role bypasses RLS).
+-- Events are visible to the team. Written by the server only.
 CREATE POLICY module_job_events_select_team ON public.module_job_events
   FOR SELECT TO authenticated
   USING (EXISTS (
     SELECT 1 FROM public.module_jobs j
-    JOIN public.team_members m ON m.team_id = j.team_id
-    WHERE j.id = module_job_events.job_id AND m.user_id = auth.uid()
+    WHERE j.id = module_job_events.job_id AND public.is_team_member(j.team_id)
   ));
 
 -- 4. Storage buckets (private) ---------------------------------------------------------
@@ -123,7 +202,7 @@ VALUES ('generated-videos', 'generated-videos', false)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage access for the owner's own trainer folder only: <owner_user_id>/<trainer_id>/...
--- These are new policies on storage.objects; no existing policy is changed.
+-- These policies do not read team_members.
 CREATE POLICY trainer_clips_owner_select ON storage.objects
   FOR SELECT TO authenticated
   USING (bucket_id = 'trainer-clips' AND (storage.foldername(name))[1] = auth.uid()::text);

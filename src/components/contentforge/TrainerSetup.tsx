@@ -1,13 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
-import {
-  VOICE_RANGES,
-  checkClipFile,
-  checkVoiceSettings,
-  clipPath,
-  countClips,
-} from "@/lib/trainerSetup";
+import { VOICE_RANGES, checkClipFile, checkVoiceSettings, clipPath } from "@/lib/trainerSetup";
 
 // The generated database types do not include the team columns until the migration is applied and the types are
 // regenerated. Until then, these queries use an untyped handle.
@@ -53,7 +47,9 @@ export function TrainerSetup({ userId, teamId }: { userId: string; teamId: strin
     if (!selected || !teamId) return;
     setBusy(true);
     try {
-      const { error } = await db.from("custom_trainers").update({ team_id: teamId }).eq("id", selected.id);
+      const { error } = await supabase.functions.invoke("trainer-attach-team", {
+        body: { trainer_id: selected.id, team_id: teamId },
+      });
       if (error) return toast.error("The trainer could not be added to the team.");
       toast.success(`${selected.name} is now in your team.`);
       await load();
@@ -78,11 +74,12 @@ export function TrainerSetup({ userId, teamId }: { userId: string; teamId: strin
         });
         if (error) return toast.error(`${f.name} could not be uploaded.`);
       }
-      // Recount from storage, so the number is what is really there.
-      const { data: listing } = await supabase.storage.from("trainer-clips")
-        .list(`${userId}/${selected.id}/clips`, { limit: 1000 });
-      const count = countClips((listing ?? []).map((o: { name: string }) => o.name));
-      await db.from("custom_trainers").update({ base_clip_count: count }).eq("id", selected.id);
+      // The server counts the clips in storage and saves the number.
+      const { data: synced, error: syncError } = await supabase.functions.invoke("trainer-clips-sync", {
+        body: { trainer_id: selected.id },
+      });
+      if (syncError) return toast.error("The clips were uploaded, but the count could not be updated.");
+      const count = (synced as { data?: { base_clip_count?: number } })?.data?.base_clip_count ?? 0;
       toast.success(`${list.length} clip(s) uploaded. ${count} in total.`);
       await load();
     } finally {
