@@ -8,7 +8,8 @@ import { handlePreflight } from "../_shared/cors.ts";
 import { ok, badRequest, unauthorized, forbidden, notFound, serverError, methodNotAllowed } from "../_shared/responses.ts";
 import { getAuthedUser, AuthError } from "../_shared/auth.ts";
 import { adminClient } from "../_shared/supabase.ts";
-import { estimateUsd, jobCapUsd, MAX_CONCURRENT_JOBS_PER_USER, MAX_SCRIPT_CHARS } from "../_shared/module-jobs.ts";
+import { estimateUsd, MAX_CONCURRENT_JOBS_PER_USER, MAX_SCRIPT_CHARS } from "../_shared/module-jobs.ts";
+import { jobCapUsd } from "../_shared/job-cap.ts";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 

@@ -46,10 +46,12 @@ def _find_ffmpeg():
 
 
 FF = _find_ffmpeg()
-LIPSYNC_ENDPOINT = "fal-ai/latentsync"
-# fal usage (checked): LatentSync bills $0.005 per second, with a 40-second minimum per clip.
-PRICE_PER_SECOND = 0.005
-BILLING_MINIMUM_S = 40
+# The lip-sync provider (name, endpoint, price per second, minimum seconds per clip) is read from one shared file,
+# the same one the server (supabase/functions/_shared/module-jobs.ts) and the app (src/lib/moduleJobs.ts) read.
+PROVIDER = json.loads((ROOT / "supabase" / "functions" / "_shared" / "lipsync-provider.json").read_text("utf8"))
+LIPSYNC_ENDPOINT = PROVIDER["endpoint"]
+PRICE_PER_SECOND = PROVIDER["price_per_second_usd"]
+BILLING_MINIMUM_S = PROVIDER["minimum_seconds"]
 PIECE_MAX = 40.0          # never over the billing minimum, so no piece is billed for more than it uses
 LABEL_FILTER = (r"drawtext=fontfile='C\:/Windows/Fonts/arial.ttf':text='AI-generated':fontcolor=white:fontsize=28:"
                 "box=1:boxcolor=black@0.6:x=12:y=h-th-16")
@@ -300,6 +302,15 @@ def run_latentsync(video_url, audio_url):
 
 def clip_cost(seconds):
     return round(max(BILLING_MINIMUM_S, seconds) * PRICE_PER_SECOND, 4)
+
+
+def estimate_for_seconds(seconds):
+    """Estimate for a narration of this length: equal pieces of at most PIECE_MAX, each billed by clip_cost.
+    Same rule as estimateUsdForSeconds in supabase/functions/_shared/module-jobs.ts, so the two agree."""
+    if seconds <= 0:
+        return 0.0
+    pieces = max(1, int(-(-seconds // PIECE_MAX)))  # ceiling division
+    return round(pieces * clip_cost(seconds / pieces), 2)
 
 
 # ---------- checks ----------

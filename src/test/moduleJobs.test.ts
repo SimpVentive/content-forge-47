@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  LATENTSYNC_USD_PER_PIECE,
+  LIPSYNC_PROVIDER,
   MAX_CONCURRENT_JOBS_PER_USER,
   canReview,
   canStartJob,
@@ -25,10 +25,11 @@ describe("piecesFor", () => {
 });
 
 describe("estimateUsd", () => {
-  it("prices each piece at the LatentSync rate", () => {
-    // 150 words is one minute: 2 pieces of up to 40 s, so 2 x $0.20.
+  it("prices each piece at the provider rate", () => {
+    // 150 words is one minute: 2 pieces of 30 s, each billed at the 40 s minimum: 2 x $0.20.
+    const perClip = 40 * LIPSYNC_PROVIDER.price_per_second_usd;
     expect(estimateSeconds(words(150))).toBeCloseTo(60, 5);
-    expect(estimateUsd(words(150))).toBeCloseTo(2 * LATENTSYNC_USD_PER_PIECE, 2);
+    expect(estimateUsd(words(150))).toBeCloseTo(2 * perClip, 2);
   });
   it("is zero for an empty script", () => {
     expect(estimateUsd("   ")).toBe(0);

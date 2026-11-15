@@ -1,0 +1,19 @@
+{
+  "_about": "Expected lip-sync billing and estimates for the provider in supabase/functions/_shared/lipsync-provider.json. Read by tools/test_lipsync_provider.py and src/test/lipsyncProvider.test.ts. Each value is worked out from the provider's minimum seconds and price per second.",
+  "billing": [
+    { "seconds": 10, "usd": 0.2 },
+    { "seconds": 40, "usd": 0.2 },
+    { "seconds": 41, "usd": 0.205 },
+    { "seconds": 80, "usd": 0.4 },
+    { "seconds": 100, "usd": 0.5 }
+  ],
+  "estimates": [
+    { "words": 0, "usd": 0 },
+    { "words": 75, "usd": 0.2 },
+    { "words": 150, "usd": 0.4 },
+    { "words": 200, "usd": 0.4 },
+    { "words": 201, "usd": 0.6 },
+    { "words": 500, "usd": 1.0 },
+    { "words": 1500, "usd": 3.0 }
+  ]
+}

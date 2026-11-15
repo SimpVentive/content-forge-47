@@ -1,5 +1,7 @@
 // Rules for trainer-avatar module jobs. Pure functions: no network, no storage.
-// The same numbers are enforced on the server (supabase/functions/_shared/module-jobs.ts).
+// The provider and its price come from supabase/functions/_shared/lipsync-provider.json, the same file the server
+// (supabase/functions/_shared/module-jobs.ts) and the worker (tools/make_module.py) read.
+import provider from "../../supabase/functions/_shared/lipsync-provider.json";
 
 export type JobStatus = "queued" | "generating" | "ready_for_review" | "failed" | "published" | "rejected";
 
@@ -7,8 +9,13 @@ export const JOB_STATUSES: JobStatus[] = ["queued", "generating", "ready_for_rev
 
 /** Pieces are at most 40 s; a job's narration is split into at least this many pieces. */
 export const PIECE_MAX_SECONDS = 40;
-/** LatentSync (fal.ai) bills $0.005 per second with a 40 s minimum per clip: $0.20 per piece. */
-export const LATENTSYNC_USD_PER_PIECE = 0.2;
+/** The lip-sync provider and its billing (name, endpoint, price per second, minimum seconds per clip). */
+export const LIPSYNC_PROVIDER = provider as {
+  name: string;
+  endpoint: string;
+  price_per_second_usd: number;
+  minimum_seconds: number;
+};
 /** Narration pace used for estimates (words per minute). */
 export const NARRATION_WORDS_PER_MINUTE = 150;
 /** At most this many jobs per user may be queued or generating at once. */
@@ -26,9 +33,21 @@ export function piecesFor(seconds: number): number {
   return Math.max(1, Math.ceil(seconds / PIECE_MAX_SECONDS));
 }
 
-/** Estimated LatentSync cost for a script, in USD. ElevenLabs is charged on the plan and is not included here. */
+/** What the provider bills for one clip of this length: at least the minimum, at the per-second price. */
+export function billedUsd(seconds: number): number {
+  return Math.round(Math.max(LIPSYNC_PROVIDER.minimum_seconds, seconds) * LIPSYNC_PROVIDER.price_per_second_usd * 10000) / 10000;
+}
+
+/** Estimate for a narration of this many seconds: equal pieces of at most 40 s, each billed as above. */
+export function estimateUsdForSeconds(seconds: number): number {
+  if (seconds <= 0) return 0;
+  const pieces = piecesFor(seconds);
+  return Math.round(pieces * billedUsd(seconds / pieces) * 100) / 100;
+}
+
+/** Estimated lip-sync cost for a script, in USD. ElevenLabs is charged on the plan and is not included here. */
 export function estimateUsd(scriptText: string): number {
-  return Math.round(piecesFor(estimateSeconds(scriptText)) * LATENTSYNC_USD_PER_PIECE * 100) / 100;
+  return estimateUsdForSeconds(estimateSeconds(scriptText));
 }
 
 export type StartCheck = { ok: true } | { ok: false; reason: string };
