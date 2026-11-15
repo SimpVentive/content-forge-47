@@ -202,8 +202,9 @@ CREATE POLICY module_job_events_select_team ON public.module_job_events
   ));
 
 -- 4. Storage buckets (private) ---------------------------------------------------------
--- trainer-clips: voice.json, base clips and cached pieces, per trainer.
--- generated-videos: final and proof videos and run reports, per job.
+-- trainer-clips: base clips per trainer (owner uploads; the server counts them).
+-- module-cache: cached pieces per trainer (worker only, no user policies).
+-- generated-videos: final and proof videos and run reports, per job (server writes; reviewers get signed URLs).
 -- Access is through the server (service role) and short-lived signed URLs. No public access.
 
 INSERT INTO storage.buckets (id, name, public)
@@ -212,6 +213,12 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('generated-videos', 'generated-videos', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- module-cache: finished pieces, so a re-run does not pay again. Written only by the worker (service role).
+-- It has NO storage policies, so browser users cannot read, write or overwrite it.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('module-cache', 'module-cache', false)
 ON CONFLICT (id) DO NOTHING;
 
 -- Storage access for the owner's own trainer folder only: <owner_user_id>/<trainer_id>/...

@@ -8,7 +8,9 @@ Environment (set in the host's secret store, never in code):
     SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ELEVENLABS_API_KEY, FAL_KEY
 Optional: WORKER_POLL_SECONDS (default 15), WORK_DIR (default ./work), MODULE_WORKERS (default 4).
 
-Pieces are cached in the trainer-clips bucket (trainers/<owner>/<trainer>/cache/), so a restart does not pay again.
+Pieces are cached in the private module-cache bucket (<owner>/<trainer>/cache/), so a restart does not pay again.
+Only this worker (service role) can write there: the bucket has no storage policies for browser users.
+Voice settings from the database are clamped to the approved ranges before they reach ElevenLabs.
 Keys are never logged. Only job ids, statuses and costs are written to the job rows.
 """
 import json, os, pathlib, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
@@ -21,6 +23,22 @@ WORKERS = os.environ.get("MODULE_WORKERS", "4")
 URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 VOICE_SETTINGS = {"stability": 0.5, "similarity_boost": 0.75, "style": 0.3, "use_speaker_boost": True}
+# Approved ranges. Keep in step with VOICE_RANGES in src/lib/trainerSetup.ts.
+VOICE_RANGES = {"stability": (0.35, 0.5, 0.5), "style": (0.2, 0.4, 0.3)}  # (min, max, default)
+CACHE_BUCKET = "module-cache"  # private, service role only (see the migration)
+
+
+def clamp_voice_settings(raw):
+    """Returns settings inside the approved ranges. Anything missing or not a number falls back to the default.
+    The browser can write voice_settings, so this runs on the server before the settings are used."""
+    raw = raw if isinstance(raw, dict) else {}
+    out = dict(VOICE_SETTINGS)
+    for key, (low, high, default) in VOICE_RANGES.items():
+        value = raw.get(key)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:  # NaN check
+            value = default
+        out[key] = round(min(max(float(value), low), high), 3)
+    return out
 
 
 def log(msg):
@@ -108,22 +126,23 @@ def fetch_trainer(job, folder):
     (folder / "clips").mkdir(parents=True, exist_ok=True)
     (folder / "cache").mkdir(parents=True, exist_ok=True)
     (folder / "voice.json").write_text(json.dumps({
-        "voice_id": t["voice_id"], "model_id": "eleven_multilingual_v2", "settings": t.get("voice_settings") or VOICE_SETTINGS}), "utf8")
+        "voice_id": t["voice_id"], "model_id": "eleven_multilingual_v2",
+        "settings": clamp_voice_settings(t.get("voice_settings"))}), "utf8")
     clips = [o for o in storage_list("trainer-clips", f"{base}/clips") if o.get("name", "").endswith(".mp4")]
     if not clips:
         raise RuntimeError("no base clips uploaded for this trainer")
     for o in clips:
         storage_download("trainer-clips", f"{base}/clips/{o['name']}", folder / "clips" / o["name"])
-    for o in storage_list("trainer-clips", f"{base}/cache"):
+    for o in storage_list(CACHE_BUCKET, f"{base}/cache"):
         if o.get("name"):
-            storage_download("trainer-clips", f"{base}/cache/{o['name']}", folder / "cache" / o["name"])
+            storage_download(CACHE_BUCKET, f"{base}/cache/{o['name']}", folder / "cache" / o["name"])
     return base
 
 
 def push_cache(base, folder):
     for f in (folder / "cache").glob("*"):
         if f.is_file():
-            storage_upload("trainer-clips", f"{base}/cache/{f.name}", f,
+            storage_upload(CACHE_BUCKET, f"{base}/cache/{f.name}", f,
                            "video/mp4" if f.suffix == ".mp4" else "application/octet-stream")
 
 

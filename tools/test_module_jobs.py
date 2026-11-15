@@ -167,6 +167,14 @@ def run():
     s, _ = call("POST", "/rest/v1/module_jobs", {"team_id": team_id, "owner_user_id": member["id"], "trainer_id": t_ok, "script_text": "x", "status": "queued"}, token=member["token"])
     check("a member cannot insert a job directly (expect 401 or 403)", s in (401, 403), f"HTTP {s}")
 
+    print("\n[step 5a] The anon key cannot call the helpers, and only the worker can write the piece cache", flush=True)
+    for fn in ("is_team_member", "team_role"):
+        # No token: the request carries only the anon key, as a visitor's browser would.
+        s, _ = call("POST", f"/rest/v1/rpc/{fn}", {"p_team_id": team_id})
+        check(f"anon key cannot call rpc/{fn} (expect 401, 403 or 404)", s in (401, 403, 404), f"HTTP {s}")
+    s, _ = call("POST", f"/storage/v1/object/module-cache/{creator['id']}/{t_ok}/cache/intruder.mp4", b"\x00" * 1024, token=creator["token"])
+    check("a creator cannot write to module-cache (expect 400 or 403)", s in (400, 403), f"HTTP {s}")
+
     print("\n[step 5b] Server-only columns: an owner cannot change consent, team or clip count", flush=True)
     for label, body in (("consent_recorded", {"consent_recorded": True}),
                         ("base_clip_count", {"base_clip_count": 7}),
