@@ -98,7 +98,7 @@ def storage_upload(bucket, path, src, content_type):
 
 def fetch_trainer(job, folder):
     """Writes voice.json, base clips and cached pieces into the working folder for this trainer."""
-    trainer = rest("GET", f"custom_trainers?id=eq.{job['trainer_id']}&select=id,owner_user_id,voice_id,voice_status,team_id")
+    trainer = rest("GET", f"custom_trainers?id=eq.{job['trainer_id']}&select=id,owner_user_id,voice_id,voice_status,voice_settings,team_id")
     if not trainer:
         raise RuntimeError("trainer not found")
     t = trainer[0]
@@ -108,7 +108,7 @@ def fetch_trainer(job, folder):
     (folder / "clips").mkdir(parents=True, exist_ok=True)
     (folder / "cache").mkdir(parents=True, exist_ok=True)
     (folder / "voice.json").write_text(json.dumps({
-        "voice_id": t["voice_id"], "model_id": "eleven_multilingual_v2", "settings": VOICE_SETTINGS}), "utf8")
+        "voice_id": t["voice_id"], "model_id": "eleven_multilingual_v2", "settings": t.get("voice_settings") or VOICE_SETTINGS}), "utf8")
     clips = [o for o in storage_list("trainer-clips", f"{base}/clips") if o.get("name", "").endswith(".mp4")]
     if not clips:
         raise RuntimeError("no base clips uploaded for this trainer")

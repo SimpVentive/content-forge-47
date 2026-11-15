@@ -39,6 +39,8 @@ ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS consent_recorded boo
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS consent_ref text NULL;
 -- Number of base clips uploaded for the trainer (set by the upload step). Generation needs at least one.
 ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS base_clip_count integer NOT NULL DEFAULT 0;
+-- Voice settings for generation (set in the Trainer setup screen). NULL means the approved defaults are used.
+ALTER TABLE public.custom_trainers ADD COLUMN IF NOT EXISTS voice_settings jsonb NULL;
 
 -- Teammates can read the trainers of their team (the existing owner policies are not changed).
 CREATE POLICY custom_trainers_select_team ON public.custom_trainers
@@ -119,3 +121,21 @@ ON CONFLICT (id) DO NOTHING;
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('generated-videos', 'generated-videos', false)
 ON CONFLICT (id) DO NOTHING;
+
+-- Storage access for the owner's own trainer folder only: <owner_user_id>/<trainer_id>/...
+-- These are new policies on storage.objects; no existing policy is changed.
+CREATE POLICY trainer_clips_owner_select ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'trainer-clips' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+CREATE POLICY trainer_clips_owner_insert ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'trainer-clips' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+CREATE POLICY trainer_clips_owner_update ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (bucket_id = 'trainer-clips' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+CREATE POLICY trainer_clips_owner_delete ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'trainer-clips' AND (storage.foldername(name))[1] = auth.uid()::text);

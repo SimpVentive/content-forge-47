@@ -52,3 +52,6 @@ trainers/*/cache/
 trainers/*/voice.json
 run_report*.json
 __pycache__/
+
+# Test state written by tools/test_module_jobs.py
+tools/.test_module_jobs_state.json

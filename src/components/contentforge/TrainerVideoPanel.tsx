@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { TrainerSetup } from "./TrainerSetup";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
@@ -65,6 +66,7 @@ export function TrainerVideoPanel({ moduleTitle, initialScript = "" }: { moduleT
   const [script, setScript] = useState(initialScript);
   const [busy, setBusy] = useState(false);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
 
   const latest = jobs[0] ?? null;
   const estimate = useMemo(() => estimateUsd(script), [script]);
@@ -159,6 +161,11 @@ export function TrainerVideoPanel({ moduleTitle, initialScript = "" }: { moduleT
           Make a video of your trainer for "{moduleTitle}". Every video is labelled "{AI_LABEL}".
         </p>
       </div>
+
+      <button type="button" onClick={() => setShowSetup((v) => !v)} className="rounded-md border px-3 py-2 text-[12px]">
+        {showSetup ? "Hide trainer setup" : "Trainer setup"}
+      </button>
+      {showSetup && <TrainerSetup userId={user.id} teamId={teamId} />}
 
       {!teamId && <p className="text-[12px] text-muted-foreground">You are not in a team yet. Ask an admin to add you.</p>}
 
