@@ -270,18 +270,100 @@ def write_state(team_id, users, jobs, extra_team=None):
         json.dump({"team_id": team_id, "extra_team_id": extra_team, "user_ids": [u["id"] for u in users], "job_ids": jobs}, f)
 
 
+CLEANUP_BUCKETS = ("trainer-clips", "generated-videos", "module-cache")
+
+
+def list_objects(bucket, prefix):
+    """Every object name under prefix (folders are walked). Raises if the listing fails."""
+    status, items = call("POST", f"/storage/v1/object/list/{bucket}", {"prefix": prefix, "limit": 1000, "offset": 0}, service=True)
+    if status != 200:
+        raise RuntimeError(f"list {bucket}/{prefix}: HTTP {status}")
+    out = []
+    for it in items or []:
+        name = f"{prefix}/{it['name']}" if prefix else it["name"]
+        if it.get("id") is None:
+            out += list_objects(bucket, name)
+        else:
+            out.append(name)
+    return out
+
+
+def delete_once_more(label, path, body=None, ok=(200, 204), problems=None):
+    """Runs a service-role DELETE. A failure is retried once. Anything still failing is recorded in problems."""
+    last = None
+    for _ in range(2):
+        status, resp = call("DELETE", path, body, service=True)
+        if status in ok:
+            return True
+        last = (status, resp)
+    problems.append(f"{label}: HTTP {last[0]} {str(last[1])[:160]}")
+    return False
+
+
 def cleanup():
+    """Removes what the last test run created, checks that it is gone, and keeps the state file if anything is left."""
     guard()
     if not os.path.exists(STATE):
         sys.exit("Nothing to clean up (no state file).")
     state = json.load(open(STATE, encoding="utf8"))
-    call("DELETE", f"/rest/v1/teams?id=eq.{state['team_id']}", service=True)
-    if state.get("extra_team_id"):
-        call("DELETE", f"/rest/v1/teams?id=eq.{state['extra_team_id']}", service=True)
-    for uid in state["user_ids"]:
-        call("DELETE", f"/auth/v1/admin/users/{uid}", service=True)
+    team_ids = [t for t in (state.get("team_id"), state.get("extra_team_id")) if t]
+    user_ids = state.get("user_ids", [])
+    problems, objects_removed = [], 0
+
+    # 1. Storage objects that the users own (clips, cached pieces, outputs).
+    for uid in user_ids:
+        for bucket in CLEANUP_BUCKETS:
+            try:
+                names = list_objects(bucket, uid)
+            except RuntimeError as err:
+                problems.append(str(err))
+                continue
+            for i in range(0, len(names), 100):
+                delete_once_more(f"delete storage {bucket}", f"/storage/v1/object/{bucket}",
+                                 {"prefixes": names[i:i + 100]}, ok=(200,), problems=problems)
+            objects_removed += len(names)
+
+    # 2. Teams (their memberships, trainers and jobs go with them), then users.
+    for tid in team_ids:
+        delete_once_more(f"delete team {tid}", f"/rest/v1/teams?id=eq.{tid}", problems=problems)
+    for uid in user_ids:
+        delete_once_more(f"delete user {uid}", f"/auth/v1/admin/users/{uid}", problems=problems)
+
+    # 3. Verify: nothing of the test data is left.
+    for tid in team_ids:
+        status, rows = call("GET", f"/rest/v1/teams?id=eq.{tid}&select=id", service=True)
+        if status != 200 or rows:
+            problems.append(f"team {tid} is still there (HTTP {status})")
+        status, rows = call("GET", f"/rest/v1/module_jobs?team_id=eq.{tid}&select=id", service=True)
+        if status != 200 or rows:
+            problems.append(f"jobs of team {tid} are still there (HTTP {status}, {len(rows or [])} rows)")
+    for uid in user_ids:
+        status, _ = call("GET", f"/auth/v1/admin/users/{uid}", service=True)
+        if status != 404:
+            problems.append(f"user {uid} is still there (HTTP {status})")
+        for table, column in (("custom_trainers", "owner_user_id"), ("custom_trainer_consents", "owner_user_id"),
+                              ("module_jobs", "owner_user_id")):
+            status, rows = call("GET", f"/rest/v1/{table}?{column}=eq.{uid}&select=id", service=True)
+            if status != 200 or rows:
+                problems.append(f"{table} rows of user {uid} are still there (HTTP {status}, {len(rows or [])} rows)")
+        for bucket in CLEANUP_BUCKETS:
+            try:
+                left = list_objects(bucket, uid)
+            except RuntimeError as err:
+                problems.append(str(err))
+                continue
+            if left:
+                problems.append(f"{len(left)} object(s) still in {bucket} for user {uid}")
+
+    if problems:
+        print("NOT fully cleaned. Left over or failed:")
+        for p in problems:
+            print("  -", p)
+        print(f"The state file is kept ({STATE}), so you can run --cleanup again after fixing the items above.")
+        sys.exit(1)
     os.remove(STATE)
-    print("Removed the test team and users (their trainers, jobs and team rows go with them).")
+    print(f"Verified clean: removed {objects_removed} storage object(s), {len(team_ids)} team(s) and {len(user_ids)} user(s). "
+          "Nothing of the test data is left.")
 
 
 if __name__ == "__main__":
