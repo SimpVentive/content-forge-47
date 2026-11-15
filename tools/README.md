@@ -43,6 +43,19 @@ correlation in 2-second windows, with the best lag within 0.2 seconds.
 
 A real recording of a presenter scores about 0.24 overall. A lip-synced piece scores near 0.
 
+## prepare_worker_test.py and run_worker.py (throwaway project only)
+
+Runs one worker test against the throwaway project. Nothing here touches live.
+
+    python tools/prepare_worker_test.py            creates a creator, team, trainer (with a consent record and its clip) and one queued job; spends nothing
+    python tools/prepare_worker_test.py --cleanup  removes what that run created
+
+    python tools/run_worker.py                     starts the worker in the background; it spends money when it runs a job
+    python tools/run_worker.py --stop              stops it
+
+Keys come from the environment or the Supabase CLI, never from a file. Before starting the worker, set
+`ELEVENLABS_API_KEY` and `FAL_KEY` in the PowerShell window. The launcher refuses any URL that is not the throwaway project.
+
 ## Local tests (no fal, no ElevenLabs, no spend)
 
     python tools/test_make_module_join.py     one, two and three piece joins, and the audit and label on one piece
