@@ -267,7 +267,7 @@ export function generateFlipbookHTML(
         const pairings: any[] = Array.isArray(m.correct_pairings) ? m.correct_pairings : [];
         const pairMap = pairings.map((p: any) => {
           if (typeof p === "string") {
-            const parts = p.split(/-|:|→|=/).map(s => s.trim());
+            const parts = p.split(/[-:→=]/).map(s => s.trim());
             return { a: parts[0], b: parts[1] };
           }
           return { a: String(p.a ?? p.column_a ?? p.left ?? ""), b: String(p.b ?? p.column_b ?? p.right ?? "") };
