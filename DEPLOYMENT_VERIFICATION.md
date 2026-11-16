@@ -8,7 +8,7 @@
 
 ### 1. Environment Configuration ✅
 - [x] `BFL_API_KEY` is present in `.env` file
-- [x] Value: `bfl_mKC7JuwhTruOEp1Ag6N8FzAvBsVviTGd`
+- [x] Value: `<your-key-here>`
 - [x] API key is active (assumed valid based on .env presence)
 
 ### 2. Code Changes ✅
@@ -59,7 +59,7 @@ git diff src/hooks/useAgentPipeline.ts
 grep "BFL_API_KEY" .env
 
 # Expected output:
-# BFL_API_KEY=bfl_mKC7JuwhTruOEp1Ag6N8FzAvBsVviTGd
+# BFL_API_KEY=<your-key-here>
 ```
 
 ### Step 4: Commit Changes
@@ -108,7 +108,7 @@ supabase functions deploy generate-slide-image
    - If NOT set: Add it manually
      - Click "Add new variable"
      - Name: `BFL_API_KEY`
-     - Value: `bfl_mKC7JuwhTruOEp1Ag6N8FzAvBsVviTGd`
+     - Value: `<your-key-here>`
 4. Click: **Deploy new version** (if manual changes made)
 
 ### Step 7: Test the Fix

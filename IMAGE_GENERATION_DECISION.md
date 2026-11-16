@@ -92,7 +92,7 @@ const FETCH_RETRY_DELAY_MS = 1000;           // 1s base delay between retries
 
 **Required in `.env`:**
 ```
-BFL_API_KEY=bfl_mKC7JuwhTruOEp1Ag6N8FzAvBsVviTGd
+BFL_API_KEY=<your-key-here>
 ```
 
 **Status:** ✅ Already configured and valid

@@ -1,0 +1,6 @@
+{
+  "name": "LatentSync",
+  "endpoint": "fal-ai/latentsync",
+  "price_per_second_usd": 0.005,
+  "minimum_seconds": 40
+}

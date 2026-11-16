@@ -1,0 +1,10 @@
+{
+  "voice_id": "REPLACE_WITH_ELEVENLABS_VOICE_ID",
+  "model_id": "eleven_multilingual_v2",
+  "settings": {
+    "stability": 0.5,
+    "similarity_boost": 0.75,
+    "style": 0.3,
+    "use_speaker_boost": true
+  }
+}

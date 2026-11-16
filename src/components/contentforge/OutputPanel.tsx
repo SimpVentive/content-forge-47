@@ -11,6 +11,7 @@ import { InfographicPreview } from "./InfographicPreview";
 import { LearnerPreview } from "./LearnerPreview";
 import { VideosTab, InsertedVideo } from "./VideosTab";
 import { NarrativeFlipbook } from "./NarrativeFlipbook";
+import { TrainerVideoPanel } from "./TrainerVideoPanel";
 
 interface OutputPanelProps {
   outputData: OutputData;
@@ -279,6 +280,7 @@ const PackageView: React.FC<{ raw: string; archRaw: string; visualRaw: string; c
 
   return (
     <div className="space-y-6 animate-fade-in">
+      <TrainerVideoPanel moduleTitle={courseTitle} />
       {/* Learner Preview Modal */}
       {showLearnerPreview && (
         <LearnerPreview

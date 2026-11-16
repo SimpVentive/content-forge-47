@@ -34,3 +34,33 @@ docs/*.png
 docs/**/*.gif
 docs/**/*.jpg
 docs/**/*.png
+
+# Video, audio and test outputs: never commit
+*.mp4
+*.mov
+*.webm
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.aac
+docs/screenshots/
+
+# Trainer media, caches and run reports: personal to each trainer
+trainers/*/clips/
+trainers/*/cache/
+trainers/*/voice.json
+run_report*.json
+__pycache__/
+
+# Test state written by tools/test_module_jobs.py
+tools/.test_module_jobs_state.json
+
+# Worker job folders: downloaded trainer files and generated videos, never committed
+worker/work/
+
+# Supabase CLI local state (links and caches). Never committed.
+supabase/.temp/
+
+# Worker test state written by tools/prepare_worker_test.py (ids only, used by its cleanup)
+tools/.worker_test_state.json

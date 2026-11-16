@@ -1,0 +1,373 @@
+#!/usr/bin/env python
+"""End-to-end checks for the trainer-avatar job rules, against a THROWAWAY Supabase project only.
+
+Set these in your environment (never in a file, never committed):
+    THROWAWAY_SUPABASE_URL          e.g. https://abcd1234.supabase.co
+    THROWAWAY_SUPABASE_ANON_KEY     the project's anon key
+    THROWAWAY_SUPABASE_SERVICE_KEY  the project's service role key
+Optional:
+    THROWAWAY_CAP_USD               the MODULE_JOB_MAX_USD you set on the throwaway functions (default 10)
+    THROWAWAY_CHECK_WORKER=1        wait for a worker to move a job to ready_for_review (costs about $0.20 per piece)
+
+Run:    python tools/test_module_jobs.py            (creates test data, runs the checks, prints PASS/FAIL)
+        python tools/test_module_jobs.py --cleanup  (removes the test users, team and jobs it created)
+
+Refuses to run unless the URL contains the word "throwaway" or the environment says THROWAWAY_CONFIRM=yes,
+so it cannot be pointed at the shared project by mistake.
+Every request is shown as a method, a path and a status code. Keys, tokens and passwords are never printed.
+"""
+import json, os, secrets, sys, time, urllib.error, urllib.parse, urllib.request
+
+URL = os.environ.get("THROWAWAY_SUPABASE_URL", "").rstrip("/")
+ANON = os.environ.get("THROWAWAY_SUPABASE_ANON_KEY", "")
+SERVICE = os.environ.get("THROWAWAY_SUPABASE_SERVICE_KEY", "")
+CAP = float(os.environ.get("THROWAWAY_CAP_USD", "10"))
+CHECK_WORKER = os.environ.get("THROWAWAY_CHECK_WORKER") == "1"
+RUN = secrets.token_hex(3)
+results = []
+
+
+def guard():
+    if not (URL and ANON and SERVICE):
+        sys.exit("Set THROWAWAY_SUPABASE_URL, THROWAWAY_SUPABASE_ANON_KEY and THROWAWAY_SUPABASE_SERVICE_KEY first.")
+    if "throwaway" not in URL.lower() and os.environ.get("THROWAWAY_CONFIRM") != "yes":
+        sys.exit("The URL does not say 'throwaway'. Set THROWAWAY_CONFIRM=yes only if you are sure it is not the shared project.")
+
+
+def call(method, path, body=None, token=None, service=False, prefer=None):
+    """One request. Returns (status, parsed body or text). Prints method, path and status only."""
+    headers = {"apikey": SERVICE if service else ANON, "Content-Type": "application/json"}
+    headers["Authorization"] = f"Bearer {SERVICE if service else (token or ANON)}"
+    if prefer:
+        headers["Prefer"] = prefer
+    data = None if body is None else (body if isinstance(body, bytes) else json.dumps(body).encode("utf8"))
+    if isinstance(body, bytes):
+        headers["Content-Type"] = "application/octet-stream"
+    req = urllib.request.Request(f"{URL}{path}", data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            raw = resp.read()
+            status = resp.status
+    except urllib.error.HTTPError as err:
+        raw = err.read()
+        status = err.code
+    try:
+        payload = json.loads(raw) if raw else None
+    except json.JSONDecodeError:
+        payload = raw.decode("utf8", "replace")[:200]
+    return status, payload
+
+
+def check(name, ok, detail=""):
+    results.append((name, ok, detail))
+    print(f"  {'PASS' if ok else 'FAIL'}  {name}" + (f"  ({detail})" if detail else ""), flush=True)
+
+
+def make_user(label):
+    email = f"test-{label}-{RUN}@example.test"
+    password = secrets.token_urlsafe(18)
+    status, body = call("POST", "/auth/v1/admin/users", {"email": email, "password": password, "email_confirm": True}, service=True)
+    if status not in (200, 201):
+        sys.exit(f"could not create test user {label}: HTTP {status}")
+    status, tok = call("POST", "/auth/v1/token?grant_type=password", {"email": email, "password": password})
+    if status != 200:
+        sys.exit(f"could not sign in test user {label}: HTTP {status}")
+    return {"id": body["id"], "token": tok["access_token"], "email": email, "label": label}
+
+
+def script_of(chars):
+    words = "the trainer explains each step clearly and calmly so the learner can follow along".split()
+    out = []
+    while sum(len(w) + 1 for w in out) < chars:
+        out.append(words[len(out) % len(words)])
+    return " ".join(out)[:chars]
+
+
+def run():
+    guard()
+    print(f"Throwaway project: {urllib.parse.urlsplit(URL).netloc}   run id: {RUN}")
+    print("Creating test users, team and trainers...", flush=True)
+    creator = make_user("creator")
+    admin = make_user("admin")
+    member = make_user("member")
+    outsider = make_user("outsider")
+
+    status, team = call("POST", "/rest/v1/teams", {"name": f"test-team-{RUN}"}, service=True, prefer="return=representation")
+    team_id = team[0]["id"]
+    for user, role in ((creator, "creator"), (admin, "admin"), (member, "member")):
+        call("POST", "/rest/v1/team_members", {"team_id": team_id, "user_id": user["id"], "role": role}, service=True)
+
+    def trainer(name, consent, clips):
+        """A trainer. With consent=True it also gets a consent record (the row custom-trainer-voice and the job check use)."""
+        status, rows = call("POST", "/rest/v1/custom_trainers", {
+            "owner_user_id": creator["id"], "name": name, "team_id": team_id, "voice_id": f"voice-{RUN}",
+            "voice_status": "ready", "base_clip_count": clips,
+        }, service=True, prefer="return=representation")
+        trainer_id = rows[0]["id"]
+        if consent:
+            sentence = (f"I, {name}, agree that ContentForge may create a synthetic copy of my face and voice "
+                        f"to narrate courses I choose. I can delete it at any time.")
+            call("POST", "/rest/v1/custom_trainer_consents", {
+                "trainer_id": trainer_id, "owner_user_id": creator["id"], "consent_sentence": sentence,
+                "consent_audio_path": f"{creator['id']}/{trainer_id}/consent.webm"}, service=True)
+        return trainer_id
+
+    t_ok = trainer(f"Trainer OK {RUN}", True, 1)
+    status, team_b_rows = call("POST", "/rest/v1/teams", {"name": f"test-team-b-{RUN}"}, service=True, prefer="return=representation")
+    team_b = team_b_rows[0]["id"]
+    call("POST", "/rest/v1/team_members", {"team_id": team_b, "user_id": creator["id"], "role": "creator"}, service=True)
+    t_no_consent = trainer(f"Trainer no consent {RUN}", False, 1)
+    t_no_clips = trainer(f"Trainer no clips {RUN}", True, 0)
+    t_deleted = trainer(f"Trainer deleted {RUN}", True, 1)
+    created_jobs = []
+
+    print("\n[step 3] Create-job rules", flush=True)
+    s, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_ok, "script_text": "Short test."}, token=member["token"])
+    check("member cannot create a job (expect 403)", s == 403, f"HTTP {s}")
+    s, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_no_consent, "script_text": "Short test."}, token=creator["token"])
+    check("trainer without consent is blocked (expect 403)", s == 403, f"HTTP {s}")
+    s, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_no_clips, "script_text": "Short test."}, token=creator["token"])
+    check("trainer with no base clips is blocked (expect 400)", s == 400, f"HTTP {s}")
+    call("PATCH", f"/rest/v1/custom_trainers?id=eq.{t_deleted}", {"deleted_at": "2026-11-15T00:00:00Z"}, service=True)
+    s, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_deleted, "script_text": "Short test."}, token=creator["token"])
+    check("a deleted trainer is not found (expect 404)", s == 404, f"HTTP {s}")
+    # About 830 words is 9 pieces at $0.20 = $1.80. Over the cap -> 400; under it -> 200 (and we remove that test job).
+    s, cap_body = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_ok, "script_text": script_of(5000)}, token=creator["token"])
+    over_cap_expected = 400 if CAP < 1.8 else 200
+    check(f"a script costing about $1.80 is {'refused' if over_cap_expected == 400 else 'allowed'} at cap ${CAP:.2f} (expect {over_cap_expected})",
+          s == over_cap_expected, f"HTTP {s}")
+    if s == 200 and isinstance(cap_body, dict) and cap_body.get("data", {}).get("id"):
+        call("DELETE", f"/rest/v1/module_jobs?id=eq.{cap_body['data']['id']}", service=True)
+    # Create the two jobs we need, checking the concurrency limit on the third.
+    s1, j1 = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_ok, "script_text": "First short test."}, token=creator["token"])
+    check("creator can create a job (expect 200)", s1 == 200, f"HTTP {s1}")
+    job1 = (j1 or {}).get("data", {}).get("id") if isinstance(j1, dict) else None
+    s2, j2 = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_ok, "script_text": "Second short test."}, token=creator["token"])
+    check("second job is allowed (expect 200)", s2 == 200, f"HTTP {s2}")
+    job2 = (j2 or {}).get("data", {}).get("id") if isinstance(j2, dict) else None
+    created_jobs += [j for j in (job1, job2) if j]
+    s3, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_id, "trainer_id": t_ok, "script_text": "Third short test."}, token=creator["token"])
+    check("third job at once is refused (expect 400)", s3 == 400, f"HTTP {s3}")
+
+    print("\n[step 4] Review rules (the worker is simulated by setting the status directly)", flush=True)
+    if job1:
+        s, _ = call("POST", "/functions/v1/module-job-review", {"job_id": job1, "action": "sign"}, token=creator["token"])
+        check("cannot open a proof before the job is ready (expect 400)", s == 400, f"HTTP {s}")
+        s, _ = call("POST", "/functions/v1/module-job-review", {"job_id": job1, "action": "approve"}, token=creator["token"])
+        check("cannot approve a queued job (expect 400)", s == 400, f"HTTP {s}")
+        call("PATCH", f"/rest/v1/module_jobs?id=eq.{job1}", {"status": "ready_for_review", "proof_path": f"{creator['id']}/{job1}/proof.mp4"}, service=True)
+        s, _ = call("POST", "/functions/v1/module-job-review", {"job_id": job1, "action": "approve"}, token=member["token"])
+        check("member cannot approve (expect 403)", s == 403, f"HTTP {s}")
+        s, _ = call("POST", "/functions/v1/module-job-review", {"job_id": job1, "action": "approve"}, token=admin["token"])
+        check("admin can approve a ready job (expect 200)", s == 200, f"HTTP {s}")
+        status, rows = call("GET", f"/rest/v1/module_jobs?id=eq.{job1}&select=status", service=True)
+        check("approved job is published", status == 200 and rows and rows[0]["status"] == "published", str(rows[0]["status"] if rows else rows))
+    if job2:
+        call("PATCH", f"/rest/v1/module_jobs?id=eq.{job2}", {"status": "ready_for_review"}, service=True)
+        s, _ = call("POST", "/functions/v1/module-job-review", {"job_id": job2, "action": "reject"}, token=member["token"])
+        check("member cannot reject (expect 403)", s == 403, f"HTTP {s}")
+        s, _ = call("POST", "/functions/v1/module-job-review", {"job_id": job2, "action": "reject"}, token=creator["token"])
+        check("creator can reject (expect 200)", s == 200, f"HTTP {s}")
+
+    print("\n[step 5] Row-level security", flush=True)
+    status, rows = call("GET", f"/rest/v1/module_jobs?team_id=eq.{team_id}&select=id", token=outsider["token"])
+    check("outsider cannot see the team's jobs (expect empty)", status == 200 and rows == [], f"HTTP {status}, rows {len(rows) if isinstance(rows, list) else '?'}")
+    status, rows = call("GET", f"/rest/v1/module_jobs?team_id=eq.{team_id}&select=id", token=member["token"])
+    check("member can see the team's jobs", status == 200 and isinstance(rows, list) and len(rows) >= 1, f"HTTP {status}")
+    s, _ = call("POST", "/rest/v1/module_jobs", {"team_id": team_id, "owner_user_id": creator["id"], "trainer_id": t_ok, "script_text": "x", "status": "queued"}, token=creator["token"])
+    check("a creator cannot insert a job directly (expect 401 or 403)", s in (401, 403), f"HTTP {s}")
+    s, _ = call("POST", "/rest/v1/module_jobs", {"team_id": team_id, "owner_user_id": member["id"], "trainer_id": t_ok, "script_text": "x", "status": "queued"}, token=member["token"])
+    check("a member cannot insert a job directly (expect 401 or 403)", s in (401, 403), f"HTTP {s}")
+
+    print("\n[step 5a] The anon key cannot call the helpers, and only the worker can write the piece cache", flush=True)
+    for fn in ("is_team_member", "team_role"):
+        # No token: the request carries only the anon key, as a visitor's browser would.
+        s, _ = call("POST", f"/rest/v1/rpc/{fn}", {"p_team_id": team_id})
+        check(f"anon key cannot call rpc/{fn} (expect 401, 403 or 404)", s in (401, 403, 404), f"HTTP {s}")
+    s, _ = call("POST", f"/storage/v1/object/module-cache/{creator['id']}/{t_ok}/cache/intruder.mp4", b"\x00" * 1024, token=creator["token"])
+    check("a creator cannot write to module-cache (expect 400 or 403)", s in (400, 403), f"HTTP {s}")
+
+    print("\n[step 5b] Server-only columns (team, clip count) and the consent record", flush=True)
+    for label, body in (("base_clip_count", {"base_clip_count": 7}),
+                        ("team_id", {"team_id": team_b})):
+        s, rows = call("PATCH", f"/rest/v1/custom_trainers?id=eq.{t_no_consent}", body, token=creator["token"], prefer="return=representation")
+        changed = isinstance(rows, list) and len(rows) > 0
+        check(f"owner cannot set {label} (expect 400 or 403, no rows changed)", s in (400, 403) and not changed, f"HTTP {s}")
+    s, _ = call("POST", "/rest/v1/custom_trainers", {"owner_user_id": creator["id"], "name": f"Sneaky {RUN}", "voice_status": "ready", "base_clip_count": 5}, token=creator["token"])
+    check("owner cannot insert a trainer with clips already counted (expect 400 or 403)", s in (400, 403), f"HTTP {s}")
+    s, rows = call("PATCH", f"/rest/v1/custom_trainer_consents?trainer_id=eq.{t_ok}", {"consent_sentence": "changed by owner"},
+                   token=creator["token"], prefer="return=representation")
+    check("owner cannot change a consent record (no rows changed)", s in (200, 400, 403) and not rows, f"HTTP {s}, rows {rows}")
+    s, rows = call("DELETE", f"/rest/v1/custom_trainer_consents?trainer_id=eq.{t_ok}", token=creator["token"], prefer="return=representation")
+    check("owner cannot delete a consent record (no rows removed)", s in (200, 400, 403) and not rows, f"HTTP {s}, rows {rows}")
+    status, rows = call("GET", f"/rest/v1/custom_trainer_consents?trainer_id=eq.{t_ok}&select=consent_sentence", service=True)
+    check("the consent record is still there and unchanged", status == 200 and bool(rows) and rows[0]["consent_sentence"] != "changed by owner", f"HTTP {status}")
+
+    print("\n[step 5e] Consent comes from the consent record (trainer_has_consent)", flush=True)
+    for label, who, expect in (("owner", creator, True), ("team member", member, True), ("outsider", outsider, False)):
+        s, body = call("POST", "/rest/v1/rpc/trainer_has_consent", {"p_trainer_id": t_ok}, token=who["token"])
+        check(f"{label}: trainer_has_consent is {str(expect).lower()} for a consented trainer", s == 200 and body is expect, f"HTTP {s}, value {body}")
+    s, body = call("POST", "/rest/v1/rpc/trainer_has_consent", {"p_trainer_id": t_no_consent}, token=creator["token"])
+    check("a trainer with no consent record gives false", s == 200 and body is False, f"HTTP {s}, value {body}")
+    s, _ = call("POST", "/rest/v1/rpc/trainer_has_consent", {"p_trainer_id": t_ok})
+    check("anon key cannot call rpc/trainer_has_consent (expect 401, 403 or 404)", s in (401, 403, 404), f"HTTP {s}")
+
+    print("\n[step 5c] Cross-team job and the team helpers", flush=True)
+    s, _ = call("POST", "/functions/v1/module-job-create", {"team_id": team_b, "trainer_id": t_ok, "script_text": "Cross team test."}, token=creator["token"])
+    check("a job for a trainer of another team is refused (expect 403)", s == 403, f"HTTP {s}")
+
+    print("\n[step 5d] Policies do not recurse", flush=True)
+    for path, who in (("/rest/v1/team_members?select=team_id,user_id,role", member),
+                      ("/rest/v1/teams?select=id,name", member),
+                      ("/rest/v1/module_jobs?select=id,status", member),
+                      ("/rest/v1/module_job_events?select=id,status", member),
+                      (f"/rest/v1/custom_trainers?select=id,name&team_id=eq.{team_id}", member)):
+        s, body = call("GET", path, token=who["token"])
+        recursion = "recursion" in json.dumps(body).lower() if body is not None else False
+        check(f"read succeeds without recursion: {path.split('?')[0]}", s == 200 and not recursion, f"HTTP {s}")
+
+    print("\n[step 6] Trainer setup: storage and clip count", flush=True)
+    clip = b"\x00" * 1024
+    s, _ = call("POST", f"/storage/v1/object/trainer-clips/{creator['id']}/{t_ok}/clips/test.mp4", clip, token=creator["token"])
+    check("owner can upload a clip to their own folder (expect 200)", s == 200, f"HTTP {s}")
+    s, _ = call("POST", f"/storage/v1/object/trainer-clips/{creator['id']}/{t_ok}/clips/intruder.mp4", clip, token=outsider["token"])
+    check("outsider cannot upload into the owner's folder (expect 400 or 403)", s in (400, 403), f"HTTP {s}")
+    s, body = call("POST", "/functions/v1/trainer-clips-sync", {"trainer_id": t_ok}, token=creator["token"])
+    count = (body or {}).get("data", {}).get("base_clip_count") if isinstance(body, dict) else None
+    check("the server counts the uploaded clips (expect 200 and 1)", s == 200 and count == 1, f"HTTP {s}, count {count}")
+    s, _ = call("POST", "/functions/v1/trainer-clips-sync", {"trainer_id": t_ok}, token=outsider["token"])
+    check("only the owner can sync clips (expect 403)", s == 403, f"HTTP {s}")
+    s, _ = call("POST", "/functions/v1/trainer-attach-team", {"trainer_id": t_no_clips, "team_id": team_b}, token=member["token"])
+    check("a member cannot attach a trainer to a team (expect 403)", s == 403, f"HTTP {s}")
+    s, _ = call("POST", "/functions/v1/trainer-attach-team", {"trainer_id": t_no_clips, "team_id": team_b}, token=creator["token"])
+    check("the owner can attach a trainer to a team where they are a creator (expect 200)", s == 200, f"HTTP {s}")
+
+    print("\n[step 7] Worker (optional)", flush=True)
+    if CHECK_WORKER and job1:
+        deadline = time.time() + 3600
+        status_now = None
+        while time.time() < deadline:
+            _, rows = call("GET", f"/rest/v1/module_jobs?id=eq.{job1}&select=status,error", service=True)
+            status_now = rows[0]["status"] if rows else None
+            if status_now in ("ready_for_review", "failed"):
+                break
+            time.sleep(20)
+        check("worker moves the job to ready_for_review", status_now == "ready_for_review", f"status {status_now}")
+    else:
+        print("  skipped (set THROWAWAY_CHECK_WORKER=1 with a worker running against this project)", flush=True)
+
+    failed = [r for r in results if not r[1]]
+    print(f"\nResult: {len(results) - len(failed)} passed, {len(failed)} failed.", flush=True)
+    write_state(team_id, [creator, admin, member, outsider], created_jobs, extra_team=team_b)
+    sys.exit(1 if failed else 0)
+
+
+STATE = os.path.join(os.path.dirname(__file__), ".test_module_jobs_state.json")
+
+
+def write_state(team_id, users, jobs, extra_team=None):
+    with open(STATE, "w", encoding="utf8") as f:
+        json.dump({"team_id": team_id, "extra_team_id": extra_team, "user_ids": [u["id"] for u in users], "job_ids": jobs}, f)
+
+
+CLEANUP_BUCKETS = ("trainer-clips", "generated-videos", "module-cache")
+
+
+def list_objects(bucket, prefix):
+    """Every object name under prefix (folders are walked). Raises if the listing fails."""
+    status, items = call("POST", f"/storage/v1/object/list/{bucket}", {"prefix": prefix, "limit": 1000, "offset": 0}, service=True)
+    if status != 200:
+        raise RuntimeError(f"list {bucket}/{prefix}: HTTP {status}")
+    out = []
+    for it in items or []:
+        name = f"{prefix}/{it['name']}" if prefix else it["name"]
+        if it.get("id") is None:
+            out += list_objects(bucket, name)
+        else:
+            out.append(name)
+    return out
+
+
+def delete_once_more(label, path, body=None, ok=(200, 204), problems=None):
+    """Runs a service-role DELETE. A failure is retried once. Anything still failing is recorded in problems."""
+    last = None
+    for _ in range(2):
+        status, resp = call("DELETE", path, body, service=True)
+        if status in ok:
+            return True
+        last = (status, resp)
+    problems.append(f"{label}: HTTP {last[0]} {str(last[1])[:160]}")
+    return False
+
+
+def cleanup():
+    """Removes what the last test run created, checks that it is gone, and keeps the state file if anything is left."""
+    guard()
+    if not os.path.exists(STATE):
+        sys.exit("Nothing to clean up (no state file).")
+    state = json.load(open(STATE, encoding="utf8"))
+    team_ids = [t for t in (state.get("team_id"), state.get("extra_team_id")) if t]
+    user_ids = state.get("user_ids", [])
+    problems, objects_removed = [], 0
+
+    # 1. Storage objects that the users own (clips, cached pieces, outputs).
+    for uid in user_ids:
+        for bucket in CLEANUP_BUCKETS:
+            try:
+                names = list_objects(bucket, uid)
+            except RuntimeError as err:
+                problems.append(str(err))
+                continue
+            for i in range(0, len(names), 100):
+                delete_once_more(f"delete storage {bucket}", f"/storage/v1/object/{bucket}",
+                                 {"prefixes": names[i:i + 100]}, ok=(200,), problems=problems)
+            objects_removed += len(names)
+
+    # 2. Teams (their memberships, trainers and jobs go with them), then users.
+    for tid in team_ids:
+        delete_once_more(f"delete team {tid}", f"/rest/v1/teams?id=eq.{tid}", problems=problems)
+    for uid in user_ids:
+        delete_once_more(f"delete user {uid}", f"/auth/v1/admin/users/{uid}", problems=problems)
+
+    # 3. Verify: nothing of the test data is left.
+    for tid in team_ids:
+        status, rows = call("GET", f"/rest/v1/teams?id=eq.{tid}&select=id", service=True)
+        if status != 200 or rows:
+            problems.append(f"team {tid} is still there (HTTP {status})")
+        status, rows = call("GET", f"/rest/v1/module_jobs?team_id=eq.{tid}&select=id", service=True)
+        if status != 200 or rows:
+            problems.append(f"jobs of team {tid} are still there (HTTP {status}, {len(rows or [])} rows)")
+    for uid in user_ids:
+        status, _ = call("GET", f"/auth/v1/admin/users/{uid}", service=True)
+        if status != 404:
+            problems.append(f"user {uid} is still there (HTTP {status})")
+        for table, column in (("custom_trainers", "owner_user_id"), ("custom_trainer_consents", "owner_user_id"),
+                              ("module_jobs", "owner_user_id")):
+            status, rows = call("GET", f"/rest/v1/{table}?{column}=eq.{uid}&select=id", service=True)
+            if status != 200 or rows:
+                problems.append(f"{table} rows of user {uid} are still there (HTTP {status}, {len(rows or [])} rows)")
+        for bucket in CLEANUP_BUCKETS:
+            try:
+                left = list_objects(bucket, uid)
+            except RuntimeError as err:
+                problems.append(str(err))
+                continue
+            if left:
+                problems.append(f"{len(left)} object(s) still in {bucket} for user {uid}")
+
+    if problems:
+        print("NOT fully cleaned. Left over or failed:")
+        for p in problems:
+            print("  -", p)
+        print(f"The state file is kept ({STATE}), so you can run --cleanup again after fixing the items above.")
+        sys.exit(1)
+    os.remove(STATE)
+    print(f"Verified clean: removed {objects_removed} storage object(s), {len(team_ids)} team(s) and {len(user_ids)} user(s). "
+          "Nothing of the test data is left.")
+
+
+if __name__ == "__main__":
+    if "--cleanup" in sys.argv:
+        cleanup()
+    else:
+        run()

@@ -53,7 +53,8 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const consentSentence = `I, ${name.trim() || "[my name]"}, agree that ContentForge may create a synthetic copy of my face and voice to narrate courses I choose. I can delete it at any time.`;
+  // Stored with each new consent record. Existing records keep the sentence they were recorded with.
+  const consentSentence = `I, ${name.trim() || "[my name]"}, agree that ContentForge may create a synthetic video and voice copy of me, and use it to narrate courses made by ContentForge and its clients. Every such video will be labelled as AI-generated. I can ask ContentForge to delete my copy at any time.`;
 
   useEffect(() => {
     if (!open) {
