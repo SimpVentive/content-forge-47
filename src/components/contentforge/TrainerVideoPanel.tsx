@@ -161,7 +161,8 @@ export function TrainerVideoPanel({ moduleTitle, initialScript = "" }: { moduleT
     }
   }
 
-  if (!user) return null;
+  // Users who are not in a team see nothing here. While the team is loading, nothing is shown either.
+  if (!user || !teamId) return null;
 
   return (
     <section className="rounded-xl border p-4 space-y-4">
@@ -176,8 +177,6 @@ export function TrainerVideoPanel({ moduleTitle, initialScript = "" }: { moduleT
         {showSetup ? "Hide trainer setup" : "Trainer setup"}
       </button>
       {showSetup && <TrainerSetup userId={user.id} teamId={teamId} />}
-
-      {!teamId && <p className="text-[12px] text-muted-foreground">You are not in a team yet. Ask an admin to add you.</p>}
 
       {teamId && (
         <>
