@@ -354,6 +354,7 @@ export type Database = {
         Row: {
           animation_mode: string
           approved_at: string | null
+          base_clip_count: number
           created_at: string
           deleted_at: string | null
           id: string
@@ -362,15 +363,18 @@ export type Database = {
           owner_user_id: string
           photo_path: string | null
           photo_set: Json | null
+          team_id: string | null
           updated_at: string
           voice_error: string | null
           voice_id: string | null
           voice_sample_path: string | null
+          voice_settings: Json | null
           voice_status: string
         }
         Insert: {
           animation_mode?: string
           approved_at?: string | null
+          base_clip_count?: number
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -379,15 +383,18 @@ export type Database = {
           owner_user_id: string
           photo_path?: string | null
           photo_set?: Json | null
+          team_id?: string | null
           updated_at?: string
           voice_error?: string | null
           voice_id?: string | null
           voice_sample_path?: string | null
+          voice_settings?: Json | null
           voice_status?: string
         }
         Update: {
           animation_mode?: string
           approved_at?: string | null
+          base_clip_count?: number
           created_at?: string
           deleted_at?: string | null
           id?: string
@@ -396,13 +403,133 @@ export type Database = {
           owner_user_id?: string
           photo_path?: string | null
           photo_set?: Json | null
+          team_id?: string | null
           updated_at?: string
           voice_error?: string | null
           voice_id?: string | null
           voice_sample_path?: string | null
+          voice_settings?: Json | null
           voice_status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "custom_trainers_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_job_events: {
+        Row: {
+          created_at: string
+          id: number
+          job_id: string
+          message: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          job_id: string
+          message?: string | null
+          status: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          job_id?: string
+          message?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_job_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "module_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_jobs: {
+        Row: {
+          cost_usd: number | null
+          created_at: string
+          error: string | null
+          estimate_usd: number
+          id: string
+          output_path: string | null
+          owner_user_id: string
+          progress: string | null
+          proof_path: string | null
+          published_at: string | null
+          report_path: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          script_text: string
+          status: string
+          team_id: string
+          trainer_id: string
+          updated_at: string
+        }
+        Insert: {
+          cost_usd?: number | null
+          created_at?: string
+          error?: string | null
+          estimate_usd?: number
+          id?: string
+          output_path?: string | null
+          owner_user_id: string
+          progress?: string | null
+          proof_path?: string | null
+          published_at?: string | null
+          report_path?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          script_text: string
+          status?: string
+          team_id: string
+          trainer_id: string
+          updated_at?: string
+        }
+        Update: {
+          cost_usd?: number | null
+          created_at?: string
+          error?: string | null
+          estimate_usd?: number
+          id?: string
+          output_path?: string | null
+          owner_user_id?: string
+          progress?: string | null
+          proof_path?: string | null
+          published_at?: string | null
+          report_path?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          script_text?: string
+          status?: string
+          team_id?: string
+          trainer_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_jobs_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "module_jobs_trainer_id_fkey"
+            columns: ["trainer_id"]
+            isOneToOne: false
+            referencedRelation: "custom_trainers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -520,6 +647,53 @@ export type Database = {
         }
         Relationships: []
       }
+      team_members: {
+        Row: {
+          created_at: string
+          role: string
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          role: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          role?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       user_assets: {
         Row: {
           created_at: string
@@ -587,10 +761,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      is_team_member: { Args: { p_team_id: string }; Returns: boolean }
       spend_credits: {
         Args: { p_amount: number; p_reason?: string; p_user_id: string }
         Returns: number
       }
+      team_role: { Args: { p_team_id: string }; Returns: string }
+      trainer_has_consent: { Args: { p_trainer_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
