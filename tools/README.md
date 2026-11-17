@@ -54,7 +54,16 @@ Runs one worker test against the throwaway project. Nothing here touches live.
     python tools/run_worker.py --stop              stops it
 
 Keys come from the environment or the Supabase CLI, never from a file. Before starting the worker, set
-`ELEVENLABS_API_KEY` and `FAL_KEY` in the PowerShell window. The launcher refuses any URL that is not the throwaway project.
+`ELEVENLABS_API_KEY`, `FAL_KEY` and `THROWAWAY_WORKER_PASS` in the PowerShell window. The launcher refuses any URL that is
+not the throwaway project. The worker itself has no service key: it reaches Supabase only through the worker gateway.
+
+## Worker gateway (throwaway project only)
+
+    python tools/test_worker_gateway.py    45 checks against the deployed gateway: passes, claims, tokens, paths, status rules, stale jobs. Spends nothing.
+    python tools/test_worker_pieces.py     a failed run still saves its pieces; a failed cache upload still ends the job. Uses a fake tool; spends nothing.
+
+Needs `THROWAWAY_WORKER_PASS` set to the pass currently on the throwaway function. Rollback for the migration:
+`tools/rollback_worker_gateway.sql` (not run anywhere). Read-only check: `tools/live_checks_worker_gateway.sql`.
 
 ## Local tests (no fal, no ElevenLabs, no spend)
 

@@ -1,217 +1,233 @@
 #!/usr/bin/env python
-"""Trainer-avatar job worker.
+"""Trainer-avatar job worker. It reaches Supabase only through the worker gateway (supabase/functions/worker-gateway).
 
-Polls the module_jobs table for queued jobs, claims one, fetches the trainer's files from storage, runs
-tools/make_module.py, uploads the results, and sets the job to ready_for_review (or failed).
+It claims a queued job, downloads the trainer's clips and cached pieces through signed links, runs tools/make_module.py,
+uploads the outputs and pieces through signed links, and reports the job complete or failed.
 
 Environment (set in the host's secret store, never in code):
-    SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ELEVENLABS_API_KEY, FAL_KEY
-Optional: WORKER_POLL_SECONDS (default 15), WORK_DIR (default ./work), MODULE_WORKERS (default 4).
+    WORKER_GATEWAY_URL   https://<project>.supabase.co/functions/v1/worker-gateway
+    WORKER_PASS          the worker pass, sent as X-Worker-Pass
+    SUPABASE_ANON_KEY    the public anon key, sent as the Bearer token (needed while the platform checks JWTs)
+    ELEVENLABS_API_KEY   voice narration (used by tools/make_module.py)
+    FAL_KEY              LatentSync on fal.ai (used by tools/make_module.py)
+Optional: WORKER_POLL_SECONDS (default 15), MODULE_WORKERS (default 4), WORK_DIR (default worker/work).
 
-Pieces are cached in the private module-cache bucket (<owner>/<trainer>/cache/), so a restart does not pay again.
-Only this worker (service role) can write there: the bucket has no storage policies for browser users.
-Voice settings from the database are clamped to the approved ranges before they reach ElevenLabs.
-Keys are never logged. Only job ids, statuses and costs are written to the job rows.
+Nothing is logged except job ids and fixed status words. The pass, claim tokens and signed URLs are never logged,
+and the messages stored on a job are fixed texts, so an error message cannot carry a link or a token.
 """
-import json, os, pathlib, subprocess, sys, time, urllib.error, urllib.parse, urllib.request
+import json, os, pathlib, re, shutil, subprocess, sys, threading, time, urllib.error, urllib.request
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 MODULE_TOOL = REPO / "tools" / "make_module.py"
 WORK = pathlib.Path(os.environ.get("WORK_DIR", REPO / "worker" / "work")).resolve()
 POLL = int(os.environ.get("WORKER_POLL_SECONDS", "15"))
 WORKERS = os.environ.get("MODULE_WORKERS", "4")
-URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
-KEY = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
-VOICE_SETTINGS = {"stability": 0.5, "similarity_boost": 0.75, "style": 0.3, "use_speaker_boost": True}
-# Approved ranges. Keep in step with VOICE_RANGES in src/lib/trainerSetup.ts.
-VOICE_RANGES = {"stability": (0.35, 0.5, 0.5), "style": (0.2, 0.4, 0.3)}  # (min, max, default)
-CACHE_BUCKET = "module-cache"  # private, service role only (see the migration)
+GATEWAY = os.environ.get("WORKER_GATEWAY_URL", "").rstrip("/")
+PASS = os.environ.get("WORKER_PASS", "")
+ANON = os.environ.get("SUPABASE_ANON_KEY", "")
+HEARTBEAT_SECONDS = 300  # a progress message this often keeps the job from going stale
+SAFE_NAME = re.compile(r"^[A-Za-z0-9_-][A-Za-z0-9._-]{0,119}$")
 
 
-def clamp_voice_settings(raw):
-    """Returns settings inside the approved ranges. Anything missing or not a number falls back to the default.
-    The browser can write voice_settings, so this runs on the server before the settings are used."""
-    raw = raw if isinstance(raw, dict) else {}
-    out = dict(VOICE_SETTINGS)
-    for key, (low, high, default) in VOICE_RANGES.items():
-        value = raw.get(key)
-        if isinstance(value, bool) or not isinstance(value, (int, float)) or value != value:  # NaN check
-            value = default
-        out[key] = round(min(max(float(value), low), high), 3)
-    return out
+class GatewayError(Exception):
+    """The gateway refused or could not be reached. Carries only the HTTP status, never a URL or body."""
+
+    def __init__(self, status):
+        super().__init__(f"gateway status {status}")
+        self.status = status
+
+
+class StageError(Exception):
+    """A failure with a fixed message for the job. The text never includes a link or a token."""
+
+    def __init__(self, text):
+        super().__init__(text)
+        self.text = text
 
 
 def log(msg):
     print(time.strftime("%H:%M:%S"), msg, flush=True)
 
 
-def _req(method, path, body=None, headers=None, raw=False):
-    data = None if body is None else (body if isinstance(body, bytes) else json.dumps(body).encode("utf8"))
-    h = {"apikey": KEY, "Authorization": f"Bearer {KEY}"}
-    if body is not None and not isinstance(body, bytes):
-        h["Content-Type"] = "application/json"
-    h.update(headers or {})
-    req = urllib.request.Request(f"{URL}{path}", data=data, headers=h, method=method)
-    with urllib.request.urlopen(req, timeout=300) as resp:
-        payload = resp.read()
-    if raw:
-        return payload
-    return json.loads(payload) if payload else None
+def gateway(op, **fields):
+    """One call to the gateway. The pass goes in a header and is never logged."""
+    body = json.dumps({"op": op, **fields}).encode("utf8")
+    req = urllib.request.Request(GATEWAY, data=body, method="POST", headers={
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {ANON}",
+        "X-Worker-Pass": PASS,
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            return json.loads(resp.read() or b"{}")
+    except urllib.error.HTTPError as err:
+        raise GatewayError(err.code) from None
+    except (urllib.error.URLError, OSError):
+        raise GatewayError(0) from None
 
 
-def rest(method, table_query, body=None, prefer=None):
-    headers = {"Prefer": prefer} if prefer else {}
-    return _req(method, f"/rest/v1/{table_query}", body, headers)
-
-
-def claim_next_job():
-    rows = rest("GET", "module_jobs?status=eq.queued&select=*&order=created_at.asc&limit=1")
-    if not rows:
-        return None
-    job = rows[0]
-    # Claim only if still queued (a conditional update, so two workers cannot take the same job).
-    claimed = rest("PATCH", f"module_jobs?id=eq.{job['id']}&status=eq.queued",
-                   {"status": "generating", "progress": "Preparing the trainer", "updated_at": now()},
-                   prefer="return=representation")
-    if not claimed:
-        return None
-    event(job["id"], "generating", "Worker started")
-    return claimed[0]
-
-
-def now():
-    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-
-
-def event(job_id, status, message):
-    rest("POST", "module_job_events", {"job_id": job_id, "status": status, "message": message})
-
-
-def set_job(job_id, **fields):
-    fields["updated_at"] = now()
-    rest("PATCH", f"module_jobs?id=eq.{job_id}", fields)
-
-
-def storage_list(bucket, prefix):
-    body = {"prefix": prefix, "limit": 1000, "offset": 0}
-    out = _req("POST", f"/storage/v1/object/list/{bucket}", body)
-    return out or []
-
-
-def storage_download(bucket, path, dest):
-    data = _req("GET", f"/storage/v1/object/authenticated/{bucket}/{urllib.parse.quote(path)}", raw=True)
+def fetch(url, dest):
+    """Downloads a signed link to dest. Errors do not carry the URL."""
     dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_bytes(data)
+    try:
+        with urllib.request.urlopen(url, timeout=900) as resp, open(dest, "wb") as f:
+            shutil.copyfileobj(resp, f)
+    except (urllib.error.URLError, OSError):
+        raise StageError("Could not fetch the trainer's files.") from None
 
 
-def storage_upload(bucket, path, src, content_type):
+def put(url, src, content_type):
+    """Uploads a file to a signed upload link. Errors do not carry the URL."""
     data = pathlib.Path(src).read_bytes()
-    req = urllib.request.Request(
-        f"{URL}/storage/v1/object/{bucket}/{urllib.parse.quote(path)}", data=data,
-        headers={"apikey": KEY, "Authorization": f"Bearer {KEY}", "Content-Type": content_type, "x-upsert": "true"},
-        method="POST")
-    with urllib.request.urlopen(req, timeout=900):
-        pass
+    req = urllib.request.Request(url, data=data, method="PUT", headers={"Content-Type": content_type})
+    try:
+        with urllib.request.urlopen(req, timeout=900):
+            pass
+    except (urllib.error.URLError, OSError):
+        raise StageError("Could not upload the outputs.") from None
 
 
-def fetch_trainer(job, folder):
-    """Writes voice.json, base clips and cached pieces into the working folder for this trainer."""
-    trainer = rest("GET", f"custom_trainers?id=eq.{job['trainer_id']}&select=id,owner_user_id,voice_id,voice_status,voice_settings,team_id")
-    if not trainer:
-        raise RuntimeError("trainer not found")
-    t = trainer[0]
-    if not t.get("voice_id") or t.get("voice_status") != "ready":
-        raise RuntimeError("trainer voice is not ready")
-    base = f"{t['owner_user_id']}/{t['id']}"
-    (folder / "clips").mkdir(parents=True, exist_ok=True)
-    (folder / "cache").mkdir(parents=True, exist_ok=True)
+def write_voice(folder, trainer):
+    settings = trainer["voice_settings"]
     (folder / "voice.json").write_text(json.dumps({
-        "voice_id": t["voice_id"], "model_id": "eleven_multilingual_v2",
-        "settings": clamp_voice_settings(t.get("voice_settings"))}), "utf8")
-    clips = [o for o in storage_list("trainer-clips", f"{base}/clips") if o.get("name", "").endswith(".mp4")]
-    if not clips:
-        raise RuntimeError("no base clips uploaded for this trainer")
-    for o in clips:
-        storage_download("trainer-clips", f"{base}/clips/{o['name']}", folder / "clips" / o["name"])
-    for o in storage_list(CACHE_BUCKET, f"{base}/cache"):
-        if o.get("name"):
-            storage_download(CACHE_BUCKET, f"{base}/cache/{o['name']}", folder / "cache" / o["name"])
-    return base
+        "voice_id": trainer["voice_id"], "model_id": "eleven_multilingual_v2", "settings": settings}), "utf8")
 
 
-def push_cache(base, folder):
-    for f in (folder / "cache").glob("*"):
-        if f.is_file():
-            storage_upload(CACHE_BUCKET, f"{base}/cache/{f.name}", f,
-                           "video/mp4" if f.suffix == ".mp4" else "application/octet-stream")
-
-
-def run_module(job, folder, workdir):
+def run_module(job_inputs_folder, script_text, workdir):
     script = workdir / "script.txt"
-    script.write_text(job["script_text"], "utf8")
+    script.write_text(script_text, "utf8")
     out = workdir / "out" / "module.mp4"
-    cmd = [sys.executable, str(MODULE_TOOL), "--trainer", str(folder), "--script", str(script),
+    cmd = [sys.executable, str(MODULE_TOOL), "--trainer", str(job_inputs_folder), "--script", str(script),
            "--out", str(out), "--workers", WORKERS, "--yes"]
-    log_file = workdir / "make_module.log"
-    with log_file.open("w", encoding="utf8") as lf:
-        proc = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=str(REPO))
+    # The pass is not passed on to the tool.
+    env = {k: v for k, v in os.environ.items() if k != "WORKER_PASS"}
+    with (workdir / "make_module.log").open("w", encoding="utf8") as lf:
+        proc = subprocess.run(cmd, stdout=lf, stderr=subprocess.STDOUT, cwd=str(REPO), env=env)
     return proc.returncode, out, workdir / "out" / "run_report.json"
 
 
-def process(job):
-    job_id = job["id"]
+class Heartbeat:
+    """Sends a progress message every few minutes while the tool runs, so the job is not marked stale."""
+
+    def __init__(self, job_id, token):
+        self.job_id, self.token = job_id, token
+        self.stop = threading.Event()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+
+    def _run(self):
+        while not self.stop.wait(HEARTBEAT_SECONDS):
+            try:
+                gateway("progress", job_id=self.job_id, claim_token=self.token, message="Still generating")
+            except GatewayError:
+                pass  # the next call will report the problem
+
+    def __enter__(self):
+        self.thread.start()
+        return self
+
+    def __exit__(self, *exc):
+        self.stop.set()
+
+
+def save_pieces(job_id, token, folder):
+    """Uploads the cached pieces through signed links. Best effort: it never raises, so the job still
+    ends through the normal path. Returns the upload links (including the output links), or None if it failed."""
+    try:
+        names = sorted(p.name for p in (folder / "cache").iterdir() if p.is_file() and SAFE_NAME.match(p.name))
+        up = gateway("links_upload", job_id=job_id, claim_token=token, names=names)
+        for item in up.get("cache", []):
+            src = folder / "cache" / item["name"]
+            put(item["url"], src, "video/mp4" if src.suffix == ".mp4" else "application/octet-stream")
+        log(f"job {job_id}: pieces saved ({len(up.get('cache', []))})")
+        return up
+    except Exception as err:  # the error text is not logged: it can contain a link
+        log(f"job {job_id}: pieces could not be saved ({type(err).__name__})")
+        return None
+
+
+def process(job_id, token):
+    log(f"job {job_id}: claimed")
     workdir = WORK / job_id
     workdir.mkdir(parents=True, exist_ok=True)
     folder = workdir / "trainer"
     try:
-        set_job(job_id, progress="Fetching the trainer's files")
-        base = fetch_trainer(job, folder)
-        set_job(job_id, progress="Generating (this takes several minutes)")
-        code, out, report_path = run_module(job, folder, workdir)
-        push_cache(base, folder)
+        gateway("progress", job_id=job_id, claim_token=token, message="Fetching the trainer's files")
+        inputs = gateway("inputs", job_id=job_id, claim_token=token)
+        links = gateway("links_download", job_id=job_id, claim_token=token)
+        if folder.exists():
+            shutil.rmtree(folder)
+        (folder / "clips").mkdir(parents=True)
+        (folder / "cache").mkdir(parents=True)
+        write_voice(folder, {"voice_id": inputs["trainer"]["voice_id"], "voice_settings": inputs["trainer"]["voice_settings"]})
+        for item in links.get("clips", []):
+            if SAFE_NAME.match(item["name"]):
+                fetch(item["url"], folder / "clips" / item["name"])
+        for item in links.get("cache", []):
+            if SAFE_NAME.match(item["name"]):
+                fetch(item["url"], folder / "cache" / item["name"])
+        if not any((folder / "clips").glob("*.mp4")):
+            raise StageError("This trainer has no base clips.")
+
+        gateway("progress", job_id=job_id, claim_token=token, message="Generating (this takes several minutes)")
+        with Heartbeat(job_id, token):
+            code, out, report_path = run_module(folder, inputs["script_text"], workdir)
+        # The paid pieces are saved first, whatever the exit code, so a failed or partial run keeps them.
+        # Best effort: if this fails, it is logged and the job still ends through the normal path below.
+        up = save_pieces(job_id, token, folder)
         if code != 0 or not out.exists():
-            raise RuntimeError(f"generation stopped (exit code {code}); see the worker log for this job")
-        cost = None
-        if report_path.exists():
-            cost = json.loads(report_path.read_text("utf8")).get("costs", {}).get("total_usd")
-        owner = job["owner_user_id"]
-        final_path = f"{owner}/{job_id}/final.mp4"
-        proof_path = f"{owner}/{job_id}/proof.mp4"
-        report_remote = f"{owner}/{job_id}/run_report.json"
-        storage_upload("generated-videos", final_path, out, "video/mp4")
-        storage_upload("generated-videos", proof_path, out.with_name(out.stem + "-proof.mp4"), "video/mp4")
-        if report_path.exists():
-            storage_upload("generated-videos", report_remote, report_path, "application/json")
-        set_job(job_id, status="ready_for_review", progress="Ready for review", output_path=final_path,
-                proof_path=proof_path, report_path=report_remote, cost_usd=cost)
-        event(job_id, "ready_for_review", "Generated and labelled. Waiting for review.")
+            raise StageError("Generation stopped. See the worker log for this job.")
+
+        if up is None:
+            up = gateway("links_upload", job_id=job_id, claim_token=token, names=[])
+        if not report_path.exists():
+            raise StageError("Generation stopped. See the worker log for this job.")
+        outputs = up["outputs"]
+        put(outputs["final"], out, "video/mp4")
+        put(outputs["proof"], out.with_name(out.stem + "-proof.mp4"), "video/mp4")
+        put(outputs["report"], report_path, "application/json")
+
+        gateway("complete", job_id=job_id, claim_token=token)
         log(f"job {job_id}: ready for review")
-    except Exception as err:  # the message never contains keys: only the exception type and our own text
-        message = str(err)[:300]
-        set_job(job_id, status="failed", progress="Failed", error=message)
-        event(job_id, "failed", message)
-        log(f"job {job_id}: failed ({type(err).__name__})")
+    except StageError as err:
+        fail(job_id, token, err.text)
+    except GatewayError as err:
+        log(f"job {job_id}: gateway error (status {err.status})")
+        fail(job_id, token, "The worker lost the connection to the server.")
+    except Exception:  # the message is not stored: it could contain anything
+        fail(job_id, token, "Generation stopped unexpectedly.")
+
+
+def fail(job_id, token, text):
+    try:
+        gateway("fail", job_id=job_id, claim_token=token, message=text)
+        log(f"job {job_id}: failed")
+    except GatewayError as err:
+        log(f"job {job_id}: could not record the failure (status {err.status})")
+
+
+def check_settings():
+    missing = [n for n, v in (("WORKER_GATEWAY_URL", GATEWAY), ("WORKER_PASS", PASS), ("SUPABASE_ANON_KEY", ANON),
+                              ("ELEVENLABS_API_KEY", os.environ.get("ELEVENLABS_API_KEY")),
+                              ("FAL_KEY", os.environ.get("FAL_KEY"))) if not v]
+    if missing:
+        sys.exit("Set these in the environment: " + ", ".join(missing))
 
 
 def main():
-    if not URL or not KEY:
-        sys.exit("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set in the environment")
-    for name in ("ELEVENLABS_API_KEY", "FAL_KEY"):
-        if not os.environ.get(name):
-            sys.exit(f"{name} must be set in the environment")
+    check_settings()
     WORK.mkdir(parents=True, exist_ok=True)
     log("worker started")
     while True:
         try:
-            job = claim_next_job()
-        except (urllib.error.URLError, OSError) as err:
-            log(f"database not reachable ({type(err).__name__}); retrying")
+            result = gateway("claim")
+        except GatewayError as err:
+            log(f"gateway not reachable (status {err.status}); retrying")
             time.sleep(POLL)
             continue
-        if job is None:
+        if not result.get("job_id"):
             time.sleep(POLL)
             continue
-        process(job)
+        process(result["job_id"], result["claim_token"])
 
 
 if __name__ == "__main__":

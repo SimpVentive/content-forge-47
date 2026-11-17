@@ -2,3 +2,8 @@ project_id = "licezkkahseilnmswxbc"
 
 [functions.heygen-video]
 verify_jwt = false
+
+# The worker sends the public anon key as the Bearer token, so the platform check passes. The worker pass
+# (X-Worker-Pass) is what actually authorises a request.
+[functions.worker-gateway]
+verify_jwt = true
