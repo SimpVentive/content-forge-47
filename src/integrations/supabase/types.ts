@@ -421,6 +421,32 @@ export type Database = {
           },
         ]
       }
+      module_job_claims: {
+        Row: {
+          claimed_at: string
+          job_id: string
+          token_hash: string
+        }
+        Insert: {
+          claimed_at?: string
+          job_id: string
+          token_hash: string
+        }
+        Update: {
+          claimed_at?: string
+          job_id?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_job_claims_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: true
+            referencedRelation: "module_jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_job_events: {
         Row: {
           created_at: string
@@ -463,6 +489,7 @@ export type Database = {
           output_path: string | null
           owner_user_id: string
           progress: string | null
+          progress_at: string | null
           proof_path: string | null
           published_at: string | null
           report_path: string | null
@@ -483,6 +510,7 @@ export type Database = {
           output_path?: string | null
           owner_user_id: string
           progress?: string | null
+          progress_at?: string | null
           proof_path?: string | null
           published_at?: string | null
           report_path?: string | null
@@ -503,6 +531,7 @@ export type Database = {
           output_path?: string | null
           owner_user_id?: string
           progress?: string | null
+          progress_at?: string | null
           proof_path?: string | null
           published_at?: string | null
           report_path?: string | null
@@ -761,6 +790,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_next_module_job: { Args: { p_token_hash: string }; Returns: string }
       is_team_member: { Args: { p_team_id: string }; Returns: boolean }
       spend_credits: {
         Args: { p_amount: number; p_reason?: string; p_user_id: string }
