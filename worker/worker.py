@@ -129,6 +129,22 @@ class Heartbeat:
         self.stop.set()
 
 
+def save_pieces(job_id, token, folder):
+    """Uploads the cached pieces through signed links. Best effort: it never raises, so the job still
+    ends through the normal path. Returns the upload links (including the output links), or None if it failed."""
+    try:
+        names = sorted(p.name for p in (folder / "cache").iterdir() if p.is_file() and SAFE_NAME.match(p.name))
+        up = gateway("links_upload", job_id=job_id, claim_token=token, names=names)
+        for item in up.get("cache", []):
+            src = folder / "cache" / item["name"]
+            put(item["url"], src, "video/mp4" if src.suffix == ".mp4" else "application/octet-stream")
+        log(f"job {job_id}: pieces saved ({len(up.get('cache', []))})")
+        return up
+    except Exception as err:  # the error text is not logged: it can contain a link
+        log(f"job {job_id}: pieces could not be saved ({type(err).__name__})")
+        return None
+
+
 def process(job_id, token):
     log(f"job {job_id}: claimed")
     workdir = WORK / job_id
@@ -155,14 +171,14 @@ def process(job_id, token):
         gateway("progress", job_id=job_id, claim_token=token, message="Generating (this takes several minutes)")
         with Heartbeat(job_id, token):
             code, out, report_path = run_module(folder, inputs["script_text"], workdir)
+        # The paid pieces are saved first, whatever the exit code, so a failed or partial run keeps them.
+        # Best effort: if this fails, it is logged and the job still ends through the normal path below.
+        up = save_pieces(job_id, token, folder)
         if code != 0 or not out.exists():
             raise StageError("Generation stopped. See the worker log for this job.")
 
-        names = sorted(p.name for p in (folder / "cache").iterdir() if p.is_file() and SAFE_NAME.match(p.name))
-        up = gateway("links_upload", job_id=job_id, claim_token=token, names=names)
-        for item in up.get("cache", []):
-            src = folder / "cache" / item["name"]
-            put(item["url"], src, "video/mp4" if src.suffix == ".mp4" else "application/octet-stream")
+        if up is None:
+            up = gateway("links_upload", job_id=job_id, claim_token=token, names=[])
         if not report_path.exists():
             raise StageError("Generation stopped. See the worker log for this job.")
         outputs = up["outputs"]

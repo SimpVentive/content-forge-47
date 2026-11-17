@@ -60,6 +60,7 @@ not the throwaway project. The worker itself has no service key: it reaches Supa
 ## Worker gateway (throwaway project only)
 
     python tools/test_worker_gateway.py    45 checks against the deployed gateway: passes, claims, tokens, paths, status rules, stale jobs. Spends nothing.
+    python tools/test_worker_pieces.py     a failed run still saves its pieces; a failed cache upload still ends the job. Uses a fake tool; spends nothing.
 
 Needs `THROWAWAY_WORKER_PASS` set to the pass currently on the throwaway function. Rollback for the migration:
 `tools/rollback_worker_gateway.sql` (not run anywhere). Read-only check: `tools/live_checks_worker_gateway.sql`.
