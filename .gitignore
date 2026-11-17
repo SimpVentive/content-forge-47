@@ -64,3 +64,6 @@ supabase/.temp/
 
 # Worker test state written by tools/prepare_worker_test.py (ids only, used by its cleanup)
 tools/.worker_test_state.json
+
+# Local-only files with real emails or other personal values (filled bootstrap SQL and similar). Never commit.
+tools/local/
