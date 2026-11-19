@@ -21,3 +21,7 @@
 
 # Every module keeps a quiz, every asked-for question type works
 - [x] Collect every authored assessment type (match the following, fill in the blanks, true/false, scenario, MCQ), report unscorable items instead of dropping them, and never budget fewer questions than there are modules; match and fill now render, score and speak in the shared learner runtime used by preview and SCORM, and the printable assessment pages include them. Seventeen targeted tests passed (11 coverage/answer-key, 5 learner screens, 1 printable pages) plus the full suite of 171 and a clean typecheck. The user's own saved course and exported SCORM package remain unverified without a sign-in.
+## My Courses
+- [x] Reach My Courses from Create Your Course, the studio, the home page menu and the video course screen
+- [x] Save courses to each person's account (any device); auto-save finished courses; Edit opens the chosen course
+- [ ] Earlier courses: only recoverable if "Save Draft" was pressed in that browser on that web address — open My Courses there once (waiting on the user)

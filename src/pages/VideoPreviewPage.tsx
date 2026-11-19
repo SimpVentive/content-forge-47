@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { VideoPlayerPreview } from "@/components/VideoPlayerPreview";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, BookOpen } from "lucide-react";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 
 const VideoPreviewPage = () => {
@@ -17,6 +17,9 @@ const VideoPreviewPage = () => {
           <button onClick={() => navigate("/forge")} className="text-primary underline">
             Back to Builder
           </button>
+          <button onClick={() => navigate("/dashboard")} className="ml-4 text-primary underline">
+            My Courses
+          </button>
         </div>
       </div>
     );
@@ -27,6 +30,12 @@ const VideoPreviewPage = () => {
       <header className="h-[64px] bg-white border-b border-slate-200 flex items-center px-6 gap-4">
         <img src={contentForgeLogo} alt="ContentForge" className="h-9 object-contain" />
         <span className="text-xl font-bold text-slate-800 flex-1 truncate">{courseTitle}</span>
+        <button
+          onClick={() => navigate("/dashboard")}
+          className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+        >
+          <BookOpen className="w-4 h-4" /> My Courses
+        </button>
         <button
           onClick={() => navigate("/forge")}
           className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"

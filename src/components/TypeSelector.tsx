@@ -60,8 +60,10 @@ const TypeSelector = () => {
       </div>
 
       {/* Logo */}
-      <div className="mb-12 flex justify-center">
-        <BrandLogo size="2xl" />
+      <div className="-my-6 mb-6 flex justify-center sm:my-0 sm:mb-12">
+        <div className="origin-center scale-[0.55] sm:scale-100">
+          <BrandLogo size="2xl" />
+        </div>
       </div>
 
       {/* Header Section */}

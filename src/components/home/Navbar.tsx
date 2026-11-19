@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, LogOut, LayoutDashboard, ShieldCheck } from "lucide-react";
+import { Menu, X, LogOut, LayoutDashboard, ShieldCheck, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { BrandLogo } from "./BrandLogo";
 
@@ -76,11 +76,18 @@ export const Navbar = () => {
                     </div>
                   </div>
                   <Link
+                    to="/dashboard"
+                    onClick={() => setOpenMenu(false)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <LayoutDashboard className="h-4 w-4" /> My Courses
+                  </Link>
+                  <Link
                     to="/new-course"
                     onClick={() => setOpenMenu(false)}
                     className="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
                   >
-                    <LayoutDashboard className="h-4 w-4" /> Go to Dashboard
+                    <Plus className="h-4 w-4" /> New Course
                   </Link>
                   {isAdmin && (
                     <Link
@@ -152,11 +159,18 @@ export const Navbar = () => {
             {isAuthenticated ? (
               <>
                 <Link
-                  to="/new-course"
+                  to="/dashboard"
                   onClick={() => setOpenMobile(false)}
                   className="mt-2 rounded-lg bg-indigo-600 px-3 py-2 text-center text-sm font-semibold text-white"
                 >
-                  Go to Dashboard
+                  My Courses
+                </Link>
+                <Link
+                  to="/new-course"
+                  onClick={() => setOpenMobile(false)}
+                  className="rounded-lg border border-slate-200 px-3 py-2 text-center text-sm font-medium text-slate-700"
+                >
+                  New Course
                 </Link>
                 {isAdmin && (
                   <Link
