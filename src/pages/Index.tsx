@@ -13,13 +13,14 @@ import type { InsertedVideo } from "@/components/contentforge/VideosTab";
 import { useAgentPipeline } from "@/hooks/useAgentPipeline";
 import type { OutputData, RawAgentOutputs } from "@/types/agents";
 import { AGENTS, SAMPLE_TITLE, SAMPLE_NOTES } from "@/types/agents";
-import { Plus, Play, Clock3, Loader2, Save, FolderOpen, Trash2, FileText, Zap, BarChart3, Settings } from "lucide-react";
+import { BookOpen, Plus, Play, Clock3, Loader2, Save, FolderOpen, Trash2, FileText, Zap, BarChart3, Settings } from "lucide-react";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { TabContainer } from "@/components/contentforge/TabContainer";
 import contentForgeLogo from "@/assets/contentforge-logo.png";
 import {
   createDraftId,
   deleteCourseDraftCloudFirst,
+  getCourseDraftCloudFirst,
   listCourseDraftsCloudFirst,
   saveCourseDraftCloudFirst,
   type CourseDraft,
@@ -153,6 +154,24 @@ const Index = () => {
     void refreshDrafts();
   }, []);
 
+  // Opening a course from My Courses: load that saved course into the studio.
+  const openedCourseId = (location.state as { courseId?: string } | null)?.courseId ?? null;
+  const loadedCourseIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!openedCourseId || loadedCourseIdRef.current === openedCourseId) return;
+    loadedCourseIdRef.current = openedCourseId;
+    void (async () => {
+      const draft = await getCourseDraftCloudFirst(openedCourseId);
+      if (draft) {
+        handleLoadDraft(draft);
+        if (draft.outputData && Object.values(draft.outputData).some(Boolean)) setActiveTab("output");
+      } else {
+        toast.error("That course could not be found.");
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openedCourseId]);
+
   // Handle navigation from Dashboard to Asset Library
   useEffect(() => {
     if (!hasProcessedAssetNav.current) {
@@ -187,6 +206,8 @@ const Index = () => {
 
   useEffect(() => {
     if (prevIsRunning.current && !isRunning && rawOutputs.assembly) {
+      // Every finished course is kept in My Courses without needing Save Draft.
+      void handleSaveDraft({ silent: true }).catch((err) => console.warn("Auto-save failed:", err));
       if (rawOutputs.heygenVideos) {
         // Video mode complete — route to preview
         try {
@@ -304,7 +325,7 @@ const Index = () => {
     setActiveTab("setup");
   };
 
-  const handleSaveDraft = async () => {
+  const handleSaveDraft = async ({ silent = false }: { silent?: boolean } = {}) => {
     const draftId = currentDraftId || createDraftId();
     const title = (courseTitle || "Untitled Course").trim() || "Untitled Course";
 
@@ -320,7 +341,7 @@ const Index = () => {
 
     setCurrentDraftId(draftId);
     await refreshDrafts();
-    toast.success("Draft saved");
+    toast.success(silent ? "Saved to My Courses" : "Draft saved");
   };
 
   const handleLoadDraft = (draft: CourseDraft) => {
@@ -333,7 +354,7 @@ const Index = () => {
     setManualVideos([]);
     loadPersistedState(draft.rawOutputs, draft.outputData, []);
     setShowDraftsPanel(false);
-    toast.success("Draft loaded");
+    toast.success(`Opened "${draft.title || "Untitled Course"}"`);
   };
 
   const handleDeleteDraft = async (draftId: string) => {
@@ -719,6 +740,14 @@ const Index = () => {
           >
             <Save className="w-4 h-4" />
             Save Draft
+          </button>
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="h-[44px] px-4 rounded-lg text-[14px] font-bold border-2 border-border text-foreground hover:bg-secondary transition-all duration-200 flex items-center gap-2"
+            type="button"
+          >
+            <BookOpen className="w-4 h-4" />
+            My Courses
           </button>
           <button
             onClick={() => {

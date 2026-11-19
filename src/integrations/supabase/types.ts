@@ -253,6 +253,45 @@ export type Database = {
           },
         ]
       }
+      course_drafts: {
+        Row: {
+          course_params: Json | null
+          created_at: string
+          id: string
+          input_text: string
+          output_data: Json
+          owner_user_id: string
+          raw_outputs: Json
+          saved_at: string
+          title: string
+          workflow_clips: Json
+        }
+        Insert: {
+          course_params?: Json | null
+          created_at?: string
+          id: string
+          input_text?: string
+          output_data?: Json
+          owner_user_id?: string
+          raw_outputs?: Json
+          saved_at?: string
+          title?: string
+          workflow_clips?: Json
+        }
+        Update: {
+          course_params?: Json | null
+          created_at?: string
+          id?: string
+          input_text?: string
+          output_data?: Json
+          owner_user_id?: string
+          raw_outputs?: Json
+          saved_at?: string
+          title?: string
+          workflow_clips?: Json
+        }
+        Relationships: []
+      }
       custom_trainer_clips: {
         Row: {
           audio_path: string | null

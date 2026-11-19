@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2 } from "lucide-react";
+import { BookOpen, Loader2 } from "lucide-react";
 import { BrandLogo } from "@/components/home/BrandLogo";
 
 const PresentationIcon = () => (
@@ -46,7 +46,19 @@ const TypeSelector = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f0f2f7] px-6 py-12">
+    <div className="relative min-h-screen bg-[#f0f2f7] px-6 py-12">
+      {/* Way back to courses already created */}
+      <div className="mx-auto mb-6 flex max-w-[1200px] justify-end">
+        <button
+          type="button"
+          onClick={() => navigate("/dashboard")}
+          className="flex h-11 items-center gap-2 rounded-lg border-[1.5px] border-[#e2e8f0] bg-white px-5 text-sm font-semibold text-[#0f172a] transition-all hover:border-primary hover:text-primary"
+        >
+          <BookOpen className="h-4 w-4" />
+          My Courses
+        </button>
+      </div>
+
       {/* Logo */}
       <div className="mb-12 flex justify-center">
         <BrandLogo size="2xl" />

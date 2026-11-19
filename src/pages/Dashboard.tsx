@@ -61,12 +61,15 @@ export const Dashboard = () => {
     loadCourses();
   }, []);
 
+  // New courses start by choosing a format, the same as after sign-in.
   const handleNewCourse = () => {
-    navigate("/studio");
+    navigate("/new-course");
   };
 
-  const handleEditCourse = (courseId: string) => {
-    navigate("/studio", { state: { courseId } });
+  const handleEditCourse = (course: CourseDraft) => {
+    const learningType = course.courseParams?.learningType || "static";
+    localStorage.setItem("selectedLearningType", learningType);
+    navigate("/studio", { state: { courseId: course.id, learningType } });
   };
 
   const handleSidebarClick = (itemId: SidebarItemId) => {
@@ -359,7 +362,7 @@ export const Dashboard = () => {
                       <CourseCard
                         key={course.id}
                         course={course}
-                        onEdit={() => handleEditCourse(course.id)}
+                        onEdit={() => handleEditCourse(course)}
                         onDelete={() => handleDeleteCourse(course.id)}
                         onExport={() => handleExportCourse(course)}
                       />
