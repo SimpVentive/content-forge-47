@@ -29,3 +29,6 @@
 ## Trainer profiles
 - [x] Show "Profile Deletion is under progress, please wait" while a trainer profile is deleted
 - [ ] Photo trainer (Option 2): good front-facing photo rejected with "Could not make a natural open mouth" — fix without asking the user to retake photos
+
+## Learning from quality checks
+- [ ] Final QA findings feed back into future generations (the course builder learns from past fixes)
