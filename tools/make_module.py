@@ -24,6 +24,8 @@ import numpy as np
 from mediapipe.tasks import python as mp_tasks
 from mediapipe.tasks.python import vision
 
+from speech_text import clean_for_speech  # removes pacing cues before text-to-speech (tools/speech_text.py)
+
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 TRAINERS = ROOT / "trainers"
 ENV = ROOT / ".env"
@@ -573,9 +575,10 @@ def main():
     args = ap.parse_args()
 
     voice, clips, cache_dir = load_trainer(args.trainer)  # a folder path works too
-    script = pathlib.Path(args.script).read_text("utf8").strip()
+    # Pacing cues such as [PAUSE 1s] and [EMPHASIZE] are not spoken by the voice: they are cleaned here (tools/speech_text.py).
+    script = clean_for_speech(pathlib.Path(args.script).read_text("utf8").strip())
     if not script:
-        sys.exit("The script is empty")
+        sys.exit("The script is empty once the pacing cues are removed")
     out_path = pathlib.Path(args.out).with_suffix(".mp4")
     out_dir = out_path.parent
     out_dir.mkdir(parents=True, exist_ok=True)
