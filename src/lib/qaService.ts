@@ -6,6 +6,8 @@ export interface QAIssue {
   description: string;
   location?: string;
   examples?: string[];
+  /** The problem restated as a general rule for any future course, or absent when it only applies to this course. */
+  lesson?: string;
 }
 
 export interface QACorrection {
@@ -93,6 +95,25 @@ You must respond ONLY with valid JSON (no markdown, no explanations, just JSON).
   }
 }
 
+export const SCRIPT_REVIEW_CHARS = 12000;
+export const ASSESSMENT_REVIEW_CHARS = 6000;
+export const VISUAL_REVIEW_CHARS = 4000;
+
+/**
+ * Text for the reviewer. Long sections are shortened at a sentence or line end and clearly marked, because
+ * a silent mid-word cut made the reviewer report "truncated mid-sentence" for content that was complete.
+ */
+export function excerptForReview(text: string | undefined | null, limit: number, empty: string): string {
+  const full = (text ?? "").trim();
+  if (!full) return empty;
+  if (full.length <= limit) return full;
+  const shown = full.slice(0, limit);
+  const cut = Math.max(shown.lastIndexOf("\n"), shown.lastIndexOf(". "), shown.lastIndexOf("? "), shown.lastIndexOf("! "), shown.lastIndexOf(">"));
+  const head = (cut > limit * 0.6 ? shown.slice(0, cut + 1) : shown).trimEnd();
+  const omitted = full.length - head.length;
+  return `${head}\n[REVIEW EXCERPT ENDS — ${omitted} more characters of this section exist in the course and were not shown]`;
+}
+
 function buildQAPrompt(
   context: QAContext,
   rawOutputs: RawAgentOutputs,
@@ -108,16 +129,16 @@ Domain: ${context.domain || "General"}
 Input/Scope: ${context.inputText.slice(0, 500)}${context.inputText.length > 500 ? "..." : ""}
 
 **GENERATED OUTPUT:**
+The sections below may be review excerpts. An excerpt ends with a line starting "[REVIEW EXCERPT ENDS". Text after that point exists in the course; it was only left out of this review. Never report an excerpt end as truncation, a cut-off or an unfinished sentence.
+
 Script/Content:
-${rawOutputs.writer ? rawOutputs.writer.slice(0, 1500) : "(no script)"}
-${rawOutputs.writer && rawOutputs.writer.length > 1500 ? "..." : ""}
+${excerptForReview(rawOutputs.writer, SCRIPT_REVIEW_CHARS, "(no script)")}
 
 Assessment:
-${rawOutputs.assessment ? rawOutputs.assessment.slice(0, 500) : "(no assessment)"}
-${rawOutputs.assessment && rawOutputs.assessment.length > 500 ? "..." : ""}
+${excerptForReview(rawOutputs.assessment, ASSESSMENT_REVIEW_CHARS, "(no assessment)")}
 
 Visual Plan:
-${rawOutputs.visual ? rawOutputs.visual.slice(0, 500) : "(no visual plan)"}
+${excerptForReview(rawOutputs.visual, VISUAL_REVIEW_CHARS, "(no visual plan)")}
 
 **DOMAIN REQUIREMENTS:**
 ${requirements}
@@ -138,7 +159,8 @@ Respond with a JSON object containing:
       "severity": "critical|high|medium|low",
       "description": "specific issue description",
       "location": "where in the output",
-      "examples": ["example 1", "example 2"]
+      "examples": ["example 1", "example 2"],
+      "lesson": "the same problem as a general rule for ANY future course, one sentence, no names, topics, quotes or course details (e.g. 'Every assessment question must test a point taught in the script.'); null if it only applies to this course"
     }
   ],
   "correctionsApplied": [
@@ -150,8 +172,8 @@ Respond with a JSON object containing:
     }
   ],
   "overallSeverity": "critical|high|medium|low",
-  "revisedScript": "complete revised script if major issues found, otherwise null",
-  "revisedAssessment": "revised assessment if gaps found, otherwise null",
+  "revisedScript": "complete revised script if major issues found AND the script was shown in full (no REVIEW EXCERPT ENDS line), otherwise null",
+  "revisedAssessment": "complete revised assessment if gaps found AND the assessment was shown in full, otherwise null",
   "report": "1-2 paragraph human-readable summary of findings and fixes"
 }`;
 }
@@ -191,6 +213,7 @@ function parseQAResult(
     description: issue.description || "",
     location: issue.location,
     examples: issue.examples,
+    lesson: typeof issue.lesson === "string" ? issue.lesson : undefined,
   }));
 
   const corrections: QACorrection[] = (rawResult.correctionsApplied || []).map((corr: any) => ({
@@ -227,55 +250,4 @@ function calculateSeverity(issues: QAIssue[]): string {
   if (issues.some((i) => i.severity === "high")) return "high";
   if (issues.some((i) => i.severity === "medium")) return "medium";
   return "low";
-}
-
-export async function storeQAAuditLog(
-  courseDraftId: string,
-  userId: string,
-  qaResult: QAResult,
-  context: QAContext,
-  beforeOutputs: RawAgentOutputs,
-  afterOutputs: RawAgentOutputs,
-  supabaseClient?: any
-): Promise<void> {
-  try {
-    // If no Supabase client provided, just log locally
-    if (!supabaseClient) {
-      console.log("QA Audit Log (would be stored to DB):", {
-        courseDraftId,
-        userId,
-        domain: context.domain,
-        topic: context.topic,
-        issuesFound: qaResult.issuesFound,
-        correctionsApplied: qaResult.correctionsApplied,
-        severity: qaResult.overallSeverity,
-        wasAcceptedByUser: true,
-      });
-      return;
-    }
-
-    // Store to Supabase qa_audit_logs table
-    const { error } = await supabaseClient
-      .from("qa_audit_logs")
-      .insert([
-        {
-          course_draft_id: courseDraftId,
-          user_id: userId,
-          domain: context.domain,
-          topic: context.topic,
-          issues_found: qaResult.issuesFound,
-          corrections_applied: qaResult.correctionsApplied,
-          severity: qaResult.overallSeverity,
-          was_accepted_by_user: true,
-          before_output: beforeOutputs,
-          after_output: afterOutputs,
-        },
-      ]);
-
-    if (error) {
-      console.error("Failed to store QA audit log:", error);
-    }
-  } catch (error) {
-    console.error("Error storing QA audit log:", error);
-  }
 }

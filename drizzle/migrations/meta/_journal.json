@@ -36,6 +36,13 @@
       "when": 1795092904769,
       "tag": "0004_create_course_drafts",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795152613355,
+      "tag": "0005_create_qa_lessons",
+      "breakpoints": true
     }
   ]
 }

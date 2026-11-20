@@ -715,6 +715,48 @@ export type Database = {
         }
         Relationships: []
       }
+      qa_lessons: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          last_seen_at: string
+          lesson: string
+          lesson_key: string
+          owner_user_id: string
+          section: string
+          times_confirmed: number
+          times_dismissed: number
+          times_seen: number
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          lesson: string
+          lesson_key: string
+          owner_user_id?: string
+          section?: string
+          times_confirmed?: number
+          times_dismissed?: number
+          times_seen?: number
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          last_seen_at?: string
+          lesson?: string
+          lesson_key?: string
+          owner_user_id?: string
+          section?: string
+          times_confirmed?: number
+          times_dismissed?: number
+          times_seen?: number
+        }
+        Relationships: []
+      }
       team_members: {
         Row: {
           created_at: string

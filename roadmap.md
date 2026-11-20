@@ -28,7 +28,9 @@
 
 ## Trainer profiles
 - [x] Show "Profile Deletion is under progress, please wait" while a trainer profile is deleted
-- [ ] Photo trainer (Option 2): good front-facing photo rejected with "Could not make a natural open mouth" — fix without asking the user to retake photos
+- [x] Photo trainer (Option 2): good photo rejected — picture requests now throttled and retried; the message names the busy/low-credit picture service instead of the photo
+- [ ] Picture service credits are low (external — top up the image service account)
 
 ## Learning from quality checks
-- [ ] Final QA findings feed back into future generations (the course builder learns from past fixes)
+- [x] Final QA findings become general rules per account; Apply Fixes confirms, Skip weakens; the strongest rules go into every agent's instructions
+- [x] Final QA sees whole sections (marked excerpts) so it stops reporting false "truncated mid-sentence" findings

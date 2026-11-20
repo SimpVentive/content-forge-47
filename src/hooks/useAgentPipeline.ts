@@ -23,7 +23,8 @@ import { generateFlipbookHTML } from "@/lib/flipbookGenerator";
 import { exportNarrativeToPDF, downloadPDF } from "@/lib/pdfExportService";
 import { functionErrorMessage, logApiUsage } from "@/lib/edgeFunctions";
 import { generateNarrationAudio, getVoiceIdForLanguage } from "@/lib/narrationAudioService";
-import { runFinalQACheck, storeQAAuditLog, type QAResult } from "@/lib/qaService";
+import { runFinalQACheck, type QAResult } from "@/lib/qaService";
+import { loadQaLessons, qaLessonsBlock, recordQaLessons } from "@/lib/qaLessons";
 import { enhanceScriptGenerationPrompt, enhanceAssessmentGenerationPrompt, type AuditLogEntry } from "@/lib/feedbackIntegrationService";
 import { checkAndPrepareAsset, recordAssetUsage, type SelectedAsset } from "@/lib/pipelineAssetIntegration";
 import { describeImageFailure, requireNarrativeImages } from "@/lib/imageGenerationFailure";
@@ -553,30 +554,6 @@ const timestamp = () => {
 };
 
 
-// Faults found by the last quality review. The next writer run is told about them, so the same faults are not repeated.
-const QA_LESSON_KEY = "contentforge.qaLessons.v1";
-const MAX_QA_LESSONS = 12;
-
-export function saveQaLessons(issues: { category: string; severity: string; description: string }[]): void {
-  try {
-    const lessons = issues.slice(0, MAX_QA_LESSONS).map((i) => ({ category: i.category, severity: i.severity, description: i.description }));
-    window.localStorage.setItem(QA_LESSON_KEY, JSON.stringify(lessons));
-  } catch {
-    // Storage can be unavailable (private browsing); the course still generates without the lessons.
-  }
-}
-
-export function qaLessonsBlock(): string {
-  try {
-    const lessons = JSON.parse(window.localStorage.getItem(QA_LESSON_KEY) || "[]") as { category: string; description: string }[];
-    if (!lessons.length) return "";
-    const lines = lessons.map((l) => "- [" + l.category + "] " + l.description).join("\n");
-    return "\n\nKNOWN DEFECTS FROM THE LAST QUALITY REVIEW. Do not repeat these:\n" + lines + "\nWrite every lesson, question and visual in full. Never stop mid-sentence, and never leave JSON or SVG unclosed.";
-  } catch {
-    return "";
-  }
-}
-
 const CONTINUE_TAIL_CHARS = 1500;
 const MAX_CONTINUATIONS = 4;
 
@@ -585,7 +562,7 @@ const MAX_CONTINUATIONS = 4;
  * the model is asked to pick up exactly where it stopped, and the parts are joined.
  */
 async function callClaude(systemPrompt: string, userMessage: string): Promise<string> {
-  // Every agent gets the defects the last quality review found, not only the writer.
+  // Every agent gets the rules learned from earlier quality checks, not only the writer.
   const system = `${systemPrompt}${qaLessonsBlock()}`;
   let combined = "";
   let message = userMessage;
@@ -671,36 +648,6 @@ async function callClaudeWithRetry(systemPrompt: string, userMessage: string, ad
   } catch (err) {
     addLog(`${agentName}: Error — retrying once (${(err as Error).message})...`);
     return await callClaudeWithTimeout(systemPrompt, userMessage, timeoutMs);
-  }
-}
-
-/**
- * Fetch QA audit logs from Supabase to drive learning feedback
- */
-async function fetchAuditLogs(): Promise<AuditLogEntry[]> {
-  try {
-    const { data, error } = await (supabase as any)
-      .from("qa_audit_logs")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (error) {
-      if (error.code !== "PGRST205") {
-        console.warn("Failed to fetch QA audit logs:", error);
-      }
-      return [];
-    }
-
-    return (data || []).map((log: any) => ({
-      domain: log.domain || "general",
-      issuesFound: log.issues_found || [],
-      correctionsApplied: log.corrections_applied || [],
-      wasAccepted: log.was_accepted || false,
-    }));
-  } catch (err) {
-    console.warn("Error fetching QA audit logs:", err);
-    return [];
   }
 }
 
@@ -938,6 +885,11 @@ export function useAgentPipeline() {
     const narratorLanguage = params?.narratorLanguage || textLanguage;
     const languageDirective = buildLanguageDirective(textLanguage, narratorLanguage);
     const languageDirectiveTail = buildLanguageDirectiveTail(textLanguage, narratorLanguage);
+
+    // Rules learned from this account's earlier quality checks go into every agent's instructions.
+    const learnedLessons = await loadQaLessons();
+    const activeLessons = qaLessonsBlock() ? learnedLessons.length : 0;
+    if (activeLessons) addLog("Orchestrator: Applying lessons learned from earlier quality checks.");
     const userLanguageReminder = buildUserLanguageReminder(textLanguage, narratorLanguage);
 
     // Historical QA feedback is optional. Do not block generation on a missing
@@ -2405,9 +2357,20 @@ ${modeInstructions}`;
     if (!isRunning) setAgentStatuses((prev) => settleRunningStatuses(prev));
   }, [isRunning]);
 
+  const finishQA = useCallback((message: string) => {
+    addLog(message);
+    setShowQADialog(false);
+    addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
+    setIsRunning(false);
+    runActiveRef.current = false;
+    pipelineContextRef.current = null;
+  }, [addLog]);
+
   const applyQAFixes = useCallback(async () => {
+    // Accepting the fixes confirms the findings, so their lessons carry more weight in future courses.
+    if (qaResult) void recordQaLessons(qaResult.issuesFound ?? [], "confirmed");
     if (!qaResult?.wasAutoFixed || !qaResult.revisedOutputs) {
-      skipQAFixes();
+      finishQA("Final QA Agent: No rewritten sections to apply — keeping the current output.");
       return;
     }
 
@@ -2435,30 +2398,6 @@ ${modeInstructions}`;
         ...(qaResult.revisedOutputs?.assessment && { assessment: qaResult.revisedOutputs.assessment }),
       }));
 
-      // Store audit log for learning feedback
-      try {
-        const { data: authData } = await supabase.auth.getUser();
-        const context = pipelineContextRef.current;
-        if (authData.user && context) {
-          await storeQAAuditLog(
-            "current-draft", // This would be the actual draft ID in a real scenario
-            authData.user.id,
-            qaResult,
-            {
-              courseTitle: context.courseTitle,
-              inputText: context.inputText,
-              domain: (context.params as any)?.domain,
-              topic: context.courseTitle,
-            },
-            rawOutputs,
-            { ...rawOutputs, ...qaResult.revisedOutputs },
-            supabase
-          );
-        }
-      } catch (auditErr) {
-        console.error("Failed to store QA audit log:", auditErr);
-      }
-
       addLog("Final QA Agent: Fixes applied successfully.");
       setShowQADialog(false);
       addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
@@ -2468,16 +2407,13 @@ ${modeInstructions}`;
       runActiveRef.current = false;
       pipelineContextRef.current = null;
     }
-  }, [qaResult, rawOutputs, addLog]);
+  }, [qaResult, rawOutputs, addLog, finishQA]);
 
   const skipQAFixes = useCallback(() => {
-    addLog("Final QA Agent: Skipping fixes — proceeding with original output.");
-    setShowQADialog(false);
-    addLog("Orchestrator: All agents complete. Pipeline finished successfully.");
-    setIsRunning(false);
-    runActiveRef.current = false;
-    pipelineContextRef.current = null;
-  }, [addLog]);
+    // Skipping tells the builder these findings were not worth fixing, so their lessons lose weight.
+    if (qaResult) void recordQaLessons(qaResult.issuesFound ?? [], "dismissed");
+    finishQA("Final QA Agent: Skipping fixes — proceeding with original output.");
+  }, [qaResult, finishQA]);
 
   const proceedWithoutQA = useCallback(() => {
     addLog("Final QA Agent: User declined final quality check. Proceeding with output as-is.");
@@ -2521,31 +2457,11 @@ ${modeInstructions}`;
         qaWrapper
       );
 
-      // Store the QA audit log for learning/improvements
-      const qaContext = {
-        courseTitle: context.courseTitle,
-        inputText: context.inputText,
-        domain: context.params?.domain,
-        topic: context.params?.topic,
-      };
-      const { data: authData } = await supabase.auth.getUser();
-      if (authData.user) {
-        await storeQAAuditLog(
-          "current-draft",
-          authData.user.id,
-          result,
-          qaContext,
-          rawOutputs,
-          { ...rawOutputs, ...result.revisedOutputs },
-          supabase,
-        );
-      } else {
-        await storeQAAuditLog("current-draft", "local-user", result, qaContext, rawOutputs, rawOutputs);
-      }
+      // Every finding is remembered as a general rule; the author's Apply/Skip decision then confirms or weakens it.
+      void recordQaLessons(result.issuesFound ?? [], "seen");
 
       // Update state with QA results
       setQAResult(result);
-      saveQaLessons(result.issuesFound ?? []);
       setShowQADialog(true);
 
       addLog(`Final QA Agent: Quality validation complete. ${result.issuesFound.length} issue(s) found.`);

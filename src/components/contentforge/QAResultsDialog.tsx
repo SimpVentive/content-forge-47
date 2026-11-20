@@ -89,6 +89,12 @@ export function QAResultsDialog({ open, qaResult, onApply, onSkip, isApplying }:
           )}
         </div>
 
+        {qaResult.issuesFound.some((issue) => issue.lesson) && (
+          <p className="text-xs text-muted-foreground">
+            ContentForge remembers these problems as rules for your next courses. Apply Fixes confirms them; Skip makes them count for less.
+          </p>
+        )}
+
         <DialogFooter className="flex gap-2 pt-4 border-t">
           <Button variant="outline" onClick={onSkip} disabled={isApplying}>
             Skip QA Fixes
@@ -122,6 +128,13 @@ function IssueCard({ issue, index, expanded, onToggle }: { issue: QAIssue; index
 
       {expanded && (
         <div className="p-3 bg-white border-t border-gray-200 space-y-2">
+          {issue.lesson && (
+            <div>
+              <p className="text-xs font-semibold text-gray-700">Rule for future courses:</p>
+              <p className="text-sm text-gray-600">{issue.lesson}</p>
+            </div>
+          )}
+
           {issue.location && (
             <div>
               <p className="text-xs font-semibold text-gray-700">Location:</p>
