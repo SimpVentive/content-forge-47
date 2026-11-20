@@ -513,6 +513,18 @@ def trim_piece(src, start_s, end_s, dst):
            "-crf", "18", "-c:a", "aac", "-b:a", "192k", str(dst))
 
 
+def trim_piece_with_narration(src, narration, piece_start, piece_end, start_s, end_s, dst):
+    """Keep the picture from src, and take the sound from the narration itself, at 44.1 kHz.
+    LatentSync returns its audio at 16 kHz mono, which lowers the quality of the voice, so that audio is not kept.
+    piece_start and piece_end are where the piece sits in the narration (seconds). start_s and end_s are the part of
+    the piece that is kept (seconds from the start of the piece)."""
+    seg = dst.with_name(dst.stem + "-narration.mp3")
+    cut_audio(narration, piece_start, piece_end, seg)
+    ffmpeg("-i", str(src), "-i", str(seg), "-ss", f"{start_s:.4f}", "-to", f"{end_s:.4f}",
+           "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18",
+           "-c:a", "aac", "-b:a", "192k", "-ar", "44100", str(dst))
+
+
 JOIN_SEARCH = 4   # frames: how far a join may move at either side (a pause is never longer than this in the audio)
 
 
@@ -732,9 +744,10 @@ def main():
         j["fade_frames"] = 5 if j["mode"] == "crossfade" else 1
     trimmed = []
     for k, (a, b) in enumerate(trims):
-        dst = work / f"trim-{norm_files[k].stem}-{a}-{b}.mp4"
+        # The "-narr44" name is new: trims made before this change (with 16 kHz audio) are not reused.
+        dst = work / f"trim-{norm_files[k].stem}-{a}-{b}-narr44.mp4"
         if not dst.exists():
-            trim_piece(norm_files[k], a / 25.0, b / 25.0, dst)
+            trim_piece_with_narration(norm_files[k], narration, bounds[k], bounds[k + 1], a / 25.0, b / 25.0, dst)
         trimmed.append(dst)
     norm_files = trimmed
     print("Joins: " + ", ".join(f"{j['mode']} (cost {j['pose_cost']}, drop {j['dropped_from_end_of_piece']}, skip {j['skipped_at_start_of_next']})" for j in join_plan), flush=True)
