@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { PhotoSlotsStep, type SlotAnalysis } from "@/components/contentforge/PhotoSlotsStep";
+import { canSaveSwitch, unchangedHint, type ActiveOption } from "@/lib/switchOption";
 import { useAuth } from "@/hooks/useAuth";
 import { setTrainerFields, uploadTrainerFile, type CustomTrainer } from "@/lib/customTrainers";
 import { composeSlot, type PhotoSlot } from "@/lib/facePhotos";
@@ -22,7 +23,9 @@ export function SwitchOptionDialog({ trainer, onOpenChange, onSwitched }: Props)
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState("");
 
-  const current = trainer?.animation_mode ?? "video";
+  const current = (trainer?.animation_mode ?? "video") as ActiveOption;
+  const newPhotoCount = Object.keys(analysis.photos).length;
+  const hint = unchangedHint({ target, current, newPhotoCount });
 
   async function save() {
     if (!trainer || !user || !target) return;
@@ -85,7 +88,11 @@ export function SwitchOptionDialog({ trainer, onOpenChange, onSwitched }: Props)
         <DialogFooter>
           {progress ? <p className="mr-auto self-center text-[12px] text-muted-foreground">{progress}</p> : null}
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={save} disabled={busy || !target || (target === "photos" && !analysis.ready) || target === current}>
+          {hint ? <p className="mr-auto self-center text-[12px] text-muted-foreground">{hint}</p> : null}
+          <Button
+            onClick={save}
+            disabled={!canSaveSwitch({ target, current, photosReady: analysis.ready, newPhotoCount, busy })}
+          >
             {busy ? "Saving…" : "Save"}
           </Button>
         </DialogFooter>
