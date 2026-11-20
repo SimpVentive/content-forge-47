@@ -1,5 +1,5 @@
 ﻿import React, { useState, useMemo, useEffect } from "react";
-import { X, Settings2, AlertTriangle, Info, Check } from "lucide-react";
+import { X, Settings2, AlertTriangle, Info, Check, Loader2 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { TrainerGrid } from "./TrainerGrid";
 import { CustomTrainerDialog } from "./CustomTrainerDialog";
@@ -272,8 +272,12 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
   };
   useEffect(() => { if (open) void refreshCustomTrainers(); }, [open]);
   const [retryingVoiceId, setRetryingVoiceId] = useState<string | null>(null);
+  // Name of the trainer being deleted; while set, a blocking "please wait" message is shown.
+  const [deletingTrainerName, setDeletingTrainerName] = useState<string | null>(null);
   const deleteCustomTrainerNow = async (trainer: CustomTrainer) => {
+    if (deletingTrainerName) return;
     if (!window.confirm(`Delete ${trainer.name}? This removes the voice, photo and talking videos. The consent record is kept. This cannot be undone.`)) return;
+    setDeletingTrainerName(trainer.name);
     try {
       await deleteCustomTrainerRecord(trainer.id);
       toast.success(`${trainer.name} was deleted`);
@@ -282,6 +286,7 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       toast.error(`Not deleted: ${(err as Error).message}`);
     } finally {
       await refreshCustomTrainers();
+      setDeletingTrainerName(null);
     }
   };
   const retryCustomVoice = async (trainer: CustomTrainer) => {
@@ -1747,6 +1752,28 @@ export const CourseParametersDialog: React.FC<CourseParametersDialogProps> = ({
       <div onClick={(e) => e.stopPropagation()}>
       {/* The switch window sits on top; its clicks must not reach this dialog's outside-click handler. */}
       {switchTrainer ? <div onClick={(e) => e.stopPropagation()}><SwitchOptionDialog trainer={switchTrainer} onOpenChange={(open) => { if (!open) setSwitchTrainer(null); }} onSwitched={() => void refreshCustomTrainers()} /></div> : null}
+      {deletingTrainerName ? (
+        <div onClick={(e) => e.stopPropagation()}>
+          <Dialog open onOpenChange={() => { /* stays open until deletion finishes */ }}>
+            <DialogContent
+              className="z-[10000] max-w-sm [&>button]:hidden"
+              overlayClassName="z-[10000]"
+              onEscapeKeyDown={(e) => e.preventDefault()}
+              onPointerDownOutside={(e) => e.preventDefault()}
+              onInteractOutside={(e) => e.preventDefault()}
+              aria-live="polite"
+            >
+              <DialogHeader className="items-center text-center sm:text-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" aria-hidden="true" />
+                <DialogTitle>Profile Deletion is under progress, please wait</DialogTitle>
+                <DialogDescription>
+                  Removing {deletingTrainerName}'s voice, photo and talking videos. This can take a minute.
+                </DialogDescription>
+              </DialogHeader>
+            </DialogContent>
+          </Dialog>
+        </div>
+      ) : null}
       {videoSoonOpen ? (
         <div onClick={(e) => e.stopPropagation()}>
           <Dialog open onOpenChange={setVideoSoonOpen}>
