@@ -66,12 +66,31 @@ export async function createCustomTrainer(userId: string, name: string): Promise
   return data as CustomTrainer;
 }
 
-/** Uploads one file into the trainer's folder and returns its storage path. */
-export async function uploadTrainerFile(userId: string, trainerId: string, fileName: string, blob: Blob): Promise<string> {
-  const path = `${userId}/${trainerId}/${fileName}`;
-  const { error } = await db().storage.from(CUSTOM_TRAINER_BUCKET).upload(path, blob, { upsert: true, contentType: blob.type || undefined });
+/**
+ * Uploads one file into the trainer's folder and returns its storage path.
+ * unique: give the file a new name each time (name-<timestamp>.ext), so it is an insert. The bucket has no
+ * update policy, so replacing a file under the same name is refused. Use it for photos that may be replaced.
+ */
+export async function uploadTrainerFile(
+  userId: string,
+  trainerId: string,
+  fileName: string,
+  blob: Blob,
+  options: { unique?: boolean } = {},
+): Promise<string> {
+  const name = options.unique ? withTimestamp(fileName) : fileName;
+  const path = `${userId}/${trainerId}/${name}`;
+  const { error } = await db().storage
+    .from(CUSTOM_TRAINER_BUCKET)
+    .upload(path, blob, { upsert: !options.unique, contentType: blob.type || undefined });
   if (error) throw new Error(`Upload failed: ${error.message}`);
   return path;
+}
+
+/** "photos/eh.jpg" -> "photos/eh-1700000000000.jpg" */
+export function withTimestamp(fileName: string, now: number = Date.now()): string {
+  const dot = fileName.lastIndexOf(".");
+  return dot > 0 ? `${fileName.slice(0, dot)}-${now}${fileName.slice(dot)}` : `${fileName}-${now}`;
 }
 
 export async function setTrainerFields(trainerId: string, fields: Partial<CustomTrainer>): Promise<void> {

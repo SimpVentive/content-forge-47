@@ -39,13 +39,13 @@ export function SwitchOptionDialog({ trainer, onOpenChange, onSwitched }: Props)
         if (!closed) throw new Error("The closed-mouth photo is missing");
         setProgress("Lining up your photos…");
         const closedExt = closed.file.name.split(".").pop()?.toLowerCase() || "png";
-        const closedPath = await uploadTrainerFile(user.id, trainer.id, `photos/closed.${closedExt}`, closed.file);
+        const closedPath = await uploadTrainerFile(user.id, trainer.id, `photos/closed.${closedExt}`, closed.file, { unique: true });
         const photoSet: Record<string, string> = { closed: closedPath };
         for (const slot of ["eh", "ah", "blink", "oo"] as PhotoSlot[]) {
           const shot = analysis.photos[slot];
           if (!shot) continue;
           const blob = await composeSlot(closed.bitmap, closed.pts, shot.bitmap, shot.pts, slot === "blink" ? "eyes" : "mouth");
-          photoSet[slot] = await uploadTrainerFile(user.id, trainer.id, `photos/${slot}.jpg`, blob);
+          photoSet[slot] = await uploadTrainerFile(user.id, trainer.id, `photos/${slot}.jpg`, blob, { unique: true });
         }
         await setTrainerFields(trainer.id, { animation_mode: "photos", photo_set: photoSet, photo_path: closedPath });
       }

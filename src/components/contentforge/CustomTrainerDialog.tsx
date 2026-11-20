@@ -165,13 +165,13 @@ export function CustomTrainerDialog({ open, onOpenChange, onCreated }: Props) {
       let photoSet: Record<string, string> | null = null;
       if (mouths) {
         setProgress("Saving your photos…");
-        photoPath = await uploadTrainerFile(user.id, trainer.id, "photos/closed.jpg", mouths.closed);
+        photoPath = await uploadTrainerFile(user.id, trainer.id, "photos/closed.jpg", mouths.closed, { unique: true });
         photoSet = { closed: photoPath };
         for (const slot of ["eh", "ah", "blink"] as const) {
-          photoSet[slot] = await uploadTrainerFile(user.id, trainer.id, `photos/${slot}.jpg`, mouths[slot]);
+          photoSet[slot] = await uploadTrainerFile(user.id, trainer.id, `photos/${slot}.jpg`, mouths[slot], { unique: true });
         }
       } else {
-        photoPath = await uploadTrainerFile(user.id, trainer.id, "photo.jpg", photoBlob as Blob);
+        photoPath = await uploadTrainerFile(user.id, trainer.id, "photo.jpg", photoBlob as Blob, { unique: true });
       }
       const ext = voiceFile.name.split(".").pop()?.toLowerCase() || "audio";
       const voicePath = await uploadTrainerFile(user.id, trainer.id, `voice-sample.${ext}`, voiceFile);
