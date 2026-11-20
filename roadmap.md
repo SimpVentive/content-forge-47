@@ -25,3 +25,7 @@
 - [x] Reach My Courses from Create Your Course, the studio, the home page menu and the video course screen
 - [x] Save courses to each person's account (any device); auto-save finished courses; Edit opens the chosen course
 - [ ] Earlier courses: only recoverable if "Save Draft" was pressed in that browser on that web address — open My Courses there once (waiting on the user)
+
+## Trainer profiles
+- [x] Show "Profile Deletion is under progress, please wait" while a trainer profile is deleted
+- [ ] Photo trainer (Option 2): good front-facing photo rejected with "Could not make a natural open mouth" — fix without asking the user to retake photos

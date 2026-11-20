@@ -24,6 +24,7 @@ import {
   type MouthMetrics,
   type Pt,
 } from "@/lib/mouthGeometry";
+import { isServiceBusy, retryWhenBusy, settleLimited } from "@/lib/limitedRetry";
 
 export type MouthReport = {
   openCandidates: number;
@@ -54,9 +55,12 @@ const OPEN_ROUNDS = 3;
 const BLINK_CANDIDATES = 4;
 const BLINK_ROUNDS = 2;
 const MAX_FRAME_HEIGHT = 1600;
+/** The picture service throttles hard when its credit is low; a few at a time with retries keeps every candidate. */
+const FLUX_PARALLEL = 2;
 
 const FAIL_OPEN = "Could not make a natural open mouth from this photo. Use a clear, front-facing photo with a relaxed face and good light.";
 const FAIL_BLINK = "Could not close the eyes naturally in this photo. Use a clear, front-facing photo with the eyes open.";
+const FAIL_BUSY = "The picture service was too busy to finish (its credit balance is low), so not enough shapes could be made. Your photo is fine: press Create again in a few minutes, or top up the picture service credits.";
 const FAIL_GAP = "Could not reach the target mouth openings on this photo. Use a clear, front-facing photo with a relaxed face.";
 
 // ---------- image helpers ----------
@@ -176,6 +180,14 @@ async function fluxFill(imageB64: string, maskB64: string, prompt: string, seed:
   return bitmapToRgba(bmp, w, h);
 }
 
+/** Runs a round of Flux candidates a few at a time, retrying busy refusals. */
+function fluxRound(seeds: number[], imageB64: string, maskB64: string, prompt: string, w: number, h: number) {
+  return settleLimited(seeds.map((seed) => () => retryWhenBusy(() => fluxFill(imageB64, maskB64, prompt, seed, w, h))), FLUX_PARALLEL);
+}
+
+const wasBusy = (results: PromiseSettledResult<unknown>[]) =>
+  results.some((r) => r.status === "rejected" && isServiceBusy(r.reason instanceof Error ? r.reason.message : String(r.reason)));
+
 // ---------- the pipeline ----------
 
 type Candidate = { rgba: Uint8ClampedArray; pts: Pt[]; metrics: MouthMetrics; teeth: number };
@@ -201,11 +213,13 @@ export async function buildMouthSet(file: File, onProgress: (message: string) =>
     const pool: Candidate[] = [];
     let source = -1;
     let openRounds = 0;
+    let openBusy = false;
     for (let round = 1; round <= OPEN_ROUNDS && source < 0; round++) {
       openRounds = round;
       onProgress(`Making open-mouth shapes (round ${round} of ${OPEN_ROUNDS})…`);
       const seeds = Array.from({ length: OPEN_CANDIDATES }, (_, k) => 1000 * round + k + 1);
-      const results = await Promise.allSettled(seeds.map((seed) => fluxFill(baseB64, openMaskB64, OPEN_PROMPT, seed, w, h)));
+      const results = await fluxRound(seeds, baseB64, openMaskB64, OPEN_PROMPT, w, h);
+      openBusy = openBusy || wasBusy(results);
       for (const r of results) {
         if (r.status !== "fulfilled") continue;
         const gen = composite(base, r.value.rgba, openMask, w, h);
@@ -217,22 +231,26 @@ export async function buildMouthSet(file: File, onProgress: (message: string) =>
         }
       }
       source = pickSource(pool);
+      console.info("[mouth] open round", round, pool.map((c) => ({ gap: +c.metrics.gap.toFixed(3), jaw: +c.metrics.jaw.toFixed(4), corner: +c.metrics.corner.toFixed(4) })));
       if (source < 0 && results.every((r) => r.status === "rejected")) {
         const first = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+        if (wasBusy(results)) throw new Error(FAIL_BUSY);
         throw new Error(first.reason instanceof Error ? first.reason.message : FAIL_OPEN);
       }
     }
-    if (source < 0) throw new Error(FAIL_OPEN);
+    if (source < 0) throw new Error(openBusy ? FAIL_BUSY : FAIL_OPEN);
     const src = pool[source];
 
     // 2. Blink: keep the candidate whose eyes close the most, if it closes enough.
     let blink: { rgba: Uint8ClampedArray; ratio: number } | null = null;
     let blinkRounds = 0;
+    let blinkBusy = false;
     for (let round = 1; round <= BLINK_ROUNDS && !blink; round++) {
       blinkRounds = round;
       onProgress(`Closing the eyes (round ${round} of ${BLINK_ROUNDS})…`);
       const seeds = Array.from({ length: BLINK_CANDIDATES }, (_, k) => 2000 * round + k + 1);
-      const results = await Promise.allSettled(seeds.map((seed) => fluxFill(baseB64, eyeMaskB64, BLINK_PROMPT, seed, w, h)));
+      const results = await fluxRound(seeds, baseB64, eyeMaskB64, BLINK_PROMPT, w, h);
+      blinkBusy = blinkBusy || wasBusy(results);
       for (const r of results) {
         if (r.status !== "fulfilled") continue;
         const gen = composite(base, r.value.rgba, eyes, w, h);
@@ -245,11 +263,12 @@ export async function buildMouthSet(file: File, onProgress: (message: string) =>
       }
       if (!blink && results.every((r) => r.status === "rejected")) {
         const first = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
+        if (wasBusy(results)) throw new Error(FAIL_BUSY);
         throw new Error(first.reason instanceof Error ? first.reason.message : FAIL_BLINK);
       }
       if (blink && blink.ratio > LIMITS.eyeRatio) blink = null;
     }
-    if (!blink) throw new Error(FAIL_BLINK);
+    if (!blink) throw new Error(blinkBusy ? FAIL_BUSY : FAIL_BLINK);
 
     // 3. Morph the closed photo toward the open source; solve the blend that gives each target gap.
     onProgress("Shaping the 'eh' and 'ah' mouths…");
