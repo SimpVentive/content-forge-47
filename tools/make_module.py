@@ -15,7 +15,7 @@ Keys are read from .env (ELEVENLABS_API_KEY, fal_key). They are never printed, l
 Each provider call is made once. A failed piece is retried once, only after a network error. A failed piece never
 restarts the module. Finished pieces are cached: a re-run with the same text and clips costs nothing for them.
 """
-import argparse, base64, concurrent.futures as cf, hashlib, json, os, pathlib, re, shutil, subprocess, sys, time, urllib.error, urllib.request
+import argparse, base64, concurrent.futures as cf, hashlib, io, json, os, pathlib, re, shutil, subprocess, sys, time, urllib.error, urllib.request, wave
 
 import cv2
 import fal_client
@@ -139,17 +139,63 @@ def frame_at(clip, seconds):
 
 
 # ---------- ElevenLabs ----------
+DEFAULT_OUTPUT_FORMAT = "mp3_44100_128"
+
+
+def eleven_output_format():
+    """The ElevenLabs output format: ELEVEN_OUTPUT_FORMAT, default mp3_44100_128. Only mp3_<rate>_<bitrate> and pcm_<rate>."""
+    fmt = (os.environ.get("ELEVEN_OUTPUT_FORMAT") or DEFAULT_OUTPUT_FORMAT).strip()
+    if not re.fullmatch(r"(mp3_\d+_\d+|pcm_\d+)", fmt):
+        sys.exit(f"Unsupported ELEVEN_OUTPUT_FORMAT {fmt!r}. Use mp3_<rate>_<bitrate> or pcm_<rate>.")
+    return fmt
+
+
+def is_pcm(fmt):
+    return fmt.startswith("pcm_")
+
+
+def narration_ext(fmt):
+    """The file name extension of the narration: .wav for raw PCM (wrapped as WAV), .mp3 otherwise."""
+    return ".wav" if is_pcm(fmt) else ".mp3"
+
+
+def narration_key(script, voice, fmt):
+    """The cache key of the narration. The default format is not part of the key, so narrations made before the
+    setting existed are still reused. Any other format is part of the key, so a format change makes a new narration."""
+    parts = [script, voice["voice_id"], voice["settings"], voice.get("model_id", ELEVEN_MODEL)]
+    if fmt != DEFAULT_OUTPUT_FORMAT:
+        parts.append(fmt)
+    return sha(*parts)
+
+
+def pcm_to_wav(raw, rate):
+    """Wraps raw 16-bit mono PCM in a WAV container. ElevenLabs returns pcm_<rate> as bare samples, with no header."""
+    if len(raw) % 2:
+        raw = raw[:-1]  # a whole number of 16-bit samples
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(rate)
+        w.writeframes(raw)
+    return buf.getvalue()
+
+
 def eleven_tts(text, voice, key):
+    """Narration from ElevenLabs with timestamps. Returns (audio bytes, alignment). PCM is returned as WAV."""
+    fmt = eleven_output_format()
     body = {"text": text, "model_id": voice.get("model_id", ELEVEN_MODEL), "voice_settings": voice["settings"]}
     req = urllib.request.Request(
-        f"https://api.elevenlabs.io/v1/text-to-speech/{voice['voice_id']}/with-timestamps?output_format=mp3_44100_128",
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice['voice_id']}/with-timestamps?output_format={fmt}",
         data=json.dumps(body).encode("utf8"), headers={"xi-api-key": key, "Content-Type": "application/json"}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=300) as resp:
             data = json.loads(resp.read())
     except urllib.error.HTTPError as err:
         sys.exit(f"ElevenLabs refused the request (HTTP {err.code}): {err.read()[:200].decode('utf8', 'replace')}")
-    return base64.b64decode(data["audio_base64"]), data.get("alignment") or {}
+    raw = base64.b64decode(data["audio_base64"])
+    audio = pcm_to_wav(raw, int(fmt.split("_")[1])) if is_pcm(fmt) else raw
+    return audio, data.get("alignment") or {}
 
 
 # ---------- script to pieces ----------
@@ -647,8 +693,9 @@ def main():
 
     # 1. Audio and timestamps (cached by text, voice and settings)
     t0 = time.time()
-    tts_key = sha(script, voice["voice_id"], voice["settings"], voice.get("model_id", ELEVEN_MODEL))
-    narration = work / f"narration-{tts_key}.mp3"
+    fmt = eleven_output_format()
+    tts_key = narration_key(script, voice, fmt)
+    narration = work / f"narration-{tts_key}{narration_ext(fmt)}"
     align_path = work / f"narration-{tts_key}.json"
     if narration.exists() and align_path.exists():
         alignment = json.loads(align_path.read_text("utf8"))
