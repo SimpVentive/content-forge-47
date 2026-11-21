@@ -577,6 +577,7 @@ def assemble_pieces(norm_files, join_plan, joined_tmp):
     return join_centres
 
 
+TARGET_LUFS = -16.0
 LOUDNESS_FILTER = "loudnorm=I=-16:TP=-1.5:LRA=7"   # EBU R128: integrated -16 LUFS, true peak -1.5 dBTP, range 7 LU
 
 
@@ -585,6 +586,38 @@ def final_encode(src, dst):
     loudness to -16 LUFS, and encodes the sound once as AAC (192 kbps, 48 kHz). Done here and nowhere else."""
     ffmpeg("-i", str(src), "-vf", LABEL_FILTER, "-af", LOUDNESS_FILTER, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", str(dst))
+
+
+def measure_audio(path):
+    """The finished file's sound: sample rate, channels, integrated loudness (LUFS, EBU R128), and the length of the sound
+    and of the picture, in seconds. Uses ffmpeg's own meters. Nothing is written to disk except the report."""
+    header = subprocess.run([FF, "-hide_banner", "-i", str(path)], capture_output=True, text=True).stderr
+    m = re.search(r"Audio: \w+.*?, (\d+) Hz, ([\w.]+)", header)
+    rate = int(m.group(1)) if m else None
+    channels = {"mono": 1, "stereo": 2, "5.1": 6}.get(m.group(2)) if m else None
+    meter = subprocess.run([FF, "-hide_banner", "-i", str(path), "-map", "0:a:0", "-af", "ebur128", "-f", "null", "-"],
+                           capture_output=True, text=True).stderr
+    lm = re.search(r"Integrated loudness:\s*I:\s*(-?[\d.]+)\s*LUFS", meter)
+    lufs = float(lm.group(1)) if lm else None
+    # Decoding the sound to 8 kHz mono gives the same length, and is quick.
+    pcm = subprocess.run([FF, "-v", "error", "-i", str(path), "-map", "0:a:0", "-f", "s16le", "-ac", "1", "-ar", "8000", "-"],
+                         capture_output=True).stdout
+    audio_s = len(pcm) / (2 * 8000)
+    cap = cv2.VideoCapture(str(path))
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    cap.release()
+    video_s = frames / fps
+    return {"sample_rate": rate, "channels": channels, "integrated_lufs": lufs,
+            "audio_seconds": round(audio_s, 3), "video_seconds": round(video_s, 3),
+            "drift_s": round(video_s - audio_s, 3)}
+
+
+def audio_passes(audio):
+    """The rules for the final sound: at least 44.1 kHz, within 1.5 LU of -16 LUFS, and within 0.1 s of the picture."""
+    return bool(audio["sample_rate"] and audio["sample_rate"] >= 44100
+                and audio["integrated_lufs"] is not None and abs(audio["integrated_lufs"] - TARGET_LUFS) <= 1.5
+                and abs(audio["drift_s"]) <= 0.1)
 
 
 def main():
@@ -774,10 +807,8 @@ def main():
     import join_audit
     sheets = ROOT / "docs" / "screenshots" / "joins"
     audit = join_audit.audit(out_path, join_centres, sheets, tag=args.trainer)
-    video_s = media_duration(out_path)
-    audio_only = work / f"check-audio-{sha(out_path.name, str(out_path.stat().st_size))}.wav"
-    ffmpeg("-i", str(out_path), "-vn", "-ac", "1", "-ar", "16000", str(audio_only))
-    audio_s = media_duration(audio_only)
+    audio = measure_audio(out_path)   # the final file's sound, as delivered
+    video_s, audio_s = audio["video_seconds"], audio["audio_seconds"]
     report["join_plan"] = join_plan
     report["checks"] = {
         "per_frame": {k: v for k, v in audit.items() if k not in ("spike_frames_over_3x", "ghost_frames_over_3x_variance", "joins")},
@@ -787,6 +818,8 @@ def main():
         "video_seconds": round(video_s, 2), "audio_seconds": round(audio_s, 2),
         "duration_drift_s": round(video_s - audio_s, 3),
         "duration_ok": abs(video_s - audio_s) < 0.1,
+        "audio": audio,
+        "audio_ok": audio_passes(audio),
         "faces_flagged": [p["piece"] for p in report["pieces"] if "checks" in p and not p["checks"]["ok"]],
     }
     report["status"] = "done"

@@ -84,5 +84,23 @@ class FinalLoudnessTests(unittest.TestCase):
         self.assertGreater(abs(integrated_lufs(cut) - TARGET), TOLERANCE, "intermediates must not be normalised to -16")
 
 
+class AudioRulesTests(unittest.TestCase):
+    """The pass rule for the final sound: 44.1 kHz or more, within 1.5 LU of -16 LUFS, within 0.1 s of the picture."""
+
+    def ok(self, **over):
+        base = {"sample_rate": 48000, "integrated_lufs": -16.0, "drift_s": 0.0}
+        base.update(over)
+        return mm.audio_passes(base)
+
+    def test_each_rule_at_its_limit(self):
+        self.assertTrue(self.ok(sample_rate=44100))
+        self.assertFalse(self.ok(sample_rate=32000))
+        self.assertTrue(self.ok(integrated_lufs=-17.5))
+        self.assertFalse(self.ok(integrated_lufs=-17.6))
+        self.assertTrue(self.ok(drift_s=-0.1))
+        self.assertFalse(self.ok(drift_s=0.11))
+        self.assertFalse(self.ok(integrated_lufs=None))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
