@@ -87,8 +87,7 @@ class JoinTests(unittest.TestCase):
         self.assertEqual(audio_codec(out), "pcm_s16le", "the intermediate keeps the sound uncompressed")
         labelled = self.dir / "labelled-one-piece.mp4"
         # The label step is the one AAC encode: 192 kbps, 48 kHz.
-        mm.ffmpeg("-i", str(out), "-vf", mm.LABEL_FILTER, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
-                  "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", str(labelled))
+        mm.final_encode(out, labelled)
         self.assertTrue(labelled.exists(), "label step did not write the video")
         self.assertEqual(streams(labelled), {"video", "audio"})
         self.assertEqual(audio_codec(labelled), "aac")

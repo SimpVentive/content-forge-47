@@ -577,6 +577,16 @@ def assemble_pieces(norm_files, join_plan, joined_tmp):
     return join_centres
 
 
+LOUDNESS_FILTER = "loudnorm=I=-16:TP=-1.5:LRA=7"   # EBU R128: integrated -16 LUFS, true peak -1.5 dBTP, range 7 LU
+
+
+def final_encode(src, dst):
+    """The one encode of the sound, and the last encode of the picture. It burns in the AI-generated label, normalises the
+    loudness to -16 LUFS, and encodes the sound once as AAC (192 kbps, 48 kHz). Done here and nowhere else."""
+    ffmpeg("-i", str(src), "-vf", LABEL_FILTER, "-af", LOUDNESS_FILTER, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+           "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", str(dst))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--trainer", required=True, help="trainer name, or the trainer folder (--trainer-dir)")
@@ -757,9 +767,7 @@ def main():
     joined_tmp = work / f"joined-{sha([p.name for p in norm_files], [j['mode'] for j in join_plan])}.mkv"
     join_centres = assemble_pieces(norm_files, join_plan, joined_tmp)
     # The "AI-generated" label is burned into the final video itself, not only the proof copy.
-    # The one AAC encode of the sound: 192 kbps, 48 kHz.
-    ffmpeg("-i", str(joined_tmp), "-vf", LABEL_FILTER, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
-           "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", str(out_path))
+    final_encode(joined_tmp, out_path)
 
     # 7. Checks: raw change at every frame, flags above 3x the median, ghosting, and a contact sheet per join.
     sys.path.insert(0, str(ROOT / "tools"))
