@@ -111,7 +111,8 @@ def ffmpeg(*args):
 
 
 def cut_audio(src, start, end, dst):
-    ffmpeg("-ss", f"{start:.3f}", "-to", f"{end:.3f}", "-i", str(src), "-c:a", "libmp3lame", "-b:a", "128k", str(dst))
+    # WAV (16-bit, 44.1 kHz): lossless, so the voice is only encoded once, at the end.
+    ffmpeg("-ss", f"{start:.3f}", "-to", f"{end:.3f}", "-i", str(src), "-c:a", "pcm_s16le", "-ar", "44100", str(dst))
 
 
 def read_frames(path, step=1, size=(620, 930)):
@@ -453,8 +454,8 @@ def normalise_piece(src, dst, track_smooth, ref, fill=(0.0, 0.0, 0.0)):
     cap.release()
     if writer is not None:
         writer.release()
-    ffmpeg("-i", str(tmp), "-i", str(src), "-map", "0:v", "-map", "1:a?", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-           "-crf", "18", "-c:a", "aac", "-b:a", "192k", "-shortest", str(dst))
+    # No audio: the trim step takes the sound from the narration, so this file's audio is never used.
+    ffmpeg("-i", str(tmp), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-an", str(dst))
     tmp.unlink(missing_ok=True)
 
 
@@ -518,11 +519,12 @@ def trim_piece_with_narration(src, narration, piece_start, piece_end, start_s, e
     LatentSync returns its audio at 16 kHz mono, which lowers the quality of the voice, so that audio is not kept.
     piece_start and piece_end are where the piece sits in the narration (seconds). start_s and end_s are the part of
     the piece that is kept (seconds from the start of the piece)."""
-    seg = dst.with_name(dst.stem + "-narration.mp3")
+    # The intermediate is a Matroska file with uncompressed (PCM) sound, so nothing is compressed before the final encode.
+    seg = dst.with_name(dst.stem + "-narration.wav")
     cut_audio(narration, piece_start, piece_end, seg)
     ffmpeg("-i", str(src), "-i", str(seg), "-ss", f"{start_s:.4f}", "-to", f"{end_s:.4f}",
            "-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18",
-           "-c:a", "aac", "-b:a", "192k", "-ar", "44100", str(dst))
+           "-c:a", "pcm_s16le", "-ar", "44100", str(dst))
 
 
 JOIN_SEARCH = 4   # frames: how far a join may move at either side (a pause is never longer than this in the audio)
@@ -551,7 +553,8 @@ def assemble_pieces(norm_files, join_plan, joined_tmp):
     """Joins the trimmed pieces into one video at joined_tmp and returns the join centres in seconds.
     A crossfade starts at the end of the earlier clip minus the fade; a cut is a one-frame fade.
     One piece has no join. It is re-encoded with the same settings, because ffmpeg rejects an empty filter graph."""
-    out_args = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-c:a", "aac", "-b:a", "192k"]
+    # Intermediate: picture as before, sound as PCM. The one AAC encode is in the label step.
+    out_args = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-c:a", "pcm_s16le"]
     if len(norm_files) == 1:
         ffmpeg("-i", str(norm_files[0]), *out_args, str(joined_tmp))
         return []
@@ -667,7 +670,7 @@ def main():
         if synced.exists():
             info.update({"cached": True, "cost_usd": 0.0, "seconds_taken": 0.0})
         else:
-            a_path = work / f"audio-{key}.mp3"
+            a_path = work / f"audio-{key}.wav"
             v_path = work / f"base-{key}.mp4"
             cut_audio(narration, s, e, a_path)
             make_base_piece(clip, start, length, v_path)
@@ -744,18 +747,19 @@ def main():
         j["fade_frames"] = 5 if j["mode"] == "crossfade" else 1
     trimmed = []
     for k, (a, b) in enumerate(trims):
-        # The "-narr44" name is new: trims made before this change (with 16 kHz audio) are not reused.
-        dst = work / f"trim-{norm_files[k].stem}-{a}-{b}-narr44.mp4"
+        # The "-narr48" name is new: trims made before this change are not reused.
+        dst = work / f"trim-{norm_files[k].stem}-{a}-{b}-narr48.mkv"
         if not dst.exists():
             trim_piece_with_narration(norm_files[k], narration, bounds[k], bounds[k + 1], a / 25.0, b / 25.0, dst)
         trimmed.append(dst)
     norm_files = trimmed
     print("Joins: " + ", ".join(f"{j['mode']} (cost {j['pose_cost']}, drop {j['dropped_from_end_of_piece']}, skip {j['skipped_at_start_of_next']})" for j in join_plan), flush=True)
-    joined_tmp = work / f"joined-{sha([p.name for p in norm_files], [j['mode'] for j in join_plan])}.mp4"
+    joined_tmp = work / f"joined-{sha([p.name for p in norm_files], [j['mode'] for j in join_plan])}.mkv"
     join_centres = assemble_pieces(norm_files, join_plan, joined_tmp)
     # The "AI-generated" label is burned into the final video itself, not only the proof copy.
-    ffmpeg("-i", str(joined_tmp), "-vf", LABEL_FILTER, "-c:a", "copy", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-           "-crf", "18", str(out_path))
+    # The one AAC encode of the sound: 192 kbps, 48 kHz.
+    ffmpeg("-i", str(joined_tmp), "-vf", LABEL_FILTER, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+           "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", str(out_path))
 
     # 7. Checks: raw change at every frame, flags above 3x the median, ghosting, and a contact sheet per join.
     sys.path.insert(0, str(ROOT / "tools"))

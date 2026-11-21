@@ -16,8 +16,23 @@ PIECE_SECONDS = 4.0
 
 
 def make_sample(path):
+    # The pieces are the trimmed intermediates: picture as encoded, sound as PCM in a Matroska file.
     mm.ffmpeg("-f", "lavfi", "-i", "testsrc2=size=320x240:rate=25", "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=44100",
-              "-t", str(PIECE_SECONDS), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", str(path))
+              "-t", str(PIECE_SECONDS), "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "pcm_s16le", "-shortest", str(path))
+
+
+def audio_codec(path):
+    """The codec of the first audio stream, or None."""
+    err = subprocess.run([mm.FF, "-i", str(path)], capture_output=True, text=True).stderr
+    m = re.search(r"Audio: (\w+)", err)
+    return m.group(1) if m else None
+
+
+def audio_rate(path):
+    """The sample rate of the first audio stream, or None."""
+    err = subprocess.run([mm.FF, "-i", str(path)], capture_output=True, text=True).stderr
+    m = re.search(r"Audio:.*?(\d{4,6}) Hz", err)
+    return int(m.group(1)) if m else None
 
 
 def streams(path):
@@ -42,7 +57,7 @@ class JoinTests(unittest.TestCase):
         cls.dir = Path(tempfile.mkdtemp(prefix="make_module_join_"))
         cls.pieces = []
         for i in range(3):
-            p = cls.dir / f"piece{i}.mp4"
+            p = cls.dir / f"piece{i}.mkv"
             make_sample(p)
             cls.pieces.append(p)
 
@@ -51,7 +66,7 @@ class JoinTests(unittest.TestCase):
         shutil.rmtree(cls.dir, ignore_errors=True)
 
     def assemble(self, n, modes):
-        out = self.dir / f"joined-{n}-{'-'.join(modes)}.mp4"
+        out = self.dir / f"joined-{n}-{'-'.join(modes)}.mkv"
         centres = mm.assemble_pieces(self.pieces[:n], plan(modes), out)
         return out, centres
 
@@ -69,11 +84,15 @@ class JoinTests(unittest.TestCase):
         self.assertGreater(result["frames"], 0)
         self.assertEqual(result["joins"], [])
         self.assertIsNone(result["max_change_at_joins"])
+        self.assertEqual(audio_codec(out), "pcm_s16le", "the intermediate keeps the sound uncompressed")
         labelled = self.dir / "labelled-one-piece.mp4"
-        mm.ffmpeg("-i", str(out), "-vf", mm.LABEL_FILTER, "-c:a", "copy", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-                  "-crf", "18", str(labelled))
+        # The label step is the one AAC encode: 192 kbps, 48 kHz.
+        mm.ffmpeg("-i", str(out), "-vf", mm.LABEL_FILTER, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
+                  "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", str(labelled))
         self.assertTrue(labelled.exists(), "label step did not write the video")
         self.assertEqual(streams(labelled), {"video", "audio"})
+        self.assertEqual(audio_codec(labelled), "aac")
+        self.assertEqual(audio_rate(labelled), 48000)
 
     def test_two_pieces_one_crossfade(self):
         out, centres = self.assemble(2, ["crossfade"])
