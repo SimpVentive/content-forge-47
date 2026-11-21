@@ -508,12 +508,6 @@ def read_frame_at(path, index):
     return f if ok else None
 
 
-def trim_piece(src, start_s, end_s, dst):
-    """Keep video and audio from start_s to end_s (seconds), so they stay in step."""
-    ffmpeg("-i", str(src), "-ss", f"{start_s:.4f}", "-to", f"{end_s:.4f}", "-c:v", "libx264", "-pix_fmt", "yuv420p",
-           "-crf", "18", "-c:a", "aac", "-b:a", "192k", str(dst))
-
-
 def trim_piece_with_narration(src, narration, piece_start, piece_end, start_s, end_s, dst):
     """Keep the picture from src, and take the sound from the narration itself, at 44.1 kHz.
     LatentSync returns its audio at 16 kHz mono, which lowers the quality of the voice, so that audio is not kept.
